@@ -1,0 +1,460 @@
+# Story 01.8 - Frontend Specification
+# Purpose: Components, hooks, types, UX
+# Agent: FRONTEND-DEV
+
+is_backend_focused: false
+is_fullstack: true
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/warehouse.ts"
+    content: |
+      export type WarehouseType =
+        | 'GENERAL'
+        | 'RAW_MATERIALS'
+        | 'WIP'
+        | 'FINISHED_GOODS'
+        | 'QUARANTINE';
+
+      export interface Warehouse {
+        id: string;
+        org_id: string;
+        code: string;
+        name: string;
+        type: WarehouseType;
+        address: string | null;
+        contact_email: string | null;
+        contact_phone: string | null;
+        is_default: boolean;
+        is_active: boolean;
+        location_count: number;
+        disabled_at: string | null;
+        disabled_by: string | null;
+        created_at: string;
+        updated_at: string;
+        created_by: string;
+        updated_by: string;
+      }
+
+      export interface WarehouseListParams {
+        search?: string;
+        type?: WarehouseType;
+        status?: 'active' | 'disabled';
+        sort?: 'code' | 'name' | 'type' | 'location_count' | 'created_at';
+        order?: 'asc' | 'desc';
+        page?: number;
+        limit?: number;
+      }
+
+      export interface CreateWarehouseInput {
+        code: string;
+        name: string;
+        type: WarehouseType;
+        address?: string | null;
+        contact_email?: string | null;
+        contact_phone?: string | null;
+        is_active?: boolean;
+      }
+
+      export interface UpdateWarehouseInput {
+        code?: string;
+        name?: string;
+        type?: WarehouseType;
+        address?: string | null;
+        contact_email?: string | null;
+        contact_phone?: string | null;
+        is_active?: boolean;
+      }
+
+      export const WAREHOUSE_TYPE_LABELS: Record<WarehouseType, string> = {
+        GENERAL: 'General',
+        RAW_MATERIALS: 'Raw Materials',
+        WIP: 'WIP',
+        FINISHED_GOODS: 'Finished Goods',
+        QUARANTINE: 'Quarantine',
+      };
+
+      export const WAREHOUSE_TYPE_DESCRIPTIONS: Record<WarehouseType, string> = {
+        GENERAL: 'Multi-purpose warehouse',
+        RAW_MATERIALS: 'Incoming ingredients and materials',
+        WIP: 'Work in progress inventory',
+        FINISHED_GOODS: 'Completed products ready for shipping',
+        QUARANTINE: 'Items on hold for quality inspection',
+      };
+
+      export const WAREHOUSE_TYPE_COLORS = {
+        GENERAL: { bg: 'bg-blue-100', text: 'text-blue-800' },
+        RAW_MATERIALS: { bg: 'bg-green-100', text: 'text-green-800' },
+        WIP: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+        FINISHED_GOODS: { bg: 'bg-purple-100', text: 'text-purple-800' },
+        QUARANTINE: { bg: 'bg-red-100', text: 'text-red-800' },
+      };
+
+# React Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-warehouses.ts"
+    description: "React Query hook for warehouse list"
+    exports:
+      - name: "useWarehouses"
+        params: ["params: WarehouseListParams"]
+        returns: "UseQueryResult<PaginatedResult<Warehouse>>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { WarehouseService } from '@/lib/services/warehouse-service';
+
+      export function useWarehouses(params: WarehouseListParams = {}) {
+        return useQuery({
+          queryKey: ['warehouses', params],
+          queryFn: () => WarehouseService.list(params),
+          staleTime: 2 * 60 * 1000, // 2 minutes
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-warehouse.ts"
+    description: "React Query hook for single warehouse"
+    exports:
+      - name: "useWarehouse"
+        params: ["id: string"]
+        returns: "UseQueryResult<Warehouse>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { WarehouseService } from '@/lib/services/warehouse-service';
+
+      export function useWarehouse(id: string) {
+        return useQuery({
+          queryKey: ['warehouse', id],
+          queryFn: () => WarehouseService.getById(id),
+          enabled: !!id,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-warehouse-mutations.ts"
+    description: "React Query mutations for warehouse CRUD"
+    exports:
+      - name: "useCreateWarehouse"
+      - name: "useUpdateWarehouse"
+      - name: "useDeleteWarehouse"
+      - name: "useSetDefaultWarehouse"
+      - name: "useDisableWarehouse"
+      - name: "useEnableWarehouse"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { WarehouseService } from '@/lib/services/warehouse-service';
+
+      export function useCreateWarehouse() {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: WarehouseService.create,
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+          },
+        });
+      }
+
+      export function useSetDefaultWarehouse() {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: WarehouseService.setDefault,
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+          },
+        });
+      }
+
+# Page Component
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/warehouses/page.tsx"
+    description: "Warehouse list page with DataTable"
+    wireframe: "SET-012"
+    structure: |
+      export default function WarehousesPage() {
+        return (
+          <div className="container mx-auto py-6">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold">Warehouses</h1>
+              <Button onClick={handleAddWarehouse}>+ Add Warehouse</Button>
+            </div>
+
+            <WarehouseFilters />
+            <WarehousesDataTable />
+          </div>
+        );
+      }
+
+# UI Components
+components:
+  - name: "WarehousesDataTable"
+    path: "apps/frontend/components/settings/warehouses/WarehousesDataTable.tsx"
+    description: "Main data table with sorting, filtering, pagination"
+    wireframe: "SET-012"
+    props:
+      - name: "warehouses"
+        type: "Warehouse[]"
+      - name: "loading"
+        type: "boolean"
+      - name: "pagination"
+        type: "PaginationState"
+    features:
+      - "ShadCN DataTable pattern"
+      - "Column sorting (code, name, type, location_count)"
+      - "Search by code/name"
+      - "Filter by type and status"
+      - "Actions menu per row (edit, set default, disable)"
+      - "Default warehouse badge (gold star icon)"
+      - "Status badge (active/disabled)"
+      - "Type badge with colors"
+      - "Secondary row showing truncated address"
+
+  - name: "WarehouseModal"
+    path: "apps/frontend/components/settings/warehouses/WarehouseModal.tsx"
+    description: "Create/Edit modal form"
+    wireframe: "SET-013"
+    props:
+      - name: "mode"
+        type: "'create' | 'edit'"
+      - name: "warehouse"
+        type: "Warehouse | null"
+      - name: "open"
+        type: "boolean"
+      - name: "onClose"
+        type: "() => void"
+      - name: "onSuccess"
+        type: "(warehouse: Warehouse) => void"
+    features:
+      - "ShadCN Dialog component"
+      - "React Hook Form with Zod validation"
+      - "Code field with real-time uniqueness validation (debounced)"
+      - "Code immutability warning when inventory exists"
+      - "Type dropdown with tooltips"
+      - "3-line address textarea with char counter (500 max)"
+      - "Contact email + phone fields"
+      - "Active checkbox"
+      - "Loading state on submit"
+      - "Error toast on validation failure"
+      - "Success toast on save"
+
+  - name: "WarehouseRow"
+    path: "apps/frontend/components/settings/warehouses/WarehouseRow.tsx"
+    description: "Single warehouse row with secondary line"
+    props:
+      - name: "warehouse"
+        type: "Warehouse"
+      - name: "onEdit"
+        type: "() => void"
+      - name: "onSetDefault"
+        type: "() => void"
+      - name: "onDisable"
+        type: "() => void"
+    structure: |
+      <TableRow>
+        <TableCell>
+          <div>{warehouse.code}</div>
+          <div className="text-sm text-gray-500">{truncateAddress(warehouse.address)}</div>
+        </TableCell>
+        <TableCell>{warehouse.name}</TableCell>
+        <TableCell><WarehouseTypeBadge type={warehouse.type} /></TableCell>
+        <TableCell>{warehouse.location_count}</TableCell>
+        <TableCell>{warehouse.is_default && <Star className="text-yellow-500" />}</TableCell>
+        <TableCell><WarehouseStatusBadge status={warehouse.is_active ? 'active' : 'disabled'} /></TableCell>
+        <TableCell><WarehouseActionsMenu warehouse={warehouse} /></TableCell>
+      </TableRow>
+
+  - name: "WarehouseTypeBadge"
+    path: "apps/frontend/components/settings/warehouses/WarehouseTypeBadge.tsx"
+    description: "Badge component for warehouse type with color coding"
+    props:
+      - name: "type"
+        type: "WarehouseType"
+    colors:
+      GENERAL: "bg-blue-100 text-blue-800"
+      RAW_MATERIALS: "bg-green-100 text-green-800"
+      WIP: "bg-yellow-100 text-yellow-800"
+      FINISHED_GOODS: "bg-purple-100 text-purple-800"
+      QUARANTINE: "bg-red-100 text-red-800"
+
+  - name: "WarehouseStatusBadge"
+    path: "apps/frontend/components/settings/warehouses/WarehouseStatusBadge.tsx"
+    description: "Badge for active/disabled status"
+    props:
+      - name: "status"
+        type: "'active' | 'disabled'"
+    colors:
+      active: "bg-green-100 text-green-800"
+      disabled: "bg-gray-100 text-gray-800"
+
+  - name: "WarehouseActionsMenu"
+    path: "apps/frontend/components/settings/warehouses/WarehouseActionsMenu.tsx"
+    description: "Dropdown menu with row actions"
+    props:
+      - name: "warehouse"
+        type: "Warehouse"
+    actions:
+      - "Edit - Opens WarehouseModal in edit mode"
+      - "Set as Default - Opens confirmation dialog, calls setDefault mutation"
+      - "Disable - Opens confirmation dialog with inventory check, calls disable mutation"
+      - "Enable - Calls enable mutation (only shown if disabled)"
+    permissions:
+      - "Edit: ADMIN, WAREHOUSE_MANAGER"
+      - "Set Default: ADMIN, WAREHOUSE_MANAGER"
+      - "Disable/Enable: ADMIN, WAREHOUSE_MANAGER"
+
+  - name: "WarehouseFilters"
+    path: "apps/frontend/components/settings/warehouses/WarehouseFilters.tsx"
+    description: "Search and filter controls"
+    features:
+      - "Search input (debounced, min 2 chars)"
+      - "Type dropdown filter (All, General, Raw Materials, WIP, Finished Goods, Quarantine)"
+      - "Status dropdown filter (All, Active, Disabled)"
+      - "Clear filters button"
+
+  - name: "SetDefaultConfirmDialog"
+    path: "apps/frontend/components/settings/warehouses/SetDefaultConfirmDialog.tsx"
+    description: "Confirmation dialog for setting default warehouse"
+    props:
+      - name: "warehouse"
+        type: "Warehouse"
+      - name: "open"
+        type: "boolean"
+      - name: "onConfirm"
+        type: "() => void"
+      - name: "onCancel"
+        type: "() => void"
+    content: "Set {warehouse.code} as default warehouse? The current default will be unset."
+
+  - name: "DisableConfirmDialog"
+    path: "apps/frontend/components/settings/warehouses/DisableConfirmDialog.tsx"
+    description: "Confirmation dialog for disabling warehouse"
+    props:
+      - name: "warehouse"
+        type: "Warehouse"
+      - name: "open"
+        type: "boolean"
+      - name: "onConfirm"
+        type: "() => void"
+      - name: "onCancel"
+        type: "() => void"
+    features:
+      - "Shows warning if warehouse has active inventory"
+      - "Shows error if warehouse is default"
+      - "Calls canDisable service method before allowing confirmation"
+
+  - name: "WarehouseTypeSelect"
+    path: "apps/frontend/components/settings/warehouses/WarehouseTypeSelect.tsx"
+    description: "Dropdown select with tooltips explaining each type"
+    props:
+      - name: "value"
+        type: "WarehouseType"
+      - name: "onChange"
+        type: "(value: WarehouseType) => void"
+    features:
+      - "ShadCN Select component"
+      - "Tooltips on hover showing type descriptions"
+      - "Badge with color coding for each option"
+
+  - name: "WarehouseAddressSection"
+    path: "apps/frontend/components/settings/warehouses/WarehouseAddressSection.tsx"
+    description: "Multi-line address input with character counter"
+    props:
+      - name: "value"
+        type: "string"
+      - name: "onChange"
+        type: "(value: string) => void"
+      - name: "error"
+        type: "string | undefined"
+    features:
+      - "Textarea with 3 rows"
+      - "Character counter (0/500)"
+      - "Red counter when approaching limit"
+      - "Validation error display"
+
+  - name: "WarehouseContactSection"
+    path: "apps/frontend/components/settings/warehouses/WarehouseContactSection.tsx"
+    description: "Email and phone inputs with validation"
+    props:
+      - name: "email"
+        type: "string"
+      - name: "phone"
+        type: "string"
+      - name: "onEmailChange"
+        type: "(value: string) => void"
+      - name: "onPhoneChange"
+        type: "(value: string) => void"
+      - name: "errors"
+        type: "{ email?: string; phone?: string }"
+    features:
+      - "Email input with format validation"
+      - "Phone input with max 20 chars"
+      - "Inline error messages"
+
+# UX States
+ux:
+  wireframes:
+    - id: "SET-012"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-012-warehouse-list.md"
+      description: "Warehouse list page"
+      components: ["WarehousesDataTable", "WarehouseFilters", "WarehouseRow", "WarehouseActionsMenu"]
+
+    - id: "SET-013"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-013-warehouse-create-edit-modal.md"
+      description: "Warehouse create/edit modal"
+      components: ["WarehouseModal", "WarehouseTypeSelect", "WarehouseAddressSection", "WarehouseContactSection"]
+
+  states:
+    - state: "loading"
+      description: "Show skeleton loaders in table rows"
+      trigger: "Initial page load or filter change"
+
+    - state: "empty"
+      description: "Show empty state with 'Add Warehouse' CTA"
+      trigger: "No warehouses exist or no results after filter"
+      message: "No warehouses found. Add your first warehouse to get started."
+
+    - state: "error"
+      description: "Show error alert above table"
+      trigger: "API request fails"
+      message: "Failed to load warehouses. Please try again."
+
+    - state: "success"
+      description: "Show data table with results"
+      trigger: "Data loaded successfully"
+
+  patterns:
+    table: "ShadCN DataTable with TanStack Table"
+    modal: "ShadCN Dialog with React Hook Form"
+    toast: "ShadCN Toast for success/error messages"
+    confirmation: "ShadCN AlertDialog for destructive actions"
+
+# Accessibility
+accessibility:
+  - "Keyboard navigation: Tab through table rows, Enter to open actions menu"
+  - "Screen reader: ARIA labels on all interactive elements"
+  - "Focus management: Return focus to trigger button after modal close"
+  - "Error announcements: Use aria-live regions for validation errors"
+  - "Default warehouse: aria-label='Default warehouse' on star icon"
+  - "Type badges: Include sr-only text with full type description"
+
+# Validation UI
+validation_ui:
+  code:
+    - "Real-time uniqueness check (debounced 300ms)"
+    - "Format validation: uppercase alphanumeric + hyphens"
+    - "Inline error message below input"
+    - "Auto-uppercase transformation on blur"
+
+  email:
+    - "Format validation on blur"
+    - "Inline error message"
+    - "Optional field indicator"
+
+  address:
+    - "Character counter always visible"
+    - "Red counter when > 450 chars"
+    - "Inline error on exceed 500"
+
+# Performance
+performance:
+  - "Debounce search input: 300ms"
+  - "Debounce code validation: 300ms"
+  - "Optimistic updates for toggle actions (set default, disable/enable)"
+  - "React Query caching: 2 minutes stale time"
+  - "Virtualize table rows if > 100 items (TanStack Virtual)"

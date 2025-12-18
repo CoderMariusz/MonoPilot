@@ -1,0 +1,596 @@
+# Story 07.5 - Frontend Specification (PRIMARY)
+# Purpose: Clone dialog, import dialog, preview table, result summary components
+# Agent: FRONTEND-DEV
+# Note: This is the PRIMARY specification for user-facing features
+
+is_frontend_focused: true
+
+# Components
+
+components:
+  - path: "apps/frontend/components/shipping/sales-orders/CloneOrderDialog.tsx"
+    description: "Confirmation dialog for cloning SO"
+    props:
+      - "isOpen: boolean"
+      - "soNumber: string (original SO number)"
+      - "onConfirm: () => Promise<void>"
+      - "onCancel: () => void"
+      - "isLoading?: boolean"
+    features:
+      - "Shows SO number being cloned"
+      - "Confirmation message"
+      - "Cancel and Confirm buttons"
+      - "Loading state with spinner during clone"
+      - "Error message display if clone fails"
+    states:
+      - "idle: Dialog open with clickable buttons"
+      - "loading: Confirm button disabled, spinner shown"
+      - "success: Auto-close after 1 second"
+      - "error: Show error message with Retry button"
+    pattern: |
+      'use client';
+
+      import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+      import { Button } from '@/components/ui/button';
+      import { Loader2 } from 'lucide-react';
+      import { useState } from 'react';
+
+      interface Props {
+        isOpen: boolean;
+        soNumber: string;
+        onConfirm: () => Promise<void>;
+        onCancel: () => void;
+        isLoading?: boolean;
+      }
+
+      export function CloneOrderDialog({ isOpen, soNumber, onConfirm, onCancel, isLoading }: Props) {
+        const [error, setError] = useState<string | null>(null);
+
+        const handleConfirm = async () => {
+          try {
+            setError(null);
+            await onConfirm();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to clone order');
+          }
+        };
+
+        return (
+          <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clone Sales Order</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Clone <span className="font-medium">{soNumber}</span>? A new draft order will be created with the same customer and products.
+                </p>
+                {error && (
+                  <div className="rounded-md bg-red-50 p-3">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={onCancel} disabled={isLoading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleConfirm} disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Cloning...
+                    </>
+                  ) : (
+                    'Clone'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      }
+
+  - path: "apps/frontend/components/shipping/sales-orders/ImportOrdersDialog.tsx"
+    description: "File upload and preview dialog for CSV import"
+    props:
+      - "isOpen: boolean"
+      - "onClose: () => void"
+      - "onImport: (file: File) => Promise<ImportResult>"
+    features:
+      - "File dropzone with drag-and-drop"
+      - "CSV format instructions"
+      - "Download sample CSV template"
+      - "File selection validation"
+      - "Error messages for invalid file"
+      - "Upload progress indicator"
+      - "Transitions to preview after file parse"
+    states:
+      - "upload: File dropzone visible"
+      - "parsing: Loading spinner while parsing CSV"
+      - "preview: Shows ImportPreviewTable with validation results"
+      - "importing: Preview table disabled, import button shows spinner"
+      - "error: Show error message with retry option"
+    pattern: |
+      'use client';
+
+      import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+      import { useState } from 'react';
+      import { Upload } from 'lucide-react';
+      import { Button } from '@/components/ui/button';
+      import { ImportPreviewTable } from './ImportPreviewTable';
+      import { ImportResultSummary } from './ImportResultSummary';
+
+      interface Props {
+        isOpen: boolean;
+        onClose: () => void;
+        onImport: (file: File) => Promise<ImportResult>;
+      }
+
+      export function ImportOrdersDialog({ isOpen, onClose, onImport }: Props) {
+        const [step, setStep] = useState<'upload' | 'preview' | 'result'>('upload');
+        const [file, setFile] = useState<File | null>(null);
+        const [isLoading, setIsLoading] = useState(false);
+        const [result, setResult] = useState<ImportResult | null>(null);
+        const [error, setError] = useState<string | null>(null);
+
+        const handleFileDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          const droppedFile = e.dataTransfer.files?.[0];
+          if (droppedFile) {
+            validateAndSetFile(droppedFile);
+          }
+        };
+
+        const validateAndSetFile = (f: File) => {
+          if (!f.name.endsWith('.csv')) {
+            setError('Only CSV files are supported');
+            return;
+          }
+          if (f.size > 5 * 1024 * 1024) {
+            setError('File is too large (max 5 MB)');
+            return;
+          }
+          setError(null);
+          setFile(f);
+          handleImportClick(f);
+        };
+
+        const handleImportClick = async (f: File) => {
+          setIsLoading(true);
+          try {
+            const importResult = await onImport(f);
+            setResult(importResult);
+            setStep('result');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Import failed');
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        const handleClose = () => {
+          setStep('upload');
+          setFile(null);
+          setResult(null);
+          setError(null);
+          onClose();
+        };
+
+        return (
+          <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {step === 'upload' && 'Import Sales Orders'}
+                  {step === 'preview' && 'Review Import Preview'}
+                  {step === 'result' && 'Import Complete'}
+                </DialogTitle>
+              </DialogHeader>
+
+              {step === 'upload' && (
+                <div className="space-y-4">
+                  <div
+                    onDrop={handleFileDrop}
+                    onDragOver={(e) => e.preventDefault()}
+                    className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center hover:border-gray-400"
+                  >
+                    <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                    <p className="mt-2 text-sm font-medium text-gray-700">Drag and drop CSV file</p>
+                    <p className="text-xs text-gray-500">or click to select file</p>
+                  </div>
+                  {error && <div className="rounded-md bg-red-50 p-3"><p className="text-sm text-red-800">{error}</p></div>}
+                  <div className="text-sm text-gray-600">
+                    <p className="font-medium mb-2">CSV Format:</p>
+                    <code className="block bg-gray-50 p-2 rounded text-xs mb-2">
+                      customer_code,product_code,quantity,unit_price
+                    </code>
+                    <Button variant="outline" size="sm">Download Sample CSV</Button>
+                  </div>
+                </div>
+              )}
+
+              {step === 'result' && result && (
+                <ImportResultSummary result={result} onClose={handleClose} />
+              )}
+            </DialogContent>
+          </Dialog>
+        );
+      }
+
+  - path: "apps/frontend/components/shipping/sales-orders/ImportPreviewTable.tsx"
+    description: "Preview table showing CSV rows with validation status"
+    props:
+      - "rows: CSVPreviewRow[] (parsed and validated rows)"
+      - "isImporting?: boolean"
+      - "onImport: () => Promise<void>"
+      - "onCancel: () => void"
+    features:
+      - "Table with 6 columns: Status (icon), Customer, Product, Qty, Unit Price, Error (if any)"
+      - "Green checkmark for valid rows"
+      - "Red X with error message for invalid rows"
+      - "Row count badge showing valid/total"
+      - "Scrollable container for many rows"
+      - "Error details in tooltip on hover"
+    states:
+      - "idle: Table visible, Import button enabled"
+      - "importing: Table disabled, Import button shows spinner"
+      - "error: Show error under Import button"
+    pattern: |
+      'use client';
+
+      import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+      import { Check, X } from 'lucide-react';
+      import { Button } from '@/components/ui/button';
+      import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+      interface CSVPreviewRow {
+        row: number;
+        customer_code: string;
+        product_code: string;
+        quantity: string;
+        unit_price?: string;
+        valid: boolean;
+        error?: string;
+      }
+
+      interface Props {
+        rows: CSVPreviewRow[];
+        isImporting?: boolean;
+        onImport: () => Promise<void>;
+        onCancel: () => void;
+      }
+
+      export function ImportPreviewTable({ rows, isImporting, onImport, onCancel }: Props) {
+        const validCount = rows.filter(r => r.valid).length;
+
+        return (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">{validCount}</span> of <span className="font-medium">{rows.length}</span> rows valid
+              </p>
+            </div>
+
+            <div className="border rounded-lg overflow-auto max-h-96">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">Status</TableHead>
+                    <TableHead>Customer Code</TableHead>
+                    <TableHead>Product Code</TableHead>
+                    <TableHead>Qty</TableHead>
+                    <TableHead>Unit Price</TableHead>
+                    <TableHead>Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow key={row.row} className={row.valid ? 'bg-green-50' : 'bg-red-50'}>
+                      <TableCell>
+                        {row.valid ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <X className="h-4 w-4 text-red-600" />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{row.customer_code}</TableCell>
+                      <TableCell className="text-sm">{row.product_code}</TableCell>
+                      <TableCell className="text-sm">{row.quantity}</TableCell>
+                      <TableCell className="text-sm">{row.unit_price || '(default)'}</TableCell>
+                      <TableCell className="text-sm">
+                        {row.error && (
+                          <Tooltip>
+                            <TooltipTrigger className="text-red-600 underline">Error</TooltipTrigger>
+                            <TooltipContent>{row.error}</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={onCancel} disabled={isImporting}>Cancel</Button>
+              <Button onClick={onImport} disabled={isImporting || validCount === 0}>
+                {isImporting ? 'Importing...' : `Import ${validCount} Order${validCount !== 1 ? 's' : ''}`}
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/components/shipping/sales-orders/ImportResultSummary.tsx"
+    description: "Summary of import results with success/error counts"
+    props:
+      - "result: ImportResult"
+      - "onClose: () => void"
+    features:
+      - "Success/error summary statistics"
+      - "List of created order numbers"
+      - "Error details for failed rows"
+      - "View Orders button (navigates to list)"
+      - "Download error report (CSV)"
+    pattern: |
+      'use client';
+
+      import { Button } from '@/components/ui/button';
+      import { useRouter } from 'next/navigation';
+      import { Download, CheckCircle, AlertCircle } from 'lucide-react';
+
+      interface Props {
+        result: ImportResult;
+        onClose: () => void;
+      }
+
+      export function ImportResultSummary({ result, onClose }: Props) {
+        const router = useRouter();
+
+        return (
+          <div className="space-y-6">
+            {result.summary.errors_count === 0 ? (
+              <div className="rounded-lg bg-green-50 p-4 flex gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-green-900">Import successful</p>
+                  <p className="text-sm text-green-800">
+                    {result.summary.orders_created} order{result.summary.orders_created !== 1 ? 's' : ''} created with {result.summary.lines_imported} line{result.summary.lines_imported !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-yellow-50 p-4 flex gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-yellow-900">Import completed with errors</p>
+                  <p className="text-sm text-yellow-800">
+                    {result.summary.orders_created} order{result.summary.orders_created !== 1 ? 's' : ''} created, {result.summary.errors_count} row{result.summary.errors_count !== 1 ? 's' : ''} skipped
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {result.created_orders.length > 0 && (
+              <div>
+                <p className="font-medium text-sm mb-3">Created Orders:</p>
+                <ul className="space-y-2">
+                  {result.created_orders.map((order) => (
+                    <li key={order.id} className="text-sm text-gray-700">
+                      <span className="font-medium">{order.order_number}</span> - {order.customer_code} ({order.lines_count} line{order.lines_count !== 1 ? 's' : ''})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {result.errors.length > 0 && (
+              <div>
+                <p className="font-medium text-sm mb-3">Errors:</p>
+                <div className="bg-red-50 rounded-lg p-3 max-h-48 overflow-auto space-y-1">
+                  {result.errors.map((err, idx) => (
+                    <p key={idx} className="text-xs text-red-700">
+                      <span className="font-medium">Row {err.row}:</span> {err.error}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-4">
+              {result.errors.length > 0 && (
+                <Button variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Errors
+                </Button>
+              )}
+              <Button variant="outline" onClick={onClose}>Close</Button>
+              <Button onClick={() => router.push('/shipping/sales-orders?created=today')}>
+                View Orders
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+# Hooks
+
+hooks:
+  - path: "apps/frontend/lib/hooks/useCloneSalesOrder.ts"
+    description: "Hook for cloning a sales order"
+    signature: "useCloneSalesOrder(): { clone: (soId: string) => Promise<ClonedSalesOrderResponse>, isLoading: boolean, error: string | null }"
+    pattern: |
+      'use client';
+
+      import { useMutation } from '@tanstack/react-query';
+      import { api } from '@/lib/api';
+      import { useState } from 'react';
+
+      export function useCloneSalesOrder() {
+        const [error, setError] = useState<string | null>(null);
+
+        const mutation = useMutation({
+          mutationFn: async (soId: string) => {
+            const response = await api.post(`/api/shipping/sales-orders/${soId}/clone`);
+            return response.data;
+          },
+          onError: (err) => {
+            const message = err instanceof Error ? err.message : 'Failed to clone order';
+            setError(message);
+          },
+        });
+
+        return {
+          clone: mutation.mutate,
+          isLoading: mutation.isPending,
+          error,
+        };
+      }
+
+  - path: "apps/frontend/lib/hooks/useImportSalesOrders.ts"
+    description: "Hook for importing sales orders from CSV"
+    signature: "useImportSalesOrders(): { import: (file: File) => Promise<ImportResult>, isLoading: boolean, error: string | null }"
+
+# UI Integration
+
+ui_integration:
+  so_detail_page:
+    location: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/page.tsx"
+    add_component: "CloneOrderDialog"
+    placement: "Top right of SO header (near action buttons)"
+    visibility: "Always visible (all SO statuses)"
+    permission: "SALES, MANAGER, ADMIN, SUPER_ADMIN roles"
+
+  so_list_page:
+    location: "apps/frontend/app/(authenticated)/shipping/sales-orders/page.tsx"
+    add_component: "ImportOrdersDialog"
+    placement: "Top right toolbar (near Create New SO button)"
+    visibility: "Only for authorized roles"
+    permission: "SALES, MANAGER, ADMIN, SUPER_ADMIN roles"
+
+# UX Specification
+
+ux:
+  wireframes:
+    - id: "SHIP-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-006-sales-order-create.md"
+      focus: "Create wizard with Clone/Template tabs (Phase 2: templates only)"
+    - id: "SHIP-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-007-sales-order-detail.md"
+      focus: "Clone button in SO detail page header"
+
+  clone_workflow:
+    step_1: "User opens SO detail page (any status)"
+    step_2: "User clicks Clone Order button (top right)"
+    step_3: "CloneOrderDialog appears with confirmation message"
+    step_4: "User clicks Confirm or Cancel"
+    step_5_success: "Clone API called, dialog shows loading spinner"
+    step_6_success: "New SO created, user redirected to new SO detail page"
+    step_7_success: "Toast notification: 'Cloned from SO-2025-00123'"
+
+  import_workflow:
+    step_1: "User navigates to SO list page"
+    step_2: "User clicks Import Orders button (top toolbar)"
+    step_3: "ImportOrdersDialog opens with file upload area"
+    step_4: "User drags/drops or selects CSV file"
+    step_5: "File parsed and validated (shows ImportPreviewTable)"
+    step_6: "User reviews preview table (green check for valid rows, red X for errors)"
+    step_7: "User clicks Import button"
+    step_8_success: "Batch import API called, preview table disabled"
+    step_9_success: "SOs created, ImportResultSummary shows results"
+    step_10_success: "User can click View Orders to see new SOs"
+
+  states:
+    clone_dialog:
+      - "idle: Dialog open with Cancel and Clone buttons"
+      - "loading: Clone button disabled with spinner"
+      - "error: Error message displayed with Retry option"
+      - "success: Auto-close after toast notification"
+
+    import_dialog_upload:
+      - "empty: File dropzone visible"
+      - "error: Red error message with retry option"
+      - "loading: Upload progress spinner"
+
+    import_dialog_preview:
+      - "idle: Preview table visible, Import button enabled"
+      - "importing: Preview table dimmed, Import button disabled with spinner"
+
+  validation_feedback:
+    clone_errors:
+      - "SO not found: 'Sales order not found (may be from another organization)'"
+      - "Permission: 'You do not have permission to clone this order'"
+      - "Network: 'Failed to clone order. Check your connection and try again'"
+
+    import_errors:
+      - "Empty file: 'CSV file is empty'"
+      - "Invalid format: 'Missing required columns: customer_code, product_code, quantity'"
+      - "Invalid file: 'Only CSV files (.csv) are supported'"
+      - "Too large: 'File size must be <= 5 MB'"
+      - "Parse error: Display row-level validation errors in preview table"
+
+# Accessibility
+
+accessibility:
+  clone_dialog:
+    role: "dialog"
+    aria_modal: "true"
+    aria_labelledby: "Clone Order confirmation"
+    focus_management: "Focus on Confirm button (safer default)"
+    keyboard: "Enter to confirm, Escape to cancel"
+
+  import_dialog:
+    role: "dialog"
+    aria_modal: "true"
+    aria_labelledby: "Import Sales Orders"
+    dropzone_aria_label: "Drag and drop CSV file or click to select"
+    file_input_aria_label: "Select CSV file for upload"
+    keyboard: "Tab through dropzone and buttons"
+
+  preview_table:
+    role: "table"
+    aria_rowcount: "Total rows in table"
+    aria_colcount: "6 columns"
+    status_icons: "aria-label for check (valid) and X (error) icons"
+    error_tooltip: "Accessible tooltip with error message on hover"
+
+  focus_management:
+    clone_dialog: "Focus on Confirm button on open"
+    import_dialog_upload: "Focus on file input on open"
+    import_dialog_preview: "Focus on Import button when table loaded"
+    import_result: "Focus on Close button on completion"
+
+# Responsive Design
+
+responsive:
+  mobile_below_768px:
+    clone_dialog: "Full-width modal with stacked buttons"
+    import_dropzone: "Full-width dropzone with touch-friendly target"
+    preview_table: "Scrollable table with smaller font"
+    result_summary: "Stacked layout with smaller margins"
+
+  tablet_768_1024px:
+    clone_dialog: "Modal width 90vw with side-by-side buttons"
+    import_dropzone: "Wider dropzone area"
+    preview_table: "Full-width table with horizontal scroll if needed"
+
+  desktop_above_1024px:
+    clone_dialog: "Modal width 500px, centered"
+    import_dialog: "Modal width 800px (fits preview table)"
+    preview_table: "Full-width table with all columns visible"
+
+# CSS Classes (TailwindCSS)
+
+tailwind_classes:
+  button_primary: "bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2"
+  button_outline: "border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md px-4 py-2"
+  button_disabled: "opacity-50 cursor-not-allowed"
+  dialog_overlay: "fixed inset-0 bg-black/50 z-50"
+  dialog_content: "bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto"
+  error_message: "rounded-md bg-red-50 p-3 text-sm text-red-800"
+  success_message: "rounded-md bg-green-50 p-3 text-sm text-green-800"
+  loading_spinner: "animate-spin"
+  table_row_valid: "bg-green-50"
+  table_row_error: "bg-red-50"
+

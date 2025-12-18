@@ -1,0 +1,21 @@
+{
+  "exportDate": "2025-12-11T20:13:24+00:00",
+  "archiveFile": "test_backup.tar.gz",
+  "archiveSize": "56K",
+  "contents": {
+    "coldCache": {
+      "entries": 1,
+      "size": "1.0K"
+    },
+    "semanticCache": {
+      "size": "790K"
+    },
+    "qaPatterns": {
+      "size": "0"
+    },
+    "logs": {
+      "size": "5.0K"
+    }
+  },
+  "version": "2.0.0"
+}

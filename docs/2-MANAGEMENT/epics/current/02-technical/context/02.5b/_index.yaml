@@ -1,0 +1,164 @@
+# Story 02.5b - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+# Phase: 1B (NOT MVP) - Advanced BOM Items features
+
+story:
+  id: "02.5b"
+  name: "BOM Items Advanced"
+  slug: "bom-items-advanced"
+  epic: "02-technical"
+  phase: "1B"  # NOT MVP - Phase 1B
+  complexity: "M"  # Medium
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  parent_story: "02.5"  # Split from parent story 02.5
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, columns, indexes
+  - api.yaml         # Endpoints, request/response schemas
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.5a"
+      name: "BOM Items Core (MVP)"
+      provides:
+        - "bom_items table"
+        - "BOMItemsTable component"
+        - "BOMItemModal component"
+        - "bom-items-service.ts"
+        - "bomItemSchema validation"
+      reason: "Core CRUD must exist before adding advanced features"
+    - story: "02.8"
+      name: "Routing Operations"
+      provides:
+        - "routing_operations table"
+        - "operation_seq FK target"
+      reason: "Operation assignment requires routing operations to exist"
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides:
+        - "boms table"
+        - "bom_id FK target"
+      reason: "BOM header must exist before items"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "org_id context"
+        - "RLS policies"
+      reason: "Multi-tenant isolation required"
+
+  optional:
+    - story: "01.11"
+      name: "Production Lines CRUD"
+      provides:
+        - "production_lines table"
+        - "line_ids FK target"
+      reason: "Line-specific items use production_lines (nullable, optional feature)"
+      nullable: true
+
+  blocked_by: []  # No blockers beyond required dependencies
+
+  blocks:
+    - story: "02.9"
+      name: "BOM Costing"
+      reason: "Cost calculation uses advanced item fields"
+    - story: "02.14"
+      name: "Multi-level BOM Explosion"
+      reason: "Explosion uses conditional items and byproducts"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.26"  # Conditional BOM items (if/then rules)
+      - "FR-2.27"  # BOM byproducts (yield %)
+      - "FR-2.31"  # BOM item operation assignment
+      - "FR-2.33"  # BOM production line assignment
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections:
+      - "bom_items table schema"
+      - "bom_production_lines table schema"
+      - "conditional_flags table schema"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.5b.bom-items-advanced.md"
+  parent_story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.5a.bom-items-core.md"
+    reason: "MVP fields implemented in parent - extend these"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-bom-items-detail.md"
+      relevance: "Item modal, byproducts section, conditional flags"
+  adrs: []  # No ADRs specific to this story
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "Extended item endpoints + bulk import"
+    files:
+      - "apps/frontend/app/api/v1/technical/boms/[id]/items/route.ts (extended)"
+      - "apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/route.ts"
+  - type: "service"
+    count: 1
+    description: "Extended bom-items-service.ts with Phase 1B functions"
+    files:
+      - "apps/frontend/lib/services/bom-items-service.ts (extended)"
+  - type: "component"
+    count: 5
+    description: "Phase 1B UI components"
+    files:
+      - "components/technical/bom/BOMByproductsSection.tsx"
+      - "components/technical/bom/ConditionalFlagsSelect.tsx"
+      - "components/technical/bom/ProductionLinesCheckbox.tsx"
+      - "components/technical/bom/BOMBulkImportModal.tsx"
+      - "components/technical/bom/BOMItemModal.tsx (extended)"
+  - type: "validation"
+    count: 1
+    description: "Extended Zod schemas for Phase 1B fields"
+    files:
+      - "apps/frontend/lib/validation/bom-items.ts (extended)"
+  - type: "test"
+    count: 3
+    description: "Unit + integration tests for Phase 1B features"
+    files:
+      - "apps/frontend/lib/services/__tests__/bom-items-service.test.ts (extended)"
+      - "apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/__tests__/route.test.ts"
+      - "supabase/tests/bom-items-advanced.test.sql"
+
+# Technical notes
+technical_notes:
+  - "Phase 1B story - NOT MVP, extends 02.5a (BOM Items Core)"
+  - "Conditional flags stored as JSONB: {\"organic\": true, \"vegan\": true}"
+  - "line_ids is nullable UUID[] - NULL means all production lines"
+  - "Byproducts use is_by_product=true, is_output=true flags"
+  - "yield_percent auto-calculated: (byproduct_qty / bom_output_qty) * 100"
+  - "Bulk import limited to 500 items per request"
+  - "Production lines are OPTIONAL - line_ids can be NULL even without lines table"
+  - "consume_whole_lp flag for License Plate consumption mode"
+
+# Scope clarification
+scope:
+  in_scope:
+    - "Conditional items with flags (condition_flags JSONB)"
+    - "By-products management (is_output=true, yield_percent)"
+    - "Line-specific items (line_ids array)"
+    - "POST /api/technical/boms/:id/items/bulk (bulk add from CSV/import)"
+    - "Byproducts section in BOM items table"
+    - "Enhanced BOM item modal with conditional/line fields"
+    - "consume_whole_lp flag for LP consumption mode"
+
+  out_of_scope:
+    - "BOM header CRUD (covered in 02.4)"
+    - "Core items CRUD (covered in 02.5a)"
+    - "Alternative ingredients (covered in 02.6)"
+    - "Multi-level BOM explosion (covered in 02.14)"
+    - "BOM cost calculation (covered in 02.9)"
+    - "Drag-drop reordering (deferred to future)"

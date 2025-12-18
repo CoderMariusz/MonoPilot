@@ -1,0 +1,120 @@
+# Story 03.4 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.4"
+  name: "Bulk PO Creation"
+  slug: "bulk-po-creation"
+  epic: "03-planning"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (po_templates optional), reuse purchase_orders/lines
+  - api.yaml         # Endpoints: bulk create, import/parse/validate
+  - frontend.yaml    # Components: BulkPOImportModal, CSVUploader, etc.
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "03.3"
+      name: "PO CRUD + Lines"
+      provides:
+        - "purchase_orders table"
+        - "purchase_order_lines table"
+        - "purchase-order-service.ts"
+        - "PO creation endpoints"
+    - story: "03.2"
+      name: "Supplier-Product Assignments"
+      provides:
+        - "supplier_products table"
+        - "Default supplier lookup"
+        - "Supplier-specific pricing"
+        - "Lead time and MOQ overrides"
+    - story: "03.1"
+      name: "Suppliers CRUD"
+      provides:
+        - "suppliers table"
+        - "Supplier currency and tax defaults"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "org_id context"
+        - "RLS patterns"
+
+  blocked_by: []
+
+  blocks:
+    - story: "03.5a"
+      name: "PO Approval Workflow"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections:
+      - "FR-PLAN-008"
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.4.po-calculations.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-007-po-bulk-import.md"
+      relevance: "PRIMARY - 4-step wizard wireframe for bulk PO import"
+  patterns:
+    - path: "apps/frontend/lib/services/purchase-order-service.ts"
+      relevance: "Existing PO service for create operations"
+    - path: "apps/frontend/lib/services/supplier-product-service.ts"
+      relevance: "Default supplier and pricing lookups"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 4
+    description: "POST /purchase-orders/bulk, /import/parse, /import/validate, /bulk-submit"
+  - type: "service"
+    count: 1
+    description: "bulk-po-import-service.ts"
+  - type: "validation"
+    count: 1
+    description: "bulk-po-import.ts (Zod schemas)"
+  - type: "components"
+    count: 6
+    description: "BulkPOImportModal, POGroupPreview, CSVUploader, ValidationResults, etc."
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# PRD Traceability
+prd_mapping:
+  - fr_id: "FR-PLAN-008"
+    requirement: "Bulk PO Creation"
+    priority: "Must Have"
+    description: "Create multiple POs from product list"
+    acceptance:
+      - "User can enter products via form or Excel import"
+      - "System groups by default supplier"
+      - "Creates one draft PO per supplier"
+      - "User can review before submit"
+      - "Products without supplier flagged as warning"
+
+# Technical notes
+technical_notes:
+  - "Reuses existing purchase_orders/purchase_order_lines tables from 03.3"
+  - "po_templates table is OPTIONAL (Phase 2 feature)"
+  - "Groups imported rows by default supplier from supplier_products"
+  - "Auto-fills lead time, MOQ from supplier_products overrides"
+  - "Supports Excel (.xlsx, .xls) file upload with 5MB limit"
+  - "Client-side parsing using SheetJS (xlsx library)"
+  - "Creates POs in parallel transactions (partial failure handling)"
+  - "4-step wizard: Upload -> Preview -> Validate -> Create"

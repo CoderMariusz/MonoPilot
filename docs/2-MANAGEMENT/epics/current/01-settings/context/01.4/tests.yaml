@@ -1,0 +1,252 @@
+# Story 01.4 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/components/settings/onboarding/__tests__/OrganizationProfileStep.test.tsx"
+    type: "unit"
+    description: "Unit tests for step 1 component"
+  - path: "apps/frontend/lib/validation/__tests__/organization-profile-step.test.ts"
+    type: "unit"
+    description: "Unit tests for validation schema"
+  - path: "apps/frontend/lib/utils/__tests__/browser-detection.test.ts"
+    type: "unit"
+    description: "Unit tests for browser detection utilities"
+  - path: "apps/frontend/e2e/onboarding-step1.spec.ts"
+    type: "e2e"
+    description: "E2E tests for step 1 flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "wizard step 1 loads"
+    when: "organization name was set during registration"
+    then: "the name field is pre-filled with that value"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "new organization"
+    when: "wizard step 1 loads"
+    then: "timezone auto-detected from browser (editable)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "browser language is Polish"
+    when: "wizard step 1 loads"
+    then: "language defaults to PL (editable)"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-04"
+    given: "wizard step 1 loads"
+    when: "detecting browser language"
+    then: "language dropdown defaults to browser language if supported (PL/EN/DE/FR), otherwise EN"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-05"
+    given: "user enters valid data"
+    when: "'Next' clicked"
+    then: "organization is updated in database and wizard advances to step 2"
+    test_type: "integration"
+    priority: "P0"
+    example:
+      name: "Bakery Fresh Ltd"
+      timezone: "Europe/Warsaw"
+      language: "PL"
+      currency: "PLN"
+
+  - id: "AC-06"
+    given: "organization name field is empty"
+    when: "'Next' clicked"
+    then: "error message 'Organization name is required' displays and wizard does not advance"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "organization name is 1 character"
+    when: "'Next' clicked"
+    then: "error message 'Organization name must be at least 2 characters' displays"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-08"
+    given: "organization name is 101 characters"
+    when: "'Next' clicked"
+    then: "error message 'Organization name must be at most 100 characters' displays"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-09"
+    given: "timezone dropdown is opened"
+    when: "user types 'war'"
+    then: "'Europe/Warsaw' appears in filtered results"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-10"
+    given: "language dropdown"
+    when: "opened"
+    then: "options include: Polski (PL), English (EN), Deutsch (DE), Francais (FR)"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-11"
+    given: "currency dropdown"
+    when: "opened"
+    then: "options include: PLN, EUR, USD, GBP (4 currencies for MVP)"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-12"
+    given: "wizard is on step 1"
+    when: "'Back' button is checked"
+    then: "it is disabled or hidden (first step)"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-13"
+    given: "step 1 is completed"
+    when: "step 2 loads"
+    then: "progress indicator shows 'Step 2 of 6' with step 1 checkmarked"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  OrganizationProfileStep:
+    - name: "pre-fills org name from initialData"
+      setup: "Render with initialData.name = 'Test Org'"
+      expected: "Name input has value 'Test Org'"
+
+    - name: "detects browser timezone on mount"
+      setup: "Mock Intl.DateTimeFormat to return 'Europe/Warsaw'"
+      expected: "Timezone select has value 'Europe/Warsaw'"
+
+    - name: "detects browser language on mount"
+      setup: "Mock navigator.language = 'pl-PL'"
+      expected: "Language select has value 'pl'"
+
+    - name: "shows validation error for empty name"
+      setup: "Render component"
+      action: "Clear name field, submit form"
+      expected: "Error message displayed"
+
+    - name: "shows validation error for short name"
+      setup: "Enter 'A' in name field"
+      action: "Submit form"
+      expected: "Min length error displayed"
+
+  TimezoneSelect:
+    - name: "renders all IANA timezones"
+      expected: "300+ options available"
+
+    - name: "filters timezones on search"
+      action: "Type 'war' in search"
+      expected: "'Europe/Warsaw' in results"
+
+    - name: "selects timezone on click"
+      action: "Click 'Europe/Warsaw'"
+      expected: "onValueChange called with 'Europe/Warsaw'"
+
+  organizationProfileStepSchema:
+    - name: "rejects empty name"
+      input: { name: "", timezone: "UTC", language: "en", currency: "EUR" }
+      expected: "Validation fails with name error"
+
+    - name: "rejects name under 2 chars"
+      input: { name: "A", timezone: "UTC", language: "en", currency: "EUR" }
+      expected: "Validation fails with min length error"
+
+    - name: "rejects name over 100 chars"
+      input: { name: "A".repeat(101), timezone: "UTC", language: "en", currency: "EUR" }
+      expected: "Validation fails with max length error"
+
+    - name: "rejects invalid timezone"
+      input: { name: "Test", timezone: "Invalid/Zone", language: "en", currency: "EUR" }
+      expected: "Validation fails with timezone error"
+
+    - name: "rejects invalid language"
+      input: { name: "Test", timezone: "UTC", language: "es", currency: "EUR" }
+      expected: "Validation fails with language error"
+
+    - name: "accepts valid data"
+      input: { name: "Test Org", timezone: "Europe/Warsaw", language: "pl", currency: "PLN" }
+      expected: "Validation passes"
+
+  browserDetection:
+    - name: "getBrowserTimezone returns valid IANA timezone"
+      expected: "Returns string matching Intl.supportedValuesOf('timeZone')"
+
+    - name: "getBrowserTimezone returns UTC on error"
+      setup: "Mock Intl to throw"
+      expected: "Returns 'UTC'"
+
+    - name: "getBrowserLanguage returns supported language"
+      setup: "Mock navigator.language = 'pl-PL'"
+      expected: "Returns 'pl'"
+
+    - name: "getBrowserLanguage returns 'en' for unsupported language"
+      setup: "Mock navigator.language = 'ja-JP'"
+      expected: "Returns 'en'"
+
+# Integration Test Cases
+integration_tests:
+  - name: "Successful step 1 completion advances to step 2"
+    setup: "Admin on step 1"
+    action: "Fill valid data, click Next"
+    expected: |
+      - API call to POST /api/v1/settings/onboarding/step/1
+      - Organization updated in database
+      - Wizard advances to step 2
+
+  - name: "Validation errors prevent advancement"
+    setup: "Admin on step 1"
+    action: "Leave name empty, click Next"
+    expected: |
+      - No API call
+      - Error message displayed
+      - Wizard stays on step 1
+
+  - name: "Pre-population from registration data"
+    setup: "Org created with name 'My Company'"
+    action: "Load step 1"
+    expected: "Name field pre-filled with 'My Company'"
+
+# Definition of Done
+definition_of_done:
+  - "Organization name pre-fills from registration data"
+  - "Timezone defaults to browser-detected timezone"
+  - "Language defaults to browser language if supported"
+  - "All validation rules enforced with clear error messages"
+  - "Successful save updates organization and advances to step 2"
+  - "Back button is disabled on step 1"
+  - "Unit and integration tests pass for all acceptance criteria"
+  - "Unit test coverage >= 80%"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Form validation and component behavior"
+  integration:
+    target: 70
+    reason: "API integration and state updates"
+  files:
+    - "components/settings/onboarding/OrganizationProfileStep.tsx: 85%"
+    - "components/settings/onboarding/TimezoneSelect.tsx: 80%"
+    - "lib/validation/organization-profile-step.ts: 100%"
+    - "lib/utils/browser-detection.ts: 90%"
+
+# Output Artifacts
+output_artifacts:
+  - "OrganizationProfileStep.tsx component"
+  - "TimezoneSelect.tsx component"
+  - "organization-profile-step.ts Zod schema"
+  - "browser-detection.ts utilities"
+  - "POST /api/v1/settings/onboarding/step/1 endpoint"
+  - "Unit tests for all components and validation"
+  - "Integration tests for step completion flow"

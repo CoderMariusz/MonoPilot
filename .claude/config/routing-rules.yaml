@@ -1,0 +1,71 @@
+# Routing Rules Configuration
+# Defines how ORCHESTRATOR routes requests to agents/workflows
+
+# Workflow routing
+workflows:
+  - match:
+      request_type: "new_project"
+      keywords: ["new project", "start project", "greenfield", "from scratch"]
+    workflow: "definitions/product/new-project.yaml"
+    description: "Full project setup workflow"
+
+  - match:
+      request_type: "story"
+      keywords: ["implement story", "feature", "user story"]
+      prerequisites:
+        - epic_exists
+        - story_approved
+    workflow: "definitions/engineering/story-delivery.yaml"
+    description: "TDD story implementation"
+
+  - match:
+      request_type: "fix"
+      keywords: ["bug", "fix", "hotfix", "patch", "typo"]
+      conditions:
+        estimated_time: "<1h"
+        files_affected: "<=3"
+    workflow: "definitions/engineering/quick-fix.yaml"
+    description: "Fast-track bug fix"
+
+# Direct agent routing (no workflow)
+direct:
+  - match:
+      request_type: "clarify"
+      keywords: ["unclear", "don't understand", "what do you mean"]
+    agent: "discovery-agent"
+    type: "clarification"
+
+  - match:
+      request_type: "research"
+      keywords: ["research", "investigate", "compare", "evaluate"]
+    agent: "research-agent"
+    type: "technology"
+
+  - match:
+      request_type: "review"
+      keywords: ["review code", "PR review", "code review"]
+    agent: "code-reviewer"
+    type: "full_review"
+
+  - match:
+      request_type: "audit"
+      keywords: ["audit", "check docs", "documentation review"]
+    agent: "doc-auditor"
+    type: "full_audit"
+
+# Fallback rules (when no match)
+fallback:
+  unclear_requirements:
+    action: "route_to_agent"
+    agent: "discovery-agent"
+    type: "clarification"
+
+  default:
+    action: "ask_user"
+    prompt: "Could not determine task type. Please clarify."
+
+# Priority order (first match wins)
+priority:
+  1: workflows
+  2: direct
+  3: fallback

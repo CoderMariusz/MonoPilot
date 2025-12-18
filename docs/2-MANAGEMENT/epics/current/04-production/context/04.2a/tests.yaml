@@ -1,0 +1,585 @@
+# Story 04.2a - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/production-execution-service.test.ts"
+    type: "unit"
+    description: "Unit tests for production execution service"
+  - path: "apps/frontend/lib/validation/__tests__/production-execution.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "__tests__/integration/api/production/work-orders-start.test.ts"
+    type: "integration"
+    description: "Integration tests for start WO API endpoint"
+  - path: "__tests__/e2e/production/work-order-start.spec.ts"
+    type: "e2e"
+    description: "E2E tests for WO start flow"
+
+# Acceptance Criteria (from story file - 35+ total)
+acceptance_criteria:
+  # AC-1: Start WO from Released Status (FR-PROD-002)
+  - id: "AC-01"
+    group: "Start WO from Released Status"
+    given: "WO 'WO-001' has status 'Released'"
+    when: "user clicks 'Start Production'"
+    then: "WO status changes to 'In Progress' within 1 second"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    group: "Start WO from Released Status"
+    given: "WO 'WO-001' has status 'Released'"
+    when: "user clicks 'Start Production'"
+    then: "started_at timestamp is set to current time (+/- 1 second)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    group: "Start WO from Released Status"
+    given: "WO 'WO-001' has status 'Released'"
+    when: "user clicks 'Start Production'"
+    then: "started_by is set to current user's ID"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    group: "Start WO from Released Status"
+    given: "WO 'WO-001' has status 'Released'"
+    when: "user clicks 'Start Production'"
+    then: "success toast 'Work Order WO-001 started successfully' displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-05"
+    group: "Start WO from Released Status"
+    given: "WO 'WO-002' has status 'Released'"
+    when: "user views WO detail page"
+    then: "'Start Production' button is visible and enabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06"
+    group: "Start WO from Released Status"
+    given: "WO 'WO-003' has status 'Draft'"
+    when: "user views WO detail page"
+    then: "'Start Production' button is disabled or hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-07"
+    group: "Start WO from Released Status"
+    given: "WO 'WO-003' has status 'Draft'"
+    when: "user hovers over disabled Start button"
+    then: "tooltip 'WO must be Released to start' displays"
+    test_type: "e2e"
+    priority: "P2"
+
+  # AC-2: Status Validation (FR-PROD-002)
+  - id: "AC-08"
+    group: "Status Validation"
+    given: "WO 'WO-004' has status 'Draft'"
+    when: "user attempts to start WO via API"
+    then: "error message 'WO must be Released to start' returned with 400 status"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    group: "Status Validation"
+    given: "WO 'WO-004' has status 'Draft'"
+    when: "user attempts to start WO"
+    then: "WO status remains 'Draft'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    group: "Status Validation"
+    given: "WO 'WO-005' has status 'In Progress'"
+    when: "user views WO detail page"
+    then: "'Start Production' button is disabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-11"
+    group: "Status Validation"
+    given: "WO 'WO-006' has status 'Completed'"
+    when: "user views WO detail page"
+    then: "'Start Production' button is disabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-12"
+    group: "Status Validation"
+    given: "WO 'WO-007' has status 'Cancelled'"
+    when: "user views WO detail page"
+    then: "'Start Production' button is disabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-3: Line/Machine Assignment (FR-PROD-002)
+  - id: "AC-13"
+    group: "Line/Machine Assignment"
+    given: "WO 'WO-008' has line assigned to 'Line A'"
+    when: "user clicks 'Start Production'"
+    then: "confirmation modal displays 'Start WO-008 on Line A?'"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-14"
+    group: "Line/Machine Assignment"
+    given: "WO 'WO-009' has no machine assigned"
+    when: "user clicks 'Start Production'"
+    then: "machine field is optional (can leave blank) and WO starts successfully"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-15"
+    group: "Line/Machine Assignment"
+    given: "production line 'Line B' is running WO 'WO-010' (status In Progress)"
+    when: "user attempts to start WO 'WO-011' with line 'Line B'"
+    then: "warning message 'Line B already in use by WO-010. Continue?' displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-16"
+    group: "Line/Machine Assignment"
+    given: "line in use warning is displayed"
+    when: "user confirms to proceed anyway"
+    then: "WO starts successfully (warning only, not blocking)"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-4: Material Availability Check (FR-PROD-002)
+  - id: "AC-17"
+    group: "Material Availability"
+    given: "WO 'WO-012' has material availability = 100%"
+    when: "user clicks 'Start Production'"
+    then: "no warning message displays and WO starts successfully"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-18"
+    group: "Material Availability"
+    given: "WO 'WO-013' has material availability = 80%"
+    when: "user clicks 'Start Production'"
+    then: "warning message 'Material availability is 80%. Continue?' displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-19"
+    group: "Material Availability"
+    given: "WO 'WO-013' has material availability = 80%"
+    when: "user confirms to proceed"
+    then: "WO starts successfully (warning does NOT block start)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-20"
+    group: "Material Availability"
+    given: "WO 'WO-014' has material availability = 0%"
+    when: "user clicks 'Start Production'"
+    then: "warning message 'No materials available. Continue?' displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-21"
+    group: "Material Availability"
+    given: "WO 'WO-014' has material availability = 0%"
+    when: "user confirms to proceed"
+    then: "WO can still start if user confirms"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-5: Material Reservations - Phase 1 Deferred (FR-PROD-016)
+  - id: "AC-22"
+    group: "Material Reservations Deferred"
+    given: "WO 'WO-015' has status 'Released'"
+    when: "user starts WO"
+    then: "NO records are created in material_reservations table"
+    test_type: "integration"
+    priority: "P0"
+    security: false
+    note: "Material reservations deferred to Story 04.8 (Phase 1)"
+
+  # AC-6: Timestamp Tracking (FR-PROD-002)
+  - id: "AC-23"
+    group: "Timestamp Tracking"
+    given: "WO 'WO-016' has status 'Released' and current time is 2025-01-15 10:30:00"
+    when: "user starts WO"
+    then: "started_at is set to 2025-01-15 10:30:00 (+/- 1 second)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-24"
+    group: "Timestamp Tracking"
+    given: "user 'operator-123' starts WO 'WO-017'"
+    when: "WO starts"
+    then: "started_by field is set to 'operator-123' user ID"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-25"
+    group: "Timestamp Tracking"
+    given: "WO 'WO-018' starts"
+    when: "status changes to 'In Progress'"
+    then: "updated_at timestamp is set to current time"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-26"
+    group: "Timestamp Tracking"
+    given: "WO 'WO-018' starts"
+    when: "status changes to 'In Progress'"
+    then: "updated_by is set to current user's ID"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-7: UI - Start WO Modal (FR-PROD-002)
+  - id: "AC-27"
+    group: "Start WO Modal"
+    given: "WO 'WO-019' status is 'Released'"
+    when: "user clicks 'Start Production'"
+    then: "modal displays WO Number, Product, Planned Qty, Line, Material Availability"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-28"
+    group: "Start WO Modal"
+    given: "WO 'WO-020' has 3 required materials"
+    when: "start modal opens"
+    then: "material list displays all 3 materials with name, required qty, available qty, availability %"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-8: Permission Enforcement
+  - id: "AC-29"
+    group: "Permission Enforcement"
+    given: "user has PROD_OPERATOR role"
+    when: "viewing WO with status 'Released'"
+    then: "'Start Production' button is visible"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-30"
+    group: "Permission Enforcement"
+    given: "user has PROD_MANAGER role"
+    when: "viewing WO with status 'Released'"
+    then: "'Start Production' button is visible"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-31"
+    group: "Permission Enforcement"
+    given: "user has VIEWER role"
+    when: "viewing WO with status 'Released'"
+    then: "'Start Production' button is hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-32"
+    group: "Permission Enforcement"
+    given: "user has ADMIN role"
+    when: "viewing WO with status 'Released'"
+    then: "'Start Production' button is visible"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-9: Multi-tenancy (RLS)
+  - id: "AC-33"
+    group: "Multi-tenancy RLS"
+    given: "User A from Org A and WO 'WO-021' belongs to Org A"
+    when: "User A starts WO 'WO-021'"
+    then: "WO starts successfully"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-34"
+    group: "Multi-tenancy RLS"
+    given: "User A from Org A and WO 'WO-022' belongs to Org B"
+    when: "User A attempts to start WO 'WO-022'"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-35"
+    group: "Multi-tenancy RLS"
+    given: "cross-tenant start attempt"
+    when: "API response returned"
+    then: "WO status unchanged (no data leak)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # AC-10: API Response and Error Handling
+  - id: "AC-36"
+    group: "API Response"
+    given: "WO 'WO-023' status is 'Released'"
+    when: "POST /api/production/work-orders/WO-023/start"
+    then: "response status is 200 with id, status='in_progress', started_at, started_by"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-37"
+    group: "API Response"
+    given: "WO 'WO-024' status is 'Draft'"
+    when: "POST /api/production/work-orders/WO-024/start"
+    then: "response status is 400 with error 'WO must be Released to start'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-38"
+    group: "API Response"
+    given: "WO 'WO-999' does not exist"
+    when: "POST /api/production/work-orders/WO-999/start"
+    then: "response status is 404 with error 'Work Order not found'"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  production_execution_service:
+    - name: "startWorkOrder updates status to in_progress"
+      setup: "Mock successful API response"
+      expected: "Returns WorkOrder with status 'in_progress'"
+
+    - name: "startWorkOrder rejects when API returns 400"
+      setup: "Mock 400 response with error"
+      expected: "Throws error with message from response"
+
+    - name: "startWorkOrder rejects when API returns 404"
+      setup: "Mock 404 response"
+      expected: "Throws error 'Work Order not found'"
+
+    - name: "checkMaterialAvailability returns material list"
+      setup: "Mock successful API response with materials"
+      expected: "Returns MaterialAvailability object"
+
+    - name: "checkLineAvailability returns available=true for idle line"
+      setup: "Mock no active WO on line"
+      expected: "Returns { available: true }"
+
+    - name: "checkLineAvailability returns available=false with current_wo"
+      setup: "Mock active WO 'WO-001' on line"
+      expected: "Returns { available: false, current_wo: 'WO-001' }"
+
+  validation_schemas:
+    - name: "startWorkOrderSchema accepts valid input"
+      input: "{ line_id: 'uuid', machine_id: 'uuid', force: true }"
+      expected: "Parses successfully"
+
+    - name: "startWorkOrderSchema accepts empty input"
+      input: "{}"
+      expected: "Parses with defaults { force: false }"
+
+    - name: "startWorkOrderSchema rejects invalid UUID"
+      input: "{ line_id: 'not-a-uuid' }"
+      expected: "Throws validation error"
+
+    - name: "woStatusEnum accepts valid statuses"
+      input: "'in_progress'"
+      expected: "Parses successfully"
+
+    - name: "woStatusEnum rejects invalid status"
+      input: "'invalid_status'"
+      expected: "Throws validation error"
+
+# Integration Test Cases
+integration_tests:
+  api_start_wo:
+    - name: "POST /start returns 200 for Released WO"
+      setup: "Create org, user, released WO"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "200 with status='in_progress', started_at, started_by"
+
+    - name: "POST /start sets started_at within 1 second"
+      setup: "Create released WO, capture current time"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "started_at within 1 second of request time"
+
+    - name: "POST /start sets started_by to current user"
+      setup: "Create org, user, released WO"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "started_by equals authenticated user ID"
+
+    - name: "POST /start returns 400 for Draft WO"
+      setup: "Create WO with status='draft'"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "400 with error 'WO must be Released to start'"
+
+    - name: "POST /start returns 400 for In Progress WO"
+      setup: "Create WO with status='in_progress'"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "400 with error message"
+
+    - name: "POST /start returns 404 for non-existent WO"
+      setup: "Random UUID not in database"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "404 with error 'Work Order not found'"
+
+    - name: "POST /start returns 404 for cross-tenant WO"
+      setup: "Create WO in Org B, authenticate as Org A user"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "404 (not 403) to prevent existence leak"
+
+    - name: "POST /start returns 401 without auth"
+      setup: "Create released WO"
+      action: "POST /api/production/work-orders/:id/start without auth header"
+      expected: "401 Unauthorized"
+
+    - name: "POST /start returns 409 when line in use"
+      setup: "Create line with active WO, create released WO on same line"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "409 with warning=true and current_wo"
+
+    - name: "POST /start with force=true bypasses line check"
+      setup: "Create line with active WO, create released WO on same line"
+      action: "POST /api/production/work-orders/:id/start with force=true"
+      expected: "200 success (bypasses line warning)"
+
+    - name: "POST /start allows line_id override"
+      setup: "Create released WO on Line A, Line B available"
+      action: "POST /api/production/work-orders/:id/start with line_id=Line B"
+      expected: "200 with production_line_id=Line B"
+
+    - name: "POST /start does NOT create material_reservations"
+      setup: "Create released WO with materials"
+      action: "POST /api/production/work-orders/:id/start"
+      expected: "No records in material_reservations table"
+
+  api_material_availability:
+    - name: "GET /material-availability returns material list"
+      setup: "Create WO with 3 materials"
+      action: "GET /api/production/work-orders/:id/material-availability"
+      expected: "200 with overall_availability_percent and materials array"
+
+    - name: "GET /material-availability returns 100% in Phase 0"
+      setup: "Create WO with materials"
+      action: "GET /api/production/work-orders/:id/material-availability"
+      expected: "overall_availability_percent = 100 (mock for Phase 0)"
+
+    - name: "GET /material-availability returns 404 for non-existent WO"
+      setup: "Random UUID"
+      action: "GET /api/production/work-orders/:id/material-availability"
+      expected: "404 Work Order not found"
+
+# E2E Test Cases
+e2e_tests:
+  start_wo_flow:
+    - name: "Start WO complete flow"
+      steps:
+        - "Navigate to /production/work-orders/:id (Released WO)"
+        - "Verify Start Production button visible"
+        - "Click Start Production button"
+        - "Verify modal opens with WO summary"
+        - "Click Confirm Start button"
+        - "Verify success toast displays"
+        - "Verify status badge changes to 'In Progress'"
+      expected: "WO successfully transitioned to In Progress"
+
+    - name: "Start button visibility for Released WO"
+      steps:
+        - "Navigate to /production/work-orders/:id (Released WO)"
+      expected: "Start Production button visible and enabled"
+
+    - name: "Start button disabled for Draft WO"
+      steps:
+        - "Navigate to /production/work-orders/:id (Draft WO)"
+      expected: "Start Production button disabled with tooltip"
+
+    - name: "Material availability warning display"
+      steps:
+        - "Create WO with material availability < 100%"
+        - "Navigate to WO detail page"
+        - "Click Start Production"
+      expected: "Warning banner displays in modal"
+
+    - name: "Line in use warning display"
+      steps:
+        - "Create Line A with active WO"
+        - "Create Released WO assigned to Line A"
+        - "Navigate to WO detail page"
+        - "Click Start Production"
+      expected: "Warning 'Line A already in use by WO-XXX' displays"
+
+    - name: "Permission denied - Viewer role"
+      steps:
+        - "Login as Viewer role user"
+        - "Navigate to Released WO detail page"
+      expected: "Start Production button not visible"
+
+    - name: "Success toast after start"
+      steps:
+        - "Start a Released WO"
+      expected: "Toast 'Work Order WO-XXX started successfully' displays"
+
+    - name: "Status badge updates after start"
+      steps:
+        - "Start a Released WO"
+        - "Observe status badge"
+      expected: "Badge changes from blue 'Released' to green 'In Progress'"
+
+# Definition of Done
+definition_of_done:
+  - "POST /api/production/work-orders/:id/start endpoint implemented and tested"
+  - "GET /api/production/work-orders/:id/material-availability endpoint implemented"
+  - "production-execution-service.ts implements all 4 methods"
+  - "Zod schema validates start request"
+  - "Status validation: only Released WOs can be started"
+  - "Timestamp tracking: started_at and started_by set atomically"
+  - "Material availability check returns mock 100% (Phase 0)"
+  - "Line availability check warns if line in use"
+  - "NO material reservations created (deferred to Story 04.8)"
+  - "WO detail page shows Start Production button"
+  - "Start button only visible for Released status"
+  - "StartWorkOrderModal component with WO summary"
+  - "Material availability list in modal"
+  - "Line availability warning in modal"
+  - "Success toast notification on start"
+  - "Error handling with user-friendly messages"
+  - "Permission enforcement: Prod Operator, Manager, Admin can start"
+  - "Multi-tenancy: RLS enforces org isolation (cross-org returns 404)"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all endpoints"
+  - "E2E test for start WO flow"
+  - "Loading states implemented (button spinner)"
+  - "Accessibility: keyboard nav, ARIA labels"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic in service layer"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS policies"
+  e2e:
+    target: 1
+    reason: "Happy path for start WO flow"
+  files:
+    - "lib/services/production-execution-service.ts: 80%"
+    - "lib/validation/production-execution.ts: 90%"
+    - "app/api/production/work-orders/[id]/start/route.ts: 85%"
+    - "components/production/work-orders/StartWorkOrderModal.tsx: 75%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS bypass could allow cross-tenant WO start"
+    mitigation: "Integration tests verify 404 for cross-tenant access"
+    severity: "high"
+    test_coverage: "AC-33, AC-34, AC-35"
+
+  - id: "RISK-02"
+    description: "Race condition if two users start same WO simultaneously"
+    mitigation: "Database-level status check in UPDATE query"
+    severity: "medium"
+    test_coverage: "Addressed by atomic UPDATE WHERE status='released'"
+
+  - id: "RISK-03"
+    description: "Material availability check may slow down start modal"
+    mitigation: "Fetch availability async while modal opens"
+    severity: "low"
+    test_coverage: "Performance test (optional)"

@@ -1,0 +1,207 @@
+# Story 02.10a - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.10a"
+  name: "Traceability Configuration + GS1 Encoding"
+  slug: "traceability-configuration"
+  epic: "02-technical"
+  phase: "MVP"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  parent_story: "02.10"  # Split from parent 02.10
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, constraints
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Pages, components, services, validation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table"
+        - "RLS pattern (ADR-013)"
+        - "org-context-service.ts"
+    - story: "02.1"
+      name: "Products CRUD + Types"
+      provides:
+        - "products table"
+        - "product_id FK"
+        - "product service"
+  blocked_by: []
+  blocks:
+    - story: "02.10b"
+      name: "Traceability Queries (Forward/Backward Trace)"
+      note: "Deferred to Epic 05 - requires license_plates and lp_genealogy tables"
+
+# External Dependencies
+external_dependencies:
+  epic_05:
+    - table: "license_plates"
+      description: "Required for actual trace queries - NOT available in Epic 02"
+      status: "planned_epic_05"
+    - table: "lp_genealogy"
+      description: "Required for genealogy tree - NOT available in Epic 02"
+      status: "planned_epic_05"
+  note: "This story implements CONFIG only. Trace queries deferred to 02.10b (Epic 05)"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.60"   # Forward traceability (config only)
+      - "FR-2.64"   # Lot/batch tracking configuration
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections:
+      - "Database Schema - Traceability Tables"
+      - "API Design - Traceability Endpoints"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.10a.traceability-configuration.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-016-traceability-search.md"
+      id: "TEC-016"
+      name: "Traceability Search (Framework Only)"
+      relevance: "Search page framework with empty state for MVP"
+      components:
+        - "TraceabilitySearch (framework)"
+        - "TraceabilityEmptyState"
+        - "Direction Toggle"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-014-shelf-life-config.md"
+      id: "TEC-014"
+      name: "Shelf Life Configuration"
+      relevance: "Lot tracking aspects and FIFO/FEFO settings pattern"
+      components:
+        - "Configuration Form Pattern"
+        - "Calculation Rules Display"
+        - "Override Workflow Pattern"
+  patterns:
+    - path: "apps/frontend/lib/services/shelf-life-service.ts"
+      relevance: "Product-level config service pattern"
+    - path: "apps/frontend/lib/validation/technical-schemas.ts"
+      relevance: "Existing technical module validation patterns"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "product_traceability_config table with RLS"
+  - type: "api"
+    count: 2
+    description: "GET/PUT /api/v1/technical/products/:id/traceability-config"
+  - type: "service"
+    count: 2
+    description: "traceability-config-service.ts, gs1-service.ts"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for traceability config"
+  - type: "types"
+    count: 1
+    description: "TypeScript interfaces for traceability"
+  - type: "page"
+    count: 1
+    description: "/technical/traceability page (framework with empty state)"
+  - type: "component"
+    count: 4
+    description: "TraceabilitySearch, TraceabilityEmptyState, LotConfigModal, TraceabilityConfigSection"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + GS1 encoding tests"
+
+# Scope Boundaries
+scope:
+  in_scope:
+    - "product_traceability_config table creation"
+    - "Lot number format configuration per product"
+    - "Batch size defaults (standard, min, max)"
+    - "Traceability level selection (lot/batch/serial)"
+    - "Expiry calculation method (fixed_days/rolling/manual)"
+    - "GS1 encoding settings (lot, expiry, SSCC)"
+    - "GS1 encoding service (AI 10, AI 17, SSCC-18)"
+    - "GTIN-14 validation and check digit calculation"
+    - "Traceability search page FRAMEWORK (empty state)"
+    - "LotConfigModal for product-level settings"
+    - "TraceabilityConfigSection in product form"
+    - "RLS policies for config table"
+    - "GET/PUT config endpoints"
+  out_of_scope:
+    - "Forward traceability API (where-used query) - requires license_plates"
+    - "Backward traceability API (what-consumed query) - requires lp_genealogy"
+    - "Recall simulation API with impact assessment - requires LP data"
+    - "Genealogy tree data structure - requires LP data"
+    - "Traceability matrix report generation - requires LP data"
+    - "List/tree/matrix views with actual data - requires LP data"
+    - "Note: All above deferred to 02.10b (Epic 05 dependency)"
+
+# Technical notes
+technical_notes:
+  - "MVP substory split from 02.10 - CONFIG only, NO trace queries"
+  - "02.10b (Trace Queries) deferred until Epic 05 provides LP tables"
+  - "GS1 formats: GTIN-14 (products), GS1-128 AI 10 (lot), AI 17 (expiry), SSCC-18 (pallets)"
+  - "Lot format placeholders: {YYYY}, {YY}, {MM}, {DD}, {SEQ:N}, {JULIAN}, {PROD}, {LINE}"
+  - "Batch size constraint: min <= standard <= max (DB check constraint)"
+  - "Traceability page shows empty state until Epic 05 provides data"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Return 404 (not 403) for cross-tenant config access"
+
+# PRD Requirements Coverage
+prd_coverage:
+  covered:
+    - { fr_id: "FR-2.64", description: "Lot/batch tracking configuration", priority: "P0", status: "covered" }
+  partial:
+    - { fr_id: "FR-2.60", description: "Forward traceability - CONFIG only", priority: "P0", status: "config_only" }
+  deferred_to_02_10b:
+    - { fr_id: "FR-2.60", description: "Forward trace queries", priority: "P0", status: "deferred_to_02.10b" }
+    - { fr_id: "FR-2.61", description: "Backward traceability", priority: "P0", status: "deferred_to_02.10b" }
+    - { fr_id: "FR-2.62", description: "Recall simulation", priority: "P0", status: "deferred_to_02.10b" }
+    - { fr_id: "FR-2.63", description: "Genealogy tree visualization", priority: "P1", status: "deferred_to_02.10b" }
+    - { fr_id: "FR-2.65", description: "Traceability matrix report", priority: "P1", status: "deferred_to_02.10b" }
+
+# GS1 Compliance Reference
+gs1_formats:
+  gtin_14:
+    description: "Global Trade Item Number - 14 digits"
+    format: "NNNNNNNNNNNNNN"
+    check_digit: "Modulo 10 algorithm"
+    example: "12345678901234"
+  gs1_128_lot:
+    description: "GS1-128 Application Identifier 10 - Batch/Lot Number"
+    ai: "10"
+    max_length: 20
+    example: "(10)LOT-2025-000001"
+  gs1_128_expiry:
+    description: "GS1-128 Application Identifier 17 - Expiry Date"
+    ai: "17"
+    format: "YYMMDD"
+    example: "(17)250615"
+  sscc_18:
+    description: "Serial Shipping Container Code - 18 digits"
+    ai: "00"
+    format: "NNNNNNNNNNNNNNNNNN"
+    example: "(00)123456789012345678"
+
+# Lot Format Placeholders
+lot_format_placeholders:
+  - { placeholder: "{YYYY}", description: "4-digit year", example: "2025" }
+  - { placeholder: "{YY}", description: "2-digit year", example: "25" }
+  - { placeholder: "{MM}", description: "2-digit month (01-12)", example: "01" }
+  - { placeholder: "{DD}", description: "2-digit day (01-31)", example: "15" }
+  - { placeholder: "{SEQ:N}", description: "N-digit sequence number", example: "000001" }
+  - { placeholder: "{JULIAN}", description: "Julian day (001-366)", example: "015" }
+  - { placeholder: "{PROD}", description: "Product code prefix", example: "BRD" }
+  - { placeholder: "{LINE}", description: "Production line code", example: "L01" }
+example_formats:
+  - { format: "LOT-{YYYY}-{SEQ:6}", result: "LOT-2025-000001" }
+  - { format: "{PROD}-{YYMMDD}-{SEQ:4}", result: "BRD-250115-0001" }
+  - { format: "{JULIAN}{YY}-{SEQ:5}", result: "01525-00001" }

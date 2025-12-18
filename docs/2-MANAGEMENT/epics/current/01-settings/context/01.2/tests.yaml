@@ -1,0 +1,200 @@
+# Story 01.2 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/hooks/__tests__/useSettingsGuard.test.ts"
+    type: "unit"
+    description: "Unit tests for guard hook"
+  - path: "apps/frontend/components/settings/__tests__/SettingsNav.test.tsx"
+    type: "unit"
+    description: "Unit tests for navigation component"
+  - path: "apps/frontend/e2e/settings-navigation.spec.ts"
+    type: "e2e"
+    description: "E2E tests for navigation behavior"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "user navigates to /settings"
+    when: "user has Admin role"
+    then: "all settings sections are visible in navigation"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "user has Viewer role"
+    when: "accessing /settings/users"
+    then: "redirect to dashboard with 'insufficient permissions' toast"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "an authenticated user"
+    when: "they open Settings"
+    then: "a Settings landing page loads with navigation items for implemented pages"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "a non-admin user"
+    when: "they navigate to an admin-only Settings route"
+    then: "they are blocked (redirect or 'no access' message)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "a navigation item points to an unimplemented route"
+    when: "clicked"
+    then: "a clear 'coming soon' state is shown (or link is visually disabled)"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-06"
+    given: "module toggles exist (later)"
+    when: "toggles are disabled"
+    then: "navigation can hide/disable related sections without breaking routing"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  useSettingsGuard:
+    - name: "returns allowed:true for admin roles"
+      setup: "Mock context with role: 'admin'"
+      params: ["['admin', 'super_admin']"]
+      expected: "{ allowed: true, loading: false, role: 'admin' }"
+
+    - name: "returns allowed:false for viewer role"
+      setup: "Mock context with role: 'viewer'"
+      params: ["['admin', 'super_admin']"]
+      expected: "{ allowed: false, loading: false, role: 'viewer' }"
+
+    - name: "returns loading:true while context is loading"
+      setup: "Mock isLoading: true"
+      params: []
+      expected: "{ allowed: false, loading: true, role: null }"
+
+    - name: "returns allowed:true when no role required"
+      setup: "Mock context with any role"
+      params: []
+      expected: "{ allowed: true, loading: false, role: <any> }"
+
+  SettingsNav:
+    - name: "renders correct sections for admin"
+      setup: "Mock context with role: 'admin'"
+      expected: "All 6 sections visible (Organization, Users, Infrastructure, Master Data, Integrations, System)"
+
+    - name: "hides restricted sections for non-admin"
+      setup: "Mock context with role: 'warehouse_manager'"
+      expected: "Only shows Infrastructure section items user has access to"
+
+    - name: "renders skeleton while loading"
+      setup: "Mock isLoading: true"
+      expected: "SettingsNavSkeleton component rendered"
+
+    - name: "returns null when no context"
+      setup: "Mock context: null"
+      expected: "Component returns null"
+
+  SettingsNavItem:
+    - name: "shows active state for current path"
+      setup: "Mock pathname matches item.path"
+      expected: "Active styling applied (bg-primary)"
+
+    - name: "shows disabled state for unimplemented routes"
+      setup: "item.implemented: false"
+      expected: "Disabled styling + 'Soon' badge"
+
+    - name: "renders icon and label"
+      setup: "item with icon and name"
+      expected: "Icon and name both visible"
+
+  buildSettingsNavigation:
+    - name: "filters items by role"
+      setup: "Context with role 'VIEWER', navigation with admin-only items"
+      expected: "Admin-only items excluded"
+
+    - name: "filters items by enabled modules"
+      setup: "enabledModules excludes 'warehouse'"
+      expected: "Warehouse-related items excluded"
+
+    - name: "removes empty sections"
+      setup: "All items in section filtered out"
+      expected: "Section not included in result"
+
+# Integration Test Cases
+integration_tests:
+  - name: "Protected route redirect for unauthorized user"
+    setup: "Login as VIEWER role"
+    action: "Navigate to /settings/users"
+    expected: "Redirect to /dashboard with toast message"
+
+  - name: "Navigation updates when role changes"
+    setup: "Admin user views Settings"
+    action: "Role changed to VIEWER (simulate via context update)"
+    expected: "Navigation re-renders with fewer items"
+
+  - name: "Mobile navigation opens in sheet"
+    setup: "Viewport < 768px"
+    action: "Click hamburger menu"
+    expected: "Sheet component opens with navigation"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Admin can access all settings sections"
+    steps:
+      - "Login as admin user"
+      - "Navigate to /settings"
+      - "Click each navigation item"
+    expected: "All implemented pages load without error"
+
+  - name: "Viewer redirected from protected routes"
+    steps:
+      - "Login as viewer user"
+      - "Navigate directly to /settings/users"
+    expected: "Redirected to dashboard, toast shown"
+
+  - name: "Unimplemented route shows coming soon"
+    steps:
+      - "Login as admin"
+      - "Navigate to /settings"
+      - "Click 'Invitations' (unimplemented)"
+    expected: "Coming soon state displayed"
+
+# Definition of Done
+definition_of_done:
+  - "Settings shell exists and can host later pages without refactor"
+  - "Protected routes are enforced in UI and backed by server-side checks"
+  - "Navigation renders correctly for different role types"
+  - "Loading, error, and empty states are implemented"
+  - "Tests pass for guard logic and redirect behavior"
+  - "Unit test coverage >= 80%"
+  - "Settings page loads within 300ms (performance target)"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Frontend component coverage"
+  integration:
+    target: 70
+    reason: "Navigation and routing behavior"
+  files:
+    - "lib/hooks/useSettingsGuard.ts: 90%"
+    - "lib/hooks/useSettingsPermissions.ts: 90%"
+    - "components/settings/SettingsNav.tsx: 80%"
+    - "lib/services/settings-navigation-service.ts: 85%"
+
+# Output Artifacts
+output_artifacts:
+  - "Settings layout component (SettingsLayout.tsx)"
+  - "Settings navigation sidebar component (SettingsNav.tsx)"
+  - "Navigation item component (SettingsNavItem.tsx)"
+  - "Empty state component (SettingsEmptyState.tsx)"
+  - "Guard hook (useSettingsGuard.ts)"
+  - "Permissions hook (useSettingsPermissions.ts)"
+  - "Navigation service (settings-navigation-service.ts)"
+  - "Unit tests for hooks and components"
+  - "E2E tests for navigation behavior"

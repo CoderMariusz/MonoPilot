@@ -1,0 +1,462 @@
+# Story 07.9 - Pick Confirmation Desktop Frontend Context
+# Status: Ready for Implementation
+# Last Updated: 2025-12-18
+
+# Pages
+pages:
+  pick_confirmation_page:
+    path: "apps/frontend/app/(authenticated)/shipping/pick-lists/[id]/pick/page.tsx"
+    description: "Main desktop pick confirmation page"
+    type: "async server component"
+    responsibility: |
+      1. Fetch pick list with lines, products, allergens, customer data
+      2. Validate user is assigned picker or Warehouse+
+      3. Render PickConfirmationHeader, pick lines display, action buttons
+      4. Handle state management: current line index, picked lines, etc.
+      5. Pass state to child components
+    props:
+      params: "{ id: string }"
+    hooks:
+      - "useAsync to fetch pick list data"
+      - "useState for current line index, picked quantity"
+      - "useCallback for pick confirmation handler"
+    layout:
+      - header: "PickConfirmationHeader"
+      - main: "PickLineCard (current line) or PickLinesTable (all lines)"
+      - modals: "ShortPickModal, AllergenWarningBanner"
+      - footer: "Action buttons (Confirm, Short Pick, Complete)"
+
+# Components
+components:
+  pick_confirmation_header:
+    path: "components/PickConfirmationHeader.tsx"
+    description: "Header with pick list details and progress"
+    type: "functional component"
+    props:
+      pickList: |
+        {
+          id: string;
+          pick_list_number: string;
+          status: string;
+          priority: string;
+          assigned_to: string;
+          assigned_user_name: string;
+          started_at: string;
+        }
+      salesOrders: |
+        {
+          id: string;
+          order_number: string;
+          customer_name: string;
+        }[]
+      progress: |
+        {
+          picked_count: number;
+          short_count: number;
+          total_count: number;
+          percentage: number;
+        }
+    renders:
+      - "Pick list number (large, bold)"
+      - "Status badge (color-coded)"
+      - "Priority indicator (🟢/🟡/🔴)"
+      - "Assigned to: username"
+      - "Progress bar (████████░░ percentage%)"
+      - "Counter: Picked X of Y lines (Z%)"
+      - "Breakdown: X picked, Y short picks"
+      - "Sales Orders: SO-002450, SO-002451 (linked)"
+      - "[Complete Pick List] button (disabled until all picked/short)"
+
+  pick_line_card:
+    path: "components/PickLineCard.tsx"
+    description: "Current pick line with product, location, LP, allergen info"
+    type: "functional component"
+    props:
+      line: |
+        {
+          id: string;
+          product_id: string;
+          product_name: string;
+          product_sku: string;
+          product_allergens: string[];
+          location: { zone: string; aisle: string; bin: string };
+          lp_number: string;
+          quantity_to_pick: number;
+          quantity_picked: number;
+          lot_number: string;
+          best_before_date: string;
+        }
+      customerAllergens: string[]
+      onPickConfirm: "(qty: number) => Promise<void>"
+      onShortPick: "(qty: number) => void"  # Opens modal
+    state:
+      - quantity: number (default = quantity_to_pick)
+      - isLoading: boolean
+      - allergenAcknowledged: boolean
+    renders:
+      - "Location: Zone → Aisle → Bin (large, prominent)"
+      - "Product: Name, SKU, Image thumbnail"
+      - "Lot: LOT-2025-001, Expiry: 2025-06-30"
+      - "LP barcode display (CODE128 + human-readable)"
+      - "Quantity input: default = quantity_to_pick (editable)"
+      - "+/– buttons to adjust quantity"
+      - "Allergen warning banner (if conflict detected)"
+      - "[Confirm Pick] button (primary, disabled if allergen + not acknowledged)"
+      - "[Short Pick] button (secondary)"
+      - "[Skip] button (tertiary)"
+    event_handlers:
+      - onQuantityChange: Update local state
+      - onAllergenAcknowledge: Unlock [Confirm Pick] button
+      - onConfirmClick: Validate & call onPickConfirm
+      - onShortPickClick: Open ShortPickModal
+
+  short_pick_modal:
+    path: "components/ShortPickModal.tsx"
+    description: "Modal for handling short pick with reason selection"
+    type: "functional component (Dialog)"
+    props:
+      isOpen: boolean
+      line: PickListLine
+      quantity_picked: number
+      onConfirm: "(reason: string, notes?: string) => Promise<void>"
+      onCancel: "() => void"
+    state:
+      - selectedReason: enum (required)
+      - notes: string (optional)
+      - isSubmitting: boolean
+    renders:
+      - "Short Pick Detected header"
+      - "Product: Pasta Sauce 500ml"
+      - "Required: 80 Units, Available: 70 Units, Short: 10 Units"
+      - "Reason dropdown (required):"
+        - "Insufficient Inventory (default)"
+        - "Damaged Units Found"
+        - "Wrong Lot / Expiry Issue"
+        - "Location Out of Stock"
+        - "Other (text field)"
+      - "Notes textarea (optional, max 500 chars)"
+      - "Search Warehouse button (alternative source)"
+      - "Backorder info: 'Backorder will be created for 10 Units'"
+      - "[Confirm Short Pick] button (primary)"
+      - "[Go Back] button (secondary)"
+      - "[Cancel & Skip] button (tertiary)"
+    validation:
+      - selectedReason required
+      - If reason='other', notes required
+
+  allergen_warning_banner:
+    path: "components/AllergenWarningBanner.tsx"
+    description: "Prominent warning if product allergen conflicts with customer restrictions"
+    type: "functional component (Alert)"
+    props:
+      product: { name: string; allergens: string[] }
+      customerRestrictions: string[]
+      onAcknowledge: "() => void"
+    renders:
+      - "Red/orange background alert"
+      - "Alert icon (⚠️)"
+      - "Text: 'ALLERGEN ALERT: This product contains GLUTEN. Customer is allergic to GLUTEN.'"
+      - "[✓] Acknowledge checkbox (required to unlock pick confirmation)"
+    logic: |
+      Display only if:
+        productAllergens.some(a => customerRestrictions.includes(a))
+
+  lp_barcode_display:
+    path: "components/LPBarcodeDisplay.tsx"
+    description: "Display LP barcode for scanner users, human-readable fallback"
+    type: "functional component"
+    props:
+      lp_number: string
+    renders:
+      - "Human-readable LP number (large font, top)"
+      - "CODE128 barcode image (scannable, middle)"
+      - "'Scan LP with handheld scanner' instruction text (bottom)"
+    libraries: "jsbarcode or bwip.js for barcode generation"
+
+  pick_progress_bar:
+    path: "components/PickProgressBar.tsx"
+    description: "Real-time progress indicator"
+    type: "functional component"
+    props:
+      pickedLines: number
+      shortLines: number
+      totalLines: number
+    renders:
+      - "Visual progress bar: ████████░░░░ (proportional fill)"
+      - "Percentage: 67%"
+      - "Text: 'Picked X of Y lines (Z%)'"
+      - "Breakdown: 'X picked, Y short picks'"
+    update_pattern: "Re-render on every pick confirmation (real-time)"
+
+  pick_lines_table:
+    path: "components/PickLinesTable.tsx"
+    description: "Alternative view: all pick lines in table format (desktop only)"
+    type: "functional component"
+    props:
+      lines: PickListLine[]
+      onLineClick: "(lineId: string) => void"
+    columns:
+      - "Ln #"
+      - "Product"
+      - "Location"
+      - "Qty Req"
+      - "Qty Pick"
+      - "LP Suggested"
+      - "Status"
+      - "Actions"
+    features:
+      - "Sorting by pick_sequence (default)"
+      - "Sorting by zone (optional)"
+      - "Filter by status (pending, picked, short)"
+      - "Clickable row opens PickLineCard or modal"
+      - "Status badge (✓ Picked, ◁ Pending, ◔ Short, ⚠ Alert)"
+
+# Types & Interfaces
+types:
+  pick_confirmation_types:
+    path: "types/pick-confirmation.ts"
+    exports: |
+      export interface PickList {
+        id: string;
+        pick_list_number: string;
+        status: 'pending' | 'assigned' | 'in_progress' | 'completed';
+        priority: 'low' | 'normal' | 'high' | 'urgent';
+        assigned_to: string;
+        assigned_user_name: string;
+        started_at: string | null;
+        completed_at: string | null;
+      }
+
+      export interface PickListLine {
+        id: string;
+        pick_list_id: string;
+        sales_order_line_id: string;
+        license_plate_id: string;
+        location_id: string;
+        product_id: string;
+        product_name: string;
+        product_sku: string;
+        product_allergens: string[];
+        quantity_to_pick: number;
+        quantity_picked: number;
+        status: 'pending' | 'picked' | 'short';
+        lot_number: string;
+        best_before_date: string;
+        pick_sequence: number;
+        picked_at: string | null;
+        picked_by: string | null;
+      }
+
+      export interface PickProgress {
+        picked_count: number;
+        short_count: number;
+        total_count: number;
+        percentage: number;
+      }
+
+      export interface ConfirmPickInput {
+        quantity_picked: number;
+        picked_license_plate_id: string;
+      }
+
+      export interface ShortPickInput {
+        quantity_picked: number;
+        reason: 'insufficient_inventory' | 'damaged' | 'expired' | 'location_empty' | 'quality_hold' | 'other';
+        notes?: string;
+        picked_license_plate_id?: string;
+      }
+
+# Hooks
+hooks:
+  use_pick_confirmation:
+    path: "hooks/usePickConfirmation.ts"
+    description: "Custom hook for pick confirmation logic"
+    signature: |
+      function usePickConfirmation(pickListId: string) {
+        const [pickList, setPickList] = useState<PickList | null>(null);
+        const [lines, setLines] = useState<PickListLine[]>([]);
+        const [progress, setProgress] = useState<PickProgress>({...});
+        const [isLoading, setIsLoading] = useState(true);
+        const [currentLineIndex, setCurrentLineIndex] = useState(0);
+
+        // Methods
+        const fetchPickList = async () => {...}
+        const confirmPick = async (lineId: string, qty: number) => {...}
+        const confirmShortPick = async (lineId: string, qty: number, reason: string) => {...}
+        const completePickList = async () => {...}
+        const updateProgress = (updatedLine: PickListLine) => {...}
+
+        return {
+          pickList,
+          lines,
+          progress,
+          isLoading,
+          currentLineIndex,
+          setCurrentLineIndex,
+          confirmPick,
+          confirmShortPick,
+          completePickList,
+          currentLine: lines[currentLineIndex]
+        };
+      }
+
+# State Management
+state_management:
+  approach: "React hooks + Server components"
+  no_redux: "Not needed for this story (can use context if extended)"
+  local_state_per_component:
+    - "PickLineCard: quantity, allergenAcknowledged"
+    - "ShortPickModal: selectedReason, notes"
+    - "Page component: currentLineIndex, isLoading"
+  shared_state:
+    - "Pick list data (fetched once at page load)"
+    - "Progress (updated after each pick confirmation)"
+
+# Responsive Design
+responsive:
+  desktop_desktop: "(> 1024px)"
+    layout: |
+      - Header (full width)
+      - Pick line card (center, wide)
+      - Modals (centered, 600px wide)
+      - Table view available as alternative
+    buttons: "Full labels, 48x48dp minimum"
+
+  tablet: "(768-1024px)"
+    layout: |
+      - Header (full width)
+      - Pick line card (stacked, full width)
+      - Modals (90% viewport width)
+    buttons: "Icons + abbreviated labels, 48x48dp"
+
+  mobile: "(< 768px)"
+    layout: |
+      - Header (full width)
+      - Pick line card (full screen, single item)
+      - Modals (full screen)
+    buttons: "Full width buttons, 56x56dp minimum"
+    features: |
+      - Simplified view (single line at a time)
+      - Swipe to next/previous line
+      - Quantity input with touch-friendly +/– buttons
+      - All modals full-screen
+
+# Accessibility (WCAG 2.1 AA)
+accessibility:
+  focus_management:
+    - "Skip link to pick lines table"
+    - "Focus ring: 2px solid #2563eb, offset 2px"
+    - "Modal focus trap (Tab loops within modal)"
+    - "Escape key closes modal"
+
+  keyboard_navigation:
+    - "Tab to cycle through interactive elements"
+    - "Enter/Space to activate buttons"
+    - "Arrow keys in dropdowns (reason selector)"
+    - "Ctrl+Enter to submit modal (shortcut)"
+
+  semantic_html:
+    - "<button> for interactive elements"
+    - "<input> for form fields"
+    - "<label> for form field labels"
+    - "<section> for logical groupings"
+    - "aria-label on icons and unlabeled buttons"
+    - "aria-live on progress updates"
+
+  screen_readers:
+    - "Announce pick progress: 'Picked 3 of 12 lines, 25%'"
+    - "Announce allergen alert: 'This product contains gluten, customer is allergic'"
+    - "Announce line status: 'Line 2 is pending, needs 50 units'"
+    - "Confirm pick action: 'Picked 50 units of Greek Yogurt'"
+
+# UX Patterns
+ux_patterns:
+  real_time_updates:
+    - "After confirming pick, progress updates without page reload"
+    - "UI shows 'Picking...' loading state during API call"
+    - "Success toast: 'Line picked successfully'"
+    - "Error toast: 'Cannot pick more than allocated (50 units)'"
+
+  confirmation_flows:
+    - "Full Pick: Quantity input → [Confirm Pick] → Success toast → Next line"
+    - "Short Pick: Quantity input → [Short Pick] → Reason modal → [Confirm] → Success → Next line"
+    - "Allergen Alert: Click pick → Red warning banner → [✓] Acknowledge → [Confirm Pick] enabled"
+
+  error_recovery:
+    - "Validation error: Highlight field in red + error message"
+    - "Permission error: Redirect to pick list list with error toast"
+    - "Network error: Show retry button + error message"
+    - "Business logic error: Show warning modal with next steps"
+
+  empty_states:
+    - "No pick list found: Show 404 page with [Back to Pick Lists] button"
+    - "All lines picked: Show completion summary + [Go to Packing] button"
+
+# Styling
+styling:
+  framework: "TailwindCSS + ShadCN UI components"
+  color_scheme:
+    - "Primary: #2563eb (blue)"
+    - "Success: #10b981 (green)"
+    - "Warning: #f59e0b (amber)"
+    - "Error: #ef4444 (red)"
+    - "Status badges: Green ✓, Yellow ◁, Orange ◔, Red ⚠"
+  typography:
+    - "Heading: text-2xl font-bold (pick list #)"
+    - "Subheading: text-lg font-semibold (location)"
+    - "Body: text-base (product name)"
+    - "Small: text-sm (metadata)"
+  spacing:
+    - "Gap between sections: 1rem"
+    - "Gap between components: 0.5rem"
+    - "Padding: 1rem (cards), 0.5rem (cells)"
+
+# Form Validation (Frontend)
+validation:
+  confirm_pick_form:
+    quantity_picked:
+      - "Required"
+      - "Positive number"
+      - "<= quantity_to_pick"
+      - "<= lp.quantity_on_hand"
+    error_messages: |
+      "Quantity is required"
+      "Quantity must be positive"
+      "Cannot pick more than allocated (X units)"
+      "Cannot pick more than available in LP (Y units)"
+
+  short_pick_form:
+    quantity_picked:
+      - "Required"
+      - "Positive number"
+      - "< quantity_to_pick (must be short)"
+    reason:
+      - "Required"
+      - "Must be in enum"
+    notes:
+      - "Max 500 characters (if reason='other', required)"
+    error_messages: |
+      "Short quantity must be less than required (X units)"
+      "Reason is required"
+      "Notes are required if reason is 'Other'"
+
+# Testing Strategy
+testing:
+  unit_tests:
+    - "PickConfirmationService.confirmPick()"
+    - "PickConfirmationService.confirmShortPick()"
+    - "AllergenWarningBanner allergen conflict detection"
+    - "Progress calculation logic"
+
+  integration_tests:
+    - "Start pick list → Pick line → Verify progress updates"
+    - "Confirm pick → Verify 4 table updates"
+    - "Short pick → Verify backorder created"
+    - "Complete pick list → Verify SO status updated"
+
+  e2e_tests:
+    - "Full happy path: Start → Pick all lines → Complete"
+    - "Short pick path: Start → Pick some → Short pick one → Complete"
+    - "Allergen flow: Detect conflict → Require acknowledgment → Allow pick"
+    - "Permission check: Non-assigned picker blocked"
+    - "Error handling: Invalid quantity rejected"

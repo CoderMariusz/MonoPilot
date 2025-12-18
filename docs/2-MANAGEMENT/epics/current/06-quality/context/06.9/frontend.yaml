@@ -1,0 +1,324 @@
+# Story 06.9 - Frontend Components & Pages
+# Purpose: Pages, components, services, styling
+# Agent: FRONTEND-DEV (UI focus)
+
+pages:
+  ncr_list:
+    path: "apps/frontend/app/(authenticated)/quality/ncrs/page.tsx"
+    description: "NCR list page with filters, search, pagination"
+    wireframe: "QA-009-ncr-list.md"
+    sections:
+      - name: "Header"
+        elements:
+          - "Breadcrumb: Quality > NCRs"
+          - "Page title: NCRs"
+          - "[+ Create NCR] button"
+          - "[Export] button"
+
+      - name: "Stats Cards (4 columns)"
+        elements:
+          - "Open NCRs card (count + % critical)"
+          - "Overdue NCRs card (count)"
+          - "Critical NCRs card (count)"
+          - "Avg Resolution Time card (days)"
+
+      - name: "Filters Bar"
+        elements:
+          - "Status dropdown (All, Draft, Open, Closed)"
+          - "Severity dropdown (All, Critical, Major, Minor)"
+          - "Detection Point dropdown (All, Incoming, In-Process, Final, Customer, etc.)"
+          - "Date range picker (From/To)"
+          - "Search input (NCR # or title)"
+
+      - name: "Bulk Actions"
+        elements:
+          - "[Select All] checkbox"
+          - "[Assign Selected] button"
+          - "[Export] button"
+
+      - name: "NCR DataTable"
+        elements:
+          - "Columns: Checkbox, NCR #, Title, Severity (badge), Status (badge), Detection Point (badge), Detected Date, Detected By, Actions (...)"
+          - "Row actions: View, Edit (draft only), Delete (draft only), ..."
+          - "Pagination: Page numbers, Previous/Next buttons"
+          - "Sorting: Clickable column headers"
+
+  ncr_detail:
+    path: "apps/frontend/app/(authenticated)/quality/ncrs/[id]/page.tsx"
+    description: "NCR detail page with status, source reference, actions"
+    wireframe: "QA-009-ncr-detail.md"
+    sections:
+      - name: "Header"
+        elements:
+          - "[< Back to NCRs] link"
+          - "[Actions ▼] menu (View, Edit, Submit, Close, Assign, Delete)"
+          - "[Print] button"
+
+      - name: "Info Card"
+        elements:
+          - "NCR number (bold)"
+          - "Severity badge (colored)"
+          - "Status badge (colored)"
+          - "Title and description"
+          - "Detected date, Detected by, Owner, Due date (for future phases)"
+
+      - name: "Workflow Progress (Phase 1)"
+        elements:
+          - "Simple status indicator: Draft -> Open -> Closed"
+          - "[Submit NCR] or [Close NCR] button (based on status)"
+
+      - name: "Tabs"
+        elements:
+          - "[Details] - Basic info, Detection, Source, Assignment, Closure"
+          - "Additional tabs for Phase 2 (Investigation, Root Cause, etc.)"
+
+      - name: "Details Tab Content"
+        elements:
+          - "Title, Description (read-only)"
+          - "Severity, Category, Detection Point (read-only)"
+          - "Detected Date, Detected By (read-only)"
+          - "Source Reference (if linked)"
+          - "Assigned To (if assigned)"
+          - "Closed Date, Closed By, Closure Notes (if closed)"
+
+  ncr_create_modal:
+    path: "components/quality/ncrs/CreateNCRModal.tsx"
+    description: "Modal for creating new NCR"
+    type: "modal"
+    elements:
+      - name: "Form Fields"
+        elements:
+          - "Title (text input, 5-200 chars)"
+          - "Description (textarea, 20-2000 chars)"
+          - "Severity (dropdown: Critical, Major, Minor)"
+          - "Detection Point (dropdown: Incoming, In-Process, Final, Customer, Internal Audit, Supplier Audit, Other)"
+          - "Category (dropdown, optional: Product Defect, Process Deviation, etc.)"
+          - "Source Type (dropdown, optional: Inspection, Hold, Batch, Work Order, etc.)"
+          - "Source ID (text input, optional)"
+          - "Source Description (text input, optional)"
+          - "[Submit immediately] checkbox (default: false = save as draft)"
+
+      - name: "Actions"
+        elements:
+          - "[Create NCR] button (loading state)"
+          - "[Cancel] button"
+
+components:
+  data_table:
+    path: "components/quality/ncrs/NCRDataTable.tsx"
+    description: "ShadCN DataTable for NCR listing"
+    features:
+      - "Sortable columns"
+      - "Selectable rows (checkbox)"
+      - "Pagination with limit selector"
+      - "Column visibility toggle"
+      - "Row click navigation to detail page"
+      - "Inline row actions menu"
+
+  filters:
+    path: "components/quality/ncrs/NCRFilters.tsx"
+    description: "Filter controls for NCR list"
+    elements:
+      - "Status dropdown"
+      - "Severity dropdown"
+      - "Detection Point dropdown"
+      - "Date range picker"
+      - "Search input (debounced)"
+      - "[Clear Filters] button"
+
+  badges:
+    - path: "components/quality/ncrs/NCRStatusBadge.tsx"
+      description: "Status badge (draft: gray, open: blue, closed: green)"
+    - path: "components/quality/ncrs/NCRSeverityBadge.tsx"
+      description: "Severity badge (critical: red, major: orange, minor: yellow)"
+    - path: "components/quality/ncrs/NCRDetectionPointBadge.tsx"
+      description: "Detection point badge with icon"
+
+  detail:
+    path: "components/quality/ncrs/NCRDetail.tsx"
+    description: "Container for detail page layout"
+    children:
+      - "NCRHeader"
+      - "NCRWorkflowProgress"
+      - "NCRDetailTabs"
+      - "NCRActions"
+
+  modals:
+    - path: "components/quality/ncrs/EditNCRModal.tsx"
+      description: "Modal to edit draft NCR"
+    - path: "components/quality/ncrs/CloseNCRDialog.tsx"
+      description: "Dialog to close NCR with notes (QA Manager only)"
+      elements:
+        - "Closure notes textarea (50-2000 chars)"
+        - "Character counter"
+        - "[Close NCR] button"
+    - path: "components/quality/ncrs/AssignNCRModal.tsx"
+      description: "Modal to assign NCR to user"
+      elements:
+        - "User dropdown (QA roles)"
+        - "[Assign] button"
+    - path: "components/quality/ncrs/SubmitNCRDialog.tsx"
+      description: "Confirmation dialog to submit draft"
+      elements:
+        - "Confirmation message"
+        - "[Submit] button"
+        - "[Cancel] button"
+    - path: "components/quality/ncrs/DeleteNCRDialog.tsx"
+      description: "Confirmation dialog to delete draft"
+      elements:
+        - "Warning message"
+        - "[Delete] button (danger style)"
+        - "[Cancel] button"
+
+  actions_menu:
+    path: "components/quality/ncrs/NCRActions.tsx"
+    description: "Action buttons based on NCR status and user permissions"
+    actions:
+      draft:
+        - "[Edit]"
+        - "[Submit]"
+        - "[Delete]"
+      open:
+        - "[Assign]"
+        - "[Close]"
+      closed:
+        - "[View Details]"
+
+  summary_card:
+    path: "components/quality/ncrs/NCRSummaryCard.tsx"
+    description: "Summary card for dashboard widget"
+    elements:
+      - "NCR number (link to detail)"
+      - "Title (truncated)"
+      - "Severity badge"
+      - "Status badge"
+      - "Owner name"
+      - "Due date"
+
+# Hooks/Context
+hooks:
+  - name: "useNCRList"
+    path: "hooks/quality/useNCRList.ts"
+    description: "Hook for fetching NCR list with filters"
+    returns: "{ ncrs, loading, error, pagination, filters, setFilters }"
+
+  - name: "useNCRDetail"
+    path: "hooks/quality/useNCRDetail.ts"
+    description: "Hook for fetching NCR detail"
+    returns: "{ ncr, loading, error, permissions }"
+
+  - name: "useNCRActions"
+    path: "hooks/quality/useNCRActions.ts"
+    description: "Hook for NCR mutations (create, update, delete, etc.)"
+    returns: "{ create, update, delete, submit, close, assign }"
+
+# Services (Frontend)
+services:
+  - path: "lib/services/ncr-service.ts"
+    description: "Service for NCR API calls"
+    methods:
+      - name: "list"
+        params: ["params: NCRListParams"]
+        returns: "Promise<PaginatedResult<NCRReport>>"
+      - name: "getById"
+        params: ["id: string"]
+        returns: "Promise<NCRDetailResponse>"
+      - name: "create"
+        params: ["data: CreateNCRInput"]
+        returns: "Promise<NCRReport>"
+      - name: "update"
+        params: ["id: string", "data: UpdateNCRInput"]
+        returns: "Promise<NCRReport>"
+      - name: "delete"
+        params: ["id: string"]
+        returns: "Promise<void>"
+      - name: "submit"
+        params: ["id: string"]
+        returns: "Promise<NCRReport>"
+      - name: "close"
+        params: ["id: string", "closureNotes: string"]
+        returns: "Promise<NCRReport>"
+      - name: "assign"
+        params: ["id: string", "assignedToId: string"]
+        returns: "Promise<NCRReport>"
+
+# Types
+types:
+  - path: "lib/types/ncr.ts"
+    description: "NCR TypeScript interfaces (see api.yaml for details)"
+
+# Validation
+validation:
+  - path: "lib/validation/ncr.ts"
+    description: "Zod schemas for client-side validation (see api.yaml for details)"
+
+# Styling
+styling:
+  component_design:
+    severity_colors:
+      critical: "bg-red-100 text-red-800 border-red-300"
+      major: "bg-orange-100 text-orange-800 border-orange-300"
+      minor: "bg-yellow-100 text-yellow-800 border-yellow-300"
+
+    status_colors:
+      draft: "bg-gray-100 text-gray-800 border-gray-300"
+      open: "bg-blue-100 text-blue-800 border-blue-300"
+      closed: "bg-green-100 text-green-800 border-green-300"
+
+    detection_point_icons:
+      incoming: "📥"
+      in_process: "⚙️"
+      final: "✓"
+      customer: "👥"
+      internal_audit: "📋"
+      supplier_audit: "🏭"
+      other: "❓"
+
+  responsive:
+    breakpoints:
+      mobile: "max-width: 640px - Hide Detection Point, Detected By columns"
+      tablet: "768px-1024px - Collapse some columns, stack stats vertically"
+      desktop: "1024px+ - Full layout"
+
+# UX Patterns (from wireframes)
+ux_patterns:
+  ncr_list_page:
+    layout: "Dashboard-style header with stats, filters, then DataTable"
+    filters: "Horizontal filter bar above table"
+    search: "Global search for NCR # or title with debounce"
+    pagination: "20 items per page by default"
+    sorting: "By detected_date DESC (newest first)"
+    bulk_actions: "Row selection with bulk assign/export"
+
+  ncr_detail_page:
+    layout: "Breadcrumb, Header card, Workflow progress, Tabbed content"
+    tabs: "Details (Phase 1), plus placeholder tabs for Phase 2"
+    actions: "Context menu (ellipsis) for edit/delete/close/assign"
+    source_link: "Clickable link to source inspection/hold if linked"
+    back_button: "Back to NCRs list navigation"
+
+# Accessibility
+accessibility:
+  - "ARIA labels on all buttons and form fields"
+  - "Keyboard navigation support (Tab, Enter, Escape)"
+  - "Color not sole indicator (badges include icons/text)"
+  - "Form validation errors displayed inline and in summary"
+  - "Focus visible on interactive elements"
+  - "Modal focus trapping and escape key handling"
+
+# Performance
+performance:
+  - "Virtual scrolling for large NCR lists (500+ items)"
+  - "Lazy load NCR detail content (tabs)"
+  - "Debounced search input (300ms)"
+  - "Pagination prevents loading all NCRs at once"
+  - "React Query for caching and background refetch"
+  - "Image lazy loading for attachments (Phase 2)"
+
+# Mobile Considerations
+mobile:
+  - "Responsive DataTable (stack columns on mobile)"
+  - "Full-screen modals instead of overlays on mobile"
+  - "Touch-friendly button sizes (min 44px)"
+  - "Swipe to close modals"
+  - "Horizontal scroll for table if needed"

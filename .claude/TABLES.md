@@ -1,332 +1,78 @@
-# Database Tables - Quick Schema Reference
+# Tables Reference
 
-> AI: Użyj tego zamiast czytać migracje SQL
+## Standard Table Formats
 
----
-
-## Core Tables
-
-### organizations
-```
-id, name, slug, settings (jsonb),
-wizard_completed, wizard_step, logo_url,
-created_at, updated_at
+### Task Table
+```markdown
+| ID | Task | Priority | Status | Owner |
+|----|------|----------|--------|-------|
+| T-001 | Task name | P1 | In Progress | Agent |
 ```
 
-### users
-```
-id, email, first_name, last_name, role, org_id,
-status (invited/active/inactive), last_login_at,
-created_by, updated_by, created_at, updated_at
-```
-
-### user_sessions
-```
-id, user_id, token, ip_address, user_agent,
-expires_at, created_at
+### Story Table
+```markdown
+| ID | Story | Complexity | Type | Status |
+|----|-------|------------|------|--------|
+| S-1.1 | Story title | M | Backend | Ready |
 ```
 
-### user_invitations
-```
-id, email, role, org_id, invited_by,
-token, status, expires_at, created_at
-```
-
-### user_preferences
-```
-id, user_id, preferences (jsonb), created_at, updated_at
+### Bug Table
+```markdown
+| ID | Bug | Severity | Priority | Status |
+|----|-----|----------|----------|--------|
+| BUG-001 | Bug title | High | P1 | Open |
 ```
 
-### activity_logs
-```
-id, org_id, user_id, action, entity_type, entity_id,
-details (jsonb), created_at
-```
-
----
-
-## Settings Tables
-
-### warehouses
-```
-id, org_id, name, code, address, is_active,
-is_default, created_at, updated_at
+### Decision Table
+```markdown
+| Date | Decision | Made By | Impact |
+|------|----------|---------|--------|
+| YYYY-MM-DD | Decision text | Agent | Description |
 ```
 
-### locations
-```
-id, org_id, warehouse_id, name, code, type,
-is_active, created_at, updated_at
-```
-
-### machines
-```
-id, org_id, name, code, type, status,
-is_active, created_at, updated_at
+### Risk Table
+```markdown
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Risk description | Low/Med/High | Low/Med/High | Mitigation plan |
 ```
 
-### machine_line_assignments
-```
-id, machine_id, line_id, is_primary, created_at
-```
-
-### production_lines
-```
-id, org_id, warehouse_id, name, code,
-is_active, created_at, updated_at
+### Metric Table
+```markdown
+| Metric | Current | Target | Trend |
+|--------|---------|--------|-------|
+| Metric name | Value | Value | Up/Down/Stable |
 ```
 
-### allergens
-```
-id, org_id, name, code, description, eu_code,
-is_eu_standard, is_active, created_at, updated_at
-```
-
-### tax_codes
-```
-id, org_id, name, code, rate, description,
-is_default, is_active, created_at, updated_at
+### Agent Status Table
+```markdown
+| Agent | Status | Current Task | Last Active |
+|-------|--------|--------------|-------------|
+| Agent name | Idle/Active | Task or - | Timestamp |
 ```
 
----
-
-## Technical Tables
-
-### products
-```
-id, org_id, name, sku, description, type,
-unit_of_measure, cost, price, status,
-is_active, created_at, updated_at
+### Dependency Table
+```markdown
+| Item | Depends On | Type | Status |
+|------|------------|------|--------|
+| Task/Story | Dependency | Hard/Soft | Resolved/Pending |
 ```
 
-### product_version_history
-```
-id, product_id, version, changes (jsonb),
-changed_by, created_at
-```
+## Status Values
+- Todo
+- In Progress
+- Blocked
+- Review
+- Done
 
-### product_allergens
-```
-id, product_id, allergen_id, level (contains/may_contain/free),
-created_at
-```
+## Priority Values
+- P0: Critical
+- P1: High
+- P2: Medium
+- P3: Low
 
-### product_type_config
-```
-id, org_id, type_code, name, settings (jsonb),
-is_active, created_at, updated_at
-```
-
-### technical_settings
-```
-id, org_id, settings (jsonb), created_at, updated_at
-```
-
-### boms (Bill of Materials)
-```
-id, org_id, product_id, routing_id, version, status,
-output_qty, output_uom, effective_from, effective_to,
-units_per_box, boxes_per_pallet, notes,
-created_by, updated_by, created_at, updated_at
-```
-
-### bom_items
-```
-id, bom_id, component_id, operation_seq, is_output,
-quantity, uom, scrap_percent, sequence,
-line_ids (uuid[]), consume_whole_lp, notes,
-created_at, updated_at
-```
-
-### bom_item_alternatives
-```
-id, bom_item_id, alternative_component_id,
-priority, quantity_ratio, notes, created_at
-```
-
-### bom_production_lines
-```
-id, bom_id, line_id, labor_cost_per_hour, created_at
-```
-
-### routings
-```
-id, org_id, name, code, description,
-is_active, created_at, updated_at
-```
-
-### routing_operations
-```
-id, routing_id, name, sequence, duration,
-machine_id, line_id, instructions,
-created_at, updated_at
-```
-
-### product_routings
-```
-id, product_id, routing_id, is_default, created_at
-```
-
----
-
-## Planning Tables
-
-### suppliers
-```
-id, org_id, name, code, contact_name, email, phone,
-address, is_active, created_at, updated_at
-```
-
-### supplier_products
-```
-id, supplier_id, product_id, supplier_sku,
-lead_time_days, min_order_qty, price,
-created_at, updated_at
-```
-
-### purchase_orders
-```
-id, org_id, supplier_id, po_number, status,
-order_date, expected_date, total_amount,
-notes, created_at, updated_at
-```
-
-### po_lines
-```
-id, po_id, product_id, quantity, unit_price,
-received_qty, status, created_at, updated_at
-```
-
-### po_approvals
-```
-id, org_id, po_id, status (pending/approved/rejected),
-approved_by (FK users), approved_at, rejection_reason,
-comments, created_at
-```
-
-### po_status_history
-```
-id, po_id, status, changed_by, created_at
-```
-
-### planning_settings
-```
-id, org_id, settings (jsonb), created_at, updated_at
-```
-
-### work_orders
-```
-id, org_id, wo_number, product_id, bom_id, routing_id,
-quantity, status, scheduled_start, scheduled_end,
-actual_start, actual_end, line_id,
-created_at, updated_at
-```
-
-### wo_materials
-```
-id, org_id, work_order_id, product_id, product_code, product_name,
-quantity_per, quantity_required, quantity_issued, consumed_qty, uom,
-bom_id, bom_item_id, line_number, consume_whole_lp,
-created_at, updated_at
-```
-
-### wo_operations
-```
-id, wo_id, operation_id, sequence, status,
-planned_duration, actual_duration,
-started_at, completed_at, created_at, updated_at
-```
-
-### wo_consumption
-```
-id, org_id, wo_id, material_id, reservation_id, lp_id,
-consumed_qty, uom, consumed_by_user_id, consumed_at,
-operation_id, status (consumed/reversed),
-reversed_at, reversed_by_user_id, reverse_reason,
-notes, created_at, updated_at
-```
-
-### lp_movements
-```
-id, org_id, lp_id, movement_type,
-qty_change, qty_before, qty_after, uom,
-wo_id, po_id, consumption_id,
-created_by_user_id, created_at, notes
-```
-
-### transfer_orders
-```
-id, org_id, to_number, status,
-from_warehouse_id, to_warehouse_id,
-planned_ship_date, planned_receive_date,
-actual_ship_date, actual_receive_date,
-notes, created_by, updated_by,
-created_at, updated_at
-```
-
-### to_lines
-```
-id, to_id, product_id, quantity, received_qty,
-status, created_at, updated_at
-```
-
-### to_line_lps
-```
-id, to_line_id, lp_id, quantity, created_at
-```
-
-### to_status_history
-```
-id, to_id, status, changed_by, created_at
-```
-
----
-
-## Warehouse Tables
-
-### license_plates
-```
-id, org_id, lp_number, product_id, quantity,
-status, location_id, expiry_date,
-lot_number, batch_number,
-created_at, updated_at
-```
-
-### lp_genealogy
-```
-id, parent_lp_id, child_lp_id, relationship_type,
-quantity, created_at
-```
-
-### traceability_links
-```
-id, org_id, source_type, source_id,
-target_type, target_id, link_type,
-quantity, created_at
-```
-
-### recall_simulations
-```
-id, org_id, name, criteria (jsonb),
-results (jsonb), created_at
-```
-
----
-
-## Common Patterns
-
-### Wszystkie tabele mają:
-- `id` - UUID primary key
-- `org_id` - FK do organizations (multi-tenant)
-- `created_at`, `updated_at` - timestamps
-
-### RLS Pattern:
-```sql
--- Wszystkie tabele: authenticated users only
-USING (true) / WITH CHECK (true)
-```
-
-### Status Enums:
-- **PO/TO/WO**: draft, pending, approved, in_progress, completed, cancelled
-- **Products**: active, inactive, discontinued
-- **LP**: available, reserved, consumed, expired
+## Complexity Values
+- S: Small (< 2 hours)
+- M: Medium (2-4 hours)
+- L: Large (4-8 hours)
+- XL: Extra Large (> 8 hours, should split)

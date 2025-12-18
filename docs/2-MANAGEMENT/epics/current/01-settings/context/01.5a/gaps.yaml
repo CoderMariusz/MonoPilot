@@ -1,0 +1,380 @@
+# Story 01.5a - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+
+gap_summary:
+  overall_readiness: "25%"
+  critical_blockers: 2
+  components_done: 1
+  components_partial: 3
+  components_missing: 12
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "users table"
+    expected: "From 01.1 - role_id UUID FK, warehouse_access_ids UUID[]"
+    found: "PARTIAL - uses role VARCHAR(20) enum, no warehouse_access_ids"
+    status: "PARTIAL"
+    gap_description: |
+      Table exists but schema mismatch from 01.1:
+      - Current: role VARCHAR(20) with enum values
+      - Required: role_id UUID FK to roles(id) per ADR-012
+      - Missing: warehouse_access_ids UUID[] column for Phase 1B
+    refactor_action: "Migration 057_migrate_users_role_to_role_id.sql (from 01.1)"
+    priority: "P0-BLOCKER"
+    dependency: "Story 01.1 must complete first"
+
+  - component: "RLS policies for users table"
+    expected: "ADR-013 pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+    found: "Uses auth.jwt() ->> 'org_id' (JWT claim)"
+    status: "WRONG_PATTERN"
+    gap_description: |
+      RLS pattern mismatch - same issue as 01.1
+      Current: JWT claim for org isolation
+      Required: Users table lookup per ADR-013
+    refactor_action: "Migration 058_update_rls_policies_adr013.sql (from 01.1)"
+    priority: "P0-BLOCKER"
+    dependency: "Story 01.1 must complete first"
+
+  - component: "users table admin write policy"
+    expected: "Only SUPER_ADMIN and ADMIN can write"
+    found: "Generic admin role check"
+    status: "PARTIAL"
+    gap_description: |
+      Current policy checks for role = 'admin'
+      Required: Check for role.code IN ('SUPER_ADMIN', 'ADMIN')
+    refactor_action: "Update RLS policy after role_id migration"
+    priority: "P0"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/users"
+    expected: "Paginated user list with search/filter"
+    found: "NOT FOUND (exists at /api/settings/users but missing v1 prefix and features)"
+    status: "PARTIAL"
+    gap_description: |
+      Existing endpoint /api/settings/users exists but:
+      - Wrong path (no /v1 prefix)
+      - Missing pagination
+      - Missing search by name/email
+      - Missing role filter
+      - Missing status filter
+      - Returns users without joined role data
+    refactor_action: "Create new /api/v1/settings/users with full features"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/users"
+    expected: "Create user with role_id FK"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No user creation endpoint exists"
+    refactor_action: "Create endpoint per api.yaml spec"
+    priority: "P0"
+
+  - component: "PUT /api/v1/settings/users/:id"
+    expected: "Update user with role_id FK"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No user update endpoint exists"
+    refactor_action: "Create endpoint per api.yaml spec"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/users/:id/deactivate"
+    expected: "Deactivate user with self-protection logic"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No deactivation endpoint exists"
+    refactor_action: "Create endpoint with self-protection checks"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/users/:id/activate"
+    expected: "Reactivate user"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No activation endpoint exists"
+    refactor_action: "Create endpoint per api.yaml spec"
+    priority: "P1"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "user-service.ts"
+    expected: "apps/frontend/lib/services/user-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No user service exists. Required methods:
+      - getUsers(params: UsersListParams): Promise<UsersListResponse>
+      - createUser(data: CreateUserRequest): Promise<User>
+      - updateUser(id, data: UpdateUserRequest): Promise<User>
+      - deactivateUser(id: string): Promise<void>
+      - activateUser(id: string): Promise<void>
+      - canDeactivate(userId, currentUserId): Promise<{ allowed, reason }>
+    refactor_action: "Create new file per api.yaml service spec"
+    priority: "P0"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "user-schemas.ts"
+    expected: "apps/frontend/lib/validation/user-schemas.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No Zod schemas for user validation. Required schemas:
+      - createUserSchema (email, first_name, last_name, role_id, language)
+      - updateUserSchema (optional fields)
+    refactor_action: "Create validation schemas per api.yaml"
+    priority: "P0"
+
+# =============================================================================
+# FRONTEND GAPS
+# =============================================================================
+frontend_gaps:
+  pages:
+    - component: "/settings/users/page.tsx"
+      expected: "User list page with DataTable"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No users page exists in Settings"
+      refactor_action: "Create page per SET-008 wireframe"
+      priority: "P0"
+
+  components:
+    - component: "UsersDataTable.tsx"
+      expected: "DataTable with search, filter, pagination"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No users table component"
+      refactor_action: "Create using ShadCN DataTable pattern"
+      priority: "P0"
+
+    - component: "UserModal.tsx"
+      expected: "Create/Edit modal with validation"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No user modal component"
+      refactor_action: "Create using ShadCN Dialog + Form"
+      priority: "P0"
+
+    - component: "UserRow.tsx"
+      expected: "Table row with actions"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No user row component"
+      refactor_action: "Create per SET-008 wireframe"
+      priority: "P1"
+
+    - component: "UserStatusBadge.tsx"
+      expected: "Active/Inactive badge"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No status badge component"
+      refactor_action: "Create using ShadCN Badge"
+      priority: "P1"
+
+    - component: "DeactivateConfirmDialog.tsx"
+      expected: "Confirmation dialog"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No confirmation dialog"
+      refactor_action: "Create using ShadCN AlertDialog"
+      priority: "P1"
+
+  hooks:
+    - component: "use-users.ts"
+      expected: "React Query hook for user list"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No hook for fetching users"
+      refactor_action: "Create React Query hook"
+      priority: "P0"
+
+    - component: "use-create-user.ts"
+      expected: "Mutation hook for creating user"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No mutation hook"
+      refactor_action: "Create React Query mutation"
+      priority: "P0"
+
+    - component: "use-update-user.ts"
+      expected: "Mutation hook for updating user"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No mutation hook"
+      refactor_action: "Create React Query mutation"
+      priority: "P0"
+
+    - component: "use-deactivate-user.ts"
+      expected: "Mutation hook for deactivating user"
+      found: "NOT FOUND"
+      status: "MISSING"
+      gap_description: "No mutation hook"
+      refactor_action: "Create React Query mutation"
+      priority: "P0"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "User interface (extended)"
+    expected: "User type with role join, warehouse_access_ids"
+    found: "PARTIAL - basic User type exists without joins"
+    status: "PARTIAL"
+    gap_description: |
+      Basic User type exists but missing:
+      - role?: Role (joined data)
+      - warehouse_access_ids: string[] | null
+    refactor_action: "Extend User type in lib/types/user.ts"
+    priority: "P1"
+
+  - component: "CreateUserRequest"
+    expected: "Request type for POST /api/v1/settings/users"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No request type defined"
+    refactor_action: "Create in lib/types/user.ts"
+    priority: "P1"
+
+  - component: "UpdateUserRequest"
+    expected: "Request type for PUT /api/v1/settings/users/:id"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No request type defined"
+    refactor_action: "Create in lib/types/user.ts"
+    priority: "P1"
+
+  - component: "UsersListParams"
+    expected: "Query params type for GET /api/v1/settings/users"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No params type defined"
+    refactor_action: "Create in lib/types/user.ts"
+    priority: "P1"
+
+  - component: "UsersListResponse"
+    expected: "Response type for paginated user list"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No response type defined"
+    refactor_action: "Create in lib/types/user.ts"
+    priority: "P1"
+
+# =============================================================================
+# WIREFRAME GAPS
+# =============================================================================
+wireframe_gaps:
+  - component: "SET-008 wireframe"
+    expected: "User list wireframe at docs/.../wireframes/SET-008-user-list.md"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No wireframe documentation"
+    refactor_action: "Create wireframe or reference existing UX design"
+    priority: "P2"
+
+  - component: "SET-009 wireframe"
+    expected: "User modal wireframe at docs/.../wireframes/SET-009-user-modal.md"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No wireframe documentation"
+    refactor_action: "Create wireframe or reference existing UX design"
+    priority: "P2"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "Story 01.1 Incomplete"
+    description: "This story depends on 01.1 completing (role_id migration, RLS update)"
+    migrations:
+      - "055_create_roles_table.sql"
+      - "057_migrate_users_role_to_role_id.sql"
+      - "058_update_rls_policies_adr013.sql"
+    risk: "HIGH - cannot implement without proper schema"
+
+  - blocker: "No user-service.ts"
+    description: "All API endpoints and components depend on this service"
+    file: "lib/services/user-service.ts"
+    risk: "MEDIUM - blocks both API and UI development"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_1_prerequisites:
+    note: "Wait for 01.1 to complete"
+    dependencies:
+      - "Story 01.1: Database migrations (role_id FK, RLS update)"
+      - "Story 01.2: Settings shell and navigation"
+      - "Story 01.6: System roles seeded"
+
+  phase_2_backend:
+    - "lib/validation/user-schemas.ts (Zod schemas)"
+    - "lib/services/user-service.ts (business logic)"
+    - "app/api/v1/settings/users/route.ts (GET, POST)"
+    - "app/api/v1/settings/users/[id]/route.ts (PUT)"
+    - "app/api/v1/settings/users/[id]/deactivate/route.ts (PATCH)"
+    - "app/api/v1/settings/users/[id]/activate/route.ts (PATCH)"
+
+  phase_3_types:
+    - "lib/types/user.ts (extend User, add request/response types)"
+
+  phase_4_hooks:
+    - "lib/hooks/use-users.ts"
+    - "lib/hooks/use-create-user.ts"
+    - "lib/hooks/use-update-user.ts"
+    - "lib/hooks/use-deactivate-user.ts"
+
+  phase_5_components:
+    - "components/settings/users/UserStatusBadge.tsx"
+    - "components/settings/users/DeactivateConfirmDialog.tsx"
+    - "components/settings/users/UserRow.tsx"
+    - "components/settings/users/UserModal.tsx"
+    - "components/settings/users/UsersDataTable.tsx"
+
+  phase_6_pages:
+    - "app/(authenticated)/settings/users/page.tsx"
+
+  phase_7_tests:
+    - "Unit tests for user-service"
+    - "Integration tests for API endpoints"
+    - "Component tests for DataTable and Modal"
+    - "E2E tests for user CRUD flow"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] Story 01.1 complete (role_id FK, RLS updated)"
+  - "[ ] users.role_id column exists and populated"
+  - "[ ] users.warehouse_access_ids column exists (NULL in MVP)"
+  - "[ ] GET /api/v1/settings/users returns paginated users with role join"
+  - "[ ] POST /api/v1/settings/users creates user with role_id"
+  - "[ ] PUT /api/v1/settings/users/:id updates user"
+  - "[ ] PATCH deactivate blocks self and last Super Admin"
+  - "[ ] Users list page renders at /settings/users"
+  - "[ ] DataTable shows role names (not codes)"
+  - "[ ] UserModal hides warehouse access field (MVP)"
+  - "[ ] Search/filter/pagination work correctly"
+  - "[ ] Permission enforcement hides actions from non-admins"
+  - "[ ] All tests pass (unit, integration, component, e2e)"
+  - "[ ] Performance targets met (500ms list, 300ms search)"
+
+# =============================================================================
+# PHASE 1B PREVIEW (Story 01.5b)
+# =============================================================================
+phase_1b_changes:
+  note: "Story 01.5b will enable warehouse access restrictions"
+  changes:
+    - "Unhide warehouse access multi-select in UserModal (SET-009 lines 49-117)"
+    - "Add warehouse_access_ids to CreateUserRequest/UpdateUserRequest"
+    - "Add warehouse access column to UsersDataTable"
+    - "Add RLS enforcement for warehouse-scoped operations"
+    - "Add validation for warehouse_access_ids (must be valid UUIDs for org)"

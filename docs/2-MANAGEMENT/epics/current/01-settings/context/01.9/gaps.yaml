@@ -1,0 +1,298 @@
+# Story 01.9 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+
+gap_summary:
+  overall_readiness: "5%"
+  critical_blockers: 2
+  components_done: 0
+  components_partial: 0
+  components_missing: 12
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "locations table"
+    expected: "supabase/migrations/061_create_locations_table.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      CRITICAL: No locations table exists.
+      Story requires: id, org_id, warehouse_id, parent_id (self-referencing),
+      code, name, level (enum), full_path (computed), depth, location_type (enum),
+      max_pallets, current_pallets, max_weight_kg, current_weight_kg, is_active,
+      audit fields (created_at, created_by, updated_at, updated_by).
+    refactor_action: "Migration 061_create_locations_table.sql with enums and triggers"
+    priority: "P0-BLOCKER"
+
+  - component: "location_level enum"
+    expected: "ENUM: zone, aisle, rack, bin"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Required for hierarchical level validation."
+    refactor_action: "Create enum in 061 migration"
+    priority: "P0-BLOCKER"
+
+  - component: "location_type enum"
+    expected: "ENUM: bulk, pallet, shelf, floor, staging"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Required for storage type classification."
+    refactor_action: "Create enum in 061 migration"
+    priority: "P0-BLOCKER"
+
+  - component: "compute_location_full_path() trigger function"
+    expected: "Auto-compute full_path on INSERT/UPDATE"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Database trigger to compute full_path from warehouse code + parent path + code.
+      Example: 'WH-001/ZONE-A/A01/R01/B001'
+    refactor_action: "Create trigger function in 061 migration"
+    priority: "P0-BLOCKER"
+
+  - component: "validate_location_hierarchy() trigger function"
+    expected: "Enforce level hierarchy: zone > aisle > rack > bin"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Database trigger to validate parent-child level relationships.
+      Prevents invalid combinations like: bin under zone, rack under aisle, etc.
+    refactor_action: "Create trigger function in 061 migration"
+    priority: "P0-BLOCKER"
+
+  - component: "RLS policies for locations"
+    expected: "Org isolation via ADR-013 users lookup"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      RLS policies required:
+      - SELECT: org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      - INSERT: org_id check + warehouse ownership check + parent ownership check
+      - UPDATE: org_id check
+      - DELETE: org_id check
+    refactor_action: "Migration 062_locations_rls_policies.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "locations indexes"
+    expected: "Indexes on: org_id, warehouse_id, parent_id, level, type, full_path"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Performance indexes required for tree queries and filters."
+    refactor_action: "Create indexes in 061 migration"
+    priority: "P1"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "location-service.ts"
+    expected: "apps/frontend/lib/services/location-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No location service exists.
+      Required methods: list(), getById(), create(), update(), delete(),
+      getTree(), getAncestors(), getDescendants(), canDelete(), validateHierarchy(),
+      updateCapacity().
+    refactor_action: "Create new file per story specification"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "Location interface"
+    expected: "apps/frontend/lib/types/location.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No TypeScript interface for Location entity."
+    refactor_action: "Create lib/types/location.ts"
+    priority: "P1"
+
+  - component: "LocationNode interface"
+    expected: "LocationNode with children array for tree structure"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Tree node interface with nested children."
+    refactor_action: "Create in lib/types/location.ts"
+    priority: "P1"
+
+  - component: "LocationLevel and LocationType types"
+    expected: "Enum types matching database enums"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Type-safe level and type enums."
+    refactor_action: "Create in lib/types/location.ts"
+    priority: "P1"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/settings/warehouses/:id/locations"
+    expected: "List locations (tree or flat view)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No locations API endpoint exists."
+    refactor_action: "Create route at path above"
+    priority: "P0-BLOCKER"
+
+  - component: "POST /api/settings/warehouses/:id/locations"
+    expected: "Create location with hierarchy validation"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No create endpoint."
+    refactor_action: "Create route"
+    priority: "P0-BLOCKER"
+
+  - component: "PUT /api/settings/warehouses/:id/locations/:id"
+    expected: "Update location (immutable: code, level, parent_id)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No update endpoint."
+    refactor_action: "Create route"
+    priority: "P0-BLOCKER"
+
+  - component: "DELETE /api/settings/warehouses/:id/locations/:id"
+    expected: "Delete with children/inventory validation"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No delete endpoint with validation."
+    refactor_action: "Create route"
+    priority: "P0-BLOCKER"
+
+  - component: "GET /api/settings/warehouses/:id/locations/:id/tree"
+    expected: "Get subtree under location"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No tree subtree endpoint."
+    refactor_action: "Create route"
+    priority: "P1"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "LocationTree.tsx"
+    expected: "Hierarchical tree view with expand/collapse"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No tree view component exists."
+    refactor_action: "Create components/settings/locations/LocationTree.tsx"
+    priority: "P0-BLOCKER"
+
+  - component: "LocationModal.tsx"
+    expected: "Create/Edit form modal"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No modal component for location forms."
+    refactor_action: "Create components/settings/locations/LocationModal.tsx"
+    priority: "P0-BLOCKER"
+
+  - component: "CapacityIndicator.tsx"
+    expected: "Visual capacity indicator with color states"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No capacity indicator component."
+    refactor_action: "Create components/settings/locations/CapacityIndicator.tsx"
+    priority: "P1"
+
+  - component: "LocationBreadcrumb.tsx"
+    expected: "Breadcrumb path display with navigation"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No breadcrumb component for full_path display."
+    refactor_action: "Create components/settings/locations/LocationBreadcrumb.tsx"
+    priority: "P1"
+
+  - component: "Locations page"
+    expected: "app/(authenticated)/settings/warehouses/[id]/locations/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No locations page exists."
+    refactor_action: "Create page with tree view layout"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "location.ts validation schemas"
+    expected: "Zod schemas: createLocationSchema, updateLocationSchema"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No validation schemas for location input."
+    refactor_action: "Create lib/validation/location.ts"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "No Warehouses Table"
+    description: "Locations depend on warehouses table (FK: warehouse_id)"
+    dependency: "Story 01.8 - Warehouses CRUD"
+    risk: "HIGH - cannot create locations without warehouses"
+
+  - blocker: "No locations table"
+    description: "Core table missing - entire story blocked"
+    migration: "061_create_locations_table.sql"
+    risk: "HIGH - story cannot proceed"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_1_database:
+    - "Ensure Story 01.8 (Warehouses) is complete"
+    - "061_create_locations_table.sql (table + enums + triggers + indexes)"
+    - "062_locations_rls_policies.sql"
+
+  phase_2_services:
+    - "lib/services/location-service.ts"
+
+  phase_3_api:
+    - "app/api/settings/warehouses/[warehouseId]/locations/route.ts (GET, POST)"
+    - "app/api/settings/warehouses/[warehouseId]/locations/[id]/route.ts (GET, PUT, DELETE)"
+    - "app/api/settings/warehouses/[warehouseId]/locations/[id]/tree/route.ts (GET)"
+
+  phase_4_types:
+    - "lib/types/location.ts"
+
+  phase_5_validation:
+    - "lib/validation/location.ts"
+
+  phase_6_components:
+    - "components/settings/locations/LocationTree.tsx"
+    - "components/settings/locations/LocationModal.tsx"
+    - "components/settings/locations/CapacityIndicator.tsx"
+    - "components/settings/locations/LocationBreadcrumb.tsx"
+
+  phase_7_pages:
+    - "app/(authenticated)/settings/warehouses/[id]/locations/page.tsx"
+
+  phase_8_tests:
+    - "Unit tests for location-service"
+    - "Integration tests for API + triggers"
+    - "E2E tests for tree view"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] Locations table created with all columns"
+  - "[ ] location_level and location_type enums created"
+  - "[ ] compute_location_full_path() trigger works correctly"
+  - "[ ] validate_location_hierarchy() trigger enforces rules"
+  - "[ ] RLS policies block cross-tenant access (2-org test)"
+  - "[ ] All 6 API endpoints functional"
+  - "[ ] Tree view displays hierarchical structure"
+  - "[ ] Expand/collapse persists state"
+  - "[ ] Capacity indicator shows correct colors"
+  - "[ ] Breadcrumb displays full path"
+  - "[ ] Delete blocked for locations with children"
+  - "[ ] Delete blocked for locations with inventory"
+  - "[ ] Code uniqueness enforced per warehouse"
+  - "[ ] 404 (not 403) for cross-tenant resource access"

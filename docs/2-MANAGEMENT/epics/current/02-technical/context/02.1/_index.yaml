@@ -1,0 +1,134 @@
+# Story 02.1 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.1"
+  name: "Products CRUD + Types"
+  slug: "products-crud-types"
+  epic: "02-technical"
+  phase: "MVP"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Pages, components, services, validation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table"
+        - "roles table"
+        - "RLS pattern (ADR-013)"
+        - "org-context-service.ts"
+        - "permission-service.ts"
+  blocked_by: []
+  blocks:
+    - story: "02.2"
+      name: "Product Versioning + History"
+    - story: "02.3"
+      name: "Allergen Declaration"
+    - story: "02.5"
+      name: "BOM CRUD"
+    - story: "02.6"
+      name: "BOM Items Management"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.1"   # Product CRUD
+      - "FR-2.5"   # Product types
+      - "FR-2.6"   # Product status
+      - "FR-2.7"   # Product search and filters
+      - "FR-2.8"   # Technical settings
+      - "FR-2.13"  # Product standard price
+      - "FR-2.14"  # Product expiry policy
+      - "FR-2.15"  # Product cost validation (RM/PKG warning)
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+      - "Row Level Security (RLS) Policies"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.1.products-crud-types.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-001-products-list.md"
+      id: "TEC-001"
+      name: "Products List"
+      components:
+        - "DataTable"
+        - "Search/Filter Bar"
+        - "Status Badges"
+        - "Type Badges"
+        - "Allergen Indicators"
+        - "Actions Menu"
+        - "Pagination"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-002-product-modal.md"
+      id: "TEC-002"
+      name: "Product Create/Edit Modal"
+      components:
+        - "Modal Container"
+        - "Form Fields"
+        - "Section Headers"
+        - "Validation Icons"
+        - "Warning Banners"
+        - "Nested Modals"
+        - "Version History Panel"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-010-product-level-lead-time-moq.md"
+      relevance: "Lead time and MOQ fields on product table"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for multi-tenancy"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "products + product_types tables with RLS + seed data"
+  - type: "api"
+    count: 6
+    description: "CRUD endpoints for products and product-types"
+  - type: "service"
+    count: 2
+    description: "product-service.ts, product-type-service.ts"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for product CRUD"
+  - type: "types"
+    count: 1
+    description: "TypeScript interfaces for products"
+  - type: "page"
+    count: 1
+    description: "/technical/products list page"
+  - type: "component"
+    count: 9
+    description: "DataTable, Modal, Badges, Filters, etc."
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Foundation story for Technical module - all subsequent stories depend on this"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "SKU (code) and product_type_id are IMMUTABLE after creation"
+  - "Version auto-increments on edit (deferred to Story 02.2)"
+  - "Product types seeded: RM, WIP, FG, PKG, BP"
+  - "lead_time_days defaults to 7 (per ADR-010)"
+  - "Cost warning for RM/PKG without cost_per_unit (FR-2.15)"
+  - "std_price field for costing baseline (FR-2.13)"

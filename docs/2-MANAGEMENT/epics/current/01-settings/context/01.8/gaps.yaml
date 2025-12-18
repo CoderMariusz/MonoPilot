@@ -1,0 +1,519 @@
+# Story 01.8 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+
+gap_summary:
+  overall_readiness: "5%"
+  critical_blockers: 2
+  components_done: 0
+  components_partial: 0
+  components_missing: 26
+  notes: "Story depends on 01.1 (Org Context + RLS) which has gaps. Address 01.1 gaps first."
+
+# =============================================================================
+# DEPENDENCY GAPS (Blockers from Story 01.1)
+# =============================================================================
+dependency_gaps:
+  - dependency: "Story 01.1 - Org Context + Base RLS"
+    readiness: "17%"
+    blockers:
+      - "RLS pattern mismatch (JWT claims vs users lookup)"
+      - "No roles table (required for permission checks)"
+      - "No org-context-service.ts"
+      - "No permission-service.ts"
+    impact: "Cannot implement warehouse RLS policies or permission checks until 01.1 complete"
+    recommendation: "Complete Story 01.1 migrations and services before starting 01.8"
+
+  - dependency: "Story 01.2 - Settings Shell Navigation"
+    readiness: "Unknown"
+    blockers: ["Not assessed yet"]
+    impact: "May lack /settings route structure and layout"
+
+  - dependency: "Story 01.6 - Role Permissions"
+    readiness: "Unknown"
+    blockers: ["Not assessed yet"]
+    impact: "May lack role-based permission enforcement in API routes"
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "warehouses table"
+    expected: "supabase/migrations/065_create_warehouses_table.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No warehouses table exists in codebase.
+      Required schema:
+      - id, org_id, code, name, type, address, contact_email, contact_phone
+      - is_default, is_active, location_count
+      - disabled_at, disabled_by, created_at, updated_at, created_by, updated_by
+      - Constraints: org_code_unique, type_check, code_format, address_length, phone_length
+      - Indexes: org_id, org_code, org_type, org_active, org_default
+    refactor_action: "Create migration 065_create_warehouses_table.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "warehouses RLS policies"
+    expected: "supabase/migrations/066_warehouses_rls_policies.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No RLS policies for warehouses table.
+      Required policies (ADR-013 pattern):
+      - warehouses_select: All authenticated users can read org warehouses
+      - warehouses_insert: Only ADMIN, WAREHOUSE_MANAGER can create
+      - warehouses_update: Only ADMIN, WAREHOUSE_MANAGER can update
+      - warehouses_delete: Only SUPER_ADMIN, ADMIN can delete
+    refactor_action: "Create migration 066_warehouses_rls_policies.sql (after 01.1 RLS pattern fixed)"
+    priority: "P0-BLOCKER"
+
+  - component: "ensure_single_default_warehouse trigger"
+    expected: "Database trigger for atomic default assignment"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No trigger to ensure only one default warehouse per org.
+      Required: BEFORE INSERT OR UPDATE OF is_default trigger
+      Function: ensure_single_default_warehouse() to unset previous default
+    refactor_action: "Include in migration 065_create_warehouses_table.sql"
+    priority: "P0"
+
+  - component: "update_updated_at trigger"
+    expected: "Auto-update updated_at timestamp"
+    found: "PARTIAL - function may exist globally"
+    status: "PARTIAL"
+    gap_description: "Need to apply trigger to warehouses table"
+    refactor_action: "Include in migration 065_create_warehouses_table.sql"
+    priority: "P1"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "warehouse-service.ts"
+    expected: "apps/frontend/lib/services/warehouse-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No warehouse service exists.
+      Required methods:
+      - list(params) - List with filters, pagination
+      - getById(id) - Get single warehouse
+      - create(data) - Create with validation
+      - update(id, data) - Update with code immutability check
+      - delete(id) - Soft delete
+      - setDefault(id) - Atomic default assignment
+      - disable(id) - Disable with validation
+      - enable(id) - Enable warehouse
+      - validateCode(code, excludeId?) - Real-time code validation
+      - hasActiveInventory(id) - Check for active LPs
+      - canDisable(id) - Business rule validation
+    refactor_action: "Create lib/services/warehouse-service.ts"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "warehouse.ts Zod schemas"
+    expected: "apps/frontend/lib/validation/warehouse.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No Zod schemas for warehouse validation.
+      Required schemas:
+      - warehouseTypeEnum (5 types)
+      - createWarehouseSchema (code, name, type, address, contact_email, contact_phone, is_active)
+      - updateWarehouseSchema (partial, conditional code validation)
+      - setDefaultSchema (warehouse_id)
+      Code validation: ^[A-Z0-9-]{2,20}$, auto-uppercase transform
+      Address: max 500 chars
+      Email: standard email validation
+      Phone: max 20 chars
+    refactor_action: "Create lib/validation/warehouse.ts"
+    priority: "P0"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "warehouse.ts TypeScript types"
+    expected: "apps/frontend/lib/types/warehouse.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No TypeScript types for warehouses.
+      Required types:
+      - WarehouseType (5 enum values)
+      - Warehouse interface (17 fields)
+      - WarehouseListParams (search, type, status, sort, order, page, limit)
+      - CreateWarehouseInput
+      - UpdateWarehouseInput
+      - WAREHOUSE_TYPE_LABELS (display labels)
+      - WAREHOUSE_TYPE_DESCRIPTIONS (tooltips)
+      - WAREHOUSE_TYPE_COLORS (badge colors)
+    refactor_action: "Create lib/types/warehouse.ts"
+    priority: "P1"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/warehouses"
+    expected: "List warehouses with filters"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No warehouse list endpoint exists"
+    refactor_action: "Create app/api/v1/settings/warehouses/route.ts (GET, POST)"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/warehouses/:id"
+    expected: "Get warehouse by ID"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Create app/api/v1/settings/warehouses/[id]/route.ts (GET, PUT, DELETE)"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/warehouses"
+    expected: "Create warehouse"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Include in app/api/v1/settings/warehouses/route.ts"
+    priority: "P0"
+
+  - component: "PUT /api/v1/settings/warehouses/:id"
+    expected: "Update warehouse"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Include in app/api/v1/settings/warehouses/[id]/route.ts"
+    priority: "P0"
+
+  - component: "DELETE /api/v1/settings/warehouses/:id"
+    expected: "Soft delete warehouse"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Include in app/api/v1/settings/warehouses/[id]/route.ts"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/warehouses/:id/set-default"
+    expected: "Set as default"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Create app/api/v1/settings/warehouses/[id]/set-default/route.ts"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/warehouses/:id/disable"
+    expected: "Disable warehouse"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Create app/api/v1/settings/warehouses/[id]/disable/route.ts"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/warehouses/:id/enable"
+    expected: "Enable warehouse"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Create app/api/v1/settings/warehouses/[id]/enable/route.ts"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/warehouses/validate-code"
+    expected: "Validate code uniqueness"
+    found: "NOT FOUND"
+    status: "MISSING"
+    refactor_action: "Create app/api/v1/settings/warehouses/validate-code/route.ts"
+    priority: "P1"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "useWarehouses"
+    expected: "apps/frontend/lib/hooks/use-warehouses.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "React Query hook for warehouse list"
+    refactor_action: "Create hook after API endpoint exists"
+    priority: "P1"
+
+  - component: "useWarehouse"
+    expected: "apps/frontend/lib/hooks/use-warehouse.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "React Query hook for single warehouse"
+    refactor_action: "Create hook after API endpoint exists"
+    priority: "P1"
+
+  - component: "use-warehouse-mutations.ts"
+    expected: "React Query mutations for CRUD"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Mutations: create, update, delete, setDefault, disable, enable"
+    refactor_action: "Create hook after API endpoints exist"
+    priority: "P1"
+
+# =============================================================================
+# PAGE GAPS
+# =============================================================================
+page_gaps:
+  - component: "/settings/warehouses page"
+    expected: "apps/frontend/app/(authenticated)/settings/warehouses/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No warehouse list page exists"
+    refactor_action: "Create page after DataTable component ready"
+    priority: "P0"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "WarehousesDataTable"
+    expected: "components/settings/warehouses/WarehousesDataTable.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Main data table with sorting, filtering, pagination (SET-012)"
+    refactor_action: "Create component using ShadCN DataTable pattern"
+    priority: "P0"
+
+  - component: "WarehouseModal"
+    expected: "components/settings/warehouses/WarehouseModal.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Create/Edit modal (SET-013)"
+    refactor_action: "Create component using ShadCN Dialog + React Hook Form"
+    priority: "P0"
+
+  - component: "WarehouseRow"
+    expected: "components/settings/warehouses/WarehouseRow.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Table row with secondary address line"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "WarehouseTypeBadge"
+    expected: "components/settings/warehouses/WarehouseTypeBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Badge with 5 color variants"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "WarehouseStatusBadge"
+    expected: "components/settings/warehouses/WarehouseStatusBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Active/Disabled status badge"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "WarehouseActionsMenu"
+    expected: "components/settings/warehouses/WarehouseActionsMenu.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Dropdown with edit, set default, disable actions"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "WarehouseFilters"
+    expected: "components/settings/warehouses/WarehouseFilters.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Search + type/status filters"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "SetDefaultConfirmDialog"
+    expected: "components/settings/warehouses/SetDefaultConfirmDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Confirmation dialog for default change"
+    refactor_action: "Create component using ShadCN AlertDialog"
+    priority: "P1"
+
+  - component: "DisableConfirmDialog"
+    expected: "components/settings/warehouses/DisableConfirmDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Confirmation with inventory check warning"
+    refactor_action: "Create component using ShadCN AlertDialog"
+    priority: "P1"
+
+  - component: "WarehouseTypeSelect"
+    expected: "components/settings/warehouses/WarehouseTypeSelect.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Dropdown with tooltips"
+    refactor_action: "Create component using ShadCN Select + Tooltip"
+    priority: "P1"
+
+  - component: "WarehouseAddressSection"
+    expected: "components/settings/warehouses/WarehouseAddressSection.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "3-line textarea with char counter"
+    refactor_action: "Create component using ShadCN Textarea"
+    priority: "P2"
+
+  - component: "WarehouseContactSection"
+    expected: "components/settings/warehouses/WarehouseContactSection.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Email + phone inputs with validation"
+    refactor_action: "Create component using ShadCN Input"
+    priority: "P2"
+
+# =============================================================================
+# UX GAPS (Wireframes)
+# =============================================================================
+ux_gaps:
+  - component: "SET-012 wireframe"
+    expected: "docs/3-ARCHITECTURE/ux/wireframes/SET-012-warehouse-list.md"
+    found: "UNKNOWN"
+    status: "UNKNOWN"
+    gap_description: "Warehouse list page wireframe"
+    refactor_action: "Verify wireframe exists or create"
+    priority: "P1"
+
+  - component: "SET-013 wireframe"
+    expected: "docs/3-ARCHITECTURE/ux/wireframes/SET-013-warehouse-create-edit-modal.md"
+    found: "UNKNOWN"
+    status: "UNKNOWN"
+    gap_description: "Warehouse modal wireframe"
+    refactor_action: "Verify wireframe exists or create"
+    priority: "P1"
+
+# =============================================================================
+# TEST GAPS
+# =============================================================================
+test_gaps:
+  - component: "warehouse-service.test.ts"
+    expected: "Unit tests for service"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+  - component: "warehouses API integration tests"
+    expected: "Integration tests for all endpoints"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+  - component: "warehouses E2E tests"
+    expected: "E2E tests for critical flows"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+  - component: "warehouses RLS tests"
+    expected: "SQL tests for RLS policies"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "Story 01.1 Incomplete"
+    description: "Dependency story 01.1 (Org Context + RLS) has critical gaps"
+    mitigation: "Complete Story 01.1 first (RLS pattern, roles table, services)"
+    risk: "HIGH - cannot implement warehouse RLS or permissions"
+    estimated_effort: "2 days (Story 01.1 completion)"
+
+  - blocker: "No warehouses table"
+    description: "Core table does not exist"
+    mitigation: "Create migration 065_create_warehouses_table.sql with all constraints and triggers"
+    risk: "HIGH - blocks all warehouse functionality"
+    estimated_effort: "2 hours"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_0_dependencies:
+    - "Complete Story 01.1 (Org Context + Base RLS)"
+    - "Verify Story 01.2 (Settings Shell) ready"
+    - "Verify Story 01.6 (Role Permissions) ready"
+
+  phase_1_database:
+    - "065_create_warehouses_table.sql (table + constraints + triggers)"
+    - "066_warehouses_rls_policies.sql (4 RLS policies)"
+
+  phase_2_backend:
+    - "lib/types/warehouse.ts (TypeScript types)"
+    - "lib/validation/warehouse.ts (Zod schemas)"
+    - "lib/services/warehouse-service.ts (business logic)"
+
+  phase_3_api:
+    - "app/api/v1/settings/warehouses/route.ts (GET, POST)"
+    - "app/api/v1/settings/warehouses/[id]/route.ts (GET, PUT, DELETE)"
+    - "app/api/v1/settings/warehouses/[id]/set-default/route.ts (PATCH)"
+    - "app/api/v1/settings/warehouses/[id]/disable/route.ts (PATCH)"
+    - "app/api/v1/settings/warehouses/[id]/enable/route.ts (PATCH)"
+    - "app/api/v1/settings/warehouses/validate-code/route.ts (GET)"
+
+  phase_4_hooks:
+    - "lib/hooks/use-warehouses.ts"
+    - "lib/hooks/use-warehouse.ts"
+    - "lib/hooks/use-warehouse-mutations.ts"
+
+  phase_5_components:
+    - "WarehouseTypeBadge.tsx"
+    - "WarehouseStatusBadge.tsx"
+    - "WarehouseTypeSelect.tsx"
+    - "WarehouseAddressSection.tsx"
+    - "WarehouseContactSection.tsx"
+    - "SetDefaultConfirmDialog.tsx"
+    - "DisableConfirmDialog.tsx"
+    - "WarehouseModal.tsx"
+    - "WarehouseFilters.tsx"
+    - "WarehouseActionsMenu.tsx"
+    - "WarehouseRow.tsx"
+    - "WarehousesDataTable.tsx"
+
+  phase_6_page:
+    - "app/(authenticated)/settings/warehouses/page.tsx"
+
+  phase_7_tests:
+    - "warehouse-service.test.ts (unit)"
+    - "warehouses.test.ts (integration)"
+    - "warehouses.spec.ts (e2e)"
+    - "warehouses-rls.test.sql (RLS)"
+
+# =============================================================================
+# ESTIMATED EFFORT
+# =============================================================================
+estimated_effort:
+  dependency_resolution: "2 days (Story 01.1)"
+  database: "4 hours (migrations + triggers)"
+  backend: "6 hours (service + validation + types)"
+  api: "8 hours (9 endpoints)"
+  hooks: "2 hours (3 hooks)"
+  components: "12 hours (11 components)"
+  page: "2 hours (1 page)"
+  tests: "8 hours (unit + integration + e2e)"
+  total_after_dependencies: "42 hours (~5-6 days)"
+  total_with_dependencies: "58 hours (~7-8 days)"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] Story 01.1 complete (RLS pattern, roles table, services)"
+  - "[ ] warehouses table exists with all constraints"
+  - "[ ] ensure_single_default_warehouse trigger works"
+  - "[ ] RLS policies block cross-tenant access"
+  - "[ ] All 9 API endpoints functional"
+  - "[ ] warehouse-service.ts implements all 11 methods"
+  - "[ ] Zod schemas validate all inputs"
+  - "[ ] WarehousesDataTable renders with data"
+  - "[ ] WarehouseModal create/edit modes work"
+  - "[ ] Set default action is atomic"
+  - "[ ] Disable validation blocks active inventory"
+  - "[ ] Code immutability enforced"
+  - "[ ] Permission matrix enforced"
+  - "[ ] 404 (not 403) for cross-tenant access"
+  - "[ ] Unit tests >= 80% coverage"
+  - "[ ] Integration tests pass"
+  - "[ ] E2E tests pass"

@@ -1,0 +1,235 @@
+# Story 02.2 - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_product_version_history.sql"
+    type: "migration"
+    description: "Product version history table with RLS and indexes"
+    dependencies:
+      - "products table (from Story 02.1)"
+      - "users table (from Story 01.1)"
+
+tables:
+  - name: "product_version_history"
+    description: "Audit log of all product changes with version tracking"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE" }
+      - { name: "version", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "changed_fields", type: "JSONB", constraints: "NOT NULL DEFAULT '{}'" }
+      - { name: "changed_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "changed_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "product_id IN (SELECT id FROM products WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - name: "idx_product_version_history_product_id"
+        columns: ["product_id", "version DESC"]
+        description: "Fast lookup by product with descending version order"
+      - name: "idx_product_version_history_changed_at"
+        columns: ["product_id", "changed_at DESC"]
+        description: "Support date range filters"
+      - name: "idx_product_version_history_changed_by"
+        columns: ["changed_by"]
+        description: "Find all changes by a specific user"
+    constraints:
+      - name: "pk_product_version_history"
+        type: "UNIQUE"
+        columns: ["product_id", "version"]
+        description: "Ensure unique version number per product"
+      - name: "chk_version_positive"
+        type: "CHECK"
+        expression: "version >= 1"
+        description: "Version must be at least 1"
+
+# RLS Policies (ADR-013 pattern)
+rls_policies:
+  pattern: "Product lookup for org isolation"
+  pattern_sql: "product_id IN (SELECT id FROM products WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+  rationale:
+    - "Inherits org isolation from products table"
+    - "User can only see history for products in their organization"
+    - "Consistent with ADR-013 approach"
+
+  policies:
+    - table: "product_version_history"
+      name: "product_version_history_select"
+      operation: "SELECT"
+      using: "product_id IN (SELECT id FROM products WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+      description: "Users can read version history for products in their org"
+
+    - table: "product_version_history"
+      name: "product_version_history_insert"
+      operation: "INSERT"
+      with_check: "product_id IN (SELECT id FROM products WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+      description: "Users can create history records for products in their org"
+
+    - table: "product_version_history"
+      name: "product_version_history_no_update"
+      operation: "UPDATE"
+      using: "false"
+      description: "History records are immutable - no updates allowed"
+
+    - table: "product_version_history"
+      name: "product_version_history_no_delete"
+      operation: "DELETE"
+      using: "false"
+      description: "History records are immutable - no deletes allowed"
+
+# Database trigger for version increment
+triggers:
+  - name: "trg_product_version_increment"
+    table: "products"
+    timing: "BEFORE UPDATE"
+    description: "Auto-increment product version on any field change"
+    function: "fn_product_version_increment"
+    function_body: |
+      CREATE OR REPLACE FUNCTION fn_product_version_increment()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_changed_fields JSONB := '{}';
+        v_field_name TEXT;
+        v_old_value JSONB;
+        v_new_value JSONB;
+      BEGIN
+        -- Compare relevant fields and build changed_fields JSONB
+        FOREACH v_field_name IN ARRAY ARRAY[
+          'name', 'description', 'base_uom', 'status', 'barcode', 'gtin',
+          'category_id', 'lead_time_days', 'moq', 'expiry_policy',
+          'shelf_life_days', 'std_price', 'cost_per_unit', 'min_stock',
+          'max_stock', 'storage_conditions', 'is_perishable'
+        ]
+        LOOP
+          EXECUTE format('SELECT to_jsonb($1.%I), to_jsonb($2.%I)', v_field_name, v_field_name)
+          INTO v_old_value, v_new_value
+          USING OLD, NEW;
+
+          IF v_old_value IS DISTINCT FROM v_new_value THEN
+            v_changed_fields := v_changed_fields || jsonb_build_object(
+              v_field_name,
+              jsonb_build_object('old', v_old_value, 'new', v_new_value)
+            );
+          END IF;
+        END LOOP;
+
+        -- If no fields actually changed, skip version increment
+        IF v_changed_fields = '{}' THEN
+          RETURN NEW;
+        END IF;
+
+        -- Increment version
+        NEW.version := OLD.version + 1;
+        NEW.updated_at := NOW();
+
+        -- Insert history record
+        INSERT INTO product_version_history (product_id, version, changed_fields, changed_by, changed_at)
+        VALUES (NEW.id, NEW.version, v_changed_fields, NEW.updated_by, NOW());
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  - name: "trg_product_initial_version"
+    table: "products"
+    timing: "AFTER INSERT"
+    description: "Create initial version history record on product creation"
+    function: "fn_product_initial_version"
+    function_body: |
+      CREATE OR REPLACE FUNCTION fn_product_initial_version()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Create initial version history record
+        INSERT INTO product_version_history (product_id, version, changed_fields, changed_by, changed_at)
+        VALUES (
+          NEW.id,
+          1,
+          jsonb_build_object('_initial', true),  -- Flag for initial creation
+          NEW.created_by,
+          NEW.created_at
+        );
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+# JSONB Schema for changed_fields
+jsonb_schema:
+  changed_fields:
+    description: "JSONB object tracking field changes"
+    format: |
+      {
+        "field_name": {
+          "old": <any>,
+          "new": <any>
+        },
+        ...
+      }
+    examples:
+      - description: "Name and shelf life changed"
+        value: |
+          {
+            "name": {"old": "Bread", "new": "White Bread"},
+            "shelf_life_days": {"old": 5, "new": 7}
+          }
+      - description: "Initial creation"
+        value: |
+          {
+            "_initial": true
+          }
+
+# SQL Migration Template
+migration_template: |
+  -- Migration: Create product_version_history table
+  -- Story: 02.2 Product Versioning + History
+  -- PRD: FR-2.2, FR-2.3
+
+  -- Create table
+  CREATE TABLE IF NOT EXISTS product_version_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    changed_fields JSONB NOT NULL DEFAULT '{}',
+    changed_by UUID NOT NULL REFERENCES users(id),
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT pk_product_version_history UNIQUE (product_id, version),
+    CONSTRAINT chk_version_positive CHECK (version >= 1)
+  );
+
+  -- Create indexes
+  CREATE INDEX IF NOT EXISTS idx_product_version_history_product_id
+    ON product_version_history(product_id, version DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_product_version_history_changed_at
+    ON product_version_history(product_id, changed_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_product_version_history_changed_by
+    ON product_version_history(changed_by);
+
+  -- Enable RLS
+  ALTER TABLE product_version_history ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policies
+  CREATE POLICY product_version_history_select ON product_version_history
+    FOR SELECT
+    USING (product_id IN (
+      SELECT id FROM products
+      WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    ));
+
+  CREATE POLICY product_version_history_insert ON product_version_history
+    FOR INSERT
+    WITH CHECK (product_id IN (
+      SELECT id FROM products
+      WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    ));
+
+  CREATE POLICY product_version_history_no_update ON product_version_history
+    FOR UPDATE
+    USING (false);
+
+  CREATE POLICY product_version_history_no_delete ON product_version_history
+    FOR DELETE
+    USING (false);
+
+  -- Comment
+  COMMENT ON TABLE product_version_history IS 'Audit log of product changes with version tracking (Story 02.2, FR-2.2, FR-2.3)';

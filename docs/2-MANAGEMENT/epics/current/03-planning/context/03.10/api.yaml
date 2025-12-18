@@ -1,0 +1,555 @@
+# Story 03.10 - API Specification
+# Purpose: Endpoints, request/response schemas, services, validation
+# Agent: BACKEND-DEV (API focus)
+
+# API Route Files
+api_routes:
+  - path: "apps/frontend/app/api/planning/work-orders/route.ts"
+    description: "List + Create WO endpoints"
+    methods: ["GET", "POST"]
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/route.ts"
+    description: "Get, Update, Delete single WO"
+    methods: ["GET", "PUT", "DELETE"]
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/plan/route.ts"
+    description: "Plan WO (draft -> planned)"
+    methods: ["POST"]
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/release/route.ts"
+    description: "Release WO (planned -> released)"
+    methods: ["POST"]
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/cancel/route.ts"
+    description: "Cancel WO"
+    methods: ["POST"]
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/history/route.ts"
+    description: "Get status history"
+    methods: ["GET"]
+  - path: "apps/frontend/app/api/planning/work-orders/bom-for-date/route.ts"
+    description: "Auto-select BOM for product/date"
+    methods: ["GET"]
+  - path: "apps/frontend/app/api/planning/work-orders/available-boms/route.ts"
+    description: "Get all active BOMs for product"
+    methods: ["GET"]
+  - path: "apps/frontend/app/api/planning/work-orders/next-number/route.ts"
+    description: "Preview next WO number"
+    methods: ["GET"]
+  - path: "apps/frontend/app/api/planning/work-orders/validate-product/route.ts"
+    description: "Validate product has active BOM"
+    methods: ["GET"]
+
+# Endpoints Specification
+endpoints:
+  # List Work Orders
+  - method: "GET"
+    path: "/api/planning/work-orders"
+    description: "List work orders with pagination and filters"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager", "production_operator", "viewer"]
+    query_params:
+      - { name: "search", type: "string", required: false, description: "Filter by WO number or product name/code (min 2 chars)" }
+      - { name: "product_id", type: "UUID", required: false, description: "Filter by product" }
+      - { name: "status", type: "string", required: false, description: "Filter by status (comma-separated)" }
+      - { name: "line_id", type: "UUID", required: false, description: "Filter by production line" }
+      - { name: "machine_id", type: "UUID", required: false, description: "Filter by machine" }
+      - { name: "priority", type: "string", required: false, description: "Filter by priority" }
+      - { name: "date_from", type: "date", required: false, description: "Scheduled date from" }
+      - { name: "date_to", type: "date", required: false, description: "Scheduled date to" }
+      - { name: "sort", type: "string", required: false, default: "created_at", description: "Sort field" }
+      - { name: "order", type: "string", required: false, default: "desc", description: "Sort order (asc/desc)" }
+      - { name: "page", type: "number", required: false, default: 1, description: "Page number" }
+      - { name: "limit", type: "number", required: false, default: 20, description: "Items per page (max 100)" }
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "WOListItem[]"
+        meta:
+          total: "number"
+          page: "number"
+          limit: "number"
+          pages: "number"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "INVALID_PARAMS", message: "Invalid query parameters" }
+
+  # Create Work Order
+  - method: "POST"
+    path: "/api/planning/work-orders"
+    description: "Create new work order with BOM auto-selection"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request_body:
+      type: "CreateWOInput"
+      schema:
+        product_id: { type: "UUID", required: true }
+        bom_id: { type: "UUID", required: false, note: "Auto-selected if not provided" }
+        planned_quantity: { type: "number", required: true, validation: "> 0" }
+        uom: { type: "string", required: false, note: "Defaults to product.base_uom" }
+        planned_start_date: { type: "date", required: true, validation: "not more than 1 day in past" }
+        planned_end_date: { type: "date", required: false }
+        scheduled_start_time: { type: "time", required: false }
+        scheduled_end_time: { type: "time", required: false }
+        production_line_id: { type: "UUID", required: false }
+        machine_id: { type: "UUID", required: false }
+        priority: { type: "string", required: false, default: "normal", enum: ["low", "normal", "high", "critical"] }
+        source_of_demand: { type: "string", required: false, enum: ["manual", "po", "customer_order", "forecast"] }
+        source_reference: { type: "string", required: false, max_length: 50 }
+        expiry_date: { type: "date", required: false }
+        notes: { type: "string", required: false, max_length: 2000 }
+    response:
+      status: 201
+      schema:
+        success: true
+        data: "WorkOrderWithRelations"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 400, code: "NO_ACTIVE_BOM", message: "No active BOM found for product on scheduled date" }
+      - { status: 404, code: "PRODUCT_NOT_FOUND", message: "Product not found" }
+
+  # Get Work Order by ID
+  - method: "GET"
+    path: "/api/planning/work-orders/:id"
+    description: "Get single work order with relations"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "WorkOrderWithRelations"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Work order not found" }
+
+  # Update Work Order
+  - method: "PUT"
+    path: "/api/planning/work-orders/:id"
+    description: "Update work order (status-dependent field restrictions)"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request_body:
+      type: "UpdateWOInput"
+      note: "Fields allowed depend on current status"
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "WorkOrderWithRelations"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "Work order not found" }
+      - { status: 400, code: "FIELD_LOCKED", message: "Cannot modify {field} after status {status}" }
+
+  # Delete Work Order
+  - method: "DELETE"
+    path: "/api/planning/work-orders/:id"
+    description: "Delete draft work order (only draft status, no materials)"
+    auth: "required"
+    roles: ["owner", "admin", "planner"]
+    response:
+      status: 200
+      schema:
+        success: true
+        message: "Work order deleted successfully"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "Work order not found" }
+      - { status: 400, code: "INVALID_STATUS", message: "Only draft work orders can be deleted" }
+      - { status: 400, code: "HAS_MATERIALS", message: "Cannot delete WO with materials" }
+
+  # Plan Work Order
+  - method: "POST"
+    path: "/api/planning/work-orders/:id/plan"
+    description: "Transition WO from draft to planned"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request_body:
+      schema:
+        notes: { type: "string", required: false, max_length: 500 }
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "WorkOrderWithRelations"
+    errors:
+      - { status: 400, code: "INVALID_TRANSITION", message: "Cannot plan WO from current status" }
+      - { status: 400, code: "NO_BOM", message: "Cannot plan WO without BOM" }
+
+  # Release Work Order
+  - method: "POST"
+    path: "/api/planning/work-orders/:id/release"
+    description: "Transition WO from planned to released"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    request_body:
+      schema:
+        notes: { type: "string", required: false, max_length: 500 }
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "WorkOrderWithRelations"
+    errors:
+      - { status: 400, code: "INVALID_TRANSITION", message: "Cannot release WO from current status" }
+
+  # Cancel Work Order
+  - method: "POST"
+    path: "/api/planning/work-orders/:id/cancel"
+    description: "Cancel work order (draft, planned, or released only)"
+    auth: "required"
+    roles: ["owner", "admin", "planner"]
+    request_body:
+      schema:
+        reason: { type: "string", required: false, max_length: 500 }
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "WorkOrderWithRelations"
+    errors:
+      - { status: 400, code: "INVALID_TRANSITION", message: "Cannot cancel WO from current status" }
+      - { status: 400, code: "HAS_PRODUCTION", message: "Cannot cancel WO with production activity" }
+
+  # Get Status History
+  - method: "GET"
+    path: "/api/planning/work-orders/:id/history"
+    description: "Get status transition history for WO"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "WOStatusHistory[]"
+
+  # BOM for Date (Auto-Selection)
+  - method: "GET"
+    path: "/api/planning/work-orders/bom-for-date"
+    description: "Get auto-selected BOM for product on scheduled date"
+    auth: "required"
+    roles: ["*"]
+    query_params:
+      - { name: "product_id", type: "UUID", required: true }
+      - { name: "scheduled_date", type: "date", required: true }
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "BomPreview | null"
+
+  # Available BOMs
+  - method: "GET"
+    path: "/api/planning/work-orders/available-boms"
+    description: "Get all active BOMs for product (manual selection)"
+    auth: "required"
+    roles: ["*"]
+    query_params:
+      - { name: "product_id", type: "UUID", required: true }
+    response:
+      status: 200
+      schema:
+        success: true
+        data: "BomPreview[]"
+
+# Service Layer
+services:
+  - path: "apps/frontend/lib/services/work-order-service.ts"
+    description: "Work order business logic service"
+    class: "WorkOrderService"
+    methods:
+      # List operations
+      - name: "list"
+        type: "async static"
+        params: ["params: WOListParams"]
+        returns: "Promise<PaginatedResult<WOListItem>>"
+        description: "List WOs with pagination and filters"
+
+      - name: "getById"
+        type: "async static"
+        params: ["id: string"]
+        returns: "Promise<WorkOrderWithRelations | null>"
+        description: "Get single WO with all relations"
+
+      # CRUD operations
+      - name: "create"
+        type: "async static"
+        params: ["data: CreateWOInput"]
+        returns: "Promise<WorkOrder>"
+        description: "Create WO with auto-BOM selection if not provided"
+
+      - name: "update"
+        type: "async static"
+        params: ["id: string", "data: UpdateWOInput"]
+        returns: "Promise<WorkOrder>"
+        description: "Update WO (validates field restrictions by status)"
+
+      - name: "delete"
+        type: "async static"
+        params: ["id: string"]
+        returns: "Promise<void>"
+        description: "Delete draft WO"
+
+      # Status transitions
+      - name: "plan"
+        type: "async static"
+        params: ["id: string", "notes?: string"]
+        returns: "Promise<WorkOrder>"
+        description: "Transition draft -> planned"
+
+      - name: "release"
+        type: "async static"
+        params: ["id: string", "notes?: string"]
+        returns: "Promise<WorkOrder>"
+        description: "Transition planned -> released"
+
+      - name: "cancel"
+        type: "async static"
+        params: ["id: string", "reason?: string"]
+        returns: "Promise<WorkOrder>"
+        description: "Cancel WO"
+
+      # BOM Selection
+      - name: "getActiveBomForDate"
+        type: "async static"
+        params: ["productId: string", "scheduledDate: Date"]
+        returns: "Promise<BomPreview | null>"
+        description: "Auto-select BOM based on effective dates"
+
+      - name: "getAvailableBoms"
+        type: "async static"
+        params: ["productId: string"]
+        returns: "Promise<BomPreview[]>"
+        description: "Get all active BOMs for manual selection"
+
+      - name: "validateProductHasActiveBom"
+        type: "async static"
+        params: ["productId: string", "scheduledDate: Date"]
+        returns: "Promise<BomValidationResult>"
+        description: "Validate product has active BOM on date"
+
+      # Utilities
+      - name: "generateNextNumber"
+        type: "async static"
+        params: ["orgId: string", "date?: Date"]
+        returns: "Promise<string>"
+        description: "Generate next WO number"
+
+      - name: "getStatusHistory"
+        type: "async static"
+        params: ["woId: string"]
+        returns: "Promise<WOStatusHistory[]>"
+        description: "Get status transition history"
+
+      - name: "validateStatusTransition"
+        type: "static"
+        params: ["currentStatus: WOStatus", "newStatus: WOStatus"]
+        returns: "boolean"
+        description: "Check if status transition is valid"
+
+      - name: "canEdit"
+        type: "static"
+        params: ["status: WOStatus", "field: string"]
+        returns: "boolean"
+        description: "Check if field is editable in current status"
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/work-order.ts"
+  schemas:
+    - name: "woStatusEnum"
+      type: "z.enum"
+      values: ["draft", "planned", "released", "in_progress", "on_hold", "completed", "closed", "cancelled"]
+
+    - name: "woPriorityEnum"
+      type: "z.enum"
+      values: ["low", "normal", "high", "critical"]
+
+    - name: "sourceOfDemandEnum"
+      type: "z.enum"
+      values: ["manual", "po", "customer_order", "forecast"]
+
+    - name: "createWOSchema"
+      type: "z.object"
+      fields:
+        product_id: "z.string().uuid()"
+        bom_id: "z.string().uuid().optional().nullable()"
+        planned_quantity: "z.number().positive().max(999999999)"
+        uom: "z.string().min(1).max(20).optional()"
+        planned_start_date: "z.string().date() with past validation"
+        planned_end_date: "z.string().date().optional().nullable()"
+        scheduled_start_time: "z.string().regex(time pattern).optional().nullable()"
+        scheduled_end_time: "z.string().regex(time pattern).optional().nullable()"
+        production_line_id: "z.string().uuid().optional().nullable()"
+        machine_id: "z.string().uuid().optional().nullable()"
+        priority: "woPriorityEnum.default('normal')"
+        source_of_demand: "sourceOfDemandEnum.optional().nullable()"
+        source_reference: "z.string().max(50).optional().nullable()"
+        expiry_date: "z.string().date().optional().nullable()"
+        notes: "z.string().max(2000).optional().nullable()"
+      refinements:
+        - "End date must be >= start date"
+        - "End time must be > start time (if same day)"
+
+    - name: "updateWOSchema"
+      type: "z.object"
+      note: "Partial version of createWOSchema"
+
+    - name: "bomForDateSchema"
+      type: "z.object"
+      fields:
+        product_id: "z.string().uuid()"
+        scheduled_date: "z.string().date()"
+
+    - name: "statusTransitionSchema"
+      type: "z.object"
+      fields:
+        id: "z.string().uuid()"
+        notes: "z.string().max(500).optional()"
+
+# Type Definitions
+types:
+  - name: "WOStatus"
+    definition: "'draft' | 'planned' | 'released' | 'in_progress' | 'on_hold' | 'completed' | 'closed' | 'cancelled'"
+
+  - name: "WOPriority"
+    definition: "'low' | 'normal' | 'high' | 'critical'"
+
+  - name: "SourceOfDemand"
+    definition: "'manual' | 'po' | 'customer_order' | 'forecast'"
+
+  - name: "WorkOrder"
+    fields:
+      - "id: string"
+      - "org_id: string"
+      - "wo_number: string"
+      - "product_id: string"
+      - "bom_id: string | null"
+      - "routing_id: string | null"
+      - "planned_quantity: number"
+      - "produced_quantity: number"
+      - "uom: string"
+      - "status: WOStatus"
+      - "planned_start_date: string | null"
+      - "planned_end_date: string | null"
+      - "scheduled_start_time: string | null"
+      - "scheduled_end_time: string | null"
+      - "production_line_id: string | null"
+      - "machine_id: string | null"
+      - "priority: WOPriority"
+      - "source_of_demand: SourceOfDemand | null"
+      - "source_reference: string | null"
+      - "started_at: string | null"
+      - "completed_at: string | null"
+      - "paused_at: string | null"
+      - "pause_reason: string | null"
+      - "actual_qty: number | null"
+      - "yield_percent: number | null"
+      - "expiry_date: string | null"
+      - "notes: string | null"
+      - "created_at: string"
+      - "updated_at: string"
+      - "created_by: string"
+      - "updated_by: string | null"
+
+  - name: "WorkOrderWithRelations"
+    extends: "WorkOrder"
+    additional_fields:
+      - "product?: { id, code, name, base_uom }"
+      - "bom?: { id, code, version, output_qty, effective_from, effective_to, item_count }"
+      - "routing?: { id, code, name }"
+      - "production_line?: { id, code, name }"
+      - "machine?: { id, code, name }"
+      - "created_by_user?: { name }"
+
+  - name: "WOListItem"
+    fields:
+      - "id: string"
+      - "wo_number: string"
+      - "product_code: string"
+      - "product_name: string"
+      - "planned_quantity: number"
+      - "uom: string"
+      - "status: WOStatus"
+      - "planned_start_date: string | null"
+      - "production_line_name: string | null"
+      - "priority: WOPriority"
+      - "created_at: string"
+
+  - name: "BomPreview"
+    fields:
+      - "bom_id: string"
+      - "bom_code: string"
+      - "bom_version: number"
+      - "output_qty: number"
+      - "effective_from: string"
+      - "effective_to: string | null"
+      - "routing_id: string | null"
+      - "item_count: number"
+      - "is_current?: boolean"
+
+  - name: "BomValidationResult"
+    fields:
+      - "valid: boolean"
+      - "bom?: BomPreview"
+      - "error?: string"
+      - "warning?: string"
+
+  - name: "WOStatusHistory"
+    fields:
+      - "id: string"
+      - "wo_id: string"
+      - "from_status: WOStatus | null"
+      - "to_status: WOStatus"
+      - "changed_by: string"
+      - "changed_at: string"
+      - "notes: string | null"
+      - "changed_by_user?: { name: string }"
+
+# Implementation Patterns
+patterns:
+  bom_auto_selection: |
+    // Service method pattern for BOM auto-selection
+    static async getActiveBomForDate(productId: string, scheduledDate: Date): Promise<BomPreview | null> {
+      const { data, error } = await supabase
+        .rpc('get_active_bom_for_date', {
+          p_product_id: productId,
+          p_org_id: context.org_id,
+          p_scheduled_date: scheduledDate.toISOString().split('T')[0]
+        });
+
+      if (error || !data || data.length === 0) return null;
+      return data[0];
+    }
+
+  wo_number_generation: |
+    // Generate WO number using database function
+    static async generateNextNumber(orgId: string, date?: Date): Promise<string> {
+      const targetDate = date || new Date();
+      const { data, error } = await supabase
+        .rpc('generate_wo_number', {
+          p_org_id: orgId,
+          p_date: targetDate.toISOString().split('T')[0]
+        });
+
+      if (error) throw new Error('Failed to generate WO number');
+      return data;
+    }
+
+  status_transition_validation: |
+    // Valid status transitions map
+    const VALID_TRANSITIONS: Record<WOStatus, WOStatus[]> = {
+      draft: ['planned', 'cancelled'],
+      planned: ['released', 'draft', 'cancelled'],
+      released: ['in_progress', 'cancelled'],
+      in_progress: ['on_hold', 'completed'],
+      on_hold: ['in_progress', 'cancelled'],
+      completed: ['closed'],
+      closed: [],
+      cancelled: []
+    };
+
+    static validateStatusTransition(current: WOStatus, next: WOStatus): boolean {
+      return VALID_TRANSITIONS[current]?.includes(next) ?? false;
+    }

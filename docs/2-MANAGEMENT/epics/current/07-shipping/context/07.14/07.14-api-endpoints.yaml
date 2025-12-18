@@ -1,0 +1,537 @@
+api_endpoints:
+  title: "Story 07.14 - Shipment Manifest & Ship - API Specification"
+  last_updated: "2025-12-18"
+  base_url: "/api/shipping/shipments"
+
+endpoints:
+  manifest_shipment:
+    method: "POST"
+    path: "/api/shipping/shipments/:id/manifest"
+    summary: "Manifest shipment - Validate SSCC completeness and update status"
+    description: |
+      Validates that all boxes in the shipment have SSCC assigned, then updates
+      shipment status from 'packed' to 'manifested'. This is a prerequisite for
+      the ship endpoint.
+    authentication:
+      required: true
+      schemes: ["Bearer JWT"]
+    authorization:
+      required_roles: ["Warehouse", "Manager", "Admin"]
+      rls: true
+    request:
+      body:
+        content_type: "application/json"
+        required: false
+        schema:
+          type: "object"
+          properties: {}
+      path_parameters:
+        - name: "id"
+          type: "uuid"
+          required: true
+          description: "Shipment ID"
+    response:
+      success:
+        status: 200
+        content_type: "application/json"
+        schema:
+          type: "object"
+          properties:
+            success:
+              type: "boolean"
+              example: true
+            data:
+              type: "object"
+              properties:
+                id:
+                  type: "string"
+                  format: "uuid"
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                shipment_number:
+                  type: "string"
+                  example: "SHIP-2025-00123"
+                status:
+                  type: "string"
+                  enum: ["manifested"]
+                  example: "manifested"
+                manifested_at:
+                  type: "string"
+                  format: "date-time"
+                  example: "2025-12-16T11:00:00Z"
+                packed_at:
+                  type: "string"
+                  format: "date-time"
+                  example: "2025-12-16T10:30:00Z"
+                box_count:
+                  type: "integer"
+                  example: 2
+                boxes:
+                  type: "array"
+                  items:
+                    type: "object"
+                    properties:
+                      id: { type: "string", format: "uuid" }
+                      box_number: { type: "integer" }
+                      sscc: { type: "string", example: "00123456789012345678" }
+                      validated: { type: "boolean" }
+      error:
+        - status: 400
+          code: "SSCC_VALIDATION_FAILED"
+          message: "Cannot manifest: {N} boxes missing SSCC"
+          example:
+            error:
+              code: "SSCC_VALIDATION_FAILED"
+              message: "Cannot manifest: 1 boxes missing SSCC"
+              missing_boxes: [{ box_number: 2, id: "uuid-box-002" }]
+        - status: 400
+          code: "INVALID_STATUS"
+          message: "Shipment must be in 'packed' status to manifest"
+          example:
+            error:
+              code: "INVALID_STATUS"
+              message: "Shipment must be in 'packed' status to manifest"
+              current_status: "pending"
+              allowed_statuses: ["packed"]
+        - status: 404
+          code: "NOT_FOUND"
+          message: "Shipment not found"
+        - status: 403
+          code: "FORBIDDEN"
+          message: "Insufficient permissions for this action"
+    examples:
+      request: |
+        POST /api/shipping/shipments/550e8400-e29b-41d4-a716-446655440000/manifest
+        Authorization: Bearer {jwt_token}
+      response_success: |
+        {
+          "success": true,
+          "data": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "shipment_number": "SHIP-2025-00123",
+            "status": "manifested",
+            "manifested_at": "2025-12-16T11:00:00Z",
+            "packed_at": "2025-12-16T10:30:00Z",
+            "box_count": 2,
+            "boxes": [
+              {
+                "id": "uuid-box-001",
+                "box_number": 1,
+                "sscc": "00123456789012345678",
+                "validated": true
+              },
+              {
+                "id": "uuid-box-002",
+                "box_number": 2,
+                "sscc": "00123456789012345679",
+                "validated": true
+              }
+            ]
+          }
+        }
+      response_error: |
+        {
+          "success": false,
+          "error": {
+            "code": "SSCC_VALIDATION_FAILED",
+            "message": "Cannot manifest: 1 boxes missing SSCC",
+            "missing_boxes": [
+              { "box_number": 2, "id": "uuid-box-002" }
+            ]
+          }
+        }
+
+  ship_shipment:
+    method: "POST"
+    path: "/api/shipping/shipments/:id/ship"
+    summary: "Ship shipment - IRREVERSIBLE: Consume inventory and update sales order"
+    description: |
+      Confirms shipment as shipped. This is an IRREVERSIBLE action that:
+      1. Updates shipment status to 'shipped'
+      2. Updates all license_plates in box_contents to status='shipped'
+      3. Updates sales_order status to 'shipped' with shipped_at timestamp
+      4. Updates all sales_order_lines with quantity_shipped = quantity_packed
+
+      All updates are performed in a database transaction. If any step fails,
+      the entire transaction is rolled back.
+
+      Requires explicit confirmation via confirm=true parameter.
+    authentication:
+      required: true
+      schemes: ["Bearer JWT"]
+    authorization:
+      required_roles: ["Warehouse", "Manager", "Admin"]
+      rls: true
+    request:
+      body:
+        content_type: "application/json"
+        required: true
+        schema:
+          type: "object"
+          properties:
+            confirm:
+              type: "boolean"
+              description: "Must be true to confirm ship action"
+              required: true
+              example: true
+          required: ["confirm"]
+      path_parameters:
+        - name: "id"
+          type: "uuid"
+          required: true
+          description: "Shipment ID"
+    response:
+      success:
+        status: 200
+        content_type: "application/json"
+        schema:
+          type: "object"
+          properties:
+            success:
+              type: "boolean"
+              example: true
+            data:
+              type: "object"
+              properties:
+                id: { type: "string", format: "uuid" }
+                shipment_number: { type: "string", example: "SHIP-2025-00123" }
+                status: { type: "string", enum: ["shipped"] }
+                shipped_at: { type: "string", format: "date-time" }
+                shipped_by:
+                  type: "object"
+                  properties:
+                    id: { type: "string", format: "uuid" }
+                    name: { type: "string", example: "John Warehouse" }
+                sales_order:
+                  type: "object"
+                  properties:
+                    id: { type: "string", format: "uuid" }
+                    order_number: { type: "string", example: "SO-2025-00456" }
+                    status: { type: "string", enum: ["shipped"] }
+                    shipped_at: { type: "string", format: "date-time" }
+                license_plates_consumed:
+                  type: "integer"
+                  description: "Count of license plates marked as shipped"
+                  example: 3
+                sales_order_lines_updated:
+                  type: "integer"
+                  description: "Count of SO lines with quantity_shipped updated"
+                  example: 3
+      error:
+        - status: 400
+          code: "NOT_MANIFESTED"
+          message: "Shipment must be manifested before shipping"
+          example:
+            error:
+              code: "NOT_MANIFESTED"
+              message: "Shipment must be manifested before shipping"
+              current_status: "packed"
+              allowed_statuses: ["manifested", "packed"]
+        - status: 400
+          code: "CONFIRMATION_REQUIRED"
+          message: "Ship action requires explicit confirmation (confirm=true)"
+          example:
+            error:
+              code: "CONFIRMATION_REQUIRED"
+              message: "Ship action requires explicit confirmation (confirm=true)"
+        - status: 409
+          code: "TRANSACTION_FAILED"
+          message: "Failed to update shipment inventory"
+          detail: "Could not consume license plates"
+          example:
+            error:
+              code: "TRANSACTION_FAILED"
+              message: "Failed to update shipment inventory"
+              detail: "Could not consume license plates"
+              rollback_successful: true
+        - status: 404
+          code: "NOT_FOUND"
+          message: "Shipment not found"
+        - status: 403
+          code: "FORBIDDEN"
+          message: "Insufficient permissions for this action"
+    examples:
+      request: |
+        POST /api/shipping/shipments/550e8400-e29b-41d4-a716-446655440000/ship
+        Authorization: Bearer {jwt_token}
+        Content-Type: application/json
+
+        {
+          "confirm": true
+        }
+      response_success: |
+        {
+          "success": true,
+          "data": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "shipment_number": "SHIP-2025-00123",
+            "status": "shipped",
+            "shipped_at": "2025-12-16T14:00:00Z",
+            "shipped_by": {
+              "id": "uuid-user-001",
+              "name": "John Warehouse"
+            },
+            "sales_order": {
+              "id": "uuid-so-001",
+              "order_number": "SO-2025-00456",
+              "status": "shipped",
+              "shipped_at": "2025-12-16T14:00:00Z"
+            },
+            "license_plates_consumed": 3,
+            "sales_order_lines_updated": 3
+          }
+        }
+      response_error_not_manifested: |
+        {
+          "success": false,
+          "error": {
+            "code": "NOT_MANIFESTED",
+            "message": "Shipment must be manifested before shipping",
+            "current_status": "packed"
+          }
+        }
+      response_error_no_confirmation: |
+        {
+          "success": false,
+          "error": {
+            "code": "CONFIRMATION_REQUIRED",
+            "message": "Ship action requires explicit confirmation (confirm=true)"
+          }
+        }
+
+  mark_delivered:
+    method: "POST"
+    path: "/api/shipping/shipments/:id/mark-delivered"
+    summary: "Mark shipment as delivered (Manager+ only)"
+    description: |
+      Marks shipment status as delivered. Requires Manager or Admin role.
+      Updates shipment.status and related sales_order.status to 'delivered'.
+
+      Note: Phase 1 allows manual marking. Phase 2 will support automatic
+      updates via carrier webhooks.
+    authentication:
+      required: true
+      schemes: ["Bearer JWT"]
+    authorization:
+      required_roles: ["Manager", "Admin"]
+      rls: true
+      note: "Warehouse users cannot perform this action"
+    request:
+      body:
+        content_type: "application/json"
+        required: false
+        schema:
+          type: "object"
+          properties: {}
+      path_parameters:
+        - name: "id"
+          type: "uuid"
+          required: true
+          description: "Shipment ID"
+    response:
+      success:
+        status: 200
+        content_type: "application/json"
+        schema:
+          type: "object"
+          properties:
+            success:
+              type: "boolean"
+              example: true
+            data:
+              type: "object"
+              properties:
+                id: { type: "string", format: "uuid" }
+                shipment_number: { type: "string", example: "SHIP-2025-00123" }
+                status: { type: "string", enum: ["delivered"] }
+                delivered_at: { type: "string", format: "date-time" }
+                delivered_by:
+                  type: "object"
+                  properties:
+                    id: { type: "string", format: "uuid" }
+                    name: { type: "string", example: "Sarah Manager" }
+                sales_order:
+                  type: "object"
+                  properties:
+                    id: { type: "string", format: "uuid" }
+                    order_number: { type: "string" }
+                    status: { type: "string", enum: ["delivered"] }
+      error:
+        - status: 400
+          code: "INVALID_STATUS"
+          message: "Shipment must be in 'shipped' status to mark as delivered"
+        - status: 403
+          code: "INSUFFICIENT_PERMISSIONS"
+          message: "Manager role required to mark shipment as delivered"
+          example:
+            error:
+              code: "INSUFFICIENT_PERMISSIONS"
+              message: "Manager role required to mark shipment as delivered"
+              user_role: "Warehouse"
+              required_roles: ["Manager", "Admin"]
+        - status: 404
+          code: "NOT_FOUND"
+          message: "Shipment not found"
+    examples:
+      request: |
+        POST /api/shipping/shipments/550e8400-e29b-41d4-a716-446655440000/mark-delivered
+        Authorization: Bearer {jwt_token}
+      response_success: |
+        {
+          "success": true,
+          "data": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "shipment_number": "SHIP-2025-00123",
+            "status": "delivered",
+            "delivered_at": "2025-12-16T15:30:00Z",
+            "delivered_by": {
+              "id": "uuid-user-002",
+              "name": "Sarah Manager"
+            },
+            "sales_order": {
+              "id": "uuid-so-001",
+              "order_number": "SO-2025-00456",
+              "status": "delivered"
+            }
+          }
+        }
+      response_error: |
+        {
+          "success": false,
+          "error": {
+            "code": "INSUFFICIENT_PERMISSIONS",
+            "message": "Manager role required to mark shipment as delivered",
+            "user_role": "Warehouse"
+          }
+        }
+
+  get_tracking:
+    method: "GET"
+    path: "/api/shipping/shipments/:id/tracking"
+    summary: "Get shipment tracking information"
+    description: |
+      Returns complete tracking information for a shipment, including:
+      - Current carrier and tracking number
+      - Status timeline with dates and user names
+      - External tracking URL (DHL, UPS, DPD, FedEx)
+
+      Accessible to any authenticated user in the organization.
+    authentication:
+      required: true
+      schemes: ["Bearer JWT"]
+    authorization:
+      required_roles: ["Authenticated"]
+      rls: true
+    request:
+      query_parameters:
+        - name: "include_history"
+          type: "boolean"
+          required: false
+          default: false
+          description: "Include full audit trail of all status changes"
+      path_parameters:
+        - name: "id"
+          type: "uuid"
+          required: true
+          description: "Shipment ID"
+    response:
+      success:
+        status: 200
+        content_type: "application/json"
+        schema:
+          type: "object"
+          properties:
+            success:
+              type: "boolean"
+              example: true
+            data:
+              type: "object"
+              properties:
+                shipment_id: { type: "string", format: "uuid" }
+                shipment_number: { type: "string", example: "SHIP-2025-00123" }
+                sales_order_number: { type: "string", example: "SO-2025-00456" }
+                carrier: { type: ["string", "null"], example: "DHL" }
+                tracking_number: { type: ["string", "null"], example: "1234567890" }
+                status:
+                  type: "string"
+                  enum: ["pending", "packing", "packed", "manifested", "shipped", "delivered", "exception"]
+                  example: "shipped"
+                timeline:
+                  type: "object"
+                  properties:
+                    packed_at: { type: ["string", "null"], format: "date-time" }
+                    packed_by: { type: ["string", "null"], example: "John Warehouse" }
+                    manifested_at: { type: ["string", "null"], format: "date-time" }
+                    manifested_by: { type: ["string", "null"] }
+                    shipped_at: { type: ["string", "null"], format: "date-time" }
+                    shipped_by: { type: ["string", "null"], example: "John Warehouse" }
+                    delivered_at: { type: ["string", "null"], format: "date-time" }
+                    delivered_by: { type: ["string", "null"], example: "Sarah Manager" }
+                external_url: { type: ["string", "null"], format: "uri", example: "https://www.dhl.com/en/express/tracking.html?AWB=1234567890" }
+      error:
+        - status: 404
+          code: "NOT_FOUND"
+          message: "Shipment not found"
+        - status: 403
+          code: "FORBIDDEN"
+          message: "Access denied - shipment not in your organization"
+    examples:
+      request: |
+        GET /api/shipping/shipments/550e8400-e29b-41d4-a716-446655440000/tracking
+        Authorization: Bearer {jwt_token}
+      response_success: |
+        {
+          "success": true,
+          "data": {
+            "shipment_id": "550e8400-e29b-41d4-a716-446655440000",
+            "shipment_number": "SHIP-2025-00123",
+            "sales_order_number": "SO-2025-00456",
+            "carrier": "DHL",
+            "tracking_number": "1234567890",
+            "status": "shipped",
+            "timeline": {
+              "packed_at": "2025-12-16T10:30:00Z",
+              "packed_by": "John Warehouse",
+              "manifested_at": "2025-12-16T11:00:00Z",
+              "manifested_by": "John Warehouse",
+              "shipped_at": "2025-12-16T14:00:00Z",
+              "shipped_by": "John Warehouse",
+              "delivered_at": null,
+              "delivered_by": null
+            },
+            "external_url": "https://www.dhl.com/en/express/tracking.html?AWB=1234567890"
+          }
+        }
+
+error_codes:
+  SSCC_VALIDATION_FAILED:
+    status: 400
+    description: "One or more boxes missing SSCC barcode"
+    action: "Complete SSCC generation (Story 07.13) before manifesting"
+  INVALID_STATUS:
+    status: 400
+    description: "Shipment status does not allow requested operation"
+    action: "Check shipment status and follow workflow (packed → manifested → shipped)"
+  NOT_MANIFESTED:
+    status: 400
+    description: "Shipment must be manifested before shipping"
+    action: "Call manifest endpoint first"
+  CONFIRMATION_REQUIRED:
+    status: 400
+    description: "Ship action requires explicit confirm=true parameter"
+    action: "Include 'confirm': true in request body"
+  TRANSACTION_FAILED:
+    status: 409
+    description: "Database transaction failed (LP or SO update failed)"
+    action: "Verify database connectivity, retry request"
+  INSUFFICIENT_PERMISSIONS:
+    status: 403
+    description: "User role does not have permission for action"
+    action: "Manager role required for mark-delivered, Warehouse+ for manifest/ship"
+  FORBIDDEN:
+    status: 403
+    description: "Cross-organization access attempt (RLS)"
+    action: "Request shipment from authorized organization"
+  NOT_FOUND:
+    status: 404
+    description: "Shipment not found"
+    action: "Verify shipment ID exists in your organization"

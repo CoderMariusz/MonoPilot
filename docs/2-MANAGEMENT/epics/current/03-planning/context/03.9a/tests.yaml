@@ -1,0 +1,310 @@
+# Story 03.9a - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/transfer-order-service.ship.test.ts"
+    type: "unit"
+    description: "Unit tests for ship/receive service methods"
+  - path: "apps/frontend/lib/validation/__tests__/transfer-order-schemas.receive.test.ts"
+    type: "unit"
+    description: "Unit tests for receive validation schemas"
+  - path: "apps/frontend/app/api/planning/transfer-orders/[id]/ship/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for ship endpoint"
+  - path: "apps/frontend/app/api/planning/transfer-orders/[id]/receive/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for receive endpoint"
+  - path: "e2e/planning/to-partial-shipments.spec.ts"
+    type: "e2e"
+    description: "E2E test for full TO lifecycle with partial shipments"
+
+# Acceptance Criteria (from story 03.9a.to-partial-shipments.md)
+acceptance_criteria:
+  - id: "AC-1"
+    name: "Ship TO Modal - Full Shipment"
+    given: "TO Detail page with status = PLANNED and 3 lines"
+    when: "User clicks Ship TO and ships all lines fully"
+    then:
+      - "API POST /ship with all line quantities"
+      - "TO status changes to SHIPPED"
+      - "All lines shipped_qty = quantity"
+      - "actual_ship_date set"
+      - "shipped_by set to current user"
+      - "Success toast displayed"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2"
+    name: "Ship TO Modal - Partial Shipment"
+    given: "TO with status = PLANNED and 2 lines"
+    when: "User ships Line 1 partially (5 of 10), Line 2 fully (5 of 5)"
+    then:
+      - "TO status changes to PARTIALLY_SHIPPED"
+      - "Line 1: shipped_qty = 5"
+      - "Line 2: shipped_qty = 5"
+      - "Progress indicators show partial progress"
+      - "Ship TO button remains enabled"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-3"
+    name: "Ship TO Modal - Second Partial Shipment"
+    given: "TO with status = PARTIALLY_SHIPPED"
+    when: "User ships remaining quantities"
+    then:
+      - "TO status changes to SHIPPED"
+      - "Quantities accumulate (not replace)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-4"
+    name: "Ship TO Modal - Validation Errors"
+    given: "Ship TO modal open"
+    when: "User enters ship_qty > remaining"
+    then:
+      - "API returns 400 error"
+      - "Error message: Cannot ship X units, only Y remaining"
+      - "Modal stays open"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-5"
+    name: "Receive TO Modal - Full Receipt"
+    given: "TO with status = SHIPPED"
+    when: "User receives all lines fully"
+    then:
+      - "API POST /receive with all line quantities"
+      - "TO status changes to RECEIVED"
+      - "All lines received_qty = shipped_qty"
+      - "actual_receive_date set"
+      - "received_by set to current user"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-6"
+    name: "Receive TO Modal - Partial Receipt"
+    given: "TO with status = SHIPPED"
+    when: "User receives partially"
+    then:
+      - "TO status changes to PARTIALLY_RECEIVED"
+      - "Quantities update correctly"
+      - "Receive TO button remains enabled"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-7"
+    name: "Receive TO Modal - Validation Errors"
+    given: "Receive TO modal open"
+    when: "User enters receive_qty > shipped"
+    then:
+      - "API returns 400 error"
+      - "Error message: Cannot receive X units, only Y shipped"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-8"
+    name: "Status-Based Action Visibility"
+    given: "TO Detail page"
+    when: "Viewing different status TOs"
+    then:
+      - "DRAFT: Ship hidden, Receive hidden"
+      - "PLANNED: Ship visible, Receive hidden"
+      - "PARTIALLY_SHIPPED: Ship visible, Receive visible"
+      - "SHIPPED: Ship hidden, Receive visible"
+      - "PARTIALLY_RECEIVED: Ship hidden, Receive visible"
+      - "RECEIVED: Ship hidden, Receive hidden"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-9"
+    name: "Progress Indicators"
+    given: "TO with partial shipment"
+    when: "Viewing lines table"
+    then:
+      - "Shipped column shows X / Y with progress bar"
+      - "100% shows green checkmark"
+      - "Partial shows yellow bar"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-10"
+    name: "Settings Toggle - Disable Partial Shipments"
+    given: "to_allow_partial_shipments = false"
+    when: "User opens Ship TO modal"
+    then:
+      - "All Ship Now fields locked to ordered quantities"
+      - "Message: Partial shipments disabled"
+    test_type: "integration"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  service_methods:
+    - name: "shipTransferOrder validates status is planned or partially_shipped"
+      setup: "TO with status = draft"
+      expected: "Returns error: Cannot ship TO with status draft"
+
+    - name: "shipTransferOrder validates ship_qty <= remaining"
+      setup: "Line with quantity=10, shipped_qty=5"
+      params: "ship_qty=6"
+      expected: "Returns error: Cannot ship more than remaining"
+
+    - name: "shipTransferOrder accumulates shipped_qty"
+      setup: "Line with quantity=10, shipped_qty=5"
+      params: "ship_qty=3"
+      expected: "Line shipped_qty = 8"
+
+    - name: "shipTransferOrder sets actual_ship_date on first shipment only"
+      setup: "TO with actual_ship_date = null"
+      expected: "Sets actual_ship_date"
+      setup2: "TO with actual_ship_date = 2024-12-01"
+      expected2: "Does NOT update actual_ship_date"
+
+    - name: "receiveTransferOrder validates status is shipped/partially_shipped/partially_received"
+      setup: "TO with status = planned"
+      expected: "Returns error: Cannot receive TO with status planned"
+
+    - name: "receiveTransferOrder validates receive_qty <= shipped_qty"
+      setup: "Line with shipped_qty=10, received_qty=5"
+      params: "receive_qty=6"
+      expected: "Returns error: Cannot receive more than shipped"
+
+    - name: "determineStatusAfterShip returns shipped when all lines fully shipped"
+      setup: "All lines have shipped_qty >= quantity"
+      expected: "Returns 'shipped'"
+
+    - name: "determineStatusAfterShip returns partially_shipped when not all lines fully shipped"
+      setup: "Some lines have shipped_qty < quantity"
+      expected: "Returns 'partially_shipped'"
+
+    - name: "determineStatusAfterReceive returns received when all lines fully received"
+      setup: "All lines have received_qty >= shipped_qty"
+      expected: "Returns 'received'"
+
+    - name: "determineStatusAfterReceive returns partially_received when not all lines fully received"
+      setup: "Some lines have received_qty < shipped_qty"
+      expected: "Returns 'partially_received'"
+
+  validation_schemas:
+    - name: "shipTORequestSchema requires at least one line with ship_qty > 0"
+      input: "{ lines: [{ line_id: 'x', ship_qty: 0 }] }"
+      expected: "Validation error: At least one line must have quantity > 0"
+
+    - name: "shipTORequestSchema validates shipment_date format"
+      input: "{ shipment_date: '2024/12/16' }"
+      expected: "Validation error: Invalid date format"
+
+    - name: "shipTORequestSchema rejects future shipment_date"
+      input: "{ shipment_date: '2099-12-16' }"
+      expected: "Validation error: Shipment date cannot be in the future"
+
+    - name: "receiveTORequestSchema requires at least one line with receive_qty > 0"
+      input: "{ lines: [{ line_id: 'x', receive_qty: 0 }] }"
+      expected: "Validation error: At least one line must have quantity > 0"
+
+# Integration Test Cases
+integration_tests:
+  ship_endpoint:
+    - name: "POST /ship returns 400 for wrong status"
+      setup: "TO with status = draft"
+      action: "POST /api/planning/transfer-orders/:id/ship"
+      expected: "400 with error message"
+
+    - name: "POST /ship updates status to shipped for full shipment"
+      setup: "TO with status = planned, 2 lines"
+      action: "Ship all lines fully"
+      expected: "200, status = shipped, all lines shipped_qty = quantity"
+
+    - name: "POST /ship updates status to partially_shipped for partial"
+      setup: "TO with status = planned"
+      action: "Ship first line partially"
+      expected: "200, status = partially_shipped"
+
+    - name: "POST /ship enforces RLS - cross-org returns 404"
+      setup: "TO from Org A"
+      action: "User from Org B calls POST /ship"
+      expected: "404 Not Found"
+
+  receive_endpoint:
+    - name: "POST /receive returns 400 for wrong status"
+      setup: "TO with status = planned"
+      action: "POST /api/planning/transfer-orders/:id/receive"
+      expected: "400 with error message"
+
+    - name: "POST /receive updates status to received for full receipt"
+      setup: "TO with status = shipped"
+      action: "Receive all lines fully"
+      expected: "200, status = received"
+
+    - name: "POST /receive updates status to partially_received for partial"
+      setup: "TO with status = shipped"
+      action: "Receive first line partially"
+      expected: "200, status = partially_received"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full TO lifecycle: Create -> Ship partial -> Ship remaining -> Receive partial -> Receive remaining"
+    steps:
+      - "Create TO with 2 lines (Line A: 100 units, Line B: 50 units)"
+      - "Release TO to planned"
+      - "Ship: Line A = 50 (partial), Line B = 50 (full)"
+      - "Verify status = partially_shipped"
+      - "Verify progress indicators show 50/100 and 50/50"
+      - "Ship remaining: Line A = 50"
+      - "Verify status = shipped"
+      - "Receive: Line A = 30 (partial), Line B = 30 (partial)"
+      - "Verify status = partially_received"
+      - "Receive remaining: Line A = 70, Line B = 20"
+      - "Verify status = received"
+      - "Verify Ship/Receive buttons hidden"
+
+# Definition of Done
+definition_of_done:
+  - "Ship endpoint handles partial and full shipments correctly"
+  - "Receive endpoint handles partial and full receipts correctly"
+  - "Status transitions follow business rules"
+  - "Quantities accumulate (not replace)"
+  - "Audit trail fields populated (shipped_by, received_by, dates)"
+  - "Settings toggle respected for partial shipments"
+  - "UI modals show correct data and validation errors"
+  - "Progress indicators update in real-time"
+  - "Action buttons visible/hidden based on status"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests pass for all endpoints"
+  - "E2E smoke test passes"
+  - "Performance: Operations complete in < 500ms"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic for status transitions critical"
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+  files:
+    - "lib/services/transfer-order-service.ts (ship/receive methods): 80%"
+    - "lib/validation/transfer-order-schemas.ts (receive schema): 90%"
+    - "API route handlers: 80%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Race condition on concurrent ship/receive operations"
+    mitigation: "Use database transactions, optimistic locking on quantities"
+    severity: "medium"
+    test_coverage: "Integration test with concurrent requests"
+
+  - id: "RISK-02"
+    description: "Status calculation incorrect after partial operations"
+    mitigation: "Unit tests for all status transition scenarios"
+    severity: "high"
+    test_coverage: "unit_tests.service_methods"
+
+  - id: "RISK-03"
+    description: "Audit trail fields not set correctly"
+    mitigation: "Integration tests verify shipped_by, received_by, dates"
+    severity: "low"
+    test_coverage: "Integration tests verify audit fields"

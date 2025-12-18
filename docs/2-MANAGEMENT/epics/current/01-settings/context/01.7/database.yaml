@@ -1,0 +1,113 @@
+# Story 01.7 - Database Schema
+# Purpose: Module toggles tables and RLS policies
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/053_create_modules_tables.sql"
+    type: "migration"
+    description: "Create modules and organization_modules tables with RLS"
+
+tables:
+  - name: "modules"
+    description: "System-defined modules (seeded, read-only)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "UNIQUE NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "dependencies", type: "TEXT[]", constraints: "" }
+      - { name: "can_disable", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "display_order", type: "INT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_policy: "SELECT only for all authenticated users (system data)"
+    indexes:
+      - "code (unique)"
+      - "display_order"
+    seed_data:
+      - "('settings', 'Settings', 'Organization and user management', '{}', false, 0)"
+      - "('technical', 'Technical', 'Products, BOMs, and routings', '{}', true, 1)"
+      - "('planning', 'Planning', 'Work orders and scheduling', '{technical}', true, 2)"
+      - "('production', 'Production', 'Work order execution', '{technical,planning}', true, 3)"
+      - "('quality', 'Quality', 'QC holds and inspections', '{production}', true, 4)"
+      - "('warehouse', 'Warehouse', 'Inventory and license plates', '{technical}', true, 5)"
+      - "('shipping', 'Shipping', 'Order fulfillment and dispatch', '{warehouse}', true, 6)"
+      - "('npd', 'NPD', 'Stage-Gate Workflow, Trial BOMs', '{technical}', true, 7)"
+      - "('finance', 'Finance', 'Production Costing, Variance', '{production,warehouse}', true, 8)"
+      - "('oee', 'OEE', 'Real-time OEE, Machine Dashboard', '{production}', true, 9)"
+      - "('integrations', 'Integrations', 'Comarch Optima, EDI, Portals', '{}', true, 10)"
+
+  - name: "organization_modules"
+    description: "Org-specific module enabled state"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "module_id", type: "UUID", constraints: "NOT NULL REFERENCES modules(id)" }
+      - { name: "enabled", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "enabled_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "enabled_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "UNIQUE(org_id, module_id)", type: "CONSTRAINT", constraints: "" }
+    rls: true
+    rls_policy: "ADR-013 users lookup pattern"
+    indexes:
+      - "org_id"
+      - "module_id"
+      - "(org_id, module_id) UNIQUE"
+
+rls_policies:
+  modules:
+    - name: "modules_select"
+      operation: "SELECT"
+      role: "authenticated"
+      using: "true"
+      notes: "Read-only for all authenticated users (system data)"
+
+  organization_modules:
+    - name: "org_modules_select"
+      operation: "SELECT"
+      role: "authenticated"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: "org_modules_insert"
+      operation: "INSERT"
+      role: "authenticated"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: "org_modules_update"
+      operation: "UPDATE"
+      role: "authenticated"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+database_queries:
+  list_modules_with_status:
+    description: "Get all modules with org-specific enabled status"
+    sql: |
+      SELECT
+        m.id,
+        m.code,
+        m.name,
+        m.description,
+        m.dependencies,
+        m.can_disable,
+        m.display_order,
+        COALESCE(om.enabled, false) as enabled
+      FROM modules m
+      LEFT JOIN organization_modules om ON m.id = om.module_id
+        AND om.org_id = $1
+      ORDER BY m.display_order ASC;
+
+  toggle_module:
+    description: "Update module enabled status for org"
+    sql: |
+      UPDATE organization_modules
+      SET enabled = $3, enabled_at = NOW(), enabled_by = $4
+      WHERE org_id = $1 AND module_id = $2
+      RETURNING id, enabled;
+
+  check_dependents:
+    description: "Find enabled modules that depend on this module"
+    sql: |
+      SELECT m.code
+      FROM modules m
+      JOIN organization_modules om ON m.id = om.module_id
+      WHERE om.org_id = $1 AND om.enabled = true
+        AND m.dependencies @> ARRAY[$2]::text[];

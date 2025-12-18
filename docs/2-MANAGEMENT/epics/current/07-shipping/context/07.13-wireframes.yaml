@@ -1,0 +1,556 @@
+wireframes:
+  ship_019_sscc_labels:
+    id: "SHIP-019"
+    name: "SSCC Label Generation & Printing"
+    file: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-019-sscc-labels.md"
+    feature: "FR-7.39 - GS1-18 SSCC Label Generation & Batch Printing"
+
+    screens:
+      - name: "single_label_preview"
+        title: "SSCC Label Preview & Print Settings"
+        description: "Desktop 2-column layout: label preview (left) + print settings (right)"
+        content: "SHIP-019 lines 14-90"
+        key_components:
+          - name: "label_preview_pane"
+            size: "50% width"
+            content:
+              - "GS1-128 barcode image (bwip-js rendering)"
+              - "Human-readable SSCC: 00 1234 5678 9012 3456 78"
+              - "SHIP TO section: customer name, address, city/state"
+              - "PO # and ORDER # fields"
+              - "BOX X of Y indicator"
+              - "Weight: 125.4 kg"
+              - "Handling instructions (if applicable)"
+          - name: "format_selector"
+            options: ["4x6\" (Standard Carton)", "4x8\" (Large Carton/Pallet)"]
+            default: "4x6\""
+            behavior: "Toggle updates preview pane and label dimensions"
+          - name: "scale_controls"
+            current_scale: "100%"
+            controls: ["[- Scale +]", "Fit to Page"]
+            behavior: "Adjust preview size without changing actual label"
+          - name: "preview_mode_selector"
+            options: ["Desktop Print", "Zebra ZPL"]
+            description: "Switch between desktop PDF preview and raw ZPL output"
+
+        print_settings:
+          section: "Print Settings (right panel)"
+          content: "SHIP-019 lines 52-86"
+          elements:
+            - name: "printer_selection"
+              type: "dropdown combobox"
+              default: "Zebra ZD430 (Dock 1) - 203 DPI [Selected]"
+              options:
+                - "Zebra ZD430 (Dock 1)"
+                - "Brother QL-800 (Desktop)"
+                - "Generic PDF Printer"
+                - "Email PDF"
+              button: "[⚙ Printer Setup] - opens printer configuration"
+              behavior: "Filters available label formats and print modes by printer"
+
+            - name: "label_format"
+              type: "radio group"
+              options:
+                - value: "4x6"
+                  label: "4x6\" (Standard Carton)"
+                  selected: true
+                - value: "4x8"
+                  label: "4x8\" (Large Carton/Pallet)"
+              behavior: "Updates preview pane and ZPL coordinates"
+
+            - name: "label_orientation"
+              type: "radio group"
+              options:
+                - value: "portrait"
+                  label: "Portrait (default)"
+                  selected: true
+                - value: "landscape"
+                  label: "Landscape"
+              behavior: "Changes ZPL rotation parameter"
+
+            - name: "copies_to_print"
+              type: "number input with +/- buttons"
+              default: 1
+              range: [1, 99]
+              description: "Print duplicate labels if needed (useful for multi-copy orders)"
+
+            - name: "print_mode"
+              type: "radio group"
+              options:
+                - value: "native_zpl"
+                  label: "Native ZPL (Faster, Zebra only)"
+                  selected: true
+                - value: "pdf"
+                  label: "PDF (Universal compatibility)"
+              behavior: "ZPL mode sends directly to Zebra printer, PDF renders first"
+
+            - name: "auto_print_checkbox"
+              type: "checkbox"
+              label: "☑ Auto-print (Skip confirmation dialog)"
+              description: "Skip browser print dialog and send directly to printer"
+
+            - name: "status_display"
+              content: "Printer ready (Last check: 2 min ago) | Connection: Online ✓"
+              styling: "Green checkmark, gray text"
+
+          actions:
+            - "[<< Back] - Return to packing station"
+            - "[Save Print Settings] - Store settings for next label"
+            - "[Print Now] - Trigger immediate print"
+            - "[Preview PDF] - Open PDF preview in new window"
+
+        footer:
+          - "SSCC: 00123456789012345678 (GS1-18 Format)"
+          - "Generated: 2025-12-15 14:30"
+          - "User: John S."
+
+        states:
+          - success: "All controls enabled, preview displays barcode"
+          - loading: "Spinner on barcode area, 'Generating barcode...' message"
+          - error_no_sscc: "Error message: 'SSCC not generated yet. Click [Generate SSCC]'"
+          - error_printer_offline: "Status shows 'Printer offline', [Print] button disabled"
+
+      - name: "batch_label_queue"
+        title: "Batch SSCC Label Printing Queue"
+        description: "Manage multiple labels with bulk print, retry, and error handling"
+        content: "SHIP-019 lines 93-150"
+
+        header_section:
+          toolbar:
+            - "[+ Add Boxes] - Add more shipments to batch"
+            - "[Generate All] - Generate SSCCs for all boxes in batch"
+            - "[Print All (8)] - Print all ready labels"
+            - "[⟲ Refresh] - Reload batch status from server"
+            - "[Select All] - Check all rows"
+            - "[Clear All] - Uncheck all rows"
+
+        main_table:
+          title: "Batch Label Queue (8 labels to print)"
+          columns:
+            - name: "checkbox"
+              width: "5%"
+              content: "[✓] or [ ] for bulk selection"
+
+            - name: "box_number"
+              width: "8%"
+              content: "1/2, 2/2, etc."
+              sortable: true
+
+            - name: "sscc"
+              width: "20%"
+              content: "00123456789012345678 (formatted)"
+              sortable: true
+              format_size: "(4x6\")" or "(4x8\")"
+              status_label: "Generated" or "Generated: 2min ago"
+
+            - name: "customer"
+              width: "20%"
+              content: "Customer name"
+              action_link: "[View Details]"
+
+            - name: "weight"
+              width: "12%"
+              content: "125 kg, 142 kg, etc."
+              sortable: true
+
+            - name: "contents"
+              width: "20%"
+              content: "2 products (100+150), Lots: 2"
+
+            - name: "status"
+              width: "10%"
+              content: "✓ Ready, ⟳ Retry [?], ERROR"
+              styling:
+                ready: "Green checkmark"
+                error: "Red X"
+                retry: "Yellow warning"
+
+            - name: "actions"
+              width: "15%"
+              buttons:
+                - "[Print]"
+                - "[Preview]"
+                - "[Regen] (if error)"
+
+        error_rows:
+          - box_3: "ERROR: SSCC generation failed | Reason: GS1 prefix not configured"
+            status: "⟳ Retry [?]"
+            action: "[Regen] [Print]"
+
+          - box_4: "ERROR: Invalid box dimensions"
+            status: "⟳ Retry [?]"
+            action: "[Regen] [Print]"
+
+        footer_section:
+          batch_summary: "Batch Status: 6 Ready | 2 Errors | 0 Printed"
+          actions:
+            - "[Retry All Errors] - Regenerate all failed labels"
+            - "[Resolve Errors] - Show error details and fixes"
+
+        printer_section:
+          title: "Printer Selection:"
+          dropdown: "[Zebra ZD430 (Dock 1) - Default] ▼"
+          quick_actions: "[Generic PDF] [Email] [⚙ Printer Setup]"
+          connection_info: "| Online ✓"
+
+        print_settings_section:
+          title: "Print Settings:"
+          radio_options:
+            - "○ Native ZPL (Faster)"
+            - "● PDF (Universal)"
+          dropdowns:
+            - "[Orientation: Portrait ▼]"
+            - "[Size: 4x6\" ▼]"
+          checkboxes:
+            - "☑ Auto-print when ready"
+            - "☐ Print in order"
+            - "☐ Pause after each label"
+
+    data_sources:
+      primary: "shipment_boxes table with SSCC, box_number, weight, dimensions"
+      secondary: "shipments (customer info), customers (name)"
+      related: "printer_configs (printer list), org settings (default printer)"
+
+    business_logic:
+      - "Generate All: batch process SSCCs for boxes with sscc = NULL"
+      - "Print All: filter to status='Ready', generate ZPL for each, send to printer"
+      - "Error handling: display error reason, [Regen] retries generation, [Resolve] links to settings"
+      - "Status auto-refresh: poll /api/shipping/shipments/:id/boxes for SSCC status updates"
+
+    error_scenarios:
+      - id: "no_gs1_prefix"
+        message: "ERROR: SSCC generation failed | Reason: GS1 prefix not configured"
+        resolution: "Show link to Organization Settings > Shipping > GS1 Configuration"
+
+      - id: "invalid_dimensions"
+        message: "ERROR: Invalid box dimensions"
+        resolution: "Show [Update Dimensions] link to box detail page"
+
+      - id: "printer_offline"
+        message: "ERROR: Printer offline"
+        resolution: "Status shows 'Printer offline', [Print] button disabled"
+
+    responsive_design:
+      desktop:
+        - "Full table visible with all columns"
+        - "Print settings panel on right side"
+        - "Printer dropdown + quick actions in header"
+
+      tablet:
+        - "Table condensed: hide 'Contents' column"
+        - "Print settings below table"
+        - "Printer selection on separate row"
+
+      mobile:
+        - "Convert table to card layout (1 card per label)"
+        - "Print settings collapsed/expandable"
+        - "Printer selection in modal"
+
+  ship_021_bill_of_lading:
+    id: "SHIP-021"
+    name: "Bill of Lading Generation & Printing"
+    file: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-021-bill-of-lading.md"
+    feature: "FR-7.41 - BOL PDF Generation with Carrier Info & Shipping Details"
+
+    screens:
+      - name: "bol_success"
+        title: "Bill of Lading Preview"
+        description: "Full BOL PDF display with print/email/download buttons"
+        content: "SHIP-021 lines 12-76"
+
+        page_layout: "8.5\" x 11\" (letter) document preview, centered with zoom controls"
+
+        header:
+          buttons_right:
+            - "[< Back] - Return to shipment detail"
+            - "[Print] - Open browser print dialog"
+            - "[Email] - Open email modal"
+            - "[Download] - Save PDF to device"
+
+        navigation:
+          bottom: "[Page 1] [Zoom: 100%] [<] [>] [Print View]"
+          zoom_options: "50%, 75%, 100%, 125%, 150%, Fit Width"
+
+        pdf_content:
+          header:
+            title: "BILL OF LADING"
+            left_section:
+              - "BOL #: BOL-2025-001234"
+              - "Date: 2025-01-15"
+              - "Carrier: DHL Freight"
+              - "Pro #: 1Z999AA10012345678"
+
+          shipper_consignee:
+            left:
+              title: "SHIPPER:"
+              content:
+                - "MonoPilot Foods"
+                - "456 Industrial Blvd"
+                - "Denver, CO 80202, USA"
+                - "Phone: (303) 555-5678"
+                - "Contact: shipping@monopilot.com"
+
+            right:
+              title: "CONSIGNEE (SHIP TO):"
+              content:
+                - "Blue Mountain Restaurant"
+                - "Attn: John Smith"
+                - "789 Main Street"
+                - "Denver, CO 80210, USA"
+                - "Phone: (303) 555-1234"
+
+          special_instructions:
+            - "Handle with care - Perishable items"
+            - "Keep refrigerated at 2-8°C (35-46°F)"
+            - "Do not stack - Fragile items"
+            - "Temperature-controlled transport req'd"
+
+          freight_terms:
+            - "FREIGHT TERMS: Prepaid"
+            - "PAYMENT TERMS: Due upon receipt"
+
+          freight_details_table:
+            columns:
+              - "Item #"
+              - "SSCC Barcode"
+              - "Weight (kg)"
+              - "Dimensions (LxWxH) (cm)"
+              - "Freight Class"
+              - "NMFC Code"
+            rows:
+              - ["1", "00123456789012345678", "48.5", "60 x 40 x 30", "65", "1234"]
+              - ["2", "00123456789012345679", "42.3", "60 x 40 x 25", "65", "1234"]
+
+          totals:
+            - "TOTALS: 2 cartons / 0 pallets"
+            - "Total Weight: 90.8 kg"
+            - "Declared Value: $3,738.75 USD"
+
+          product_summary:
+            carton_1:
+              sscc: "00123456789012345678"
+              items:
+                - "Organic Flour 5lb (Lot: FLOUR-2024-001, BBD: 2025-06-30) x 100 units"
+                - "Butter 2kg Block (Lot: BUTT-2024-022, BBD: 2025-04-15) x 12 units"
+
+            carton_2:
+              sscc: "00123456789012345679"
+              items:
+                - "Organic Sugar 10lb (Lot: SUGAR-2024-045, BBD: 2025-12-31) x 50 units"
+                - "Butter 2kg Block (Lot: BUTT-2024-022, BBD: 2025-04-15) x 13 units"
+
+          signatures:
+            shipper:
+              - "Signature: __________________"
+              - "Name: __________________"
+              - "Title: __________________"
+              - "Date: __________________"
+
+            carrier:
+              - "Signature: __________________"
+              - "Name: __________________"
+              - "Title: __________________"
+              - "Date: __________________"
+
+          footer:
+            - "RETURN BOL TO: shipping@monopilot.com"
+            - "DocID: BOL-2025-001234"
+            - "Generated: 2025-01-15 14:30"
+            - "Page 1 of 1"
+
+      - name: "bol_email_modal"
+        title: "Email Bill of Lading to Carrier"
+        description: "Modal form for emailing BOL with carrier contact suggestions"
+        content: "SHIP-021 lines 78-118"
+
+        modal_size: "650px wide, centered"
+
+        form_fields:
+          to_carrier:
+            label: "To: (Carrier Contact)"
+            type: "dropdown combobox"
+            required: true
+            options:
+              - "dhl@dhlogistics.com"
+              - "john.smith@dhl.com"
+              - "[+ Add Custom Email]"
+            default: "dhl@dhlogistics.com"
+            validation: "Must be valid email format (RFC 5322)"
+
+          cc_contacts:
+            label: "CC: (Additional Recipients)"
+            type: "multi-select with add button"
+            optional: true
+            button: "[Add Custom Contacts +]"
+            validation: "All entries must be valid email format"
+
+          subject:
+            label: "Subject:"
+            type: "text input"
+            default: "BOL-2025-001234 Shipment Manifest"
+            char_limit: 200
+            validation: "5-200 characters"
+
+          message:
+            label: "Message:"
+            type: "rich text editor"
+            default_template: |
+              Dear DHL Freight,
+
+              Please find attached the Bill of Lading for our shipment.
+
+              BOL #: BOL-2025-001234
+              Pro #: 1Z999AA100123
+              Date: 2025-01-15
+              Total Weight: 90.8 kg
+
+              Thank you!
+
+              MonoPilot Foods
+            char_limit: 5000
+            validation: "Max 5000 characters"
+
+        checkboxes:
+          - label: "[ ] Include PDF attachment"
+            default: true
+          - label: "[x] Include carrier instructions"
+            default: true
+
+        actions:
+          - "[Cancel] - Close modal"
+          - "[Send Email] - POST to /api/shipping/bol/:id/email"
+
+      - name: "bol_error_no_carrier"
+        title: "Cannot Generate BOL"
+        description: "Error state when required data is missing"
+        content: "SHIP-021 lines 300-329"
+
+        icon: "[Warning Icon]"
+
+        title_text: "Incomplete Shipment"
+
+        message: "Cannot generate BOL. Missing information:"
+        missing_fields_list:
+          - "No carrier assigned (required for Pro #)"
+          - "Box weights not captured"
+          - "SSCC barcodes not generated"
+          - "Freight class and NMFC codes not set"
+
+        call_to_action: "Please complete packing before generating BOL."
+
+        buttons:
+          - "[Complete Packing] - Link to packing station"
+          - "[Assign Carrier] - Link to carrier assignment modal"
+          - "[Back to Shipment] - Return to detail page"
+
+      - name: "bol_error_pdf_timeout"
+        title: "PDF Generation Failed"
+        description: "Error when PDF generation times out"
+        content: "SHIP-021 lines 272-298"
+
+        icon: "[Error Icon]"
+
+        title_text: "Failed to Generate BOL"
+
+        error_code: "Error: PDF_GENERATION_TIMEOUT (Code 5002)"
+
+        message: "The BOL generation service took too long to respond. Please try again or contact support."
+
+        buttons:
+          - "[Retry] - Attempt BOL generation again"
+          - "[Contact Support] - Open support chat"
+          - "[Back to Shipment] - Return to detail page"
+
+      - name: "bol_loading"
+        title: "Generating Bill of Lading"
+        description: "Loading state with progress bar"
+        content: "SHIP-021 lines 220-241"
+
+        progress_bar: "[================= 45% =================]"
+
+        message: "Generating Bill of Lading PDF..."
+
+        substatus: "Fetching shipment and carrier details... Please wait"
+
+      - name: "bol_empty"
+        title: "No Bill of Lading Available"
+        description: "Empty state when BOL cannot be generated"
+        content: "SHIP-021 lines 243-270"
+
+        icon: "[Document Icon]"
+
+        title_text: "No Bill of Lading Available"
+
+        message: "This shipment does not have a BOL."
+
+        explanation:
+          - "BOL is generated after packing is complete"
+          - "and carrier is assigned to the shipment."
+
+        buttons:
+          - "[Back to Shipment] - Return to shipment detail"
+          - "[Generate BOL] - Attempt BOL generation"
+          - "[View Packing Slip] - Show packing slip instead"
+
+    data_sources:
+      primary: "shipments (shipment_number, carrier_id, tracking_number, status)"
+      secondary: "shipment_boxes (SSCC, weight, dimensions), customers, customer_addresses"
+      related: "products, license_plates (lots), sales_orders"
+
+    business_logic:
+      - "BOL generation requires: status='packed'+, carrier assigned, all boxes with SSCC+weight+dimensions"
+      - "BOL numbering: BOL-YYYY-XXXXXX (per org, immutable once generated)"
+      - "PDF caching: cached for 24h, invalidated on shipment update"
+      - "Email with carrier contact fallback: use primary contact or company email"
+
+    responsive_design:
+      desktop:
+        - "PDF preview 70% width, right sidebar 30% (empty for future)"
+        - "Print/Email/Download buttons in header, horizontal layout"
+        - "Full freight details table with all columns visible"
+
+      tablet:
+        - "PDF preview 100% width, scrollable"
+        - "Buttons below header, horizontal layout"
+        - "Freight table condensed (fewer columns, stacked)"
+
+      mobile:
+        - "PDF preview full width, scrollable"
+        - "Buttons vertical stack or sticky footer"
+        - "Freight table converted to card layout"
+
+    email_template_default: |
+      Subject: BOL-{bol_number} Shipment Manifest - {customer_name}
+
+      Dear {carrier_contact_name},
+
+      Please find attached the Bill of Lading for the following shipment:
+
+      BOL #: {bol_number}
+      Pro #: {pro_number}
+      Shipment Date: {shipment_date}
+      Carrier: {carrier_name}
+
+      Shipper: {org_name}
+      Consignee: {customer_name}
+
+      Total Weight: {total_weight_kg} kg ({total_weight_lbs} lbs)
+      Total Cartons: {carton_count}
+      Total Declared Value: {declared_value} {currency}
+
+      Special Instructions:
+      {special_instructions}
+
+      The Bill of Lading is attached. Please sign and return a copy.
+
+      Best regards,
+      {org_name}
+      Shipping Department
+      {org_phone}
+      {org_email}
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    changes: "Detailed wireframe mapping for SHIP-019 (SSCC labels) and SHIP-021 (BOL)"
+    author: "TECH-WRITER"

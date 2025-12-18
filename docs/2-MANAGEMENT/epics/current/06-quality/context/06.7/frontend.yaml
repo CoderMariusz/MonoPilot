@@ -1,0 +1,409 @@
+# Story 06.7 - Frontend Components, Pages, Types
+# Purpose: React components, UI structure, state management
+# Agent: FRONTEND-DEV (UI focus)
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/page.tsx"
+    name: "Sampling Plans List Page"
+    description: "Main sampling plans list with search, filters, pagination"
+    layout: "QA Module layout (sidebar navigation)"
+    states:
+      - "Loading: skeleton rows"
+      - "Empty: 'No sampling plans configured' with CTA"
+      - "Error: failed to load with retry"
+      - "Success: table with plans"
+    components_used:
+      - "SamplingPlansList"
+      - "SearchBar"
+      - "FilterDropdowns"
+      - "Pagination"
+      - "CreateButton"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/[id]/page.tsx"
+    name: "Sampling Plan Detail/Edit Page"
+    description: "View, edit, or create sampling plan"
+    layout: "Modal or fullscreen form"
+    states:
+      - "View mode: read-only display"
+      - "Edit mode: editable form with save/cancel"
+      - "Create mode: empty form with create button"
+    components_used:
+      - "SamplingPlanForm"
+      - "ISO2859TableModal (helper)"
+      - "ParameterDisplay"
+      - "ActionButtons"
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/SamplingPlansList.tsx"
+    name: "SamplingPlansList"
+    type: "Data Table Component"
+    description: "Displays list of sampling plans with filters, search, pagination"
+    props:
+      plans: "SamplingPlan[]"
+      total: "number"
+      isLoading: "boolean"
+      onEdit: "(id: string) => void"
+      onDelete: "(id: string) => void"
+      onClone: "(id: string) => void"
+    features:
+      - "Sortable columns (name, product, lot_size, sample_size, aql, created_at)"
+      - "Search by plan name or product"
+      - "Filter by inspection_type (dropdown)"
+      - "Filter by status (active/inactive)"
+      - "Pagination (20 items per page default)"
+      - "Row-level actions menu (⋮)"
+      - "Status badges (Active/Inactive)"
+      - "Method indicators (AQL-based, etc.)"
+      - "Quick guide footer with ISO 2859 info"
+    state_management:
+      - "useQueryState for filters/sort/page"
+      - "useQuery for data fetching"
+    responsive:
+      - "Desktop: full table with all columns"
+      - "Tablet: card layout with key info"
+      - "Mobile: card layout, simplified"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/SamplingPlanForm.tsx"
+    name: "SamplingPlanForm"
+    type: "Modal/Form Component"
+    description: "Create or edit sampling plan with validation"
+    props:
+      mode: "'create' | 'edit'"
+      initialData: "SamplingPlan | null"
+      onSave: "(data: CreateSamplingPlanRequest) => Promise<void>"
+      onCancel: "() => void"
+      isLoading: "boolean"
+    sections:
+      1. "Plan Information"
+        - plan_name (text input, required)
+        - product_id (select, optional)
+        - inspection_type (radio buttons: incoming/in-process/final)
+        - aql_level (radio buttons: I/II/III)
+        - is_active (checkbox)
+
+      2. "Lot Size Range"
+        - lot_size_min (number input)
+        - lot_size_max (number input)
+        - Help text: "This plan applies to lots between X and Y units"
+
+      3. "Sample Size & Acceptance"
+        - ISO 2859 table helper button
+        - sample_size (number, read-only if AQL-based)
+        - acceptance_number (number, read-only if AQL-based)
+        - rejection_number (number, read-only if AQL-based)
+        - Help text: "Values calculated from ISO 2859 table"
+
+    validation:
+      - Real-time validation on field blur
+      - Red border + error message on invalid fields
+      - Display count of inspections using this plan (edit mode)
+    state_management:
+      - "useForm hook with Zod validation"
+      - "useMutation for save operation"
+      - "Auto-populate from ISO 2859 if method='AQL-based'"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/ISO2859TableModal.tsx"
+    name: "ISO2859TableModal"
+    type: "Modal Component"
+    description: "Interactive ISO 2859 sample size reference table with auto-fill"
+    props:
+      isOpen: "boolean"
+      onClose: "() => void"
+      onApply: "(data: { sample_size: number; acceptance_number: number; rejection_number: number }) => void"
+      initialLotSize: "number | null"
+      initialAQL: "number | null"
+    features:
+      - "Lot size input (number)"
+      - "Inspection level selector (I/II/III)"
+      - "AQL level selector (dropdown)"
+      - "Full ISO 2859 table display (15 lot ranges)"
+      - "Highlighted row for current lot size"
+      - "Recommendation panel with explanation"
+      - "Apply button to populate form"
+      - "Download table button (CSV/PDF)"
+    state_management:
+      - "useState for filter selections"
+      - "Computed table rows based on filters"
+    data_source:
+      - "Call GET /api/quality/iso-2859-reference endpoint"
+      - "Or use in-memory constant if pre-loaded"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/SamplingPlanSelector.tsx"
+    name: "SamplingPlanSelector"
+    type: "Dropdown/Select Component"
+    description: "Auto-suggest and select sampling plan during inspection"
+    props:
+      productId: "string"
+      inspectionType: "'incoming' | 'in_process' | 'final'"
+      lotSize: "number"
+      onSelect: "(plan: SamplingPlan) => void"
+      placeholder: "string"
+    features:
+      - "Auto-fetch active plans matching criteria"
+      - "Show plan name, lot range, sample size, acceptance/rejection"
+      - "Indicate if no plan matches current lot size"
+      - "Allow 'Skip sampling' option"
+      - "Clear button to deselect"
+    state_management:
+      - "useQuery to fetch matching plans"
+      - "useEffect to trigger query when product/type/lot changes"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/SampleRecordingForm.tsx"
+    name: "SampleRecordingForm"
+    type: "Modal Component"
+    description: "Record individual sample during inspection"
+    props:
+      inspectionId: "string"
+      planId: "string"
+      sampleSequence: "number"
+      totalRequired: "number"
+      onSave: "(data: CreateSamplingRecordRequest) => Promise<void>"
+      onCancel: "() => void"
+    fields:
+      - sample_identifier (auto-generated, read-only)
+      - location_description (text input, required)
+      - Barcode scan button (optional)
+      - result (pass/fail radio buttons, required)
+      - defect_type (dropdown if fail, required if fail)
+      - notes (textarea, optional)
+      - Attach photo checkbox with camera button (optional)
+      - sampled_by (auto-filled from current user, read-only)
+      - sampled_at (auto-filled, read-only)
+    state_management:
+      - "useForm for validation"
+      - "useMutation for save"
+      - "useState for photo upload"
+    features:
+      - "Auto-focus on location field"
+      - "Show progress indicator (N of total samples)"
+      - "Show running defect count"
+      - "Camera integration for photo (mobile)"
+      - "Barcode scanner integration"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/SamplesList.tsx"
+    name: "SamplesList"
+    type: "Data Table Component"
+    description: "Display recorded samples for an inspection"
+    props:
+      inspectionId: "string"
+      samples: "SamplingRecord[]"
+      isLoading: "boolean"
+    columns:
+      - "Sample #"
+      - "Sample ID"
+      - "Location"
+      - "Sampled By"
+      - "Time"
+      - "Result (pass/fail badge)"
+      - "Notes (truncated)"
+    features:
+      - "Sorted chronologically (sampled_at ASC)"
+      - "Pass samples: green badge"
+      - "Fail samples: red badge with defect type"
+      - "Expandable row to show full notes/photos"
+      - "No edit/delete (immutable records)"
+    responsive:
+      - "Desktop: full table"
+      - "Mobile: card layout, 1 sample per card"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/SamplingProgressBar.tsx"
+    name: "SamplingProgressBar"
+    type: "Progress Indicator"
+    description: "Visual indicator of sampling completion and defect status"
+    props:
+      samplesRecorded: "number"
+      requiredSamples: "number"
+      defectsFound: "number"
+      acceptanceLimit: "number"
+      rejectionLimit: "number"
+    display:
+      - "Progress bar: {samplesRecorded}/{requiredSamples} samples"
+      - "Defect counter: {defectsFound} defects found"
+      - "Status color coding:"
+        - "Green: within acceptance limit"
+        - "Yellow: approaching rejection limit"
+        - "Red: exceeds rejection limit"
+
+  - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/components/SamplingDecisionPanel.tsx"
+    name: "SamplingDecisionPanel"
+    type: "Summary/Decision Panel"
+    description: "Display lot decision (accept/reject/review) with reasoning"
+    props:
+      decision: "'accept' | 'reject' | 'review'"
+      defectsFound: "number"
+      acceptanceLimit: "number"
+      rejectionLimit: "number"
+      defectSummary: "{ defect_type: string; count: number; percentage: number }[]"
+      inspectionNotes: "string"
+      onDisposition: "(disposition: string) => void"
+      onNCRCreate: "(create: boolean) => void"
+    sections:
+      1. "Decision Banner"
+        - Green: "✓ Lot ACCEPTED" (if accept)
+        - Red: "✗ Lot REJECTED" (if reject)
+        - Yellow: "⚠ Manual Review Required" (if review)
+
+      2. "Decision Details"
+        - Samples inspected: N units
+        - Defects found: N
+        - Acceptance limit: <= X
+        - Rejection limit: >= Y
+        - Reasoning: "N defects <= X -> ACCEPT" (etc.)
+
+      3. "Defect Summary" (if reject)
+        - List of defect types with counts and percentages
+        - Top 3 defects highlighted
+
+      4. "Disposition" (if reject, required)
+        - Radio buttons:
+          - Reject - Return to supplier
+          - Accept - Use with deviation (requires QA Manager)
+          - Sort - Remove defective units
+          - Rework - Process to meet specs
+
+      5. "Decision Notes" (if reject, required)
+        - Textarea for inspector comments
+
+      6. "NCR Creation" (if reject, optional)
+        - Checkbox: "Create NCR for this rejection"
+        - Checkbox: "Notify supplier"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/sampling-plan-service.ts"
+    description: "Client-side sampling plan service"
+    methods:
+      - "list(filters: SamplingPlanListParams): Promise<PaginatedResult<SamplingPlan>>"
+      - "getById(id: string): Promise<SamplingPlan>"
+      - "create(data: CreateSamplingPlanRequest): Promise<SamplingPlan>"
+      - "update(id: string, data: UpdateSamplingPlanRequest): Promise<SamplingPlan>"
+      - "delete(id: string): Promise<void>"
+      - "suggest(productId: string, inspectionType: string, lotSize: number): Promise<SamplingPlan | null>"
+
+  - path: "apps/frontend/lib/services/sampling-record-service.ts"
+    description: "Client-side sampling record service"
+    methods:
+      - "create(data: CreateSamplingRecordRequest): Promise<SamplingRecord>"
+      - "listByInspection(inspectionId: string): Promise<SamplingRecord[]>"
+      - "recordDecision(inspectionId: string, decision: SamplingDecision): Promise<void>"
+      - "calculateDefectSummary(records: SamplingRecord[]): DefectSummary[]"
+
+  - path: "apps/frontend/lib/services/iso-2859-service.ts"
+    description: "ISO 2859 table lookups and calculations"
+    methods:
+      - "getTable(inspectionLevel?: string, aqlLevel?: number): Promise<ISO2859Entry[]>"
+      - "lookup(lotSize: number, inspectionLevel: string, aqlLevel: number): Promise<LookupResult>"
+      - "calculateDecision(defects: number, acceptance: number, rejection: number): 'accept' | 'reject' | 'review'"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/sampling.ts"
+    description: "TypeScript types for sampling module"
+    exports:
+      SamplingPlan: "Full plan object"
+      SamplingPlanSummary: "Plan with product names for list display"
+      SamplingRecord: "Individual sample record"
+      SamplingRecordsResponse: "Paginated response with metadata"
+      CreateSamplingPlanRequest: "Input for plan creation"
+      UpdateSamplingPlanRequest: "Input for plan update (partial)"
+      CreateSamplingRecordRequest: "Input for sample recording"
+      SamplingDecision: "Decision data (accept/reject/review)"
+      ISO2859Entry: "Table row entry"
+      LookupResult: "AQL calculation result"
+      DefectSummary: "Defect breakdown by type"
+      SamplingPlanListParams: "Filter/sort/pagination params"
+
+# State Management
+state_management:
+  query_keys:
+    - "['sampling-plans']"
+    - "['sampling-plans', 'list', params]"
+    - "['sampling-plans', id]"
+    - "['sampling-plans', 'suggest', productId, inspectionType, lotSize]"
+    - "['sampling-records', 'inspection', inspectionId]"
+    - "['iso-2859', 'table']"
+
+  mutations:
+    - "createSamplingPlan"
+    - "updateSamplingPlan"
+    - "deleteSamplingPlan"
+    - "createSamplingRecord"
+    - "recordSamplingDecision"
+
+# Forms & Validation
+forms:
+  CreateSamplingPlanForm:
+    fields:
+      - name: "string (3-200 chars, required)"
+      - description: "string (optional)"
+      - inspection_type: "enum (required)"
+      - product_id: "UUID (optional)"
+      - aql_level: "enum (required)"
+      - lot_size_min: "number > 0 (required)"
+      - lot_size_max: "number > min (required)"
+      - sample_size: "number > 0 (required)"
+      - acceptance_number: "number >= 0 (required)"
+      - rejection_number: "number > acceptance (required)"
+      - is_active: "boolean (optional)"
+
+  SampleRecordingForm:
+    fields:
+      - location_description: "string (required)"
+      - result: "enum: pass|fail (required)"
+      - defect_type: "enum (required if fail)"
+      - notes: "string (optional)"
+      - photo: "file (optional)"
+
+# Responsive Design
+responsive_breakpoints:
+  desktop: ">1024px"
+    - Full table layout
+    - Side-by-side modal and form
+    - All columns visible
+
+  tablet: "768-1024px"
+    - Card layout for sampling plans list
+    - Single-column form
+    - Scrollable ISO 2859 table
+
+  mobile: "<768px"
+    - Card layout (1 plan per card)
+    - Stacked form fields
+    - Simplified sampling record entry
+    - Full-screen views for decision making
+    - Large touch targets (48x48dp minimum)
+
+# Accessibility
+accessibility:
+  wcag: "AA (4.5:1 contrast minimum)"
+  keyboard_navigation:
+    - "Tab through all controls"
+    - "Enter to activate buttons/checkboxes"
+    - "Escape to close modals"
+    - "Arrow keys for tables"
+
+  screen_reader:
+    - "Table headers announced"
+    - "Status badges described (Active/Inactive)"
+    - "Progress percentage announced"
+    - "Form error messages announced with aria-live"
+    - "Decision banner announced assertively"
+
+  touch_targets:
+    - "Minimum 44x44dp for all interactive elements"
+    - "48x48dp for modal buttons"
+
+# Performance
+performance:
+  optimizations:
+    - "Code split: sampling plans page lazy-loaded"
+    - "Memoize SamplingPlansList with React.memo"
+    - "Virtual scrolling for large plan lists (100+)"
+    - "ISO 2859 table cached in-memory (static)"
+    - "Sample recording form: debounce defect_type search (500ms)"
+  targets:
+    - "Plan list load: <1s"
+    - "Sample record save: <500ms"
+    - "Form validation: <100ms"

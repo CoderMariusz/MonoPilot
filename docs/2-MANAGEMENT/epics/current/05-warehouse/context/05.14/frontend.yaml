@@ -1,0 +1,434 @@
+# Story 05.14 - Frontend Specification
+# Purpose: Components, hooks, types, UX references
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/label-print.ts"
+    exports:
+      - name: "LPLabelData"
+        definition: |
+          export interface LPLabelData {
+            lp_number: string;
+            product_name: string;
+            product_code: string;
+            quantity: number;
+            uom: string;
+            batch_number: string | null;
+            supplier_batch_number: string | null;
+            expiry_date: string | null;
+            manufacture_date: string | null;
+            location_path: string | null;
+            warehouse_name: string | null;
+            gtin: string | null;
+            qr_data: string;
+          }
+
+      - name: "LabelGenerationOptions"
+        definition: |
+          export interface LabelGenerationOptions {
+            copies?: number;
+            label_size?: '4x6' | '4x3' | '3x2';
+            include_qr?: boolean;
+          }
+
+      - name: "PrintLabelResponse"
+        definition: |
+          export interface PrintLabelResponse {
+            zpl: string;
+            lp_number: string;
+            product_name: string;
+            copies: number;
+            label_size: string;
+            generated_at: string;
+            download_filename: string;
+          }
+
+      - name: "PrintBulkLabelsRequest"
+        definition: |
+          export interface PrintBulkLabelsRequest {
+            lp_ids: string[];
+            copies?: number;
+            format?: 'zip' | 'concat';
+          }
+
+      - name: "PrintBulkLabelsResponse"
+        definition: |
+          export interface PrintBulkLabelsResponse {
+            format: 'zip' | 'concat';
+            total_labels: number;
+            total_copies: number;
+            file_size_bytes: number;
+            download_url?: string;
+            zpl?: string;
+          }
+
+      - name: "LabelSettings"
+        definition: |
+          export interface LabelSettings {
+            print_label_on_receipt: boolean;
+            label_copies_default: number;
+            label_size: '4x6' | '4x3' | '3x2';
+            printer_ip: string | null;
+            printer_port: number;
+          }
+
+# Components
+components:
+  - path: "apps/frontend/components/warehouse/labels/PrintLabelButton.tsx"
+    description: "Button to open print label modal"
+    props:
+      - { name: "lpId", type: "string", required: true }
+      - { name: "lpNumber", type: "string", required: true }
+      - { name: "variant", type: "'default' | 'icon'", required: false, default: "'default'" }
+      - { name: "onPrintComplete", type: "() => void", required: false }
+    behavior:
+      - "Renders button with printer icon"
+      - "Opens PrintLabelModal on click"
+      - "Calls onPrintComplete after successful print/download"
+    pattern: |
+      export function PrintLabelButton({
+        lpId,
+        lpNumber,
+        variant = 'default',
+        onPrintComplete,
+      }: PrintLabelButtonProps) {
+        const [isModalOpen, setIsModalOpen] = useState(false);
+
+        return (
+          <>
+            <Button
+              variant={variant === 'icon' ? 'ghost' : 'outline'}
+              size={variant === 'icon' ? 'icon' : 'default'}
+              onClick={() => setIsModalOpen(true)}
+            >
+              <Printer className="h-4 w-4" />
+              {variant !== 'icon' && <span className="ml-2">Print Label</span>}
+            </Button>
+            <PrintLabelModal
+              lpId={lpId}
+              lpNumber={lpNumber}
+              isOpen={isModalOpen}
+              onClose={() => {
+                setIsModalOpen(false);
+                onPrintComplete?.();
+              }}
+            />
+          </>
+        );
+      }
+
+  - path: "apps/frontend/components/warehouse/labels/PrintLabelModal.tsx"
+    description: "Modal for printing LP label with preview"
+    props:
+      - { name: "lpId", type: "string", required: true }
+      - { name: "lpNumber", type: "string", required: true }
+      - { name: "isOpen", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+    state:
+      - { name: "copies", type: "number", default: "from settings" }
+      - { name: "isLoading", type: "boolean", default: "false" }
+      - { name: "lpData", type: "LPLabelData | null", default: "null" }
+      - { name: "error", type: "string | null", default: "null" }
+    sections:
+      - header: "Print Label for {lpNumber}"
+      - lp_info: "Product, Qty, Batch, Expiry, Location summary"
+      - copies_input: "Number input with +/- buttons"
+      - preview: "LabelPreview component"
+      - actions: "Cancel, Download ZPL buttons"
+    pattern: |
+      export function PrintLabelModal({
+        lpId,
+        lpNumber,
+        isOpen,
+        onClose,
+      }: PrintLabelModalProps) {
+        const { data: settings } = useWarehouseSettings();
+        const [copies, setCopies] = useState(settings?.label_copies_default || 1);
+        const [isLoading, setIsLoading] = useState(false);
+
+        const { data: lpData } = useLPLabelData(lpId, { enabled: isOpen });
+
+        const handleDownload = async () => {
+          setIsLoading(true);
+          try {
+            const response = await fetch(
+              `/api/warehouse/lps/${lpId}/print-label?copies=${copies}`
+            );
+            const data = await response.json();
+
+            // Download ZPL file
+            const blob = new Blob([data.zpl], { type: 'application/zpl' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.download_filename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            toast.success('Label downloaded');
+            onClose();
+          } catch (error) {
+            toast.error('Failed to generate label');
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        return (
+          <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Print Label for {lpNumber}</DialogTitle>
+              </DialogHeader>
+
+              {lpData && (
+                <>
+                  <div className="space-y-2">
+                    <p><strong>Product:</strong> {lpData.product_name}</p>
+                    <p><strong>Quantity:</strong> {lpData.quantity} {lpData.uom}</p>
+                    <p><strong>Batch:</strong> {lpData.batch_number || '--'}</p>
+                    <p><strong>Expiry:</strong> {lpData.expiry_date || '--'}</p>
+                    <p><strong>Location:</strong> {lpData.location_path || 'Unassigned'}</p>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <Label htmlFor="copies">Copies</Label>
+                    <CopiesInput value={copies} onChange={setCopies} />
+                  </div>
+
+                  <LabelPreview lpData={lpData} />
+                </>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleDownload} disabled={isLoading}>
+                  {isLoading ? 'Generating...' : 'Download ZPL'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      }
+
+  - path: "apps/frontend/components/warehouse/labels/LabelPreview.tsx"
+    description: "Visual preview of label layout (not actual ZPL render)"
+    props:
+      - { name: "lpData", type: "LPLabelData", required: true }
+    sections:
+      - barcode_placeholder: "Rectangle with LP number text"
+      - product_name: "Product name (truncated)"
+      - quantity: "Qty: X UoM"
+      - batch: "Batch: XXX"
+      - expiry: "Expiry: YYYY-MM-DD"
+      - location: "Location: path"
+      - qr_placeholder: "QR code placeholder square"
+    notes:
+      - "Not actual ZPL rendering (would need ZPL parser)"
+      - "Visual approximation of label layout"
+      - "4:6 aspect ratio for 4x6 inch label"
+    pattern: |
+      export function LabelPreview({ lpData }: LabelPreviewProps) {
+        return (
+          <div className="border rounded-lg p-4 bg-white aspect-[2/3] max-w-[200px]">
+            {/* Barcode placeholder */}
+            <div className="border-2 border-black h-12 mb-2 flex items-center justify-center">
+              <span className="text-xs font-mono">{lpData.lp_number}</span>
+            </div>
+
+            {/* Label content */}
+            <div className="text-xs space-y-1">
+              <p className="font-bold truncate">{lpData.product_name}</p>
+              <p>Qty: {lpData.quantity} {lpData.uom}</p>
+              <p>Batch: {lpData.batch_number || '--'}</p>
+              <p>Exp: {lpData.expiry_date || '--'}</p>
+              <p className="truncate">Loc: {lpData.location_path || 'Unassigned'}</p>
+            </div>
+
+            {/* QR placeholder */}
+            <div className="absolute bottom-2 right-2 w-8 h-8 border border-black grid grid-cols-3 grid-rows-3">
+              {/* Simple QR placeholder pattern */}
+            </div>
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/components/warehouse/labels/BulkPrintModal.tsx"
+    description: "Modal for printing labels for multiple LPs"
+    props:
+      - { name: "lpIds", type: "string[]", required: true }
+      - { name: "isOpen", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+    state:
+      - { name: "copies", type: "number", default: "1" }
+      - { name: "format", type: "'zip' | 'concat'", default: "'zip'" }
+      - { name: "isLoading", type: "boolean", default: "false" }
+    sections:
+      - header: "Print Labels for X LPs"
+      - lp_list: "Scrollable list of selected LPs"
+      - copies_input: "Copies per LP"
+      - format_select: "ZIP or concatenated ZPL"
+      - actions: "Cancel, Download All buttons"
+
+  - path: "apps/frontend/components/warehouse/labels/CopiesInput.tsx"
+    description: "Number input with +/- buttons for copies"
+    props:
+      - { name: "value", type: "number", required: true }
+      - { name: "onChange", type: "(value: number) => void", required: true }
+      - { name: "min", type: "number", required: false, default: "1" }
+      - { name: "max", type: "number", required: false, default: "100" }
+    pattern: |
+      export function CopiesInput({
+        value,
+        onChange,
+        min = 1,
+        max = 100,
+      }: CopiesInputProps) {
+        return (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onChange(Math.max(min, value - 1))}
+              disabled={value <= min}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <Input
+              type="number"
+              value={value}
+              onChange={(e) => {
+                const v = parseInt(e.target.value) || min;
+                onChange(Math.min(max, Math.max(min, v)));
+              }}
+              className="w-16 text-center"
+              min={min}
+              max={max}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onChange(Math.min(max, value + 1))}
+              disabled={value >= max}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/components/settings/LabelPrintSettings.tsx"
+    description: "Label printing settings form in warehouse settings"
+    props:
+      - { name: "settings", type: "LabelSettings", required: true }
+      - { name: "onSave", type: "(settings: LabelSettings) => Promise<void>", required: true }
+    fields:
+      - print_label_on_receipt: "Checkbox - auto-print on GRN completion"
+      - label_copies_default: "Number input 1-10"
+      - label_size: "Select - 4x6, 4x3, 3x2"
+      - printer_ip: "Text input (optional, Phase 2)"
+      - printer_port: "Number input (default 9100, Phase 2)"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-lp-label-data.ts"
+    description: "Fetch LP data for label generation"
+    exports:
+      - name: "useLPLabelData"
+        params:
+          - "lpId: string"
+          - "options?: { enabled?: boolean }"
+        returns: "UseQueryResult<LPLabelData>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { LabelPrintService } from '@/lib/services/label-print-service';
+
+      export function useLPLabelData(lpId: string, options?: { enabled?: boolean }) {
+        return useQuery({
+          queryKey: ['lp-label-data', lpId],
+          queryFn: () => LabelPrintService.getLPLabelData(lpId),
+          enabled: options?.enabled ?? true,
+          staleTime: 30 * 1000, // 30 seconds
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-print-label.ts"
+    description: "Mutation hook for printing label"
+    exports:
+      - name: "usePrintLabel"
+        returns: "UseMutationResult"
+    pattern: |
+      import { useMutation } from '@tanstack/react-query';
+
+      interface PrintLabelParams {
+        lpId: string;
+        copies?: number;
+      }
+
+      export function usePrintLabel() {
+        return useMutation({
+          mutationFn: async ({ lpId, copies = 1 }: PrintLabelParams) => {
+            const response = await fetch(
+              `/api/warehouse/lps/${lpId}/print-label?copies=${copies}`,
+              { method: 'POST' }
+            );
+            if (!response.ok) {
+              throw new Error('Failed to generate label');
+            }
+            return response.json();
+          },
+        });
+      }
+
+# UX References
+ux:
+  wireframes:
+    - id: "WH-013"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-013-label-print-modal.md"
+      description: "Print Label Modal with GS1 support"
+      components:
+        - "LP Information Display"
+        - "Print Settings Form"
+        - "Label Preview"
+        - "Bulk Print Modal"
+        - "Success/Error States"
+  patterns:
+    modal: "ShadCN Dialog component"
+    button: "ShadCN Button with Lucide icons"
+    input: "ShadCN Input with +/- buttons"
+    toast: "ShadCN Sonner for success/error feedback"
+  states:
+    - loading: "Skeleton while fetching LP data"
+    - success: "Toast message + file download"
+    - error: "Toast error message"
+    - validation: "Inline validation on copies input"
+
+# File locations summary
+files_to_create:
+  types:
+    - "apps/frontend/lib/types/label-print.ts"
+  components:
+    - "apps/frontend/components/warehouse/labels/PrintLabelButton.tsx"
+    - "apps/frontend/components/warehouse/labels/PrintLabelModal.tsx"
+    - "apps/frontend/components/warehouse/labels/LabelPreview.tsx"
+    - "apps/frontend/components/warehouse/labels/BulkPrintModal.tsx"
+    - "apps/frontend/components/warehouse/labels/CopiesInput.tsx"
+    - "apps/frontend/components/settings/LabelPrintSettings.tsx"
+  hooks:
+    - "apps/frontend/lib/hooks/use-lp-label-data.ts"
+    - "apps/frontend/lib/hooks/use-print-label.ts"
+
+# Integration points
+integration:
+  lp_detail_page:
+    path: "apps/frontend/app/(authenticated)/warehouse/lps/[id]/page.tsx"
+    add: "PrintLabelButton in header actions"
+  lp_list_page:
+    path: "apps/frontend/app/(authenticated)/warehouse/lps/page.tsx"
+    add: "Print Labels bulk action when rows selected"
+  warehouse_settings:
+    path: "apps/frontend/app/(authenticated)/settings/warehouse/page.tsx"
+    add: "LabelPrintSettings section"

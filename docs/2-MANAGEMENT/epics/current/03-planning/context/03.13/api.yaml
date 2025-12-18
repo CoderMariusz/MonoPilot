@@ -1,0 +1,352 @@
+# Story 03.13 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/planning/work-orders/:id/availability"
+    description: "Check material availability for a Work Order"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/availability/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with planning read access
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id:
+          type: "UUID"
+          required: true
+          description: "Work Order ID"
+      query: {}  # No query params
+
+    response:
+      status: 200
+      type: "AvailabilityResponse"
+      schema:
+        wo_id: "UUID"
+        checked_at: "ISO 8601 timestamp"
+        overall_status: "'sufficient' | 'low_stock' | 'shortage' | 'no_stock'"
+        enabled: "boolean"
+        cached: "boolean"
+        cache_expires_at: "ISO 8601 timestamp (optional)"
+        materials:
+          type: "array"
+          items:
+            wo_material_id: "UUID"
+            product_id: "UUID"
+            product_code: "string"
+            product_name: "string"
+            required_qty: "number"
+            available_qty: "number"
+            reserved_qty: "number"
+            shortage_qty: "number (positive=shortage, negative=surplus)"
+            coverage_percent: "number"
+            status: "'sufficient' | 'low_stock' | 'shortage' | 'no_stock'"
+            uom: "string"
+            expired_excluded_qty: "number"
+        summary:
+          total_materials: "number"
+          sufficient_count: "number"
+          low_stock_count: "number"
+          shortage_count: "number"
+
+    response_disabled:
+      description: "When wo_material_check = false in planning_settings"
+      status: 200
+      type: "AvailabilityDisabledResponse"
+      schema:
+        enabled: false
+        message: "Material check disabled"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Forbidden"
+        when: "User lacks planning read permission"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO does not exist or belongs to different org (RLS)"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/material-availability-service.ts"
+    description: "Material availability calculation and caching"
+    exports:
+      - name: "checkWOAvailability"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "orgId: string"
+        returns: "Promise<AvailabilityResult>"
+        description: "Main function - checks all materials for WO"
+
+      - name: "calculateCoveragePercent"
+        type: "function"
+        params:
+          - "availableQty: number"
+          - "requiredQty: number"
+        returns: "number"
+        description: "Calculates coverage percentage with edge case handling"
+
+      - name: "calculateAvailabilityStatus"
+        type: "function"
+        params:
+          - "coveragePercent: number"
+        returns: "AvailabilityStatus"
+        description: "Determines status from coverage (sufficient/low_stock/shortage/no_stock)"
+
+      - name: "calculateOverallStatus"
+        type: "function"
+        params:
+          - "materialStatuses: AvailabilityStatus[]"
+        returns: "AvailabilityStatus"
+        description: "Calculates worst-case overall status"
+
+      - name: "getAvailableLPQuantity"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "orgId: string"
+          - "excludeExpired: boolean = true"
+        returns: "Promise<number>"
+        description: "Sums available LP quantities for product"
+
+      - name: "getReservedQuantity"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "orgId: string"
+          - "excludeWoId?: string"
+        returns: "Promise<number>"
+        description: "Sums reservations from other active WOs"
+
+      - name: "isAvailabilityEnabled"
+        type: "async function"
+        params:
+          - "orgId: string"
+        returns: "Promise<boolean>"
+        description: "Checks wo_material_check setting"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/material-availability.ts"
+    description: "Material availability TypeScript interfaces"
+    exports:
+      - "AvailabilityStatus"
+      - "MaterialAvailability"
+      - "AvailabilitySummary"
+      - "AvailabilityResult"
+      - "AvailabilityResponse"
+
+# Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/material-availability.ts"
+  exports:
+    - name: "availabilityStatusEnum"
+      type: "z.enum(['sufficient', 'low_stock', 'shortage', 'no_stock'])"
+
+    - name: "materialAvailabilitySchema"
+      type: "z.object"
+      fields:
+        wo_material_id: "z.string().uuid()"
+        product_id: "z.string().uuid()"
+        product_code: "z.string()"
+        product_name: "z.string()"
+        required_qty: "z.number().nonnegative()"
+        available_qty: "z.number().nonnegative()"
+        reserved_qty: "z.number().nonnegative()"
+        shortage_qty: "z.number()  # Can be negative (surplus)"
+        coverage_percent: "z.number().min(0)"
+        status: "availabilityStatusEnum"
+        uom: "z.string()"
+        expired_excluded_qty: "z.number().nonnegative()"
+
+    - name: "availabilitySummarySchema"
+      type: "z.object"
+      fields:
+        total_materials: "z.number().int().nonnegative()"
+        sufficient_count: "z.number().int().nonnegative()"
+        low_stock_count: "z.number().int().nonnegative()"
+        shortage_count: "z.number().int().nonnegative()"
+
+    - name: "availabilityResponseSchema"
+      type: "z.object"
+      fields:
+        wo_id: "z.string().uuid()"
+        checked_at: "z.string().datetime()"
+        overall_status: "availabilityStatusEnum"
+        materials: "z.array(materialAvailabilitySchema)"
+        summary: "availabilitySummarySchema"
+        enabled: "z.boolean()"
+        cached: "z.boolean()"
+        cache_expires_at: "z.string().datetime().optional()"
+
+# Caching Strategy
+caching:
+  enabled: true
+  provider: "Redis"
+  key_pattern: "org:{orgId}:wo:{woId}:availability"
+  ttl_seconds: 30
+  strategy: |
+    1. Check cache for existing result
+    2. If found and not expired, return with cached: true
+    3. If not found or expired:
+       a. Query database for availability
+       b. Store result in cache with TTL
+       c. Return with cached: false
+  invalidation:
+    - trigger: "LP quantity changes (receive, consume, adjust)"
+      action: "Cache expires naturally after 30s"
+      note: "Eventual consistency acceptable for advisory feature"
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/planning/work-orders/[id]/availability/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { checkWOAvailability, isAvailabilityEnabled } from '@/lib/services/material-availability-service';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Get authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Get org context
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id, role:roles(permissions)')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      // Check permission
+      const permissions = userData.role?.permissions || {};
+      if (!permissions.planning?.includes('R')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      // Check if feature is enabled
+      const enabled = await isAvailabilityEnabled(userData.org_id);
+      if (!enabled) {
+        return NextResponse.json({
+          enabled: false,
+          message: 'Material check disabled'
+        });
+      }
+
+      // Verify WO exists and belongs to org
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id')
+        .eq('id', params.id)
+        .eq('organization_id', userData.org_id)
+        .single();
+
+      if (woError || !wo) {
+        return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
+      }
+
+      // Get availability
+      const result = await checkWOAvailability(params.id, userData.org_id);
+
+      return NextResponse.json(result);
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/material-availability-service.ts
+
+    export type AvailabilityStatus = 'sufficient' | 'low_stock' | 'shortage' | 'no_stock';
+
+    export function calculateCoveragePercent(availableQty: number, requiredQty: number): number {
+      if (requiredQty === 0) return 100;
+      if (availableQty <= 0) return 0;
+      return (availableQty / requiredQty) * 100;
+    }
+
+    export function calculateAvailabilityStatus(coveragePercent: number): AvailabilityStatus {
+      if (coveragePercent >= 100) return 'sufficient';
+      if (coveragePercent >= 50) return 'low_stock';
+      if (coveragePercent > 0) return 'shortage';
+      return 'no_stock';
+    }
+
+    export function calculateOverallStatus(materialStatuses: AvailabilityStatus[]): AvailabilityStatus {
+      if (materialStatuses.length === 0) return 'sufficient';
+      const priority = ['no_stock', 'shortage', 'low_stock', 'sufficient'];
+      for (const status of priority) {
+        if (materialStatuses.includes(status as AvailabilityStatus)) {
+          return status as AvailabilityStatus;
+        }
+      }
+      return 'sufficient';
+    }
+
+# Response Examples
+examples:
+  success:
+    status: 200
+    body:
+      wo_id: "550e8400-e29b-41d4-a716-446655440000"
+      checked_at: "2025-12-17T14:30:00Z"
+      overall_status: "low_stock"
+      enabled: true
+      cached: false
+      materials:
+        - wo_material_id: "661e8400-e29b-41d4-a716-446655440001"
+          product_id: "771e8400-e29b-41d4-a716-446655440002"
+          product_code: "RM-FLOUR-001"
+          product_name: "All-Purpose Flour"
+          required_qty: 100.00
+          available_qty: 75.00
+          reserved_qty: 0.00
+          shortage_qty: 25.00
+          coverage_percent: 75.00
+          status: "low_stock"
+          uom: "kg"
+          expired_excluded_qty: 10.00
+        - wo_material_id: "661e8400-e29b-41d4-a716-446655440003"
+          product_id: "771e8400-e29b-41d4-a716-446655440004"
+          product_code: "RM-SUGAR-001"
+          product_name: "Sugar"
+          required_qty: 50.00
+          available_qty: 80.00
+          reserved_qty: 0.00
+          shortage_qty: -30.00
+          coverage_percent: 160.00
+          status: "sufficient"
+          uom: "kg"
+          expired_excluded_qty: 0.00
+      summary:
+        total_materials: 2
+        sufficient_count: 1
+        low_stock_count: 1
+        shortage_count: 0
+
+  disabled:
+    status: 200
+    body:
+      enabled: false
+      message: "Material check disabled"
+
+  not_found:
+    status: 404
+    body:
+      error: "Work order not found"

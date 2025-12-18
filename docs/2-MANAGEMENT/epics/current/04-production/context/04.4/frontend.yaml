@@ -1,0 +1,362 @@
+# Story 04.4 - Frontend Specification
+# Purpose: Components, hooks, types, services
+# Agent: FRONTEND-DEV
+
+# Note: This is a full-stack story with significant frontend work
+is_backend_focused: false
+
+# UX References
+ux:
+  wireframes:
+    - id: "PROD-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+      sections:
+        - "4.4 Complete Operation Modal (Yield input)"
+        - "Header Bar (Yield percentage display)"
+      components:
+        - "Yield percentage display in header"
+        - "Operation completion with yield input"
+  patterns:
+    form: "ShadCN Form with react-hook-form + Zod"
+    table: "ShadCN DataTable for yield history"
+    dialog: "ShadCN Dialog for yield entry modal"
+    badge: "ShadCN Badge for yield status indicators"
+    progress: "ShadCN Progress for yield gauge"
+  states:
+    - "loading - Skeleton while fetching WO data"
+    - "disabled - When WO not in progress"
+    - "success - After yield update"
+    - "error - Validation or API errors"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/yield.ts"
+    content: |
+      export type YieldStatus = 'excellent' | 'below_target' | 'low_yield' | 'not_started';
+      export type YieldColor = 'green' | 'yellow' | 'red' | 'gray';
+
+      export interface YieldUpdateRequest {
+        produced_quantity: number;
+        notes?: string;
+      }
+
+      export interface YieldUpdateResult {
+        wo_id: string;
+        produced_quantity: number;
+        planned_quantity: number;
+        yield_percent: number;
+        yield_status: YieldStatus;
+        updated_at: string;
+      }
+
+      export interface YieldLog {
+        id: string;
+        timestamp: string;
+        user_name: string;
+        old_quantity: number;
+        new_quantity: number;
+        old_yield_percent: number;
+        new_yield_percent: number;
+        notes: string | null;
+      }
+
+      export interface YieldHistoryResponse {
+        logs: YieldLog[];
+        total: number;
+        has_more: boolean;
+      }
+
+      export interface YieldDisplayProps {
+        plannedQuantity: number;
+        producedQuantity: number;
+        yieldPercent: number;
+        status: YieldStatus;
+        woStatus: string;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/YieldSection.tsx"
+    description: "Main container for yield tracking UI"
+    props:
+      - "woId: string"
+      - "plannedQuantity: number"
+      - "producedQuantity: number"
+      - "woStatus: 'draft' | 'released' | 'in_progress' | 'paused' | 'completed' | 'cancelled'"
+    children:
+      - "YieldGauge"
+      - "YieldEntryForm"
+      - "YieldHistoryTable"
+      - "YieldWarningBanner"
+    states:
+      - "Editable: WO status = 'in_progress'"
+      - "Disabled: WO status in ['draft', 'released'] with message"
+      - "Read-only: WO status in ['completed', 'cancelled'] showing final yield"
+
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/YieldEntryForm.tsx"
+    description: "Form for manual yield entry"
+    props:
+      - "woId: string"
+      - "currentProducedQuantity: number"
+      - "plannedQuantity: number"
+      - "onSuccess: (result: YieldUpdateResult) => void"
+      - "disabled?: boolean"
+    features:
+      - "Number input with validation"
+      - "Optional notes textarea"
+      - "Submit button with loading state"
+      - "Inline validation errors"
+    validation:
+      - "produced_quantity: nonnegative number"
+      - "produced_quantity: <= planned_quantity (if overproduction disabled)"
+      - "notes: max 1000 characters"
+
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/YieldGauge.tsx"
+    description: "Visual yield percentage indicator"
+    props:
+      - "yieldPercent: number"
+      - "status: YieldStatus"
+    features:
+      - "Progress bar with color coding"
+      - "Percentage text display"
+      - "Status label (Excellent, Below Target, Low Yield)"
+    color_mapping:
+      - "green: yield >= 80% (Excellent)"
+      - "yellow: 70% <= yield < 80% (Below Target)"
+      - "red: yield < 70% (Low Yield)"
+      - "gray: yield = 0% (Not Started)"
+
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/YieldHistoryTable.tsx"
+    description: "Table showing yield update history"
+    props:
+      - "woId: string"
+      - "limit?: number"
+    columns:
+      - "Timestamp - formatted datetime"
+      - "User - full name"
+      - "Old Qty - previous produced quantity"
+      - "New Qty - new produced quantity"
+      - "Yield Change - old% -> new%"
+      - "Notes - optional notes"
+    features:
+      - "Sorted by timestamp DESC"
+      - "Pagination (default 10 per page)"
+      - "Empty state: 'No yield updates recorded'"
+
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/YieldWarningBanner.tsx"
+    description: "Warning banner for low yield"
+    props:
+      - "yieldPercent: number"
+      - "threshold?: number (default 80)"
+    behavior:
+      - "Hidden: yield >= threshold"
+      - "Yellow banner: 70% <= yield < 80% ('Low Yield Alert: X% (Target: >=80%)')"
+      - "Red banner: yield < 70% ('Critical Low Yield: X% (Target: >=80%)')"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-yield.ts"
+    description: "React Query hooks for yield operations"
+    exports:
+      - name: "useYieldHistory"
+        params:
+          - "woId: string"
+          - "options?: { limit?: number; offset?: number }"
+        returns: "UseQueryResult<YieldHistoryResponse>"
+        pattern: |
+          import { useQuery } from '@tanstack/react-query';
+          import { getYieldHistory } from '@/lib/services/yield-service';
+
+          export function useYieldHistory(woId: string, options?: { limit?: number; offset?: number }) {
+            return useQuery({
+              queryKey: ['yield-history', woId, options],
+              queryFn: () => getYieldHistory(woId, options),
+              staleTime: 30 * 1000, // 30 seconds
+              enabled: !!woId,
+            });
+          }
+
+      - name: "useUpdateYield"
+        returns: "UseMutationResult<YieldUpdateResult, Error, UpdateYieldParams>"
+        pattern: |
+          import { useMutation, useQueryClient } from '@tanstack/react-query';
+          import { updateWorkOrderYield } from '@/lib/services/yield-service';
+
+          interface UpdateYieldParams {
+            woId: string;
+            producedQuantity: number;
+            notes?: string;
+          }
+
+          export function useUpdateYield() {
+            const queryClient = useQueryClient();
+
+            return useMutation({
+              mutationFn: ({ woId, producedQuantity, notes }: UpdateYieldParams) =>
+                updateWorkOrderYield(woId, producedQuantity, notes),
+              onSuccess: (_, variables) => {
+                queryClient.invalidateQueries({ queryKey: ['work-order', variables.woId] });
+                queryClient.invalidateQueries({ queryKey: ['yield-history', variables.woId] });
+              },
+            });
+          }
+
+# Validation (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/yield-validation.ts"
+    content: |
+      import { z } from 'zod';
+
+      export const updateYieldSchema = z.object({
+        produced_quantity: z
+          .number({ message: 'Must be a valid number' })
+          .nonnegative({ message: 'Produced quantity must be positive' })
+          .finite({ message: 'Must be a valid number' }),
+        notes: z
+          .string()
+          .max(1000, { message: 'Notes cannot exceed 1000 characters' })
+          .optional(),
+      });
+
+      export const yieldLogSchema = z.object({
+        wo_id: z.string().uuid(),
+        old_quantity: z.number().nonnegative(),
+        new_quantity: z.number().nonnegative(),
+        old_yield_percent: z.number().min(0).max(10000),
+        new_yield_percent: z.number().min(0).max(10000),
+        notes: z.string().max(1000).optional(),
+      });
+
+      export type UpdateYieldInput = z.infer<typeof updateYieldSchema>;
+      export type YieldLogInput = z.infer<typeof yieldLogSchema>;
+
+# Component implementation patterns
+patterns:
+  yield_section: |
+    // apps/frontend/app/(authenticated)/production/work-orders/[id]/components/YieldSection.tsx
+    'use client';
+
+    import { YieldGauge } from './YieldGauge';
+    import { YieldEntryForm } from './YieldEntryForm';
+    import { YieldHistoryTable } from './YieldHistoryTable';
+    import { YieldWarningBanner } from './YieldWarningBanner';
+    import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    import { calculateYieldPercentage, getYieldIndicatorStatus } from '@/lib/services/yield-service';
+
+    interface YieldSectionProps {
+      woId: string;
+      plannedQuantity: number;
+      producedQuantity: number;
+      woStatus: string;
+    }
+
+    export function YieldSection({
+      woId,
+      plannedQuantity,
+      producedQuantity,
+      woStatus,
+    }: YieldSectionProps) {
+      const yieldPercent = calculateYieldPercentage(producedQuantity, plannedQuantity);
+      const yieldStatus = getYieldIndicatorStatus(yieldPercent);
+      const isEditable = woStatus === 'in_progress';
+      const isComplete = woStatus === 'completed' || woStatus === 'cancelled';
+
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Yield Tracking</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Warning Banner */}
+            <YieldWarningBanner yieldPercent={yieldPercent} />
+
+            {/* Yield Gauge */}
+            <div className="flex items-center gap-6">
+              <YieldGauge yieldPercent={yieldPercent} status={yieldStatus} />
+              <div className="text-sm text-muted-foreground">
+                <p>Planned: {plannedQuantity.toLocaleString()}</p>
+                <p>Produced: {producedQuantity.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* Entry Form (if editable) */}
+            {isEditable && (
+              <YieldEntryForm
+                woId={woId}
+                currentProducedQuantity={producedQuantity}
+                plannedQuantity={plannedQuantity}
+                onSuccess={() => {}}
+              />
+            )}
+
+            {/* Status Messages */}
+            {!isEditable && !isComplete && (
+              <p className="text-sm text-muted-foreground italic">
+                Start WO to enter yield
+              </p>
+            )}
+
+            {isComplete && (
+              <p className="text-sm text-muted-foreground italic">
+                Final yield: {yieldPercent}%
+              </p>
+            )}
+
+            {/* History Table */}
+            <YieldHistoryTable woId={woId} />
+          </CardContent>
+        </Card>
+      );
+    }
+
+  yield_gauge: |
+    // apps/frontend/app/(authenticated)/production/work-orders/[id]/components/YieldGauge.tsx
+    'use client';
+
+    import { Progress } from '@/components/ui/progress';
+    import { Badge } from '@/components/ui/badge';
+    import { cn } from '@/lib/utils';
+    import type { YieldStatus } from '@/lib/types/yield';
+
+    interface YieldGaugeProps {
+      yieldPercent: number;
+      status: YieldStatus;
+    }
+
+    const statusConfig = {
+      excellent: { label: 'Excellent', variant: 'default', color: 'bg-green-500' },
+      below_target: { label: 'Below Target', variant: 'warning', color: 'bg-yellow-500' },
+      low_yield: { label: 'Low Yield', variant: 'destructive', color: 'bg-red-500' },
+      not_started: { label: 'Not Started', variant: 'secondary', color: 'bg-gray-300' },
+    } as const;
+
+    export function YieldGauge({ yieldPercent, status }: YieldGaugeProps) {
+      const config = statusConfig[status];
+
+      return (
+        <div className="flex flex-col gap-2 min-w-[200px]">
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-bold">{yieldPercent.toFixed(1)}%</span>
+            <Badge variant={config.variant as any}>{config.label}</Badge>
+          </div>
+          <Progress
+            value={Math.min(yieldPercent, 100)}
+            className={cn('h-3', config.color)}
+          />
+        </div>
+      );
+    }
+
+# WO List yield column integration
+wo_list_integration:
+  description: "Add yield column to WO list/dashboard table"
+  column:
+    name: "Yield %"
+    component: "YieldBadge"
+    behavior:
+      - "Show '-' or 'N/A' when produced_quantity = 0"
+      - "Color-coded badge (green/yellow/red)"
+      - "Filter by yield < 80% for low yield WOs"
+  filter:
+    name: "Low Yield Only"
+    query: "yield_percent < 80"

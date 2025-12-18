@@ -1,0 +1,293 @@
+# Story 05.16 - Frontend Specification
+# Purpose: Pages, components, UX, validation schemas
+# Agent: FRONTEND-DEV
+
+# Pages to Create
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/movements/page.tsx"
+    description: "Stock movements list page"
+    wireframe: "WH-006-stock-movements-list.md"
+    features:
+      - "Paginated table with 50 items per page"
+      - "9 filters: date range, warehouse, move type, status, LP number, product, from location, to location, move ID"
+      - "4 KPI cards: total moves, completed, in transit, pending"
+      - "Quick filters: Today, This Week, This Month, Completed Only"
+      - "Export to CSV"
+      - "Create movement button"
+      - "Row actions: view, cancel, repeat"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/movements/[id]/page.tsx"
+    description: "Stock movement detail page"
+    wireframe: "WH-005 (to be created)"
+    features:
+      - "Full movement details"
+      - "LP information with link"
+      - "Location path visualization"
+      - "Cancel button (if within 24 hours)"
+      - "Related documents (GRN, WO, TO)"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/warehouse/MovementTable.tsx"
+    description: "Paginated data table for stock movements"
+    props:
+      - "data: StockMove[]"
+      - "pagination: Pagination"
+      - "onPageChange: (page: number) => void"
+      - "onRowClick: (move: StockMove) => void"
+      - "onCancel: (id: string) => void"
+    columns:
+      - { key: "move_number", label: "Move ID", width: "150px", sortable: true }
+      - { key: "lp_number", label: "LP Number", width: "150px", sortable: true }
+      - { key: "product_name", label: "Product", width: "150px", sortable: true }
+      - { key: "quantity", label: "Qty", width: "80px", sortable: true }
+      - { key: "location_path", label: "From -> To", width: "200px", sortable: false }
+      - { key: "move_type", label: "Type", width: "100px", sortable: true }
+      - { key: "status", label: "Status", width: "100px", sortable: true }
+      - { key: "actions", label: "", width: "80px", sortable: false }
+
+  - path: "apps/frontend/components/warehouse/MovementFilters.tsx"
+    description: "Filter controls for movements list"
+    props:
+      - "filters: ListStockMovesFilters"
+      - "onChange: (filters: ListStockMovesFilters) => void"
+      - "onClear: () => void"
+    filters:
+      - { name: "dateRange", type: "date-range", default: "last30days" }
+      - { name: "warehouse", type: "searchable-dropdown" }
+      - { name: "moveType", type: "multi-select" }
+      - { name: "status", type: "multi-select" }
+      - { name: "lpNumber", type: "text-input" }
+      - { name: "product", type: "searchable-dropdown" }
+      - { name: "fromLocation", type: "searchable-dropdown" }
+      - { name: "toLocation", type: "searchable-dropdown" }
+      - { name: "search", type: "text-input", placeholder: "Search move ID..." }
+
+  - path: "apps/frontend/components/warehouse/MovementHistoryCard.tsx"
+    description: "Timeline view of LP movement history (for LP detail page)"
+    props:
+      - "lpId: string"
+      - "limit?: number"
+    features:
+      - "Vertical timeline layout"
+      - "Each entry: date, type icon, from->to arrow, user avatar"
+      - "Grouped by date"
+      - "Load more pagination"
+      - "Links to movement detail"
+
+  - path: "apps/frontend/components/warehouse/MovementDetailPanel.tsx"
+    description: "Expanded view of movement details"
+    props:
+      - "move: StockMove"
+      - "onClose: () => void"
+    sections:
+      - "Header with move number, date, status badge"
+      - "LP information card"
+      - "Location path (from -> to)"
+      - "Move type and reason"
+      - "Reference documents"
+      - "Audit trail (created by, cancelled by)"
+
+  - path: "apps/frontend/components/warehouse/CreateMoveModal.tsx"
+    description: "Modal for creating manual stock movements"
+    wireframe: "WH-007-stock-movement-create-modal.md"
+    props:
+      - "isOpen: boolean"
+      - "onClose: () => void"
+      - "onSuccess: (move: StockMove) => void"
+      - "preselectedLpId?: string"
+    form_fields:
+      - { name: "lpId", type: "lp-autocomplete", required: true }
+      - { name: "toLocationId", type: "location-dropdown", required: true }
+      - { name: "quantity", type: "number", required: true, default: "LP.qty" }
+      - { name: "moveType", type: "radio-group", required: true, default: "manual" }
+      - { name: "reason", type: "textarea", required: false }
+    features:
+      - "LP search/scan input"
+      - "LP info card (read-only)"
+      - "Destination location dropdown with capacity indicators"
+      - "Partial move warning and split preview"
+      - "Capacity check warning with override"
+      - "Movement preview before submit"
+
+  - path: "apps/frontend/components/warehouse/CancelMoveModal.tsx"
+    description: "Confirmation dialog for cancelling movement"
+    props:
+      - "isOpen: boolean"
+      - "move: StockMove"
+      - "onConfirm: (reason: string) => void"
+      - "onClose: () => void"
+    features:
+      - "Warning: does not reverse LP changes"
+      - "Required reason field (min 10 chars)"
+      - "Move details summary"
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/stock-move-schema.ts"
+  schemas:
+    - name: "moveTypeEnum"
+      type: "z.enum"
+      values: ["transfer", "issue", "receipt", "adjustment", "return", "quarantine", "putaway"]
+
+    - name: "reasonCodeEnum"
+      type: "z.enum"
+      values: ["damage", "theft", "counting_error", "quality_issue", "expired", "other"]
+
+    - name: "createStockMoveSchema"
+      type: "z.object"
+      fields:
+        lpId: "z.string().uuid()"
+        moveType: "moveTypeEnum"
+        toLocationId: "z.string().uuid().optional()"
+        quantity: "z.number().positive().optional()"
+        reason: "z.string().max(500).optional()"
+        reasonCode: "reasonCodeEnum.optional()"
+        woId: "z.string().uuid().optional()"
+        referenceId: "z.string().uuid().optional()"
+        referenceType: "z.string().optional()"
+      refinements:
+        - "Destination required for transfer/putaway/quarantine/return"
+        - "Reason code required for adjustments"
+
+    - name: "cancelStockMoveSchema"
+      type: "z.object"
+      fields:
+        reason: "z.string().min(10)"
+
+    - name: "listStockMovesSchema"
+      type: "z.object"
+      fields:
+        page: "z.coerce.number().int().positive().default(1)"
+        limit: "z.coerce.number().int().positive().max(200).default(50)"
+        moveType: "moveTypeEnum.optional()"
+        lpId: "z.string().uuid().optional()"
+        locationId: "z.string().uuid().optional()"
+        dateFrom: "z.string().datetime().optional()"
+        dateTo: "z.string().datetime().optional()"
+        status: "z.enum(['completed', 'cancelled']).optional()"
+
+# UX Specifications
+ux:
+  wireframes:
+    - id: "WH-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-006-stock-movements-list.md"
+      components:
+        - "KPI Summary Cards (4)"
+        - "Filters Bar"
+        - "MovementTable"
+        - "Quick Filters"
+        - "Export Button"
+        - "Create Button"
+
+    - id: "WH-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-007-stock-movement-create-modal.md"
+      components:
+        - "LP Search/Scan Input"
+        - "LP Info Card"
+        - "Location Dropdown with Capacity"
+        - "Quantity Input"
+        - "Move Type Radio Group"
+        - "Reason Textarea"
+        - "Capacity Warning"
+        - "Split Preview (partial moves)"
+        - "Movement Preview"
+
+  patterns:
+    table: "ShadCN DataTable with pagination"
+    modal: "ShadCN Dialog"
+    filters: "ShadCN Select, DateRangePicker, Input"
+    badges: "ShadCN Badge with move type/status colors"
+
+  states:
+    - "loading"
+    - "empty"
+    - "filtered_empty"
+    - "error"
+    - "success"
+
+  badge_colors:
+    move_types:
+      manual: { bg: "#DBEAFE", text: "#1E40AF" }
+      putaway: { bg: "#D1FAE5", text: "#065F46" }
+      transfer: { bg: "#E9D5FF", text: "#6B21A8" }
+      consumption: { bg: "#FFEDD5", text: "#9A3412" }
+      adjustment: { bg: "#FEF3C7", text: "#92400E" }
+      split_related: { bg: "#CFFAFE", text: "#164E63" }
+      issue: { bg: "#FEE2E2", text: "#B91C1C" }
+      receipt: { bg: "#D1FAE5", text: "#065F46" }
+      return: { bg: "#DBEAFE", text: "#1E40AF" }
+      quarantine: { bg: "#FEE2E2", text: "#B91C1C" }
+
+    statuses:
+      pending: { bg: "#F3F4F6", text: "#4B5563" }
+      in_transit: { bg: "#DBEAFE", text: "#1E40AF" }
+      completed: { bg: "#D1FAE5", text: "#065F46" }
+      cancelled: { bg: "#FEE2E2", text: "#B91C1C" }
+
+# Responsive Breakpoints
+responsive:
+  desktop: ">1024px"
+  desktop_features:
+    - "Full table with all columns"
+    - "4 KPI cards in row"
+    - "All filters visible"
+    - "Server-side pagination with page numbers"
+
+  tablet: "768-1024px"
+  tablet_features:
+    - "Condensed table"
+    - "2x2 KPI grid"
+    - "Primary filters visible, secondary collapsed"
+
+  mobile: "<768px"
+  mobile_features:
+    - "Card layout instead of table"
+    - "Vertical KPI list"
+    - "Filters in modal/drawer"
+    - "Load More button instead of pagination"
+    - "Actions as bottom sheet"
+
+# Accessibility
+accessibility:
+  touch_targets: "48x48dp minimum"
+  contrast: "4.5:1 minimum (WCAG 2.1 AA)"
+  keyboard_navigation:
+    - "Tab: Move between interactive elements"
+    - "Enter: Activate button/link"
+    - "Escape: Close dropdown/modal"
+    - "Arrow keys: Navigate within dropdown/menu"
+  aria_attributes:
+    - "Table: role='table' with proper row/cell structure"
+    - "Type badges: role='status' aria-label='Move type: {type}'"
+    - "Status badges: role='status' aria-label='Status: {status}'"
+    - "Filters: aria-expanded for dropdowns"
+
+# Performance
+performance:
+  initial_load: "<500ms (P95)"
+  filter_change: "<300ms"
+  pagination: "<300ms"
+  export_generation: "<3s for 10,000 records"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-stock-moves.ts"
+    exports:
+      - name: "useStockMoves"
+        params: "filters: ListStockMovesFilters"
+        returns: "UseQueryResult<{ data: StockMove[], pagination: Pagination }>"
+
+      - name: "useStockMove"
+        params: "id: string"
+        returns: "UseQueryResult<StockMove>"
+
+      - name: "useLPMovementHistory"
+        params: "lpId: string"
+        returns: "UseQueryResult<StockMove[]>"
+
+      - name: "useCreateStockMove"
+        returns: "UseMutationResult<StockMove, Error, CreateStockMoveParams>"
+
+      - name: "useCancelStockMove"
+        returns: "UseMutationResult<StockMove, Error, { id: string, reason: string }>"

@@ -38,5 +38,8 @@
     "lint-staged": "^16.2.7",
     "supabase": "^2.58.5",
     "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
   }
 }

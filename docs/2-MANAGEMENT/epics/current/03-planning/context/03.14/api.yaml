@@ -1,0 +1,364 @@
+# Story 03.14 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "PATCH"
+    path: "/api/planning/work-orders/:id/schedule"
+    description: "Update WO scheduling dates/times and optionally line/machine assignment"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/schedule/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+
+      params:
+        id:
+          type: "string"
+          format: "uuid"
+          description: "Work order ID"
+
+      body:
+        schema: "ScheduleWOInput"
+        fields:
+          - name: "planned_start_date"
+            type: "string"
+            format: "date (YYYY-MM-DD)"
+            required: false
+            description: "Scheduled date (updates primary date)"
+          - name: "planned_end_date"
+            type: "string"
+            format: "date (YYYY-MM-DD)"
+            required: false
+            description: "End date if WO spans multiple days"
+          - name: "scheduled_start_time"
+            type: "string"
+            format: "time (HH:mm)"
+            required: false
+            description: "Start time within the day"
+          - name: "scheduled_end_time"
+            type: "string"
+            format: "time (HH:mm)"
+            required: false
+            description: "End time within the day"
+          - name: "production_line_id"
+            type: "string"
+            format: "uuid"
+            required: false
+            description: "Assign/change production line"
+          - name: "machine_id"
+            type: "string"
+            format: "uuid"
+            required: false
+            nullable: true
+            description: "Assign/change machine (null to clear)"
+
+    response:
+      success:
+        status: 200
+        schema:
+          success: true
+          data:
+            id: "uuid"
+            wo_number: "string"
+            status: "string"
+            planned_start_date: "string (date)"
+            planned_end_date: "string (date) | null"
+            scheduled_start_time: "string (time) | null"
+            scheduled_end_time: "string (time) | null"
+            production_line_id: "string (uuid) | null"
+            machine_id: "string (uuid) | null"
+            product:
+              id: "uuid"
+              name: "string"
+              code: "string"
+            line:
+              id: "uuid"
+              name: "string"
+            machine:
+              id: "uuid"
+              name: "string"
+            updated_at: "string (ISO timestamp)"
+
+      errors:
+        - status: 400
+          code: "VALIDATION_ERROR"
+          message: "Invalid input"
+          when: "Zod validation fails"
+          details: "Field-level errors from Zod"
+
+        - status: 400
+          code: "INVALID_TIME_RANGE"
+          message: "End time must be after start time"
+          when: "scheduled_end_time <= scheduled_start_time on same day"
+
+        - status: 400
+          code: "INVALID_DATE_RANGE"
+          message: "End date must be on or after start date"
+          when: "planned_end_date < planned_start_date"
+
+        - status: 400
+          code: "CANNOT_SCHEDULE_COMPLETED"
+          message: "Cannot schedule completed or cancelled work order"
+          when: "WO status in ['completed', 'cancelled', 'closed']"
+
+        - status: 401
+          code: "UNAUTHORIZED"
+          message: "Unauthorized"
+          when: "No valid JWT token"
+
+        - status: 403
+          code: "FORBIDDEN"
+          message: "Insufficient permissions"
+          when: "User lacks scheduling permission"
+
+        - status: 404
+          code: "NOT_FOUND"
+          message: "Work order not found"
+          when: "WO does not exist or belongs to different org"
+
+        - status: 404
+          code: "LINE_NOT_FOUND"
+          message: "Production line not found"
+          when: "production_line_id provided but does not exist in org"
+
+        - status: 404
+          code: "MACHINE_NOT_FOUND"
+          message: "Machine not found"
+          when: "machine_id provided but does not exist in org"
+
+# Validation Schema
+validation:
+  schema_name: "scheduleWOSchema"
+  file: "apps/frontend/lib/validation/work-order-schemas.ts"
+  definition: |
+    import { z } from 'zod';
+
+    // Time string regex (HH:mm format)
+    const timeString = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+      message: 'Time must be in HH:mm format (00:00-23:59)'
+    });
+
+    export const scheduleWOSchema = z.object({
+      planned_start_date: z.string().date('Invalid date format').optional(),
+      planned_end_date: z.string().date('Invalid date format').optional().nullable(),
+      scheduled_start_time: timeString.optional().nullable(),
+      scheduled_end_time: timeString.optional().nullable(),
+      production_line_id: z.string().uuid('Invalid line ID').optional().nullable(),
+      machine_id: z.string().uuid('Invalid machine ID').optional().nullable()
+    }).refine(
+      (data) => {
+        // If both dates provided, end >= start
+        if (data.planned_end_date && data.planned_start_date) {
+          return data.planned_end_date >= data.planned_start_date;
+        }
+        return true;
+      },
+      { message: 'End date must be on or after start date', path: ['planned_end_date'] }
+    ).refine(
+      (data) => {
+        // If both times provided and same day (or no end date), end > start
+        if (data.scheduled_end_time && data.scheduled_start_time) {
+          if (!data.planned_end_date || data.planned_start_date === data.planned_end_date) {
+            return data.scheduled_end_time > data.scheduled_start_time;
+          }
+        }
+        return true;
+      },
+      { message: 'End time must be after start time', path: ['scheduled_end_time'] }
+    );
+
+    export type ScheduleWOInput = z.infer<typeof scheduleWOSchema>;
+
+# Service Layer
+services:
+  - path: "apps/frontend/lib/services/work-order-service.ts"
+    method_to_add: "scheduleWorkOrder"
+    signature: |
+      static async scheduleWorkOrder(
+        orgId: string,
+        woId: string,
+        userId: string,
+        input: ScheduleWOInput
+      ): Promise<WorkOrder>
+    description: "Update WO schedule, validate status, return updated WO with relations"
+
+# Implementation pattern
+patterns:
+  api_route: |
+    // apps/frontend/app/api/planning/work-orders/[id]/schedule/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+    import { hasPermission } from '@/lib/services/permission-service';
+    import { scheduleWOSchema } from '@/lib/validation/work-order-schemas';
+    import { WorkOrderService } from '@/lib/services/work-order-service';
+
+    export async function PATCH(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      try {
+        // Auth check
+        const context = await getOrgContext();
+        if (!context) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Permission check
+        if (!hasPermission(context, 'planning', 'U')) {
+          return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+        }
+
+        // Parse and validate body
+        const body = await request.json();
+        const validationResult = scheduleWOSchema.safeParse(body);
+        if (!validationResult.success) {
+          return NextResponse.json({
+            error: 'Validation error',
+            details: validationResult.error.flatten().fieldErrors
+          }, { status: 400 });
+        }
+
+        // Schedule WO
+        const updatedWO = await WorkOrderService.scheduleWorkOrder(
+          context.org_id,
+          params.id,
+          context.user_id,
+          validationResult.data
+        );
+
+        return NextResponse.json({ success: true, data: updatedWO });
+      } catch (error: any) {
+        // Handle known errors
+        if (error.code === 'NOT_FOUND') {
+          return NextResponse.json({ error: error.message }, { status: 404 });
+        }
+        if (error.code === 'CANNOT_SCHEDULE') {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+
+        console.error('Schedule WO error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
+
+  service_pattern: |
+    // In apps/frontend/lib/services/work-order-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import type { ScheduleWOInput } from '@/lib/validation/work-order-schemas';
+
+    export class WorkOrderService {
+      // ... existing methods ...
+
+      static async scheduleWorkOrder(
+        orgId: string,
+        woId: string,
+        userId: string,
+        input: ScheduleWOInput
+      ): Promise<WorkOrder> {
+        const supabase = createClientComponentClient();
+
+        // 1. Get current WO to check status
+        const { data: existingWO, error: fetchError } = await supabase
+          .from('work_orders')
+          .select('id, status')
+          .eq('id', woId)
+          .eq('org_id', orgId)
+          .single();
+
+        if (fetchError || !existingWO) {
+          const err = new Error('Work order not found');
+          (err as any).code = 'NOT_FOUND';
+          throw err;
+        }
+
+        // 2. Check status allows scheduling
+        const terminalStatuses = ['completed', 'cancelled', 'closed'];
+        if (terminalStatuses.includes(existingWO.status)) {
+          const err = new Error('Cannot schedule completed or cancelled work order');
+          (err as any).code = 'CANNOT_SCHEDULE';
+          throw err;
+        }
+
+        // 3. Validate line/machine exist in org (if provided)
+        if (input.production_line_id) {
+          const { data: line } = await supabase
+            .from('production_lines')
+            .select('id')
+            .eq('id', input.production_line_id)
+            .eq('org_id', orgId)
+            .single();
+
+          if (!line) {
+            const err = new Error('Production line not found');
+            (err as any).code = 'NOT_FOUND';
+            throw err;
+          }
+        }
+
+        if (input.machine_id) {
+          const { data: machine } = await supabase
+            .from('machines')
+            .select('id')
+            .eq('id', input.machine_id)
+            .eq('org_id', orgId)
+            .single();
+
+          if (!machine) {
+            const err = new Error('Machine not found');
+            (err as any).code = 'NOT_FOUND';
+            throw err;
+          }
+        }
+
+        // 4. Build update object (only include provided fields)
+        const updateData: Record<string, any> = {
+          updated_at: new Date().toISOString(),
+          updated_by: userId
+        };
+
+        if (input.planned_start_date !== undefined) {
+          updateData.planned_start_date = input.planned_start_date;
+        }
+        if (input.planned_end_date !== undefined) {
+          updateData.planned_end_date = input.planned_end_date;
+        }
+        if (input.scheduled_start_time !== undefined) {
+          updateData.scheduled_start_time = input.scheduled_start_time;
+        }
+        if (input.scheduled_end_time !== undefined) {
+          updateData.scheduled_end_time = input.scheduled_end_time;
+        }
+        if (input.production_line_id !== undefined) {
+          updateData.production_line_id = input.production_line_id;
+        }
+        if (input.machine_id !== undefined) {
+          updateData.machine_id = input.machine_id;
+        }
+
+        // 5. Update WO
+        const { data: updatedWO, error: updateError } = await supabase
+          .from('work_orders')
+          .update(updateData)
+          .eq('id', woId)
+          .eq('org_id', orgId)
+          .select(`
+            *,
+            product:products(id, name, code),
+            line:production_lines(id, name),
+            machine:machines(id, name)
+          `)
+          .single();
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        return updatedWO;
+      }
+    }

@@ -1,0 +1,733 @@
+# Bug Workflow
+# Complexity-based bug fix routing: SIMPLE | MEDIUM | COMPLEX
+#
+# Documentation: @.claude/workflows/documentation/BUG-WORKFLOW.md
+
+name: bug-workflow
+description: Bug fix workflow with complexity-based routing - simple fixes use fast review, medium bugs follow TDD, complex bugs require architectural review
+trigger: "bug_report | defect | regression | incident"
+
+documentation: "@.claude/workflows/documentation/BUG-WORKFLOW.md"
+
+# Triggers
+triggers:
+  - type: bug_report
+    source: "QA-AGENT | Developer | User | Monitoring"
+  - type: regression
+    source: "CI/CD | QA testing"
+  - type: incident
+    source: "Production monitoring | User report"
+  - type: security_issue
+    source: "Security scan | Penetration test | Bug bounty"
+
+# Severity levels determine response time
+severity_matrix:
+  CRITICAL:
+    description: "System down, data loss, security breach"
+    response_time: immediate
+    path_override: complex  # Always use complex path
+  HIGH:
+    description: "Major feature broken"
+    response_time: same_day
+  MEDIUM:
+    description: "Feature impaired, workaround exists"
+    response_time: this_sprint
+  LOW:
+    description: "Minor issue, cosmetic"
+    response_time: backlog
+
+# Complexity criteria for routing
+complexity_criteria:
+  simple:
+    lines_of_change: "< 10"
+    investigation_needed: false
+    files_affected: 1
+    examples:
+      - "Typo fix"
+      - "Config change"
+      - "Simple logic fix"
+      - "CSS adjustment"
+      - "Missing null check"
+  medium:
+    lines_of_change: "10-100"
+    investigation_needed: true
+    files_affected: "multiple"
+    examples:
+      - "Logic error"
+      - "Integration issue"
+      - "Performance problem"
+      - "Edge case handling"
+      - "State management bug"
+  complex:
+    lines_of_change: "> 100"
+    architecture_impact: true
+    cross_system: true
+    examples:
+      - "Design flaw"
+      - "Cross-system bug"
+      - "Security vulnerability"
+      - "Data corruption"
+      - "Concurrency issue"
+
+# =============================================================================
+# INTAKE PHASE (All Paths)
+# =============================================================================
+phases:
+  - id: intake
+    name: "Bug Intake"
+    mandatory: true
+    agent: QA-AGENT
+    model: sonnet
+    duration: "15-30 minutes"
+    activities:
+      - "Receive and document bug report"
+      - "Verify report completeness"
+      - "Request additional info if needed"
+      - "Assign initial severity"
+    output:
+      - "Bug report (BUG-{ID})"
+      - "Environment details"
+      - "Steps to reproduce"
+      - "Screenshots/logs"
+    gate:
+      name: "INTAKE_COMPLETE"
+      criteria:
+        - "Bug report template filled"
+        - "Steps to reproduce documented"
+        - "Environment captured"
+        - "Initial severity assigned"
+      on_fail: request_more_info
+      on_pass: severity_assessment
+
+  - id: severity_assessment
+    name: "Severity Assessment"
+    mandatory: true
+    agent: QA-AGENT
+    model: sonnet
+    duration: "15-30 minutes"
+    activities:
+      - "Analyze user impact"
+      - "Check for workarounds"
+      - "Assess data/security risk"
+      - "Evaluate business impact"
+      - "Assign final severity and priority"
+    output:
+      - "Severity level (CRITICAL|HIGH|MEDIUM|LOW)"
+      - "Priority (P0|P1|P2|P3)"
+      - "Impact analysis"
+    gate:
+      name: "SEVERITY_ASSIGNED"
+      criteria:
+        - "Severity level assigned"
+        - "Priority set"
+        - "Justification documented"
+      on_pass: complexity_routing
+
+  - id: complexity_routing
+    name: "Complexity Routing"
+    mandatory: true
+    agent: QA-AGENT
+    model: sonnet
+    duration: "15-30 minutes"
+    activities:
+      - "Estimate lines of change"
+      - "Count files affected"
+      - "Determine if investigation needed"
+      - "Check for architecture impact"
+      - "Route to appropriate path"
+    routing_decision:
+      simple: simple_fix
+      medium: medium_investigation
+      complex: complex_research
+    gate:
+      name: "ROUTING_COMPLETE"
+      criteria:
+        - "Complexity assessed"
+        - "Path selected"
+        - "Justification documented"
+
+# =============================================================================
+# SIMPLE PATH (Fast Track)
+# Duration: < 1 hour
+# Agents: dev-agent -> code-reviewer -> qa-agent
+# =============================================================================
+
+  - id: simple_fix
+    name: "Simple Path - Quick Fix"
+    path: simple
+    agent_selection:
+      backend_bug: BACKEND-DEV
+      frontend_bug: FRONTEND-DEV
+      default: BACKEND-DEV
+    model: haiku
+    duration: "15-30 minutes"
+    activities:
+      - "Locate issue in code"
+      - "Implement minimal fix (< 10 LOC)"
+      - "Run existing tests"
+      - "Verify fix works"
+    output:
+      - "Fixed code"
+      - "Passing tests"
+    gate:
+      name: "SIMPLE_FIX_COMPLETE"
+      criteria:
+        - "Fix is < 10 lines of code"
+        - "All tests pass"
+        - "No side effects introduced"
+      on_fail: escalate_to_medium
+      on_pass: simple_review
+
+  - id: simple_review
+    name: "Simple Path - Quick Review"
+    path: simple
+    agent: CODE-REVIEWER
+    model: haiku
+    duration: "10-15 minutes"
+    checklist:
+      - "Fix is correct"
+      - "No side effects"
+      - "Tests pass"
+      - "No security issues"
+    gate:
+      name: "SIMPLE_REVIEW_APPROVED"
+      decision:
+        approved: simple_verify
+        rejected: simple_fix
+      criteria:
+        - "Fix approved"
+        - "No issues found"
+
+  - id: simple_verify
+    name: "Simple Path - Quick Verify"
+    path: simple
+    agent: QA-AGENT
+    model: haiku
+    duration: "10-15 minutes"
+    activities:
+      - "Verify bug is fixed"
+      - "Quick smoke test"
+      - "Close bug"
+    gate:
+      name: "SIMPLE_VERIFIED"
+      criteria:
+        - "Bug confirmed fixed"
+        - "No new bugs introduced"
+      on_pass: bug_closed
+
+# =============================================================================
+# MEDIUM PATH (Standard TDD)
+# Duration: 2-8 hours
+# Agents: dev-agent -> test-engineer -> dev-agent -> code-reviewer -> qa-agent
+# =============================================================================
+
+  - id: medium_investigation
+    name: "Medium Path - Investigation"
+    path: medium
+    agent_selection:
+      backend_bug: BACKEND-DEV
+      frontend_bug: FRONTEND-DEV
+      default: BACKEND-DEV
+    model: sonnet
+    duration: "30 min - 2 hours"
+    activities:
+      - "Reproduce the bug reliably"
+      - "Debug and trace root cause"
+      - "Document findings"
+      - "Propose fix approach"
+    output:
+      - "Root cause analysis document"
+      - "Reproduction steps"
+      - "Proposed fix approach"
+      - "Estimated scope"
+    gate:
+      name: "ROOT_CAUSE_IDENTIFIED"
+      criteria:
+        - "Bug can be reproduced"
+        - "Root cause identified"
+        - "Fix approach documented"
+      on_fail: escalate_to_complex
+      on_pass: medium_test_red
+
+  - id: medium_test_red
+    name: "Medium Path - Test (RED)"
+    path: medium
+    agent: TEST-WRITER
+    model: sonnet
+    duration: "30 min - 1 hour"
+    activities:
+      - "Write test that reproduces bug"
+      - "Verify test FAILS with current code"
+      - "Add edge case tests"
+      - "Define test coverage for fix"
+    output:
+      - "Failing reproduction test"
+      - "Edge case tests"
+      - "Coverage requirements"
+    gate:
+      name: "RED_TESTS_WRITTEN"
+      criteria:
+        - "Reproduction test exists"
+        - "Test fails with current code"
+        - "Edge cases covered"
+      on_pass: medium_fix_green
+
+  - id: medium_fix_green
+    name: "Medium Path - Fix (GREEN)"
+    path: medium
+    agent_selection:
+      backend_bug: BACKEND-DEV
+      frontend_bug: FRONTEND-DEV
+      default: BACKEND-DEV
+    model: sonnet
+    duration: "1-4 hours"
+    activities:
+      - "Implement the fix"
+      - "Make all tests pass"
+      - "Run full test suite"
+      - "Verify no regressions"
+    output:
+      - "Fixed code"
+      - "All tests passing"
+    gate:
+      name: "GREEN_TESTS_PASS"
+      criteria:
+        - "All tests pass"
+        - "No regressions"
+        - "Build succeeds"
+      on_fail: medium_fix_green  # Iterate
+      on_pass: medium_review
+
+  - id: medium_review
+    name: "Medium Path - Code Review"
+    path: medium
+    agent: CODE-REVIEWER
+    model: sonnet
+    duration: "30 min - 1 hour"
+    checklist:
+      fix_assessment:
+        - "Root cause addressed"
+        - "Fix is minimal and focused"
+        - "No side effects introduced"
+        - "Tests are meaningful"
+      quality_check:
+        - "Follows coding standards"
+        - "Error handling appropriate"
+        - "No security issues"
+    gate:
+      name: "MEDIUM_REVIEW_APPROVED"
+      decision:
+        approved: medium_verify
+        request_changes: medium_fix_green
+      criteria:
+        - "Code review passed"
+        - "All checklist items verified"
+
+  - id: medium_verify
+    name: "Medium Path - Verification"
+    path: medium
+    agent: QA-AGENT
+    model: sonnet
+    duration: "30 min - 1 hour"
+    activities:
+      - "Verify bug is fixed"
+      - "Execute regression tests"
+      - "Test related functionality"
+      - "Approve closure or reject"
+    gate:
+      name: "MEDIUM_VERIFIED"
+      decision:
+        pass: bug_closed
+        fail: medium_investigation  # Re-investigate
+      criteria:
+        - "Bug confirmed fixed"
+        - "Regression tests pass"
+        - "Related functionality works"
+
+# =============================================================================
+# COMPLEX PATH (Architecture Review)
+# Duration: 1+ days
+# Agents: research-agent (opt) -> architect-agent -> senior-dev -> code-reviewer -> qa-agent
+# =============================================================================
+
+  - id: complex_research
+    name: "Complex Path - Research (Optional)"
+    path: complex
+    agent: RESEARCH-AGENT
+    model: sonnet
+    duration: "1-2 hours"
+    optional: true
+    condition: "unknown_domain OR security_cve OR external_integration OR performance_benchmark"
+    activities:
+      - "Research technology/library involved"
+      - "Search for similar issues in community"
+      - "Identify known solutions/workarounds"
+      - "Document findings for architect"
+    output:
+      - "Research document"
+      - "Community findings"
+      - "Recommended approaches"
+      - "Reference links"
+    gate:
+      name: "RESEARCH_COMPLETE"
+      criteria:
+        - "Technology context documented"
+        - "Community solutions identified"
+        - "Recommendations provided"
+      on_pass: complex_architecture
+
+  - id: complex_architecture
+    name: "Complex Path - Architecture Review"
+    path: complex
+    agent: ARCHITECT-AGENT
+    model: opus
+    duration: "2-4 hours"
+    activities:
+      - "Deep analysis of bug and system impact"
+      - "Identify architectural root cause"
+      - "Evaluate solution options"
+      - "Decide if ADR needed"
+      - "Determine if story conversion required"
+    output:
+      - "Architecture analysis document"
+      - "Solution options with pros/cons"
+      - "ADR (if needed)"
+      - "Recommendation"
+    decision_point:
+      fix_in_workflow: complex_senior_fix
+      convert_to_story: story_workflow_handoff
+    gate:
+      name: "ARCHITECTURE_APPROVED"
+      criteria:
+        - "System impact analyzed"
+        - "Root cause category identified"
+        - "Solution approach selected"
+        - "ADR created (if needed)"
+
+  - id: story_workflow_handoff
+    name: "Complex Path - Convert to Story"
+    path: complex
+    type: handoff
+    target_workflow: "story-delivery.yaml"
+    activities:
+      - "Create story from bug"
+      - "Link bug to story"
+      - "Transfer all analysis"
+      - "Close bug as 'Converted to Story'"
+    output:
+      - "Story document (story-{N}.{M}.md)"
+      - "Bug status: Converted"
+
+  - id: complex_senior_fix
+    name: "Complex Path - Senior Dev Fix"
+    path: complex
+    agent: SENIOR-DEV
+    model: opus
+    duration: "4+ hours"
+    activities:
+      - "Implement architectural fix"
+      - "Update all affected components"
+      - "Comprehensive unit tests"
+      - "Integration tests"
+      - "Update documentation"
+    output:
+      - "Implemented fix"
+      - "Updated components"
+      - "Comprehensive tests"
+      - "Updated documentation"
+    gate:
+      name: "COMPLEX_FIX_COMPLETE"
+      criteria:
+        - "Fix implemented per architecture decision"
+        - "All affected systems updated"
+        - "Tests comprehensive"
+        - "Documentation updated"
+      on_pass: complex_full_review
+
+  - id: complex_full_review
+    name: "Complex Path - Full Review"
+    path: complex
+    parallel:
+      - agent: CODE-REVIEWER
+        model: sonnet
+        checklist:
+          - "Implementation correct"
+          - "Tests comprehensive"
+          - "No regressions introduced"
+      - agent: ARCHITECT-AGENT
+        model: opus
+        checklist:
+          - "Solution matches approved approach"
+          - "No new technical debt"
+          - "Documentation updated"
+          - "ADR completed (if needed)"
+    security_review:
+      - "No new vulnerabilities"
+      - "Security best practices followed"
+    gate:
+      name: "COMPLEX_REVIEW_APPROVED"
+      decision:
+        approved: complex_qa
+        request_changes: complex_senior_fix
+      criteria:
+        - "Code review passed"
+        - "Architecture review passed"
+        - "Security review passed"
+
+  - id: complex_qa
+    name: "Complex Path - Full QA"
+    path: complex
+    agent: QA-AGENT
+    model: sonnet
+    duration: "2-4 hours"
+    activities:
+      - "Full regression test suite"
+      - "Integration testing"
+      - "Performance testing"
+      - "Security validation"
+      - "Final approval"
+    gate:
+      name: "COMPLEX_QA_PASSED"
+      decision:
+        pass: bug_closed
+        fail: complex_senior_fix
+      criteria:
+        - "Regression tests pass"
+        - "Integration tests pass"
+        - "Performance acceptable"
+        - "Security validated"
+
+# =============================================================================
+# COMPLETION
+# =============================================================================
+
+  - id: bug_closed
+    name: "Bug Closed"
+    type: completion
+    activities:
+      - "Update bug status to CLOSED"
+      - "Update PROJECT-STATE.md"
+      - "Log metrics in METRICS.md"
+      - "Notify stakeholders"
+      - "Update ADR (if complex path)"
+    output:
+      - "Closed bug"
+      - "Updated state files"
+      - "Metrics logged"
+
+# =============================================================================
+# QUALITY GATES SUMMARY
+# =============================================================================
+quality_gates:
+  # Intake gates
+  INTAKE_COMPLETE:
+    phase: intake
+    blocker: "Cannot proceed to severity assessment"
+  SEVERITY_ASSIGNED:
+    phase: severity_assessment
+    blocker: "Cannot route bug"
+  ROUTING_COMPLETE:
+    phase: complexity_routing
+    blocker: "Cannot start fix"
+
+  # Simple path gates
+  SIMPLE_FIX_COMPLETE:
+    phase: simple_fix
+    blocker: "Cannot proceed to review"
+  SIMPLE_REVIEW_APPROVED:
+    phase: simple_review
+    blocker: "Must fix and resubmit"
+  SIMPLE_VERIFIED:
+    phase: simple_verify
+    blocker: "Cannot close bug"
+
+  # Medium path gates
+  ROOT_CAUSE_IDENTIFIED:
+    phase: medium_investigation
+    blocker: "Cannot write tests"
+  RED_TESTS_WRITTEN:
+    phase: medium_test_red
+    blocker: "Cannot implement fix"
+  GREEN_TESTS_PASS:
+    phase: medium_fix_green
+    blocker: "Cannot proceed to review"
+  MEDIUM_REVIEW_APPROVED:
+    phase: medium_review
+    blocker: "Must fix and retest"
+  MEDIUM_VERIFIED:
+    phase: medium_verify
+    blocker: "Cannot close bug"
+
+  # Complex path gates
+  RESEARCH_COMPLETE:
+    phase: complex_research
+    optional: true
+    blocker: "Cannot proceed to architecture review"
+  ARCHITECTURE_APPROVED:
+    phase: complex_architecture
+    blocker: "Cannot implement fix"
+  COMPLEX_FIX_COMPLETE:
+    phase: complex_senior_fix
+    blocker: "Cannot proceed to review"
+  COMPLEX_REVIEW_APPROVED:
+    phase: complex_full_review
+    blocker: "Must fix and resubmit"
+  COMPLEX_QA_PASSED:
+    phase: complex_qa
+    blocker: "Cannot close bug"
+
+# =============================================================================
+# ERROR HANDLING
+# =============================================================================
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalation:
+    simple_path: SENIOR-DEV
+    medium_path: ARCHITECT-AGENT
+    complex_path: ORCHESTRATOR
+
+error_recovery:
+  cannot_reproduce:
+    actions:
+      - "Request more information from reporter"
+      - "Check different environments"
+      - "Add logging/monitoring"
+    if_still_cannot:
+      - "Document investigation"
+      - "Close as 'Cannot Reproduce'"
+      - "Add monitoring for future occurrence"
+
+  fix_causes_regression:
+    actions:
+      - "Revert fix immediately"
+      - "Re-open bug"
+      - "Escalate complexity if needed"
+      - "Add regression to test requirements"
+      - "Retry with expanded scope"
+
+  complexity_underestimated:
+    actions:
+      - "Stop current path"
+      - "Re-assess complexity"
+      - "Route to appropriate path"
+      - "Document why initial assessment was wrong"
+
+  fix_requires_architecture_change:
+    actions:
+      - "Pause current work"
+      - "Route to architect-agent"
+      - "May convert to Story"
+      - "Continue with appropriate path"
+
+  escalate_to_medium:
+    trigger: "Simple fix exceeds 10 LOC or fails gate"
+    action: "Route to medium_investigation"
+
+  escalate_to_complex:
+    trigger: "Medium investigation reveals architecture issue"
+    action: "Route to complex_research or complex_architecture"
+
+# =============================================================================
+# ARTIFACTS
+# =============================================================================
+artifacts:
+  bug_report:
+    template: "BUG-{ID}"
+    location: "@docs/bugs/"
+    required_fields:
+      - title
+      - description
+      - steps_to_reproduce
+      - expected_behavior
+      - actual_behavior
+      - environment
+      - severity
+      - priority
+
+  root_cause_analysis:
+    path: medium
+    location: "@docs/bugs/analysis/"
+    fields:
+      - reproduction_steps
+      - root_cause
+      - why_not_caught
+      - proposed_fix
+      - estimated_scope
+
+  architecture_analysis:
+    path: complex
+    location: "@docs/3-ARCHITECTURE/decisions/"
+    fields:
+      - system_impact
+      - root_cause_category
+      - solution_options
+      - recommendation
+      - adr_required
+
+  research_document:
+    path: complex
+    optional: true
+    location: "@docs/bugs/research/"
+    fields:
+      - technology_context
+      - community_findings
+      - recommended_approaches
+      - references
+
+# =============================================================================
+# METRICS
+# =============================================================================
+metrics:
+  track:
+    - time_to_triage
+    - time_to_fix
+    - time_to_close
+    - complexity_accuracy
+    - regression_count
+    - reopen_count
+    - path_used
+    - escalation_count
+  store_in: "@.claude/state/METRICS.md"
+
+# =============================================================================
+# INTEGRATION WITH OTHER WORKFLOWS
+# =============================================================================
+integration:
+  bug_found_during_story:
+    action: "Complete bug workflow, return to story QA"
+
+  bug_causes_sprint_delay:
+    action: "Notify scrum-master, adjust sprint"
+
+  bug_converts_to_story:
+    target: "story-delivery.yaml"
+    action: "Create story, link bug, close bug as converted"
+
+  critical_bug_during_release:
+    action: "Immediate bug workflow, block release until fixed"
+
+# =============================================================================
+# STATUS FLOW
+# =============================================================================
+status_flow:
+  - NEW
+  - TRIAGED
+  - ASSIGNED
+  - IN_PROGRESS
+  - IN_REVIEW
+  - VERIFIED
+  - CLOSED
+  transitions:
+    IN_PROGRESS:
+      - BLOCKED
+    IN_REVIEW:
+      - CHANGES_REQUESTED
+    VERIFIED:
+      - REOPENED
+    CHANGES_REQUESTED:
+      - ASSIGNED
+    REOPENED:
+      - ASSIGNED
+    BLOCKED:
+      - ASSIGNED

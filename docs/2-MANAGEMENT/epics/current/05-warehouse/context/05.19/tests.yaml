@@ -1,0 +1,631 @@
+# Story 05.19 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/scanner-receive-service.test.ts"
+    type: "unit"
+    description: "Unit tests for scanner receive service"
+    coverage_target: "80%"
+
+  - path: "__tests__/integration/api/warehouse/scanner-receive.test.ts"
+    type: "integration"
+    description: "Integration tests for all scanner endpoints"
+
+  - path: "apps/frontend/lib/validation/__tests__/scanner-receive.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "__tests__/e2e/scanner/receive.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for full scanner receive flow"
+
+# Acceptance Criteria from Story
+acceptance_criteria:
+  # AC-1: Scanner Receive Page Layout
+  - id: "AC-01"
+    title: "Scanner receive page renders with mobile-optimized layout"
+    given: "scanner user is authenticated"
+    when: "user navigates to /scanner/receive"
+    then:
+      - "full-screen layout displays without browser chrome"
+      - "header shows 'Receive Goods' title with back button"
+      - "current step indicator shows progress (1 of 5)"
+      - "main content area fills available space"
+      - "action buttons anchored to bottom of screen"
+      - "all touch targets are minimum 48x48 pixels"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-2: Step 1 - Select PO/TO Source
+  - id: "AC-02"
+    title: "Display pending POs for receiving"
+    given: "user on Step 1 'Select Source'"
+    when: "step loads"
+    then:
+      - "list of receivable POs displayed"
+      - "each PO shows: PO Number, Supplier, Expected Date, Lines pending"
+      - "POs filtered to user's assigned warehouse"
+      - "list sorted by expected_date ASC (soonest first)"
+      - "'Scan PO Barcode' button prominently displayed"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "Valid PO barcode scanned"
+    given: "camera scanner active"
+    when: "PO barcode 'PO-2025-00001' scanned"
+    then:
+      - "system validates barcode against pending POs in < 500ms"
+      - "success tone plays (200ms, high pitch)"
+      - "green checkmark animation displays"
+      - "workflow advances to Step 2"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Invalid PO barcode scanned"
+    given: "camera scanner active"
+    when: "unrecognized barcode scanned"
+    then:
+      - "error beep plays (300ms, low pitch)"
+      - "red X animation displays"
+      - "error message shows 'PO not found: {barcode}'"
+      - "scanner remains active for retry"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-3: Step 2 - Review PO Lines
+  - id: "AC-05"
+    title: "Display PO lines for selected PO"
+    given: "PO 'PO-2025-00001' selected"
+    when: "Step 2 loads"
+    then:
+      - "PO header displays: PO Number, Supplier name"
+      - "line items table shows product, ordered qty, received qty, remaining qty, UoM"
+      - "lines with remaining > 0 highlighted"
+      - "fully received lines shown greyed/dimmed"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-4: Step 3 - Enter Receipt Details
+  - id: "AC-06"
+    title: "Receipt details form displays"
+    given: "product line selected"
+    when: "Step 3 loads"
+    then:
+      - "form displays: Product, Ordered Qty, Remaining Qty, Receive Qty, Batch, Expiry, Location"
+      - "number pad anchored at bottom"
+      - "'Receive Qty' input is focused"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "Number pad for quantity entry"
+    given: "receipt details form displayed"
+    when: "user interacts with number pad"
+    then:
+      - "number pad shows digits 0-9"
+      - "decimal point button available"
+      - "+1, +10, -1, -10 quick buttons available"
+      - "all buttons minimum 48x48 pixels"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-08"
+    title: "Batch number entry (required)"
+    given: "warehouse_settings.require_batch_on_receipt = true"
+    when: "Batch Number field displayed"
+    then:
+      - "field shows 'Required' indicator"
+      - "submission blocked without batch"
+      - "when entered, field validates as complete with green checkmark"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-5: Step 4 - Review and Confirm
+  - id: "AC-09"
+    title: "Review summary displays"
+    given: "all receipt details entered"
+    when: "user advances to Step 4"
+    then:
+      - "summary displays all fields: PO, Product, Qty, Batch, Expiry, Location"
+      - "'Edit' buttons for each section"
+      - "large 'Confirm Receipt' button at bottom"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-6: Step 5 - Success and Print
+  - id: "AC-10"
+    title: "Successful receipt creates GRN and LP"
+    given: "validation passes"
+    when: "'Confirm Receipt' tapped"
+    then:
+      - "POST /api/warehouse/scanner/receive called"
+      - "GRN created with LP"
+      - "PO line received_qty updated"
+      - "confirmation chime plays (500ms)"
+      - "success screen displays with GRN/LP numbers"
+      - "response time < 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    title: "Auto-print label on receipt"
+    given: "warehouse_settings.print_label_on_receipt = true"
+    when: "receipt completes successfully"
+    then:
+      - "LP label print job queued automatically"
+      - "'Label printing...' indicator shows"
+      - "print status displays (success/failure)"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-7: Audio Feedback
+  - id: "AC-12"
+    title: "Audio feedback plays on actions"
+    given: "audio enabled via settings"
+    when: "various actions occur"
+    then:
+      - "valid scan: 880Hz, 200ms"
+      - "invalid scan: 220Hz, 300ms"
+      - "submission complete: 660Hz+880Hz, 500ms"
+      - "network error: 440Hz, 400ms"
+    test_type: "unit"
+    priority: "P1"
+
+  # AC-9: API - Scanner Receive
+  - id: "AC-13"
+    title: "POST /scanner/receive - Happy path"
+    given: "valid request with all required fields"
+    when: "POST request sent"
+    then:
+      - "response status = 201 Created"
+      - "response includes grn, lp, po_line_status, po_status"
+      - "response time < 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    title: "POST /scanner/receive - Validation failure"
+    given: "request missing required batch_number"
+    when: "warehouse_settings.require_batch_on_receipt = true"
+    then:
+      - "response status = 400 Bad Request"
+      - "error message = 'Batch number required for receipt'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    title: "POST /scanner/receive - Over-receipt blocked"
+    given: "qty exceeding ordered + tolerance"
+    when: "POST request sent"
+    then:
+      - "response status = 400 Bad Request"
+      - "error includes max_allowed and tolerance_pct"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-10: API - Pending Receipts
+  - id: "AC-16"
+    title: "GET /scanner/pending-receipts"
+    given: "user authenticated with warehouse_id in context"
+    when: "GET request sent"
+    then:
+      - "response status = 200 OK"
+      - "response includes POs with status in [approved, confirmed, partial]"
+      - "results filtered by user's assigned warehouse"
+      - "response time < 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-11: Barcode Lookup
+  - id: "AC-17"
+    title: "GET /scanner/lookup/po/:barcode - Found"
+    given: "PO exists with po_number = barcode"
+    when: "GET request sent"
+    then:
+      - "response status = 200 OK"
+      - "response includes PO details with lines"
+      - "response time < 200ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-18"
+    title: "GET /scanner/lookup/product/:barcode - By GTIN"
+    given: "product with gtin = '12345678901234'"
+    when: "GET /scanner/lookup/product/12345678901234"
+    then:
+      - "response status = 200 OK"
+      - "response includes product details"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-12: Touch Targets
+  - id: "AC-19"
+    title: "All buttons meet minimum touch target"
+    given: "scanner receive page rendered"
+    when: "measuring all interactive elements"
+    then:
+      - "all buttons >= 48x48 pixels (48dp)"
+      - "all tappable areas >= 48x48 pixels"
+      - "spacing between targets >= 8 pixels"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-15: RLS and Security
+  - id: "AC-20"
+    title: "Org isolation on pending receipts"
+    given: "User A from Org A, User B from Org B"
+    when: "User A requests /scanner/pending-receipts"
+    then:
+      - "only Org A POs returned"
+      - "Org B POs not visible"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-21"
+    title: "Cannot receive PO from different org"
+    given: "User A from Org A, PO belongs to Org B"
+    when: "User A attempts POST /scanner/receive with orgB PO"
+    then:
+      - "404 Not Found returned (not 403)"
+      - "no GRN/LP created"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  scanner_receive_service:
+    - name: "processReceipt() creates GRN and LP"
+      setup: "Valid input with all required fields"
+      expected: "Returns ScannerReceiveResult with grn and lp"
+
+    - name: "processReceipt() updates PO line received_qty"
+      setup: "PO line with received_qty = 50, receive 25 more"
+      expected: "PO line received_qty = 75"
+
+    - name: "processReceipt() queues label print when enabled"
+      setup: "warehouse_settings.print_label_on_receipt = true"
+      expected: "print_job_id returned in result"
+
+    - name: "processReceipt() blocks over-receipt"
+      setup: "ordered = 100, received = 50, receiving = 60, tolerance = 10%"
+      expected: "Throws error 'Over-receipt exceeds tolerance'"
+
+    - name: "processReceipt() validates batch required"
+      setup: "require_batch_on_receipt = true, batch_number = null"
+      expected: "Throws error 'Batch number required'"
+
+    - name: "processReceipt() validates expiry required"
+      setup: "require_expiry_on_receipt = true, expiry_date = null"
+      expected: "Throws error 'Expiry date required'"
+
+    - name: "validateReceipt() returns errors for invalid data"
+      setup: "Missing required fields"
+      expected: "Returns { valid: false, errors: [...] }"
+
+    - name: "validateReceipt() returns warnings for over-receipt"
+      setup: "qty > remaining but within tolerance"
+      expected: "Returns { valid: true, warnings: [...] }"
+
+    - name: "getPendingReceipts() filters by warehouse"
+      setup: "POs in warehouse A and B"
+      expected: "Only warehouse A POs returned when filtered"
+
+    - name: "getPendingReceipts() excludes cancelled POs"
+      setup: "PO with status = cancelled"
+      expected: "Cancelled PO not in results"
+
+    - name: "lookupPO() finds PO by number"
+      setup: "PO with po_number = 'PO-2025-00001'"
+      expected: "Returns PO object"
+
+    - name: "lookupProduct() finds by internal code"
+      setup: "Product with code = 'FLOUR-001'"
+      expected: "Returns product object"
+
+    - name: "lookupProduct() finds by GTIN"
+      setup: "Product with gtin = '12345678901234'"
+      expected: "Returns product object"
+
+    - name: "lookupLocation() finds by barcode"
+      setup: "Location with code = 'LOC-A01-01'"
+      expected: "Returns location object with full_path"
+
+  number_pad_component:
+    - name: "renders all numeric keys"
+      expected: "Keys 0-9 visible"
+
+    - name: "renders decimal point"
+      expected: "Decimal key visible"
+
+    - name: "handles quick adjust +1"
+      setup: "value = 100"
+      action: "tap +1"
+      expected: "value = 101"
+
+    - name: "handles quick adjust +10"
+      setup: "value = 100"
+      action: "tap +10"
+      expected: "value = 110"
+
+    - name: "handles quick adjust -1"
+      setup: "value = 100"
+      action: "tap -1"
+      expected: "value = 99"
+
+    - name: "handles clear"
+      setup: "value = 123"
+      action: "tap clear"
+      expected: "value = ''"
+
+    - name: "handles backspace"
+      setup: "value = 123"
+      action: "tap backspace"
+      expected: "value = 12"
+
+  audio_feedback:
+    - name: "playSuccess() plays 880Hz tone"
+      expected: "OscillatorNode created with frequency = 880"
+
+    - name: "playError() plays 220Hz tone"
+      expected: "OscillatorNode created with frequency = 220"
+
+    - name: "playConfirm() plays dual tone"
+      expected: "Two OscillatorNodes created (660Hz, 880Hz)"
+
+    - name: "setEnabled(false) mutes all audio"
+      setup: "setEnabled(false)"
+      action: "playSuccess()"
+      expected: "No audio played"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /scanner/receive creates GRN and LP"
+      setup: |
+        - Create org, warehouse, location
+        - Create PO with line
+      request:
+        method: "POST"
+        path: "/api/warehouse/scanner/receive"
+        body:
+          po_id: "<po_uuid>"
+          po_line_id: "<line_uuid>"
+          warehouse_id: "<wh_uuid>"
+          location_id: "<loc_uuid>"
+          received_qty: 50
+          batch_number: "BATCH-001"
+      expected:
+        status: 201
+        body_contains: ["grn", "lp", "po_line_status"]
+
+    - name: "POST /scanner/receive updates PO status"
+      setup: |
+        - PO with 1 line, ordered_qty = 100
+        - Previous received_qty = 50
+      request:
+        body:
+          received_qty: 50  # Completes the line
+      expected:
+        po_line_status: "complete"
+        po_status: "closed"
+
+    - name: "POST /scanner/receive returns 400 for missing batch"
+      setup: |
+        - warehouse_settings.require_batch_on_receipt = true
+      request:
+        body:
+          batch_number: null
+      expected:
+        status: 400
+        error_code: "BATCH_REQUIRED"
+
+    - name: "POST /scanner/receive returns 400 for over-receipt"
+      setup: |
+        - PO line with ordered = 100, received = 95
+        - tolerance = 5%
+      request:
+        body:
+          received_qty: 15  # Would be 110 total
+      expected:
+        status: 400
+        error_code: "OVER_RECEIPT_BLOCKED"
+
+    - name: "GET /scanner/pending-receipts returns filtered list"
+      setup: |
+        - 3 POs: 2 pending, 1 cancelled
+      expected:
+        status: 200
+        data_length: 2
+
+    - name: "GET /scanner/lookup/po/:barcode returns PO with lines"
+      setup: |
+        - PO with 3 lines
+      request:
+        path: "/api/warehouse/scanner/lookup/po/PO-2025-00001"
+      expected:
+        status: 200
+        lines_length: 3
+
+    - name: "GET /scanner/lookup/po/:barcode returns 404 for unknown"
+      request:
+        path: "/api/warehouse/scanner/lookup/po/INVALID-PO"
+      expected:
+        status: 404
+        error_code: "PO_NOT_FOUND"
+
+    - name: "GET /scanner/lookup/product/:barcode by code"
+      request:
+        path: "/api/warehouse/scanner/lookup/product/FLOUR-001"
+      expected:
+        status: 200
+
+    - name: "GET /scanner/lookup/product/:barcode by GTIN"
+      request:
+        path: "/api/warehouse/scanner/lookup/product/12345678901234"
+      expected:
+        status: 200
+
+    - name: "GET /scanner/lookup/location/:barcode"
+      request:
+        path: "/api/warehouse/scanner/lookup/location/LOC-A01-01"
+      expected:
+        status: 200
+        body_contains: ["full_path"]
+
+  rls_tests:
+    - name: "User cannot see other org POs"
+      setup: |
+        - Org A with User A, PO A
+        - Org B with User B, PO B
+      action: "User A queries pending receipts"
+      expected: "Only PO A returned"
+
+    - name: "User cannot receive other org PO"
+      setup: |
+        - Org A with User A
+        - Org B with PO B
+      action: "User A attempts to receive PO B"
+      expected: "404 Not Found"
+
+    - name: "User cannot lookup other org product"
+      setup: |
+        - Org A with User A, Product A
+        - Org B with Product B
+      action: "User A lookups Product B barcode"
+      expected: "404 Not Found"
+
+  performance_tests:
+    - name: "Receipt submission < 500ms"
+      threshold: "500ms"
+      endpoint: "POST /scanner/receive"
+
+    - name: "Pending receipts list < 500ms"
+      threshold: "500ms"
+      endpoint: "GET /scanner/pending-receipts"
+
+    - name: "Barcode lookups < 200ms"
+      threshold: "200ms"
+      endpoints:
+        - "GET /scanner/lookup/po/:barcode"
+        - "GET /scanner/lookup/product/:barcode"
+        - "GET /scanner/lookup/location/:barcode"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full scanner receive flow"
+    steps:
+      - "Navigate to /scanner/receive"
+      - "Verify pending PO list loads"
+      - "Select PO from list"
+      - "Verify PO lines display"
+      - "Select product line"
+      - "Enter quantity via number pad"
+      - "Enter batch number"
+      - "Select expiry date"
+      - "Review summary"
+      - "Tap Confirm Receipt"
+      - "Verify success screen with GRN/LP numbers"
+    expected: "All steps complete successfully"
+
+  - name: "Select PO from list manual selection"
+    steps:
+      - "Navigate to /scanner/receive"
+      - "Tap on PO card in list"
+    expected: "Workflow advances to Step 2"
+
+  - name: "Enter receipt details with number pad"
+    steps:
+      - "On Step 3"
+      - "Tap number keys to enter 150"
+      - "Tap +10 button"
+      - "Verify value is 160"
+    expected: "Number pad responds correctly"
+
+  - name: "Over-receipt warning shown"
+    steps:
+      - "Select line with remaining = 100"
+      - "Enter qty = 120"
+    expected: "Warning displayed 'Exceeds remaining by 20'"
+
+  - name: "Success screen with LP number"
+    steps:
+      - "Complete receipt flow"
+    expected: "Success screen shows LP number starting with configured prefix"
+
+  - name: "Print button triggers print job"
+    steps:
+      - "On success screen"
+      - "Tap 'Reprint Label'"
+    expected: "Print confirmation displayed"
+
+  - name: "Back navigation works"
+    steps:
+      - "On Step 3"
+      - "Tap back button"
+    expected: "Returns to Step 2"
+
+  - name: "Touch targets >= 48dp"
+    steps:
+      - "Load scanner receive page"
+      - "Measure all button dimensions"
+    expected: "All buttons >= 48x48 pixels"
+
+# Definition of Done
+definition_of_done:
+  - "All API endpoints return correct HTTP status codes"
+  - "Validation errors return 400 with detailed messages"
+  - "Cross-tenant access returns 404 (RLS enforced)"
+  - "Response time targets met (receipt <500ms, lookups <200ms)"
+  - "processReceipt() creates GRN and LP atomically"
+  - "Over-receipt validation matches desktop (05.11)"
+  - "Mobile-optimized full-screen layout"
+  - "All touch targets >= 48dp"
+  - "Number pad with quick adjust buttons"
+  - "Audio feedback (success, error, confirm, alert)"
+  - "Visual feedback (animations, badges)"
+  - "Step wizard navigation complete"
+  - "Unit tests: >80% coverage on service"
+  - "Integration tests: All endpoints covered"
+  - "E2E tests: Full flow passing"
+  - "RLS tests: Multi-tenancy verified"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business-critical workflow"
+  integration:
+    target: 90
+    reason: "API reliability critical for scanner"
+  e2e:
+    target: "Full workflow covered"
+  files:
+    - "lib/services/scanner-receive-service.ts: 80%"
+    - "lib/validation/scanner-receive.ts: 95%"
+    - "components/scanner/**/*.tsx: 70%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Camera permission denial breaks barcode scanning"
+    mitigation: "Manual entry fallback always available"
+    severity: "high"
+    test_coverage: "e2e camera permission tests"
+
+  - id: "RISK-02"
+    description: "Network latency causes receipt timeout"
+    mitigation: "Loading indicators, retry logic"
+    severity: "medium"
+    test_coverage: "performance tests, error handling"
+
+  - id: "RISK-03"
+    description: "Touch targets too small on some devices"
+    mitigation: "48dp minimum enforced, tested on multiple devices"
+    severity: "medium"
+    test_coverage: "e2e touch target measurements"

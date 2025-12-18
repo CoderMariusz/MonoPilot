@@ -1,0 +1,441 @@
+# Story 05.19 - Frontend Specification
+# Purpose: Mobile-first scanner components, pages, hooks
+# Agent: FRONTEND-DEV
+
+# Note: This is a mobile-first scanner story with significant frontend work
+is_mobile_focused: true
+touch_target_minimum: "48dp"
+
+# UX References
+ux:
+  wireframes:
+    - id: "WH-010"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-010-scanner-receive.md"
+      description: "Primary scanner receive workflow"
+      key_states:
+        - "Step 1: Pending Orders List"
+        - "Step 2: Order Lines"
+        - "Step 3: Receive Line Details"
+        - "Step 4: Receipt Success"
+        - "Step 5: GS1 Barcode Scan (future)"
+        - "Error: Invalid Barcode"
+        - "Error: Over-Receipt"
+        - "Loading: Creating GRN"
+        - "Offline Mode (future)"
+
+  patterns:
+    table: "ShadCN DataTable - not applicable (list-based mobile UI)"
+    modal: "ShadCN Dialog for date picker"
+    mobile_list: "Card-based list items with 64dp minimum height"
+    number_pad: "Custom NumberPad component with 48dp keys"
+    scanner: "Camera-based barcode scanner with manual fallback"
+
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+    - "scanning"
+    - "offline (future)"
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/scanner/receive/page.tsx"
+    description: "Scanner receive main page with 5-step wizard"
+    route: "/scanner/receive"
+    layout: "Full-screen mobile layout, no browser chrome"
+    components:
+      - "ScannerReceiveWizard"
+      - "Step1SelectPO"
+      - "Step2ReviewLines"
+      - "Step3EnterDetails"
+      - "Step4ReviewConfirm"
+      - "Step5Success"
+
+# Components Directory Structure
+components:
+  scanner_receive:
+    path: "apps/frontend/components/scanner/receive/"
+    files:
+      - name: "ScannerReceiveWizard.tsx"
+        description: "Step wizard container with progress indicator"
+        props:
+          - "initialStep?: number"
+          - "onComplete?: () => void"
+        state:
+          - "currentStep: number"
+          - "poId: string | null"
+          - "poLineId: string | null"
+          - "receiptData: ReceiptFormData"
+
+      - name: "Step1SelectPO.tsx"
+        description: "Step 1: Select PO source via list or scan"
+        props:
+          - "onPOSelected: (poId: string) => void"
+        features:
+          - "Pending PO list with cards"
+          - "Scan PO barcode button"
+          - "Manual PO selection"
+          - "Filter by warehouse"
+
+      - name: "Step2ReviewLines.tsx"
+        description: "Step 2: Review PO lines, select for receiving"
+        props:
+          - "poId: string"
+          - "onLineSelected: (lineId: string) => void"
+        features:
+          - "PO header display"
+          - "Lines list with progress indicators"
+          - "Scan product barcode to auto-select"
+          - "Receive All Remaining option"
+
+      - name: "Step3EnterDetails.tsx"
+        description: "Step 3: Enter receipt details"
+        props:
+          - "poLineId: string"
+          - "onSubmit: (data: ReceiptFormData) => void"
+        features:
+          - "Number pad for quantity"
+          - "Batch number input (if required)"
+          - "Expiry date picker (if required)"
+          - "Location scan/select"
+          - "Quick adjust buttons (+1, +10, -1, -10)"
+
+      - name: "Step4ReviewConfirm.tsx"
+        description: "Step 4: Review summary before confirm"
+        props:
+          - "formData: ReceiptFormData"
+          - "onConfirm: () => void"
+          - "onEdit: (step: number) => void"
+        features:
+          - "Summary of all entered data"
+          - "Edit buttons for each section"
+          - "Large Confirm button"
+
+      - name: "Step5Success.tsx"
+        description: "Step 5: Success screen with print option"
+        props:
+          - "result: ScannerReceiveResult"
+          - "onReceiveMore: () => void"
+          - "onNewPO: () => void"
+          - "onDone: () => void"
+        features:
+          - "Green checkmark animation"
+          - "GRN and LP details"
+          - "Reprint label button"
+          - "Continue options"
+
+      - name: "PendingPOList.tsx"
+        description: "List of receivable POs"
+        props:
+          - "warehouseId?: string"
+          - "onSelect: (po: PendingReceiptSummary) => void"
+        features:
+          - "Card-based list"
+          - "Supplier, date, lines info"
+          - "64dp minimum row height"
+
+      - name: "POLinesList.tsx"
+        description: "List of PO lines"
+        props:
+          - "lines: POLine[]"
+          - "onSelect: (lineId: string) => void"
+        features:
+          - "Progress indicator per line"
+          - "Remaining qty display"
+          - "Greyed out for complete lines"
+
+      - name: "ReceiptDetailsForm.tsx"
+        description: "Receipt form with number pad"
+        props:
+          - "line: POLine"
+          - "settings: WarehouseSettings"
+          - "onChange: (data: Partial<ReceiptFormData>) => void"
+        features:
+          - "Quantity with number pad"
+          - "Conditional batch/expiry fields"
+          - "Location selection"
+
+  scanner_shared:
+    path: "apps/frontend/components/scanner/shared/"
+    files:
+      - name: "BarcodeScanner.tsx"
+        description: "Camera barcode scanner component"
+        props:
+          - "onScan: (barcode: string) => void"
+          - "onError: (error: string) => void"
+          - "scanTypes?: ('po' | 'product' | 'location')[]"
+          - "active?: boolean"
+        features:
+          - "Camera access with permission handling"
+          - "Guide overlay for scan area"
+          - "Continuous scanning mode"
+          - "Manual entry fallback"
+          - "Torch/flashlight toggle"
+
+      - name: "BarcodeScanButton.tsx"
+        description: "Large scan trigger button"
+        props:
+          - "onClick: () => void"
+          - "label?: string"
+          - "size?: 'default' | 'large'"
+        features:
+          - "64x64dp minimum (80x80dp for primary)"
+          - "Camera icon"
+          - "High visibility"
+
+      - name: "NumberPad.tsx"
+        description: "Touch-friendly number pad"
+        props:
+          - "value: string"
+          - "onChange: (value: string) => void"
+          - "allowDecimal?: boolean"
+          - "maxValue?: number"
+          - "onQuickAdjust?: (delta: number) => void"
+        features:
+          - "48x48dp minimum keys"
+          - "Digits 0-9"
+          - "Decimal point"
+          - "Backspace and Clear"
+          - "+1, +10, -1, -10 quick buttons"
+
+      - name: "DatePickerMobile.tsx"
+        description: "Mobile-optimized date picker"
+        props:
+          - "value?: Date"
+          - "onChange: (date: Date) => void"
+          - "label?: string"
+        features:
+          - "Large touch calendar"
+          - "Quick buttons: Today, +30d, +90d, +1y"
+          - "Modal overlay"
+
+      - name: "AudioFeedback.tsx"
+        description: "Audio feedback manager"
+        exports:
+          - name: "AudioFeedback"
+            methods:
+              - "playSuccess(): void  // 880Hz, 200ms"
+              - "playError(): void    // 220Hz, 300ms"
+              - "playConfirm(): void  // 660Hz+880Hz, 500ms"
+              - "playAlert(): void    // 440Hz, 400ms"
+              - "setEnabled(enabled: boolean): void"
+        implementation: "Web Audio API OscillatorNode"
+
+      - name: "HapticFeedback.tsx"
+        description: "Haptic vibration utility"
+        exports:
+          - name: "HapticFeedback"
+            methods:
+              - "success(): void  // 50ms short buzz"
+              - "error(): void    // 50ms, 50ms gap, 50ms double"
+              - "confirm(): void  // 100ms long buzz"
+        implementation: "navigator.vibrate API"
+
+      - name: "SuccessAnimation.tsx"
+        description: "Green checkmark animation"
+        props:
+          - "show: boolean"
+          - "size?: number"
+          - "duration?: number"
+        features:
+          - "64x64 minimum"
+          - "500ms animation"
+          - "Green background flash"
+
+      - name: "ErrorAnimation.tsx"
+        description: "Red X animation"
+        props:
+          - "show: boolean"
+          - "message?: string"
+        features:
+          - "64x64 minimum"
+          - "500ms animation"
+          - "Red background flash"
+
+      - name: "LoadingOverlay.tsx"
+        description: "Full-screen loading spinner"
+        props:
+          - "show: boolean"
+          - "message?: string"
+        features:
+          - "48x48 spinner"
+          - "Blocks interaction"
+          - "10s timeout"
+
+      - name: "ScannerHeader.tsx"
+        description: "Scanner page header"
+        props:
+          - "title: string"
+          - "onBack?: () => void"
+          - "showHelp?: boolean"
+        features:
+          - "56dp height"
+          - "Back button"
+          - "Help button"
+
+      - name: "StepProgress.tsx"
+        description: "Step progress indicator"
+        props:
+          - "currentStep: number"
+          - "totalSteps: number"
+          - "stepLabels?: string[]"
+        features:
+          - "32dp height"
+          - "Step X of Y text"
+          - "Progress dots"
+
+      - name: "HighContrastBadge.tsx"
+        description: "High visibility status badge"
+        props:
+          - "variant: 'success' | 'error' | 'warning'"
+          - "children: ReactNode"
+        colors:
+          success: "#22C55E"
+          error: "#EF4444"
+          warning: "#F59E0B"
+
+      - name: "LargeTouchButton.tsx"
+        description: "48dp+ touch target button"
+        props:
+          - "variant: 'primary' | 'secondary' | 'destructive'"
+          - "size: 'default' | 'lg' | 'full'"
+          - "children: ReactNode"
+          - "onClick: () => void"
+        sizes:
+          default: "48dp height"
+          lg: "56dp height"
+          full: "100% width, 56dp height"
+
+      - name: "NetworkStatus.tsx"
+        description: "Online/offline indicator"
+        props:
+          - "showOnline?: boolean"
+        features:
+          - "Banner for offline"
+          - "Orange/yellow warning"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-scanner-receive.ts"
+    description: "Scanner receive workflow hook"
+    exports:
+      - name: "usePendingReceipts"
+        returns: "UseQueryResult<PendingReceiptSummary[]>"
+        params: ["warehouseId?: string"]
+
+      - name: "usePOLines"
+        returns: "UseQueryResult<POLine[]>"
+        params: ["poId: string"]
+
+      - name: "useProcessReceipt"
+        returns: "UseMutationResult<ScannerReceiveResult, Error, ScannerReceiveInput>"
+
+      - name: "useBarcodeLookup"
+        returns: "UseMutationResult<BarcodeLookupResult, Error, { barcode: string; type: string }>"
+
+  - path: "apps/frontend/lib/hooks/use-audio-feedback.ts"
+    description: "Audio feedback hook with settings awareness"
+    exports:
+      - name: "useAudioFeedback"
+        returns: "{ playSuccess, playError, playConfirm, playAlert, isEnabled }"
+
+  - path: "apps/frontend/lib/hooks/use-haptic-feedback.ts"
+    description: "Haptic feedback hook"
+    exports:
+      - name: "useHapticFeedback"
+        returns: "{ success, error, confirm, isSupported }"
+
+# Color Scheme (High Contrast for Warehouse)
+colors:
+  success: "#22C55E"  # green-500
+  error: "#EF4444"    # red-500
+  warning: "#F59E0B"  # amber-500
+  primary: "#2563EB"  # blue-600
+  text_primary: "#111827"  # gray-900
+  text_secondary: "#4B5563"  # gray-600
+  background: "#FFFFFF"
+  surface: "#F9FAFB"  # gray-50
+  border: "#D1D5DB"   # gray-300
+
+# Touch Target Specifications
+touch_targets:
+  minimum: "48x48dp"
+  primary_action: "56dp height"
+  full_width_button: "100% width, 56dp height"
+  number_pad_key: "48x48dp"
+  scan_button: "64x64dp (80x80 for primary)"
+  list_row: "56dp height minimum"
+
+# Layout Structure
+layout:
+  scanner_page: |
+    +------------------------------------------+
+    | <- Back    Receive Goods     [?] Help    |  Header (56dp)
+    +------------------------------------------+
+    | Step 1 of 5: Select PO                   |  Progress (32dp)
+    +------------------------------------------+
+    |                                          |
+    |                                          |
+    |             Main Content                 |  Scrollable content
+    |         (lists, forms, summary)          |
+    |                                          |
+    |                                          |
+    +------------------------------------------+
+    |                                          |
+    |         [  SCAN PO BARCODE  ]            |  Primary Action (56dp)
+    |                                          |
+    |         [ Select from List  ]            |  Secondary Action (48dp)
+    |                                          |
+    +------------------------------------------+
+
+  number_pad: |
+    +------------------------------------------+
+    |   [ 1 ]    [ 2 ]    [ 3 ]    [ +1 ]     |
+    |   [ 4 ]    [ 5 ]    [ 6 ]    [ +10 ]    |
+    |   [ 7 ]    [ 8 ]    [ 9 ]    [ -1 ]     |
+    |   [ . ]    [ 0 ]    [ <- ]   [ -10 ]    |
+    |                                          |
+    |            [ CLEAR ]                     |
+    +------------------------------------------+
+
+# Audio Feedback Specifications
+audio:
+  success_scan:
+    frequency: "880Hz"
+    duration: "200ms"
+    pattern: "Single tone, high pitch"
+  error_scan:
+    frequency: "220Hz"
+    duration: "300ms"
+    pattern: "Single tone, low pitch"
+  submission_complete:
+    frequency: "660Hz + 880Hz"
+    duration: "500ms"
+    pattern: "Dual tone chord"
+  network_error:
+    frequency: "440Hz"
+    duration: "400ms"
+    pattern: "Repeating 3x"
+
+# Responsive Breakpoints
+breakpoints:
+  mobile_portrait: "320-480px (primary mode)"
+  mobile_landscape: "480-800px (side-by-side layout)"
+  tablet: "768-1024px (enhanced layout)"
+
+# Accessibility
+accessibility:
+  touch_targets: "48dp minimum (WCAG 2.1 AA)"
+  contrast: "4.5:1 minimum text"
+  haptic: "Success, error, warning vibrations"
+  screen_reader: "Full ARIA labels"
+  keyboard_nav: "Tab, Enter, Escape support"
+
+# Performance Targets
+performance:
+  page_load: "<1s render, <1.5s interactive"
+  barcode_decode: "<100ms"
+  api_call: "<500ms"
+  number_pad_response: "<50ms visual, <100ms value update"
+  animation_duration: "500ms"

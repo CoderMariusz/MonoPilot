@@ -1,0 +1,98 @@
+# Story 01.5a - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# Note: users table created in 01.1, no new tables for MVP
+no_new_tables: true
+
+# Tables consumed (from 01.1)
+tables_consumed:
+  - name: "users"
+    source: "Story 01.1"
+    description: "User accounts with org_id and role_id FK"
+    columns_used:
+      - { name: "id", type: "UUID", usage: "Primary key, references auth.users(id)" }
+      - { name: "org_id", type: "UUID", usage: "Tenant isolation, references organizations(id)" }
+      - { name: "email", type: "TEXT", usage: "User email, unique per org" }
+      - { name: "first_name", type: "TEXT", usage: "User first name" }
+      - { name: "last_name", type: "TEXT", usage: "User last name" }
+      - { name: "role_id", type: "UUID", usage: "FK to roles(id) per ADR-012" }
+      - { name: "language", type: "TEXT", usage: "User language preference (pl/en/de/fr)" }
+      - { name: "is_active", type: "BOOLEAN", usage: "User active status for deactivation" }
+      - { name: "last_login_at", type: "TIMESTAMPTZ", usage: "Last login timestamp" }
+      - { name: "warehouse_access_ids", type: "UUID[]", usage: "Phase 1B column - NULL in MVP" }
+      - { name: "created_at", type: "TIMESTAMPTZ", usage: "Record creation timestamp" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", usage: "Record update timestamp" }
+    operations: ["SELECT", "INSERT", "UPDATE"]
+    rls_policy: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes_used:
+      - "idx_users_org_email ON users(org_id, email)"
+      - "idx_users_org_active ON users(org_id, is_active)"
+      - "idx_users_role ON users(role_id)"
+    constraints:
+      - "UNIQUE(org_id, email)"
+      - "FOREIGN KEY (role_id) REFERENCES roles(id)"
+
+  - name: "roles"
+    source: "Story 01.1"
+    description: "System roles with JSONB permissions (ADR-012)"
+    columns_used:
+      - { name: "id", type: "UUID", usage: "Primary key for role_id FK" }
+      - { name: "code", type: "VARCHAR(50)", usage: "Role code for permission checks" }
+      - { name: "name", type: "VARCHAR(100)", usage: "Display name for dropdown" }
+      - { name: "permissions", type: "JSONB", usage: "Module permissions for authorization" }
+    operations: ["SELECT"]
+    rls_policy: "is_system = true (public read for system roles)"
+
+# RLS Policies (from 01.1)
+rls_policies:
+  pattern: "Users Table Lookup per ADR-013"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies_used:
+    - table: "users"
+      name: "users_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only see users from their org"
+
+    - table: "users"
+      name: "users_admin_write"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')"
+      description: "Only SUPER_ADMIN and ADMIN can create/update/delete users"
+
+# Business Rules
+business_rules:
+  - rule: "Email uniqueness per organization"
+    constraint: "UNIQUE(org_id, email)"
+    error: "Email already exists"
+
+  - rule: "Self-protection: cannot delete self"
+    validation: "user_id != auth.uid()"
+    error: "Cannot delete your own account"
+
+  - rule: "Self-protection: cannot deactivate last Super Admin"
+    validation: "NOT (role_code = 'SUPER_ADMIN' AND COUNT(active_super_admins) = 1)"
+    error: "Cannot deactivate the only Super Admin"
+
+  - rule: "Role must exist and be system role"
+    validation: "role_id IN (SELECT id FROM roles WHERE is_system = true)"
+    error: "Invalid role"
+
+  - rule: "Warehouse access NULL in MVP"
+    validation: "warehouse_access_ids IS NULL"
+    note: "Phase 1B will enable this field"
+
+# Data Migrations
+migrations: []  # No new migrations for MVP, uses 01.1 schema
+
+# Phase 1B Preview
+phase_1b_changes:
+  note: "Story 01.5b will enable warehouse_access_ids column"
+  columns_to_enable:
+    - name: "warehouse_access_ids"
+      type: "UUID[]"
+      description: "Array of warehouse IDs user can access (NULL = all warehouses)"
+      default: "NULL"
+      validation: "Must be valid warehouse IDs for the org"

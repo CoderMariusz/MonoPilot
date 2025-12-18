@@ -1,0 +1,378 @@
+# Story 05.17 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/warehouse/license-plates/:id/split"
+    description: "Split a License Plate into two separate LPs"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/split/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager", "warehouse_operator"]
+    permission: "warehouse:CU"
+
+    path_params:
+      id:
+        type: "UUID"
+        description: "ID of the License Plate to split"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        splitQty:
+          type: "number"
+          required: true
+          description: "Quantity to split off into new LP"
+          validation: "positive, less than source LP quantity"
+        destinationLocationId:
+          type: "UUID"
+          required: false
+          description: "Location for new LP (defaults to same as source)"
+
+    response:
+      status: 200
+      type: "SplitLPResult"
+      schema:
+        success: "boolean (always true on 200)"
+        sourceLp:
+          id: "UUID"
+          lpNumber: "string"
+          quantity: "number (reduced by splitQty)"
+          location:
+            id: "UUID"
+            name: "string"
+        newLp:
+          id: "UUID"
+          lpNumber: "string (auto-generated)"
+          quantity: "number (equals splitQty)"
+          location:
+            id: "UUID"
+            name: "string"
+        genealogyId: "UUID"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Split quantity must be less than LP quantity"
+        when: "splitQty >= source LP quantity"
+        details:
+          splitQty: "number (provided)"
+          currentQty: "number (source LP)"
+
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Split quantity must be greater than 0"
+        when: "splitQty <= 0"
+
+      - status: 400
+        code: "LP_NOT_AVAILABLE"
+        message: "Cannot split LP. Status must be 'available'. Current status: {status}"
+        when: "LP status is reserved, consumed, or blocked"
+        details:
+          currentStatus: "string"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+      - status: 403
+        code: "SPLIT_DISABLED"
+        message: "Split/merge operations are disabled"
+        when: "warehouse_settings.enable_split_merge = false"
+        details:
+          message: "Enable 'enable_split_merge' in warehouse settings to use this feature"
+
+      - status: 403
+        code: "PERMISSION_DENIED"
+        message: "You do not have permission to split license plates"
+        when: "User lacks warehouse:CU permission"
+
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License Plate not found"
+        when: "LP with given ID does not exist or belongs to different org"
+        details:
+          lpId: "string"
+
+      - status: 404
+        code: "LOCATION_NOT_FOUND"
+        message: "Destination location not found"
+        when: "destinationLocationId is invalid or belongs to different org"
+
+      - status: 500
+        code: "SPLIT_FAILED"
+        message: "Split operation failed"
+        when: "Database transaction fails"
+        details:
+          reason: "string"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/lp-split-service.ts"
+    description: "LP Split service with validation and execution"
+    exports:
+      - name: "splitLicensePlate"
+        type: "async function"
+        params:
+          - "request: SplitLPRequest"
+        returns: "Promise<SplitLPResult>"
+        description: "Execute LP split operation"
+        throws:
+          - "NotFoundError: LP not found"
+          - "ValidationError: Invalid split_qty or LP status"
+          - "ForbiddenError: Settings disabled or permission denied"
+
+      - name: "validateSplitRequest"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "splitQty: number"
+        returns: "Promise<{ valid: boolean; error?: string }>"
+        description: "Validate split request before execution"
+
+      - name: "SplitLPRequest"
+        type: "interface"
+        fields:
+          - "lpId: string"
+          - "splitQty: number"
+          - "destinationLocationId?: string"
+
+      - name: "SplitLPResult"
+        type: "interface"
+        fields:
+          - "success: boolean"
+          - "sourceLp: { id: string; lpNumber: string; quantity: number; location: { id: string; name: string } }"
+          - "newLp: { id: string; lpNumber: string; quantity: number; location: { id: string; name: string } }"
+          - "genealogyId: string"
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/lp-split-schemas.ts"
+  schemas:
+    - name: "SplitLPSchema"
+      description: "Request body validation"
+      fields:
+        splitQty:
+          type: "z.number()"
+          validation: ".positive('Split quantity must be greater than 0').finite('Split quantity must be a valid number')"
+        destinationLocationId:
+          type: "z.string().uuid('Invalid location ID')"
+          validation: ".optional()"
+
+    - name: "SplitLPRequestSchema"
+      description: "Full request validation (including path param)"
+      fields:
+        lpId:
+          type: "z.string().uuid('Invalid LP ID')"
+        splitQty:
+          type: "z.number().positive()"
+        destinationLocationId:
+          type: "z.string().uuid().optional()"
+
+    - name: "validateSplitWithContext"
+      description: "Context-aware validation (requires source LP for comparison)"
+      type: "function"
+      params:
+        - "splitQty: number"
+        - "sourceLpQty: number"
+      returns: "{ valid: boolean; error?: string }"
+
+# Types
+types:
+  path: "apps/frontend/lib/types/lp-split.ts"
+  exports:
+    - name: "SplitLPRequest"
+      fields:
+        - "lpId: string"
+        - "splitQty: number"
+        - "destinationLocationId?: string"
+
+    - name: "SplitLPResult"
+      fields:
+        - "success: boolean"
+        - "sourceLp: SplitLPInfo"
+        - "newLp: SplitLPInfo"
+        - "genealogyId: string"
+
+    - name: "SplitLPInfo"
+      fields:
+        - "id: string"
+        - "lpNumber: string"
+        - "quantity: number"
+        - "location: { id: string; name: string }"
+
+# Implementation pattern
+patterns:
+  api_route: |
+    // apps/frontend/app/api/warehouse/license-plates/[id]/split/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { splitLicensePlate } from '@/lib/services/lp-split-service';
+    import { SplitLPSchema } from '@/lib/validation/lp-split-schemas';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+    import { hasPermission } from '@/lib/services/permission-service';
+
+    export async function POST(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      try {
+        // 1. Auth check
+        const context = await getOrgContext();
+        if (!context) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // 2. Permission check
+        if (!hasPermission(context, 'warehouse', 'U')) {
+          return NextResponse.json(
+            { error: 'Permission denied', message: 'You do not have permission to split license plates' },
+            { status: 403 }
+          );
+        }
+
+        // 3. Validate request body
+        const body = await request.json();
+        const parseResult = SplitLPSchema.safeParse(body);
+
+        if (!parseResult.success) {
+          return NextResponse.json(
+            { error: 'Validation error', details: parseResult.error.flatten() },
+            { status: 400 }
+          );
+        }
+
+        // 4. Execute split
+        const result = await splitLicensePlate({
+          lpId: params.id,
+          splitQty: parseResult.data.splitQty,
+          destinationLocationId: parseResult.data.destinationLocationId,
+        });
+
+        return NextResponse.json(result, { status: 200 });
+
+      } catch (error) {
+        // Handle specific error types
+        if (error.code === 'NOT_FOUND') {
+          return NextResponse.json({ error: error.message, lpId: params.id }, { status: 404 });
+        }
+        if (error.code === 'VALIDATION_ERROR') {
+          return NextResponse.json({ error: error.message, details: error.details }, { status: 400 });
+        }
+        if (error.code === 'FORBIDDEN') {
+          return NextResponse.json({ error: error.message }, { status: 403 });
+        }
+
+        console.error('Split LP error:', error);
+        return NextResponse.json(
+          { error: 'Split operation failed', reason: error.message },
+          { status: 500 }
+        );
+      }
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/lp-split-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import { getOrgIdFromContext, getUserIdFromContext } from '@/lib/auth-utils';
+    import { generateLpNumber } from './license-plate-service';
+    import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/errors';
+
+    export async function splitLicensePlate(
+      request: SplitLPRequest
+    ): Promise<SplitLPResult> {
+      const { lpId, splitQty, destinationLocationId } = request;
+      const supabase = createClientComponentClient();
+      const orgId = await getOrgIdFromContext();
+      const userId = await getUserIdFromContext();
+
+      // 1. Check warehouse settings
+      const { data: settings } = await supabase
+        .from('warehouse_settings')
+        .select('enable_split_merge')
+        .eq('org_id', orgId)
+        .single();
+
+      if (!settings?.enable_split_merge) {
+        throw new ForbiddenError('Split/merge operations are disabled in settings');
+      }
+
+      // 2. Fetch and validate source LP
+      const { data: sourceLp, error: fetchError } = await supabase
+        .from('license_plates')
+        .select(`
+          *,
+          location:locations(id, name),
+          warehouse:warehouses(id, name)
+        `)
+        .eq('id', lpId)
+        .eq('org_id', orgId)
+        .single();
+
+      if (fetchError || !sourceLp) {
+        throw new NotFoundError('License Plate not found');
+      }
+
+      // 3. Validate LP status
+      if (sourceLp.status !== 'available') {
+        throw new ValidationError(
+          `Cannot split LP. Status must be 'available'. Current status: ${sourceLp.status}`
+        );
+      }
+
+      // 4. Validate split_qty
+      if (splitQty <= 0) {
+        throw new ValidationError('Split quantity must be greater than 0');
+      }
+
+      if (splitQty >= sourceLp.quantity) {
+        throw new ValidationError(
+          `Split quantity must be less than LP quantity. Current: ${sourceLp.quantity} ${sourceLp.uom}`
+        );
+      }
+
+      // 5. Generate new LP number
+      const newLpNumber = await generateLpNumber(orgId);
+
+      // 6. Determine destination location
+      const destLocationId = destinationLocationId || sourceLp.location_id;
+
+      // 7. Execute split via database function
+      const { data: result, error: splitError } = await supabase.rpc(
+        'split_license_plate',
+        {
+          p_source_lp_id: lpId,
+          p_org_id: orgId,
+          p_split_qty: splitQty,
+          p_new_lp_number: newLpNumber,
+          p_destination_location_id: destLocationId,
+          p_user_id: userId,
+        }
+      );
+
+      if (splitError) {
+        throw splitError;
+      }
+
+      return result as SplitLPResult;
+    }
+
+# Pre-flight checks
+pre_flight:
+  - name: "Settings check"
+    description: "Verify enable_split_merge = true in warehouse_settings"
+    endpoint: "GET /api/warehouse/settings"
+    field: "enable_split_merge"
+
+  - name: "LP availability"
+    description: "Verify LP exists, status = available"
+    endpoint: "GET /api/warehouse/license-plates/:id"
+    fields: ["status", "quantity", "qa_status"]
+
+  - name: "Quantity validation"
+    description: "Verify splitQty < LP.quantity"
+    validation: "client-side with Zod"

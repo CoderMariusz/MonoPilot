@@ -1,0 +1,93 @@
+# Story 01.16 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.16"
+  name: "User Invitations (Email)"
+  slug: "user-invitations"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "backend+frontend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # user_invitations table
+  - api.yaml         # Invitation endpoints (send, list, resend, cancel, accept)
+  - frontend.yaml    # Invitation components, accept page
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "01.5a"
+      name: "Users CRUD"
+      provides: ["users table", "user creation patterns"]
+    - story: "01.6"
+      name: "Role Permissions"
+      provides: ["role_id FK", "role dropdown", "permission checks"]
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-012"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Database Schema", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.16.user-invitations.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS for user_invitations table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "user_invitations table with RLS"
+  - type: "service"
+    count: 2
+    description: "invitation-service.ts, email-service.ts"
+  - type: "api"
+    count: 6
+    description: "Invite, list, resend, cancel, accept, get-by-token endpoints"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for invitations"
+  - type: "pages"
+    count: 2
+    description: "Pending invitations tab, accept-invitation page (public)"
+  - type: "components"
+    count: 6
+    description: "InviteModal, PendingTable, AcceptForm, Dialogs"
+  - type: "integration"
+    count: 1
+    description: "Email service integration (Resend recommended)"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Invitation token: 64-char secure random (cryptographically secure)"
+  - "Expiry: 7 days from invitation sent"
+  - "Email via Resend (free tier: 3,000 emails/month)"
+  - "Duplicate email validation (no active user + no pending invitation)"
+  - "Only SUPER_ADMIN can invite SUPER_ADMIN"
+  - "Accept creates user + logs in automatically"
+  - "Resend resets token and expiry"
+  - "Cancel invalidates token (status = 'cancelled')"
+  - "Public accept page at /invite/{token}"
+  - "Email template includes org name, role, inviter name"

@@ -1,0 +1,464 @@
+# Story 07.4 - Testing Specifications
+# Purpose: Unit, integration, and E2E test requirements
+# Agent: FRONTEND-DEV, BACKEND-DEV (testing focus)
+
+# Acceptance Criteria (from story markdown)
+acceptance_criteria:
+  AC1: "Auto-populate unit_price from product master"
+    description: "When user selects product, unit_price auto-populates with products.std_price"
+    given: "User is creating a new SO line"
+    when: "They select a product from dropdown"
+    then:
+      - "unit_price field auto-populates with products.std_price"
+      - "Field remains editable (manual override allowed)"
+
+  AC2: "Calculate line_total on quantity/price change"
+    description: "Line total calculated as qty * unit_price"
+    given: "SO line with quantity_ordered=100, unit_price=12.50"
+    when: "Line is saved"
+    then:
+      - "line_total calculated as 100 * 12.50 = 1250.00"
+      - "Value stored in sales_order_lines.line_total"
+
+  AC3: "Apply percentage discount to line"
+    description: "Percentage discount reduces line total"
+    given: "SO line with quantity=50, unit_price=20.00"
+    when: "User enters discount: {type: 'percent', value: 10}"
+    then: "line_total = (50 * 20.00) * (1 - 0.10) = 900.00"
+
+  AC4: "Apply fixed discount to line"
+    description: "Fixed amount discount reduces line total"
+    given: "SO line with quantity=25, unit_price=40.00"
+    when: "User enters discount: {type: 'fixed', value: 50.00}"
+    then: "line_total = (25 * 40.00) - 50.00 = 950.00"
+
+  AC5: "Calculate SO total_amount from all lines"
+    description: "SO total is sum of all line totals"
+    given: "Sales order with 3 lines: 500.00, 750.00, 250.00"
+    when: "SO is displayed"
+    then:
+      - "total_amount = 500.00 + 750.00 + 250.00 = 1500.00"
+      - "Value stored in sales_orders.total_amount"
+
+  AC6: "Recalculate totals on line edit"
+    description: "Editing line quantity updates all totals"
+    given: "SO with total_amount=1500.00 (lines: 500, 750, 250)"
+    when: "User edits Line 2 quantity from 30 to 40 (unit_price=25.00)"
+    then:
+      - "Line 2 line_total recalculates to 40 * 25.00 = 1000.00"
+      - "SO total_amount recalculates to 500.00 + 1000.00 + 250.00 = 1750.00"
+
+  AC7: "Recalculate totals on line delete"
+    description: "Deleting line updates SO total"
+    given: "SO with total_amount=1500.00"
+    when: "User deletes Line 3 (line_total=250.00)"
+    then: "SO total_amount recalculates to 500.00 + 750.00 = 1250.00"
+
+  AC8: "Validate positive unit_price"
+    description: "Unit price must be > 0"
+    given: "User is creating/editing SO line"
+    when: "They enter unit_price=0 or negative value"
+    then:
+      - "Validation error displays: 'Unit price must be greater than zero'"
+      - "Line cannot be saved"
+
+  AC9: "Validate non-negative discount"
+    description: "Discount cannot be negative"
+    given: "User is entering discount"
+    when: "They enter negative discount value"
+    then: "Validation error displays: 'Discount cannot be negative'"
+
+  AC10: "Validate percentage discount <= 100%"
+    description: "Percentage discount capped at 100%"
+    given: "User is entering percentage discount"
+    when: "They enter discount.value > 100"
+    then: "Validation error displays: 'Percentage discount cannot exceed 100%'"
+
+  AC11: "Handle products without std_price"
+    description: "Graceful handling when product has no price"
+    given: "Product with std_price=NULL"
+    when: "User selects this product for SO line"
+    then:
+      - "unit_price defaults to 0.00"
+      - "Warning message displays: 'Product has no standard price, please enter manually'"
+      - "Field is editable for manual entry"
+
+  AC12: "Real-time total display in SO form"
+    description: "Total updates in real-time without page refresh"
+    given: "User is creating/editing SO"
+    when: "They add, edit, or delete lines"
+    then:
+      - "SO total_amount updates in real-time without page refresh"
+      - "Updated total displayed prominently at bottom of line items table"
+
+# Unit Tests
+unit_tests:
+  suite: "pricing-service.test.ts"
+  location: "apps/frontend/lib/services/__tests__/pricing-service.test.ts"
+  coverage_target: "80%+"
+
+  tests:
+    - name: "calculateLineTotal with quantity and price"
+      description: "Basic calculation without discount"
+      test: |
+        const result = calculateLineTotal(100, 12.50, null);
+        expect(result).toBe(1250.00);
+
+    - name: "calculateLineTotal with percentage discount"
+      description: "Apply percent discount to line total"
+      test: |
+        const discount = { type: 'percent', value: 10 };
+        const result = calculateLineTotal(50, 20.00, discount);
+        expect(result).toBe(900.00);
+
+    - name: "calculateLineTotal with fixed discount"
+      description: "Apply fixed amount discount to line total"
+      test: |
+        const discount = { type: 'fixed', value: 50.00 };
+        const result = calculateLineTotal(25, 40.00, discount);
+        expect(result).toBe(950.00);
+
+    - name: "calculateLineTotal with fixed discount > subtotal"
+      description: "Fixed discount cannot make total negative"
+      test: |
+        const discount = { type: 'fixed', value: 1000.00 };
+        const result = calculateLineTotal(10, 50.00, discount);
+        expect(result).toBe(0.00);
+
+    - name: "calculateLineTotal rounds to 2 decimals"
+      description: "Precision is 2 decimal places for currency"
+      test: |
+        const result = calculateLineTotal(10.33, 5.25, null);
+        expect(result).toBe(54.18);
+
+    - name: "calculateOrderTotal sums all line totals"
+      description: "SO total is sum of all line totals"
+      test: |
+        const lines = [
+          { line_total: 500.00 },
+          { line_total: 750.00 },
+          { line_total: 250.00 },
+        ];
+        const result = calculateOrderTotal(lines);
+        expect(result).toBe(1500.00);
+
+    - name: "calculateOrderTotal with NULL line_total values"
+      description: "Null line totals treated as 0"
+      test: |
+        const lines = [
+          { line_total: 500.00 },
+          { line_total: null },
+          { line_total: 250.00 },
+        ];
+        const result = calculateOrderTotal(lines);
+        expect(result).toBe(750.00);
+
+    - name: "getProductPrice returns std_price"
+      description: "Fetch product price"
+      test: |
+        mockSupabase.from('products').select().eq().single.mockResolvedValue({
+          data: { std_price: 25.50 }
+        });
+        const result = await getProductPrice('prod-123');
+        expect(result).toBe(25.50);
+
+    - name: "getProductPrice returns null when not found"
+      description: "Handle missing product"
+      test: |
+        mockSupabase.from('products').select().eq().single.mockResolvedValue({
+          error: { message: 'Not found' }
+        });
+        const result = await getProductPrice('invalid-id');
+        expect(result).toBeNull();
+
+# Integration Tests
+integration_tests:
+  suite: "sales-order-lines-api.test.ts"
+  location: "apps/frontend/app/api/shipping/__tests__/sales-order-lines.test.ts"
+  coverage_target: "80%+"
+
+  setup: |
+    - Create test org and user
+    - Create test products with std_price
+    - Create test SO (draft status)
+
+  tests:
+    - name: "POST /api/shipping/sales-orders/:id/lines"
+      description: "Create SO line with auto-price"
+      steps:
+        - "POST new line with product_id, quantity_ordered (no unit_price)"
+        - "Service fetches product.std_price"
+        - "Service calculates line_total"
+        - "Response includes line and updated SO total"
+      assertions:
+        - "Response status 201"
+        - "line.unit_price equals products.std_price"
+        - "line.line_total = quantity * unit_price"
+        - "so_total updated and returned"
+
+    - name: "POST with manual unit_price override"
+      description: "Manual price override if provided"
+      steps:
+        - "POST with unit_price explicitly provided"
+        - "Service uses provided unit_price (ignores product.std_price)"
+      assertions:
+        - "line.unit_price equals provided value"
+
+    - name: "POST with discount"
+      description: "Create line with discount applied"
+      steps:
+        - "POST with quantity=50, unit_price=20, discount={type:'percent', value:10}"
+        - "Service calculates line_total = (50*20)*(1-0.10) = 900"
+      assertions:
+        - "line.line_total = 900.00"
+        - "line.discount stored as JSONB"
+
+    - name: "POST to non-draft SO rejected"
+      description: "Cannot add lines to confirmed/shipped SO"
+      steps:
+        - "Create SO with status='confirmed'"
+        - "POST new line"
+      assertions:
+        - "Response status 403"
+        - "Error message: 'Cannot modify non-draft sales order'"
+
+    - name: "POST with invalid quantity rejected"
+      description: "Quantity must be > 0"
+      steps:
+        - "POST with quantity_ordered=0"
+      assertions:
+        - "Response status 400"
+        - "Error includes 'Quantity must be greater than zero'"
+
+    - name: "PUT /api/shipping/sales-orders/:id/lines/:lineId"
+      description: "Update line quantity and recalculate"
+      steps:
+        - "GET SO with existing line"
+        - "PUT with updated quantity_ordered"
+        - "Service recalculates line_total and SO total"
+      assertions:
+        - "Response status 200"
+        - "line.line_total recalculated"
+        - "so_total updated"
+
+    - name: "PUT with discount change"
+      description: "Update discount and recalculate"
+      steps:
+        - "PUT with new discount value"
+      assertions:
+        - "line_total recalculated with new discount"
+
+    - name: "DELETE /api/shipping/sales-orders/:id/lines/:lineId"
+      description: "Delete line and recalculate SO total"
+      steps:
+        - "DELETE line"
+        - "Service removes line and recalculates SO total"
+      assertions:
+        - "Response status 200"
+        - "so_total updated (reduced by line_total)"
+
+    - name: "Product without std_price"
+      description: "Handle product with no price"
+      steps:
+        - "POST line with product that has std_price=NULL"
+        - "Service should handle gracefully"
+      assertions:
+        - "Response status 400 OR unit_price defaults to 0 with warning"
+
+# Frontend Component Tests
+frontend_component_tests:
+  suite: "SOLineForm.test.tsx"
+  location: "apps/frontend/app/(authenticated)/shipping/sales-orders/__tests__/SOLineForm.test.tsx"
+
+  tests:
+    - name: "Auto-populate price on product select"
+      description: "Unit price field populates when product selected"
+      steps:
+        - "Render SOLineForm"
+        - "Select product from dropdown"
+        - "Wait for price fetch"
+      assertions:
+        - "unit_price field contains product.std_price"
+        - "No error displayed"
+
+    - name: "Show warning when product has no price"
+      description: "Display warning if std_price is NULL"
+      steps:
+        - "Mock product with std_price=NULL"
+        - "Select that product"
+      assertions:
+        - "Warning toast shown: 'Product has no standard price, please enter manually'"
+        - "unit_price field remains empty and editable"
+
+    - name: "Real-time line total calculation"
+      description: "Line total updates as user types"
+      steps:
+        - "Enter quantity=100"
+        - "Enter unit_price=12.50"
+        - "onLineChange callback fires"
+      assertions:
+        - "lineTotal state = 1250.00"
+        - "Display shows calculated total"
+
+    - name: "Real-time calculation with discount"
+      description: "Line total updates when discount changed"
+      steps:
+        - "Set quantity=50, unit_price=20"
+        - "Select discount type='percent'"
+        - "Enter discount value=10"
+      assertions:
+        - "lineTotal = 900.00"
+        - "onLineChange callback fires with new total"
+
+    - name: "Discount input validation"
+      description: "DiscountInput validates discount values"
+      steps:
+        - "Try to enter discount value > 100 with type='percent'"
+      assertions:
+        - "Error message shown: 'Percentage discount cannot exceed 100%'"
+        - "Form save button disabled"
+
+    - name: "SOLineTable renders pricing columns"
+      description: "Table displays unit_price, discount, line_total"
+      steps:
+        - "Render SOLineTable with sample data"
+      assertions:
+        - "Table includes columns: Unit Price, Discount, Line Total"
+        - "Values formatted correctly (currency)"
+
+    - name: "SOTotalDisplay shows correct total"
+      description: "SO total display calculates and shows sum"
+      steps:
+        - "Render SOTotalDisplay with 3 lines (500, 750, 250)"
+      assertions:
+        - "Display shows 'Order Total: $1,500.00'"
+        - "Formatted with currency symbol"
+
+# E2E Tests (Playwright)
+e2e_tests:
+  suite: "sales-order-pricing.spec.ts"
+  location: "apps/frontend/e2e/shipping/sales-order-pricing.spec.ts"
+
+  test_happy_path: |
+    Feature: SO Pricing Happy Path
+    Scenario: Create SO, add line with auto-price, verify totals
+
+    Given user is logged in as sales clerk
+    When they navigate to Create SO
+    And select customer "Acme Corp"
+    And click "Add Line"
+    And select product "Juice Box" (std_price=$5.50)
+    Then unit_price auto-populates to $5.50
+
+    When they enter quantity 100
+    Then line_total shows $550.00 in real-time
+
+    When they apply 10% discount
+    Then line_total updates to $495.00
+
+    When they click Save
+    Then line is created
+    And SO total shows $495.00 at bottom
+    And API returns line with correct calculations
+
+    When they add second line
+    And select product "Milk Box" ($8.00)
+    And enter quantity 50
+    Then line_total shows $400.00
+    And SO total updates to $895.00
+
+    When they edit first line quantity to 200
+    Then line_total updates to $990.00 (200*5.50*0.9)
+    And SO total updates to $1,390.00
+
+    When they delete second line
+    Then second line removed
+    And SO total updates to $990.00
+
+    When they save and confirm SO
+    Then SO status changes to confirmed
+    And pricing is locked (no more edits)
+
+  test_discount_scenarios: |
+    Scenario: Test various discount combinations
+
+    Given SO with empty lines
+    When they add line with:
+      - Qty 25, Price $40, Discount {type: 'fixed', value: $50}
+    Then line_total = $950.00 (25*40-50)
+
+    When they add line with:
+      - Qty 30, Price $15, Discount {type: 'percent', value: 20}
+    Then line_total = $360.00 (30*15*0.8)
+
+    When they add line with:
+      - Qty 100, Price $2.50, No discount
+    Then line_total = $250.00
+
+    Then SO total = $950 + $360 + $250 = $1,560.00
+
+  test_validation_errors: |
+    Scenario: Validation prevents invalid pricing
+
+    Given SO line form open
+    When they enter quantity 0
+    And try to save
+    Then error 'Quantity must be greater than zero'
+
+    When they enter unit_price -5
+    Then error 'Unit price must be greater than zero'
+
+    When they set discount {type: 'percent', value: 150}
+    Then error 'Percentage discount cannot exceed 100%'
+
+    When they set discount {type: 'fixed', value: -10}
+    Then error 'Discount cannot be negative'
+
+# Test Data Fixtures
+test_fixtures:
+  products:
+    - id: "prod-juice-box"
+      name: "Juice Box"
+      std_price: 5.50
+
+    - id: "prod-milk-box"
+      name: "Milk Box"
+      std_price: 8.00
+
+    - id: "prod-no-price"
+      name: "Product Without Price"
+      std_price: null
+
+  sales_orders:
+    - id: "so-draft"
+      status: "draft"
+      total_amount: 0
+
+    - id: "so-confirmed"
+      status: "confirmed"
+      total_amount: 1500.00
+
+  so_lines:
+    - id: "line-1"
+      sales_order_id: "so-draft"
+      quantity_ordered: 100
+      unit_price: 12.50
+      line_total: 1250.00
+      discount: null
+
+    - id: "line-2"
+      sales_order_id: "so-draft"
+      quantity_ordered: 50
+      unit_price: 20.00
+      line_total: 900.00
+      discount: { type: "percent", value: 10 }
+
+# Test Coverage Report
+coverage_report:
+  target: "80%+ for services, 60%+ for components"
+  key_areas:
+    - "PricingService: 90%+ (critical business logic)"
+    - "SOLineForm: 70%+ (main component)"
+    - "DiscountInput: 75%+ (validation)"
+    - "API endpoints: 80%+"
+    - "Zod schemas: 85%+"

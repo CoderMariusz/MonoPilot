@@ -1,0 +1,208 @@
+# Story 05.16 - Database Schema
+# Purpose: Tables, RLS policies, indexes, constraints
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_stock_moves_table.sql"
+    type: "migration"
+    description: "stock_moves table with 7 move types, RLS, indexes"
+
+tables:
+  - name: "stock_moves"
+    description: "Audit trail for all LP movements and quantity changes"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "move_number", type: "TEXT", constraints: "NOT NULL" }
+
+      # LP Reference
+      - { name: "lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id) ON DELETE RESTRICT" }
+
+      # Move Details
+      - { name: "move_type", type: "TEXT", constraints: "NOT NULL CHECK (move_type IN ('transfer', 'issue', 'receipt', 'adjustment', 'return', 'quarantine', 'putaway'))" }
+      - { name: "from_location_id", type: "UUID", constraints: "REFERENCES locations(id)" }
+      - { name: "to_location_id", type: "UUID", constraints: "REFERENCES locations(id)" }
+      - { name: "quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+
+      # Status
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'completed' CHECK (status IN ('completed', 'cancelled'))" }
+      - { name: "move_date", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+
+      # Context
+      - { name: "reason", type: "TEXT", constraints: "" }
+      - { name: "reason_code", type: "TEXT", constraints: "" }  # For adjustments: damage, theft, counting_error, quality_issue, expired, other
+
+      # References
+      - { name: "wo_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "reference_id", type: "UUID", constraints: "" }  # Generic FK to GRN, TO, etc.
+      - { name: "reference_type", type: "TEXT", constraints: "" }  # 'grn', 'to', 'wo', 'adjustment', 'manual'
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "cancelled_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "cancelled_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+
+    constraints:
+      - "CONSTRAINT unique_move_number UNIQUE(org_id, move_number)"
+      - |
+        CONSTRAINT valid_locations CHECK (
+          (move_type = 'receipt' AND from_location_id IS NULL AND to_location_id IS NOT NULL) OR
+          (move_type = 'issue' AND from_location_id IS NOT NULL AND to_location_id IS NULL) OR
+          (move_type = 'adjustment' AND from_location_id IS NULL AND to_location_id IS NULL) OR
+          (move_type IN ('transfer', 'return', 'quarantine', 'putaway')
+           AND from_location_id IS NOT NULL AND to_location_id IS NOT NULL)
+        )
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - name: "idx_stock_moves_lp"
+        columns: ["lp_id"]
+        description: "Fast LP history lookup"
+      - name: "idx_stock_moves_date"
+        columns: ["move_date DESC"]
+        description: "Chronological listing"
+      - name: "idx_stock_moves_type"
+        columns: ["org_id", "move_type"]
+        description: "Filter by move type"
+      - name: "idx_stock_moves_status"
+        columns: ["org_id", "status"]
+        description: "Filter by status"
+      - name: "idx_stock_moves_location_from"
+        columns: ["from_location_id"]
+        partial: "WHERE from_location_id IS NOT NULL"
+        description: "Filter by source location"
+      - name: "idx_stock_moves_location_to"
+        columns: ["to_location_id"]
+        partial: "WHERE to_location_id IS NOT NULL"
+        description: "Filter by destination location"
+      - name: "idx_stock_moves_reference"
+        columns: ["reference_id", "reference_type"]
+        partial: "WHERE reference_id IS NOT NULL"
+        description: "Lookup by reference document"
+      - name: "idx_stock_moves_org_date"
+        columns: ["org_id", "move_date DESC"]
+        description: "Optimized list query with org filter"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "stock_moves"
+      name: "stock_moves_org_isolation"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only access stock moves from their organization"
+
+# Move Types Definition
+move_types:
+  - code: "transfer"
+    description: "LP moves from location A to location B"
+    from_location: "required"
+    to_location: "required"
+    lp_update: "LP.location_id = to_location_id"
+
+  - code: "issue"
+    description: "LP leaves warehouse (external shipment)"
+    from_location: "required"
+    to_location: "null"
+    lp_update: "none (typically LP consumed after)"
+
+  - code: "receipt"
+    description: "LP enters warehouse (GRN, TO receipt)"
+    from_location: "null"
+    to_location: "required"
+    lp_update: "LP created with to_location_id"
+
+  - code: "adjustment"
+    description: "Quantity adjustment, no location change"
+    from_location: "null"
+    to_location: "null"
+    lp_update: "LP.quantity updated"
+
+  - code: "return"
+    description: "LP returned from production/shipping"
+    from_location: "required"
+    to_location: "required"
+    lp_update: "LP.location_id = to_location_id"
+
+  - code: "quarantine"
+    description: "LP moved to quarantine due to QA failure"
+    from_location: "required"
+    to_location: "required"
+    lp_update: "LP.location_id = to_location_id, LP.qa_status = 'quarantine', LP.status = 'blocked'"
+
+  - code: "putaway"
+    description: "Guided putaway from receiving to storage"
+    from_location: "required"
+    to_location: "required"
+    lp_update: "LP.location_id = to_location_id"
+
+# Reason Codes (for adjustments)
+reason_codes:
+  - { code: "damage", name: "Damaged goods" }
+  - { code: "theft", name: "Theft/Loss" }
+  - { code: "counting_error", name: "Counting error correction" }
+  - { code: "quality_issue", name: "Quality issue" }
+  - { code: "expired", name: "Expired product" }
+  - { code: "other", name: "Other (see notes)" }
+
+# Sequence Function for Move Number
+sequence:
+  function_name: "generate_stock_move_number"
+  format: "SM-{YYYY}-{NNNNN}"
+  description: "Generates next move number with annual reset"
+  pattern: |
+    -- Function to generate SM-YYYY-NNNNN
+    CREATE OR REPLACE FUNCTION generate_stock_move_number(p_org_id UUID)
+    RETURNS TEXT AS $$
+    DECLARE
+      v_year TEXT;
+      v_seq INT;
+      v_prefix TEXT;
+    BEGIN
+      v_year := TO_CHAR(CURRENT_DATE, 'YYYY');
+      v_prefix := 'SM-' || v_year || '-';
+
+      -- Get next sequence number for this year
+      SELECT COALESCE(
+        MAX(
+          CAST(
+            SUBSTRING(move_number FROM 9 FOR 5) AS INT
+          )
+        ), 0
+      ) + 1
+      INTO v_seq
+      FROM stock_moves
+      WHERE org_id = p_org_id
+        AND move_number LIKE v_prefix || '%';
+
+      RETURN v_prefix || LPAD(v_seq::TEXT, 5, '0');
+    END;
+    $$ LANGUAGE plpgsql;
+
+# Related Table Updates
+related_table_updates:
+  license_plates:
+    on_transfer: "UPDATE location_id to to_location_id"
+    on_putaway: "UPDATE location_id to to_location_id"
+    on_quarantine: "UPDATE location_id, qa_status='quarantine', status='blocked'"
+    on_return: "UPDATE location_id to to_location_id"
+    on_adjustment: "UPDATE quantity"
+
+# Performance Requirements
+performance:
+  - query: "List stock moves with filters"
+    target: "<500ms"
+    dataset: "10,000 moves"
+  - query: "LP movement history"
+    target: "<200ms"
+    dataset: "500 moves per LP"
+  - query: "Move creation"
+    target: "<300ms (full LP), <500ms (partial/split)"

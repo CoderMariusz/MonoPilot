@@ -1,0 +1,144 @@
+# Story 03.9b - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.9b"
+  name: "TO License Plate Pre-selection"
+  slug: "to-lp-selection"
+  epic: "03-planning"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "deferred"
+  deferred_reason: "Requires Epic 05 (Warehouse Module) license_plates table"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, request/response, errors
+  - frontend.yaml    # Components, hooks, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK validation"]
+    - story: "03.8"
+      name: "TO CRUD + Lines"
+      provides: ["transfer_orders table", "transfer_order_lines table", "TO service"]
+    - story: "03.9a"
+      name: "TO Partial Shipments"
+      provides: ["Ship/Receive actions", "TO status lifecycle"]
+    - epic: "05.1"
+      name: "Warehouse License Plates"
+      provides: ["license_plates table", "lp_inventory table", "LP availability logic"]
+      critical: true
+      blocking: true
+  soft:
+    - story: "03.17"
+      name: "Planning Settings CRUD"
+      provides: ["planning_settings table", "to_require_lp_selection setting"]
+  blocked_by:
+    - epic: "05"
+      reason: "Cannot query license_plates table until Epic 05 creates it"
+  blocks:
+    - story: "05.X"
+      name: "Warehouse Ship TO with LP"
+      reason: "Ship TO action will consume pre-selected LPs"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-016"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["to_line_lps junction table", "LP Selection"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.9b.to-lp-selection.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-012-transfer-order-detail.md"
+      id: "PLAN-012"
+      description: "TO Detail page with LP assignments display"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for to_line_lps table"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/database.yaml"
+      relevance: "RLS policy pattern reference"
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/context/03.5b/_index.yaml"
+      relevance: "Context structure for deferred dependencies"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "to_line_lps junction table with RLS"
+  - type: "api"
+    count: 4
+    description: "assign-lps, list-lps, remove-lp, available-lps endpoints"
+  - type: "service"
+    count: 1
+    description: "to-lp-service.ts with LP assignment logic"
+  - type: "validation"
+    count: 2
+    description: "AssignLPsRequestSchema, AvailableLPsQuerySchema (Zod)"
+  - type: "component"
+    count: 3
+    description: "LPPickerModal, TOLineLPAssignments, LPAssignmentBadge"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, E2E, validation tests"
+
+# Technical notes
+technical_notes:
+  - "DEFERRED: Requires Epic 05 license_plates table to exist"
+  - "Junction table to_line_lps links transfer_order_lines to license_plates"
+  - "RLS via chain: to_line_lps -> transfer_order_lines -> transfer_orders -> org_id"
+  - "LP must be in correct warehouse (from_warehouse_id) and have correct product"
+  - "Quantity validation: sum(LP qty) may or may not need to equal TO line qty (configurable)"
+  - "Settings toggle: to_require_lp_selection, to_require_exact_qty_match"
+  - "LP assignments are preserved after shipping for audit trail"
+
+# Business Rules Summary
+business_rules:
+  - id: "BR-01"
+    rule: "LP.warehouse_id must equal TO.from_warehouse_id"
+  - id: "BR-02"
+    rule: "LP.product_id must equal TO line.product_id"
+  - id: "BR-03"
+    rule: "LP.available_qty must be >= assigned quantity"
+  - id: "BR-04"
+    rule: "Same LP cannot be assigned twice to same TO line (UNIQUE constraint)"
+  - id: "BR-05"
+    rule: "LP assignment only allowed when TO status is DRAFT or PLANNED"
+  - id: "BR-06"
+    rule: "If to_require_exact_qty_match=true, sum(LP quantities) must equal TO line quantity"
+  - id: "BR-07"
+    rule: "LP assignments removed when TO line is deleted (ON DELETE CASCADE)"
+  - id: "BR-08"
+    rule: "Pre-assigned LPs are auto-selected during Ship TO action (Epic 05 integration)"
+
+# Integration with Epic 05
+epic_05_integration:
+  tables_required:
+    - name: "license_plates"
+      columns: ["id", "lp_number", "product_id", "warehouse_id", "lot_number", "expiry_date", "location", "status"]
+    - name: "lp_inventory"
+      columns: ["lp_id", "available_qty", "reserved_qty", "uom"]
+  queries:
+    - purpose: "Get available LPs for TO line"
+      joins: "license_plates JOIN lp_inventory ON lp_id"
+      filters: ["warehouse_id = from_warehouse_id", "product_id = line.product_id", "available_qty > 0", "status = 'active'"]
+  ship_integration:
+    - "Ship TO action reads to_line_lps to get pre-selected LPs"
+    - "LPs are auto-marked for picking"
+    - "LP status updated to 'in_transit' after shipment"

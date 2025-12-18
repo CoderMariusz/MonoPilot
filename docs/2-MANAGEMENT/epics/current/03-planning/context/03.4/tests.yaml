@@ -1,0 +1,534 @@
+# Story 03.4 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/bulk-po-import-service.test.ts"
+    type: "unit"
+    description: "Unit tests for bulk PO import service"
+
+  - path: "apps/frontend/lib/validation/__tests__/bulk-po-import.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/lib/hooks/__tests__/use-excel-parser.test.ts"
+    type: "unit"
+    description: "Unit tests for Excel parsing hook"
+
+  - path: "__tests__/integration/api/planning/bulk-po-import.test.ts"
+    type: "integration"
+    description: "Integration tests for bulk import API endpoints"
+
+  - path: "__tests__/e2e/planning/bulk-po-import.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for bulk PO import wizard"
+
+# Acceptance Criteria (from FR-PLAN-008)
+acceptance_criteria:
+  # File Upload
+  - id: "AC-01"
+    feature: "File Upload"
+    given: "user clicks 'Import POs' button"
+    when: "upload modal opens"
+    then: "drag-drop zone displays with supported formats (.xlsx, .xls)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    feature: "File Upload"
+    given: "user uploads an Excel file"
+    when: "file is valid (.xlsx, <5MB, <1000 rows)"
+    then: "file is parsed and preview step shown within 3 seconds"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    feature: "File Upload - Error"
+    given: "user uploads invalid file type (e.g., .pdf)"
+    when: "upload attempted"
+    then: "error message 'Unsupported file type' displays"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    feature: "File Upload - Error"
+    given: "user uploads file > 5MB"
+    when: "upload attempted"
+    then: "error message 'File size exceeds 5MB limit' displays"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-05"
+    feature: "Template Download"
+    given: "user clicks 'Download Template'"
+    when: "button clicked"
+    then: "Excel template downloads with correct column headers"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Supplier Grouping
+  - id: "AC-06"
+    feature: "Supplier Grouping"
+    given: "file with 15 products from 3 different default suppliers"
+    when: "file is parsed"
+    then: "preview shows 3 PO groups, one per supplier"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    feature: "Supplier Grouping - No Supplier"
+    given: "file contains product without default supplier"
+    when: "file is parsed"
+    then: "warning 'Product has no default supplier' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    feature: "Supplier Override"
+    given: "file row specifies supplier_code different from default"
+    when: "file is parsed"
+    then: "warning 'Using non-default supplier' displays"
+    test_type: "integration"
+    priority: "P1"
+
+  # Auto-Fill from Supplier Products
+  - id: "AC-09"
+    feature: "Price Auto-Fill"
+    given: "product has supplier-specific price in supplier_products"
+    when: "file parsed without unit_price column value"
+    then: "supplier_products.unit_price used for line"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-10"
+    feature: "Price Fallback"
+    given: "product has no supplier-specific price"
+    when: "file parsed without unit_price"
+    then: "product.std_price used as fallback"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-11"
+    feature: "Lead Time Auto-Fill"
+    given: "supplier_products.lead_time_days is set"
+    when: "expected delivery date calculated"
+    then: "date = today + supplier_products.lead_time_days"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-12"
+    feature: "MOQ Warning"
+    given: "file row quantity < supplier_products.moq"
+    when: "validation runs"
+    then: "warning 'Quantity below MOQ' displays"
+    test_type: "integration"
+    priority: "P1"
+
+  # Preview Step
+  - id: "AC-13"
+    feature: "Preview Display"
+    given: "file parsed successfully"
+    when: "preview step displays"
+    then: "shows grouped POs with supplier name, line count, subtotal"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-14"
+    feature: "Edit Group"
+    given: "user clicks 'Edit Group' on a PO group"
+    when: "edit modal opens"
+    then: "can change supplier, warehouse, expected date, lines"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-15"
+    feature: "Edit Group - Line Add"
+    given: "edit group modal open"
+    when: "user clicks 'Add Line'"
+    then: "can add product with quantity to the group"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-16"
+    feature: "Edit Group - Line Remove"
+    given: "edit group modal with 3 lines"
+    when: "user clicks remove on line 2"
+    then: "line removed, subtotal recalculates"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Validation Step
+  - id: "AC-17"
+    feature: "Product Not Found Error"
+    given: "file contains product_code not in catalog"
+    when: "validation runs"
+    then: "error 'Product not found' with resolution options"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-18"
+    feature: "Invalid Quantity Error"
+    given: "file row has quantity <= 0"
+    when: "validation runs"
+    then: "error 'Quantity must be greater than 0'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-19"
+    feature: "Error Resolution - Map Product"
+    given: "error for unknown product"
+    when: "user selects 'Map to Existing Product'"
+    then: "dropdown shows products, selection replaces code"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-20"
+    feature: "Error Resolution - Remove Row"
+    given: "error for unknown product"
+    when: "user clicks 'Remove Row'"
+    then: "row excluded from import, error cleared"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-21"
+    feature: "Warning Skip"
+    given: "warnings exist (no errors)"
+    when: "user clicks 'Skip All'"
+    then: "can proceed to create step"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-22"
+    feature: "Cannot Proceed with Errors"
+    given: "errors exist"
+    when: "user attempts to proceed"
+    then: "'Next' button disabled until errors resolved"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Create Step
+  - id: "AC-23"
+    feature: "Bulk PO Creation"
+    given: "3 PO groups validated"
+    when: "user clicks 'Create POs'"
+    then: "3 draft POs created in database"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-24"
+    feature: "PO Number Generation"
+    given: "bulk POs being created"
+    when: "each PO created"
+    then: "unique PO number generated (PO-YYYY-NNNNN format)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-25"
+    feature: "Create Progress"
+    given: "bulk creation in progress"
+    when: "POs being created"
+    then: "progress bar shows X of Y POs created"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-26"
+    feature: "Full Success"
+    given: "all POs created successfully"
+    when: "creation completes"
+    then: "success message with 'Submit All', 'View List', 'Import More' buttons"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-27"
+    feature: "Partial Failure"
+    given: "2 of 3 POs created, 1 fails (e.g., credit limit)"
+    when: "creation completes"
+    then: "shows success count, failure details, retry option"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-28"
+    feature: "Retry Failed"
+    given: "partial failure with 1 failed PO"
+    when: "user clicks 'Retry Failed'"
+    then: "only failed PO retried"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Submit All
+  - id: "AC-29"
+    feature: "Submit All POs"
+    given: "3 POs created successfully"
+    when: "user clicks 'Submit All POs'"
+    then: "all POs status changed to pending_approval or confirmed"
+    test_type: "integration"
+    priority: "P0"
+
+  # Multi-tenancy
+  - id: "AC-30"
+    feature: "Org Isolation"
+    given: "user from Org A imports products"
+    when: "validation runs"
+    then: "only Org A products and suppliers validated against"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  excel_parser:
+    - name: "parses valid Excel file with all columns"
+      setup: "Create test Excel with 5 rows"
+      expected: "Returns 5 ImportRow objects with correct values"
+
+    - name: "handles missing optional columns"
+      setup: "Create Excel with only product_code, quantity"
+      expected: "Returns rows with null for optional fields"
+
+    - name: "throws error for missing required column"
+      setup: "Create Excel without product_code column"
+      expected: "Throws 'Missing required column: product_code'"
+
+    - name: "throws error for exceeding row limit"
+      setup: "Create Excel with 1001 rows"
+      expected: "Throws 'File exceeds maximum of 1000 rows'"
+
+  supplier_grouping:
+    - name: "groups rows by default supplier"
+      setup: "3 products with 2 different default suppliers"
+      expected: "Returns 2 groups with correct products"
+
+    - name: "handles products without default supplier"
+      setup: "1 product with no supplier_products.is_default"
+      expected: "Product appears in 'No Supplier' group with warning"
+
+    - name: "respects supplier_code override from file"
+      setup: "Product with default supplier A, file specifies supplier B"
+      expected: "Product grouped under supplier B"
+
+  price_resolution:
+    - name: "uses file price when provided"
+      setup: "File row with unit_price = 5.00"
+      expected: "Line unit_price = 5.00"
+
+    - name: "uses supplier_products.unit_price as fallback"
+      setup: "File row without price, supplier_products has 3.50"
+      expected: "Line unit_price = 3.50"
+
+    - name: "uses product.std_price as final fallback"
+      setup: "No file price, no supplier_products price"
+      expected: "Line unit_price = product.std_price"
+
+  expected_date_calculation:
+    - name: "calculates from supplier lead time"
+      setup: "Supplier lead_time_days = 7, today = Dec 17"
+      expected: "Expected date = Dec 24"
+
+    - name: "uses max of file dates and lead time"
+      setup: "Lead time = 7 days, file row has Dec 30"
+      expected: "Expected date = Dec 30 (max of both)"
+
+    - name: "uses supplier_products lead time override"
+      setup: "supplier.lead_time = 7, supplier_products.lead_time = 3"
+      expected: "Uses 3 days (supplier_products overrides)"
+
+  validation:
+    - name: "detects invalid product_code"
+      setup: "product_code = 'INVALID-123'"
+      expected: "Error: PRODUCT_NOT_FOUND"
+
+    - name: "detects negative quantity"
+      setup: "quantity = -5"
+      expected: "Error: QUANTITY_INVALID"
+
+    - name: "detects past expected_date"
+      setup: "expected_date = '2020-01-01'"
+      expected: "Error: EXPECTED_DATE_PAST"
+
+    - name: "detects below MOQ"
+      setup: "quantity = 10, MOQ = 100"
+      expected: "Warning: BELOW_MOQ"
+
+    - name: "detects duplicate product in same group"
+      setup: "Same product_code twice with same supplier"
+      expected: "Warning: DUPLICATE_PRODUCT"
+
+# Integration Test Cases
+integration_tests:
+  parse_endpoint:
+    - name: "POST /import/parse with valid file"
+      setup: "Upload test.xlsx with 10 rows"
+      expected: "200 OK with parsed groups"
+
+    - name: "POST /import/parse with invalid file type"
+      setup: "Upload test.pdf"
+      expected: "400 FILE_TYPE_INVALID"
+
+    - name: "POST /import/parse with oversized file"
+      setup: "Upload 6MB file"
+      expected: "400 FILE_TOO_LARGE"
+
+  validate_endpoint:
+    - name: "POST /import/validate with all valid rows"
+      setup: "Groups with existing products"
+      expected: "200 OK with valid_count = total rows"
+
+    - name: "POST /import/validate with unknown product"
+      setup: "Group with non-existent product_code"
+      expected: "200 OK with error issue for that row"
+
+  bulk_create_endpoint:
+    - name: "POST /bulk creates all POs successfully"
+      setup: "3 valid groups"
+      expected: "200 OK with created_count = 3"
+
+    - name: "POST /bulk with partial failure"
+      setup: "3 groups, one with invalid supplier"
+      expected: "200 OK with created_count = 2, failed_count = 1"
+
+    - name: "POST /bulk generates unique PO numbers"
+      setup: "3 groups"
+      expected: "All POs have unique sequential numbers"
+
+    - name: "POST /bulk rolls back on line error"
+      setup: "Group with invalid line data"
+      expected: "That group fails, header not created"
+
+  bulk_submit_endpoint:
+    - name: "POST /bulk-submit submits all POs"
+      setup: "3 draft POs"
+      expected: "200 OK with submitted_count = 3"
+
+    - name: "POST /bulk-submit with non-draft PO"
+      setup: "1 draft, 1 confirmed PO"
+      expected: "400 INVALID_STATUS"
+
+  multi_tenancy:
+    - name: "User A cannot import Org B products"
+      setup: "User A from Org A, product from Org B in file"
+      expected: "PRODUCT_NOT_FOUND (not accessible)"
+
+    - name: "Created POs have correct org_id"
+      setup: "User from Org A creates bulk POs"
+      expected: "All POs have org_id = Org A"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete import flow - happy path"
+    steps:
+      - "Click 'Import POs' button"
+      - "Upload valid Excel file with 15 rows"
+      - "Verify 3 groups displayed in preview"
+      - "Click 'Validate'"
+      - "Verify all rows valid"
+      - "Click 'Create POs'"
+      - "Verify 3 POs created"
+      - "Click 'View PO List'"
+      - "Verify 3 new POs in list"
+
+  - name: "Import with validation errors"
+    steps:
+      - "Upload file with unknown product"
+      - "Verify error displayed in validation step"
+      - "Click 'Map to Existing Product'"
+      - "Select valid product"
+      - "Verify error cleared"
+      - "Complete import"
+
+  - name: "Edit group before creation"
+    steps:
+      - "Upload valid file"
+      - "Click 'Edit Group' on first group"
+      - "Change expected delivery date"
+      - "Remove one line item"
+      - "Save changes"
+      - "Complete import"
+      - "Verify PO has updated date and line count"
+
+  - name: "Partial failure with retry"
+    steps:
+      - "Setup: One supplier at credit limit"
+      - "Upload file with products from that supplier"
+      - "Complete import"
+      - "Verify partial failure message"
+      - "Fix credit limit"
+      - "Click 'Retry Failed'"
+      - "Verify all POs now created"
+
+  - name: "Submit all POs after creation"
+    steps:
+      - "Complete import with 3 POs"
+      - "Click 'Submit All POs'"
+      - "Verify all POs have 'pending_approval' or 'confirmed' status"
+
+  - name: "Large file performance"
+    steps:
+      - "Upload file with 500 rows"
+      - "Verify parse completes in <5s"
+      - "Verify validation completes in <5s"
+      - "Verify creation completes in <30s for 50 POs"
+
+  - name: "Mobile responsive flow"
+    steps:
+      - "Open modal on 375px viewport"
+      - "Verify steps display as compact dots"
+      - "Verify PO groups show as cards"
+      - "Complete full flow"
+
+# Definition of Done
+definition_of_done:
+  - "Excel file parsing works for .xlsx and .xls formats"
+  - "Supplier grouping correctly groups by default supplier"
+  - "Price resolution follows priority: file > supplier_products > product.std_price"
+  - "Lead time calculation uses supplier_products override when available"
+  - "All validation rules implemented with resolution options"
+  - "Bulk create uses parallel transactions with partial failure handling"
+  - "Created POs have correct org_id (multi-tenancy)"
+  - "4-step wizard UI matches PLAN-007 wireframe"
+  - "Edit Group modal allows modification before creation"
+  - "Submit All POs transitions statuses correctly"
+  - "Unit tests >= 85% coverage"
+  - "Integration tests cover all 4 endpoints"
+  - "E2E tests cover happy path and error scenarios"
+  - "Performance targets met (parse <3s, create <10s for 50 POs)"
+  - "Accessibility requirements met (keyboard nav, screen reader)"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 85
+    reason: "Business logic for grouping and validation is critical"
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+  files:
+    - "lib/services/bulk-po-import-service.ts: 90%"
+    - "lib/validation/bulk-po-import.ts: 95%"
+    - "lib/hooks/use-excel-parser.ts: 85%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Large file upload could timeout"
+    mitigation: "Client-side parsing with progress indicator"
+    severity: "medium"
+    test_coverage: "e2e: large file performance"
+
+  - id: "RISK-02"
+    description: "Partial failure leaves orphan data"
+    mitigation: "Transaction per PO, clear success/failure reporting"
+    severity: "medium"
+    test_coverage: "integration: partial failure"
+
+  - id: "RISK-03"
+    description: "Concurrent imports could cause PO number collision"
+    mitigation: "Database function with SELECT FOR UPDATE"
+    severity: "low"
+    test_coverage: "integration: concurrent import test"
+
+  - id: "RISK-04"
+    description: "Product/supplier lookup performance for large imports"
+    mitigation: "Batch lookups, caching during import session"
+    severity: "low"
+    test_coverage: "performance: 1000 row import"

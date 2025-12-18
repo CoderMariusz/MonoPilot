@@ -1,0 +1,430 @@
+# Story 05.1 - API Specification
+# Purpose: Endpoints, service methods, Zod schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# API Endpoints
+endpoints:
+  # CRUD Operations
+  - method: "GET"
+    path: "/api/warehouse/license-plates"
+    description: "List LPs with filtering, sorting, pagination"
+    file: "apps/frontend/app/api/warehouse/license-plates/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager", "warehouse_operator", "production_manager", "production_operator", "quality_inspector", "viewer"]
+    query_params:
+      - { name: "search", type: "string", description: "LP number prefix search" }
+      - { name: "warehouse_id", type: "UUID", description: "Filter by warehouse" }
+      - { name: "location_id", type: "UUID", description: "Filter by location" }
+      - { name: "product_id", type: "UUID", description: "Filter by product" }
+      - { name: "status", type: "enum", description: "available|reserved|consumed|blocked" }
+      - { name: "qa_status", type: "enum", description: "pending|passed|failed|quarantine" }
+      - { name: "batch_number", type: "string", description: "Filter by batch" }
+      - { name: "expiry_before", type: "date", description: "Expiring before date" }
+      - { name: "expiry_after", type: "date", description: "Expiring after date" }
+      - { name: "sort", type: "string", description: "lp_number|created_at|expiry_date|quantity" }
+      - { name: "order", type: "string", description: "asc|desc" }
+      - { name: "page", type: "number", description: "Page number (default 1)" }
+      - { name: "limit", type: "number", description: "Items per page (default 50, max 100)" }
+    response:
+      status: 200
+      schema:
+        data: "LicensePlate[]"
+        pagination:
+          page: "number"
+          limit: "number"
+          total: "number"
+          total_pages: "number"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "INVALID_PARAMS", message: "Invalid query parameters" }
+
+  - method: "GET"
+    path: "/api/warehouse/license-plates/:id"
+    description: "Get LP detail with joined product, location, warehouse"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/route.ts"
+    auth: "required"
+    response:
+      status: 200
+      schema: "LicensePlate with joins"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "LP_NOT_FOUND", message: "License plate not found" }
+
+  - method: "POST"
+    path: "/api/warehouse/license-plates"
+    description: "Create LP (manual or auto-number)"
+    file: "apps/frontend/app/api/warehouse/license-plates/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager"]
+    body: "CreateLPInput"
+    response:
+      status: 201
+      schema: "LicensePlate"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation error" }
+      - { status: 409, code: "DUPLICATE_LP_NUMBER", message: "LP number already exists" }
+
+  - method: "PUT"
+    path: "/api/warehouse/license-plates/:id"
+    description: "Update LP (limited fields)"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager"]
+    body: "UpdateLPInput"
+    response:
+      status: 200
+      schema: "LicensePlate"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "LP_CONSUMED", message: "Consumed LP cannot be modified" }
+      - { status: 404, code: "LP_NOT_FOUND", message: "License plate not found" }
+
+  # Status Management
+  - method: "PUT"
+    path: "/api/warehouse/license-plates/:id/block"
+    description: "Block LP with reason"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/block/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager", "quality_manager"]
+    body:
+      reason: "string (optional)"
+    response:
+      status: 200
+      schema: "LicensePlate"
+    errors:
+      - { status: 400, code: "ALREADY_BLOCKED", message: "LP already blocked" }
+
+  - method: "PUT"
+    path: "/api/warehouse/license-plates/:id/unblock"
+    description: "Unblock LP"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/unblock/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager", "quality_manager"]
+    response:
+      status: 200
+      schema: "LicensePlate"
+    errors:
+      - { status: 400, code: "NOT_BLOCKED", message: "LP is not blocked" }
+
+  - method: "PUT"
+    path: "/api/warehouse/license-plates/:id/qa-status"
+    description: "Update QA status"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/qa-status/route.ts"
+    auth: "required"
+    roles: ["admin", "quality_manager", "quality_inspector"]
+    body:
+      qa_status: "pending|passed|failed|quarantine"
+    response:
+      status: 200
+      schema: "LicensePlate"
+
+  - method: "POST"
+    path: "/api/warehouse/license-plates/generate-number"
+    description: "Generate next LP number (preview)"
+    file: "apps/frontend/app/api/warehouse/license-plates/generate-number/route.ts"
+    auth: "required"
+    roles: ["admin", "warehouse_manager"]
+    response:
+      status: 200
+      schema:
+        lp_number: "string"
+
+  # Epic 04 Integration Endpoints (Internal)
+  - method: "POST"
+    path: "/api/warehouse/license-plates/consume"
+    description: "Consume LP qty for production (Epic 04 internal)"
+    file: "apps/frontend/app/api/warehouse/license-plates/consume/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "production_operator"]
+    body: "ConsumeLPInput"
+    response:
+      status: 200
+      schema: "LicensePlate"
+    errors:
+      - { status: 400, code: "LP_NOT_AVAILABLE", message: "LP not available for consumption" }
+      - { status: 400, code: "QA_NOT_PASSED", message: "LP not QA approved" }
+      - { status: 400, code: "INSUFFICIENT_QTY", message: "Insufficient quantity" }
+      - { status: 400, code: "LP_EXPIRED", message: "LP is expired" }
+
+  - method: "POST"
+    path: "/api/warehouse/license-plates/create-output"
+    description: "Create output LP from production (Epic 04 internal)"
+    file: "apps/frontend/app/api/warehouse/license-plates/create-output/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "production_operator"]
+    body: "CreateOutputLPInput"
+    response:
+      status: 201
+      schema: "LicensePlate"
+
+  - method: "GET"
+    path: "/api/warehouse/license-plates/available"
+    description: "Get available LPs for product (FIFO/FEFO)"
+    file: "apps/frontend/app/api/warehouse/license-plates/available/route.ts"
+    auth: "required"
+    query_params:
+      - { name: "product_id", type: "UUID", required: true }
+      - { name: "warehouse_id", type: "UUID", description: "Optional warehouse filter" }
+      - { name: "location_id", type: "UUID", description: "Optional location filter" }
+      - { name: "order", type: "string", description: "fifo|fefo (default: fifo)" }
+      - { name: "limit", type: "number", description: "Max results (default: 10)" }
+    response:
+      status: 200
+      schema: "LicensePlate[]"
+
+# Service Layer
+services:
+  - path: "apps/frontend/lib/services/license-plate-service.ts"
+    description: "License Plate business logic and database operations"
+    exports:
+      # Types
+      - name: "LPStatus"
+        type: "type"
+        definition: "'available' | 'reserved' | 'consumed' | 'blocked'"
+      - name: "QAStatus"
+        type: "type"
+        definition: "'pending' | 'passed' | 'failed' | 'quarantine'"
+      - name: "LPSource"
+        type: "type"
+        definition: "'manual' | 'receipt' | 'production' | 'return' | 'adjustment' | 'split'"
+      - name: "LicensePlate"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "lp_number: string"
+          - "product_id: string"
+          - "quantity: number"
+          - "uom: string"
+          - "location_id: string"
+          - "warehouse_id: string"
+          - "status: LPStatus"
+          - "qa_status: QAStatus"
+          - "batch_number: string | null"
+          - "supplier_batch_number: string | null"
+          - "expiry_date: string | null"
+          - "manufacture_date: string | null"
+          - "source: LPSource"
+          - "po_number: string | null"
+          - "grn_id: string | null"
+          - "asn_id: string | null"
+          - "wo_id: string | null"
+          - "consumed_by_wo_id: string | null"
+          - "parent_lp_id: string | null"
+          - "catch_weight_kg: number | null"
+          - "gtin: string | null"
+          - "sscc: string | null"
+          - "pallet_id: string | null"
+          - "created_at: string"
+          - "created_by: string | null"
+          - "updated_at: string"
+          - "product?: { name: string; code: string }"
+          - "location?: { full_path: string }"
+          - "warehouse?: { name: string; code: string }"
+
+      # CRUD Methods
+      - name: "list"
+        type: "async function"
+        params: ["params: LicensePlateListParams"]
+        returns: "Promise<PaginatedResult<LicensePlate>>"
+        description: "List LPs with filtering, sorting, pagination"
+      - name: "getById"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<LicensePlate | null>"
+        description: "Get single LP by ID with joins"
+      - name: "create"
+        type: "async function"
+        params: ["data: CreateLPInput"]
+        returns: "Promise<LicensePlate>"
+        description: "Create new LP, auto-generates number if not provided"
+      - name: "update"
+        type: "async function"
+        params: ["id: string", "data: UpdateLPInput"]
+        returns: "Promise<LicensePlate>"
+        description: "Update LP (throws if consumed)"
+      - name: "generateLPNumber"
+        type: "async function"
+        params: []
+        returns: "Promise<string>"
+        description: "Generate next LP number for org"
+
+      # Status Management
+      - name: "block"
+        type: "async function"
+        params: ["id: string", "reason?: string"]
+        returns: "Promise<LicensePlate>"
+        description: "Block LP"
+      - name: "unblock"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<LicensePlate>"
+        description: "Unblock LP"
+      - name: "updateQAStatus"
+        type: "async function"
+        params: ["id: string", "qa_status: QAStatus"]
+        returns: "Promise<LicensePlate>"
+        description: "Update QA status"
+
+      # Epic 04 Integration Methods (CRITICAL)
+      - name: "consumeLP"
+        type: "async function"
+        params: ["input: ConsumeLPInput"]
+        returns: "Promise<LicensePlate>"
+        description: "Consume LP qty for production - validates status, QA, qty, expiry"
+        critical: true
+      - name: "reverseConsumption"
+        type: "async function"
+        params: ["lp_id: string", "restore_qty: number", "wo_id: string"]
+        returns: "Promise<LicensePlate>"
+        description: "Reverse LP consumption for corrections"
+      - name: "createOutputLP"
+        type: "async function"
+        params: ["input: CreateOutputLPInput"]
+        returns: "Promise<LicensePlate>"
+        description: "Create output LP from production"
+        critical: true
+      - name: "getAvailableLPs"
+        type: "async function"
+        params: ["product_id: string", "options?: { warehouse_id?: string; location_id?: string; order?: 'fifo' | 'fefo'; limit?: number }"]
+        returns: "Promise<LicensePlate[]>"
+        description: "Get available LPs ordered by FIFO or FEFO"
+        critical: true
+      - name: "getTotalAvailableQty"
+        type: "async function"
+        params: ["product_id: string", "options?: { warehouse_id?: string; location_id?: string }"]
+        returns: "Promise<number>"
+        description: "Get total available quantity for product"
+      - name: "validateForConsumption"
+        type: "async function"
+        params: ["lp_id: string", "required_qty: number"]
+        returns: "Promise<{ valid: boolean; errors: string[] }>"
+        description: "Validate LP can be consumed"
+
+      # Utility Methods
+      - name: "exists"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<boolean>"
+        description: "Check if LP exists"
+      - name: "isLPNumberAvailable"
+        type: "async function"
+        params: ["lp_number: string"]
+        returns: "Promise<boolean>"
+        description: "Check if LP number is available"
+
+# Zod Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/license-plate.ts"
+  schemas:
+    - name: "lpStatusEnum"
+      schema: "z.enum(['available', 'reserved', 'consumed', 'blocked'])"
+
+    - name: "qaStatusEnum"
+      schema: "z.enum(['pending', 'passed', 'failed', 'quarantine'])"
+
+    - name: "lpSourceEnum"
+      schema: "z.enum(['manual', 'receipt', 'production', 'return', 'adjustment', 'split'])"
+
+    - name: "createLPSchema"
+      fields:
+        - { name: "lp_number", validation: "z.string().min(1).max(50).optional()" }
+        - { name: "product_id", validation: "z.string().uuid()" }
+        - { name: "quantity", validation: "z.number().positive().max(999999999)" }
+        - { name: "uom", validation: "z.string().min(1).max(20)" }
+        - { name: "location_id", validation: "z.string().uuid()" }
+        - { name: "warehouse_id", validation: "z.string().uuid()" }
+        - { name: "batch_number", validation: "z.string().max(100).nullable().optional()" }
+        - { name: "supplier_batch_number", validation: "z.string().max(100).nullable().optional()" }
+        - { name: "expiry_date", validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable().optional()" }
+        - { name: "manufacture_date", validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable().optional()" }
+        - { name: "source", validation: "lpSourceEnum.default('manual')" }
+        - { name: "po_number", validation: "z.string().max(50).nullable().optional()" }
+        - { name: "grn_id", validation: "z.string().uuid().nullable().optional()" }
+        - { name: "asn_id", validation: "z.string().uuid().nullable().optional()" }
+        - { name: "wo_id", validation: "z.string().uuid().nullable().optional()" }
+        - { name: "catch_weight_kg", validation: "z.number().positive().nullable().optional()" }
+        - { name: "gtin", validation: "z.string().length(14).nullable().optional()" }
+
+    - name: "updateLPSchema"
+      fields:
+        - { name: "quantity", validation: "z.number().positive().max(999999999).optional()" }
+        - { name: "location_id", validation: "z.string().uuid().optional()" }
+        - { name: "batch_number", validation: "z.string().max(100).nullable().optional()" }
+        - { name: "supplier_batch_number", validation: "z.string().max(100).nullable().optional()" }
+        - { name: "expiry_date", validation: "z.string().nullable().optional()" }
+        - { name: "manufacture_date", validation: "z.string().nullable().optional()" }
+        - { name: "catch_weight_kg", validation: "z.number().positive().nullable().optional()" }
+
+    - name: "consumeLPSchema"
+      fields:
+        - { name: "lp_id", validation: "z.string().uuid()" }
+        - { name: "consume_qty", validation: "z.number().positive()" }
+        - { name: "wo_id", validation: "z.string().uuid()" }
+        - { name: "operation_id", validation: "z.string().uuid().optional()" }
+
+    - name: "createOutputLPSchema"
+      fields:
+        - { name: "product_id", validation: "z.string().uuid()" }
+        - { name: "quantity", validation: "z.number().positive()" }
+        - { name: "uom", validation: "z.string().min(1)" }
+        - { name: "location_id", validation: "z.string().uuid()" }
+        - { name: "warehouse_id", validation: "z.string().uuid()" }
+        - { name: "wo_id", validation: "z.string().uuid()" }
+        - { name: "batch_number", validation: "z.string().max(100).optional()" }
+        - { name: "expiry_date", validation: "z.string().optional()" }
+        - { name: "manufacture_date", validation: "z.string().optional()" }
+        - { name: "qa_status", validation: "qaStatusEnum.default('pending')" }
+        - { name: "catch_weight_kg", validation: "z.number().positive().optional()" }
+
+    - name: "lpQuerySchema"
+      fields:
+        - { name: "search", validation: "z.string().min(1).optional()" }
+        - { name: "warehouse_id", validation: "z.string().uuid().optional()" }
+        - { name: "location_id", validation: "z.string().uuid().optional()" }
+        - { name: "product_id", validation: "z.string().uuid().optional()" }
+        - { name: "status", validation: "lpStatusEnum.optional()" }
+        - { name: "qa_status", validation: "qaStatusEnum.optional()" }
+        - { name: "batch_number", validation: "z.string().optional()" }
+        - { name: "expiry_before", validation: "z.string().optional()" }
+        - { name: "expiry_after", validation: "z.string().optional()" }
+        - { name: "sort", validation: "z.enum(['lp_number', 'created_at', 'expiry_date', 'quantity']).default('created_at')" }
+        - { name: "order", validation: "z.enum(['asc', 'desc']).default('desc')" }
+        - { name: "page", validation: "z.coerce.number().int().positive().default(1)" }
+        - { name: "limit", validation: "z.coerce.number().int().min(1).max(100).default(50)" }
+
+    - name: "updateQAStatusSchema"
+      fields:
+        - { name: "qa_status", validation: "qaStatusEnum" }
+
+    - name: "blockLPSchema"
+      fields:
+        - { name: "reason", validation: "z.string().max(500).optional()" }
+
+# Error Codes
+error_codes:
+  - code: "LP_NOT_FOUND"
+    http_status: 404
+    message: "License plate not found"
+  - code: "DUPLICATE_LP_NUMBER"
+    http_status: 409
+    message: "LP number already exists"
+  - code: "LP_NOT_AVAILABLE"
+    http_status: 400
+    message: "LP not available for consumption (status: {status})"
+  - code: "QA_NOT_PASSED"
+    http_status: 400
+    message: "LP not QA approved for consumption (qa_status: {qa_status})"
+  - code: "INSUFFICIENT_QTY"
+    http_status: 400
+    message: "Consume quantity ({consume_qty}) exceeds available quantity ({available_qty})"
+  - code: "LP_EXPIRED"
+    http_status: 400
+    message: "LP is expired (expiry: {expiry_date})"
+  - code: "LP_CONSUMED"
+    http_status: 400
+    message: "Consumed LP cannot be modified"
+  - code: "BATCH_REQUIRED"
+    http_status: 400
+    message: "Batch number required for this product"

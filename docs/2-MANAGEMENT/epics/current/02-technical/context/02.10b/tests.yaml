@@ -1,0 +1,526 @@
+# Story 02.10b - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+# Status: DEFERRED - requires Epic 05 tables
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/traceability-service.test.ts"
+    type: "unit"
+    status: "deferred"
+    description: "Unit tests for traceability query service"
+  - path: "apps/frontend/app/api/v1/technical/tracing/__tests__/forward.test.ts"
+    type: "integration"
+    status: "deferred"
+    description: "Integration tests for forward trace API"
+  - path: "apps/frontend/app/api/v1/technical/tracing/__tests__/backward.test.ts"
+    type: "integration"
+    status: "deferred"
+    description: "Integration tests for backward trace API"
+  - path: "apps/frontend/app/api/v1/technical/tracing/__tests__/recall.test.ts"
+    type: "integration"
+    status: "deferred"
+    description: "Integration tests for recall simulation API"
+  - path: "supabase/tests/traceability-queries.test.sql"
+    type: "database"
+    status: "deferred"
+    description: "Database tests for recursive CTE queries"
+  - path: "apps/frontend/e2e/traceability.spec.ts"
+    type: "e2e"
+    status: "deferred"
+    description: "End-to-end tests for traceability UI"
+  - path: "apps/frontend/__tests__/performance/traceability-performance.test.ts"
+    type: "performance"
+    status: "deferred"
+    description: "Performance tests for large genealogy trees"
+
+# Acceptance Criteria (From Story 02.10b.md)
+acceptance_criteria:
+  # FR-2.60: Forward Traceability
+  - id: "AC-01"
+    fr: "FR-2.60"
+    feature: "Forward Traceability"
+    given: "lot LP-001 was consumed in WO-100 which produced LP-002"
+    when: "forward trace is run on LP-001"
+    then: "LP-002 appears as descendant at depth 1"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    fr: "FR-2.60"
+    feature: "Forward Traceability Multi-level"
+    given: "LP-002 was then consumed in WO-200 producing LP-003"
+    when: "forward trace on LP-001 with max_depth=5"
+    then: "LP-002 (depth 1) and LP-003 (depth 2) are returned"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    fr: "FR-2.60"
+    feature: "Forward Traceability Shipped"
+    given: "a lot was shipped to customer ABC"
+    when: "forward trace runs"
+    then: "shipment info (SO number, customer, ship date) appears as leaf node"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-04"
+    fr: "FR-2.60"
+    feature: "Forward Traceability Max Depth"
+    given: "max_depth=2"
+    when: "tree has 5 levels"
+    then: "only levels 0-2 are returned (performance optimization)"
+    test_type: "integration"
+    priority: "P1"
+
+  # FR-2.61: Backward Traceability
+  - id: "AC-05"
+    fr: "FR-2.61"
+    feature: "Backward Traceability"
+    given: "finished lot LP-100 was produced from RM lots LP-001, LP-002, LP-003"
+    when: "backward trace runs on LP-100"
+    then: "all three RM lots appear as ancestors"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    fr: "FR-2.61"
+    feature: "Backward Traceability Supplier"
+    given: "LP-001 came from PO-500 (supplier lot)"
+    when: "backward trace runs with max_depth=3"
+    then: "supplier lot info is included"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-07"
+    fr: "FR-2.61"
+    feature: "Backward Traceability Multi-level BOM"
+    given: "multi-level BOM"
+    when: "backward trace runs"
+    then: "all ingredient lots from all BOM levels are traced"
+    test_type: "integration"
+    priority: "P1"
+
+  # FR-2.62: Recall Simulation
+  - id: "AC-08"
+    fr: "FR-2.62"
+    feature: "Recall Simulation Summary"
+    given: "lot LP-001 has 50 descendants across 3 levels"
+    when: "recall simulation runs"
+    then: "summary shows: 50 affected LPs, total quantity, estimated value"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    fr: "FR-2.62"
+    feature: "Recall Simulation Customers"
+    given: "some descendants are shipped to customers"
+    when: "recall runs"
+    then: "affected customers list includes: customer name, shipped qty, ship date"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    fr: "FR-2.62"
+    feature: "Recall Simulation Locations"
+    given: "affected inventory in warehouse"
+    when: "recall runs"
+    then: "location analysis shows: warehouse, zone, LP count, quantity"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11"
+    fr: "FR-2.62"
+    feature: "Recall Simulation Financial"
+    given: "recall simulation completes"
+    when: "financial impact calculated"
+    then: "shows: product value, retrieval cost (estimate), disposal cost (estimate), total impact"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-12"
+    fr: "FR-2.62"
+    feature: "Recall Simulation Performance"
+    given: "recall simulation runs"
+    when: "executed"
+    then: "execution_time_ms is logged and displayed (performance metric)"
+    test_type: "performance"
+    priority: "P1"
+
+  # FR-2.63: Genealogy Tree
+  - id: "AC-13"
+    fr: "FR-2.63"
+    feature: "Genealogy Tree Structure"
+    given: "parent-child relationships exist"
+    when: "genealogy tree is requested"
+    then: "hierarchical structure is returned with: lp_id, product_code, product_name, quantity, status, depth, children[]"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    fr: "FR-2.63"
+    feature: "Genealogy Tree Combine"
+    given: "a lot has multiple parents (combined lots)"
+    when: "tree is generated"
+    then: "relationship_type = 'combine' is indicated"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-15"
+    fr: "FR-2.63"
+    feature: "Genealogy Tree Split"
+    given: "a lot was split into multiple children"
+    when: "tree is generated"
+    then: "relationship_type = 'split' is indicated"
+    test_type: "integration"
+    priority: "P1"
+
+  # FR-2.65: Traceability Matrix Report
+  - id: "AC-16"
+    fr: "FR-2.65"
+    feature: "Matrix View"
+    given: "a traceability search completed"
+    when: "matrix view selected"
+    then: "tabular format shows: Lot ID, Product, Batch, Mfg Date, Consumed In, Produced From"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-17"
+    fr: "FR-2.65"
+    feature: "Matrix CSV Export"
+    given: "matrix data exists"
+    when: "CSV export clicked"
+    then: "CSV file downloads with all columns and rows"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-18"
+    fr: "FR-2.65"
+    feature: "Matrix Virtual Scrolling"
+    given: "large dataset (1000+ rows)"
+    when: "matrix is displayed"
+    then: "virtual scrolling is used for performance"
+    test_type: "performance"
+    priority: "P2"
+
+  # Multi-tenancy
+  - id: "AC-19"
+    fr: "Multi-tenancy"
+    feature: "Org Isolation"
+    given: "User A from Org A"
+    when: "they search traceability"
+    then: "only Org A lots are included in results"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-20"
+    fr: "Multi-tenancy"
+    feature: "Cross-tenant 404"
+    given: "User A attempts to trace Lot X from Org B"
+    when: "API is called"
+    then: "404 Not Found is returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  traceability_service:
+    - name: "traceForward returns trace result for valid LP"
+      setup: "Mock successful API response with trace tree"
+      expected: "Returns TraceResult with root_lp, trace_tree, summary"
+
+    - name: "traceForward handles LP not found"
+      setup: "Mock 404 response"
+      expected: "Throws error with 'License plate not found' message"
+
+    - name: "traceBackward returns ancestors"
+      setup: "Mock successful API response with ancestor tree"
+      expected: "Returns TraceResult with ancestors in trace_tree"
+
+    - name: "runRecallSimulation returns full simulation"
+      setup: "Mock successful recall simulation response"
+      expected: "Returns RecallSimulationResult with all sections"
+
+    - name: "runRecallSimulation handles timeout"
+      setup: "Mock 504 timeout response"
+      expected: "Throws timeout error with suggestion to reduce depth"
+
+    - name: "getGenealogyTree returns hierarchical structure"
+      setup: "Mock genealogy tree response"
+      expected: "Returns TraceNode[] with nested children"
+
+    - name: "exportMatrix returns CSV blob"
+      setup: "Mock CSV file response"
+      expected: "Returns Blob with text/csv type"
+
+    - name: "exportMatrix returns Excel blob"
+      setup: "Mock Excel file response"
+      expected: "Returns Blob with application/vnd.openxmlformats-officedocument.spreadsheetml.sheet type"
+
+  tree_transformation:
+    - name: "transformTraceResultToReactFlowNodes creates valid nodes"
+      setup: "TraceResult with 3-level tree"
+      expected: "Returns array of ReactFlow Node objects with correct positions"
+
+    - name: "transformTraceResultToReactFlowEdges creates valid edges"
+      setup: "TraceResult with 3-level tree"
+      expected: "Returns array of ReactFlow Edge objects connecting parent to children"
+
+    - name: "getStatusColor returns correct color for each status"
+      setup: "Each LP status value"
+      expected: "Returns hex color: available=#16A34A, shipped=#DC2626, etc."
+
+# Integration Test Cases
+integration_tests:
+  forward_trace_api:
+    - name: "Forward trace returns descendants for valid LP"
+      setup: |
+        - Create Org A
+        - Create Products P1, P2, P3
+        - Create LP-001 (P1)
+        - Create LP-002 (P2) with parent LP-001 (via lp_genealogy)
+        - Create LP-003 (P3) with parent LP-002
+      action: "POST /api/v1/technical/tracing/forward with lp_id=LP-001"
+      expected: "trace_tree contains LP-002 at depth 1, LP-003 at depth 2"
+
+    - name: "Forward trace respects max_depth"
+      setup: "5-level tree"
+      action: "POST /api/v1/technical/tracing/forward with max_depth=2"
+      expected: "Only depths 0, 1, 2 returned (not 3, 4)"
+
+    - name: "Forward trace prevents cycles"
+      setup: "LP-001 -> LP-002 -> LP-001 (circular reference)"
+      action: "POST /api/v1/technical/tracing/forward"
+      expected: "Query completes without infinite loop, cycle detected"
+
+    - name: "Forward trace org isolation"
+      setup: |
+        - Create Org A with LP-A1
+        - Create Org B with LP-B1
+      action: "User A traces LP-B1"
+      expected: "404 Not Found"
+
+  backward_trace_api:
+    - name: "Backward trace returns ancestors"
+      setup: |
+        - Create LP-001, LP-002, LP-003 (inputs)
+        - Create LP-100 with parents LP-001, LP-002, LP-003
+      action: "POST /api/v1/technical/tracing/backward with lp_id=LP-100"
+      expected: "trace_tree contains LP-001, LP-002, LP-003 as ancestors"
+
+    - name: "Backward trace multi-level"
+      setup: "LP-100 <- LP-050 <- LP-001 (3 levels)"
+      action: "POST /api/v1/technical/tracing/backward"
+      expected: "Returns LP-050 at depth 1, LP-001 at depth 2"
+
+  recall_simulation_api:
+    - name: "Recall simulation calculates summary"
+      setup: "LP-001 with 50 descendants, 3 shipped to customers"
+      action: "POST /api/v1/technical/tracing/recall"
+      expected: "summary.total_affected_lps=51, summary.affected_customers=3"
+
+    - name: "Recall simulation calculates financial impact"
+      setup: "LPs with known product costs, retrieval/disposal estimates"
+      action: "POST /api/v1/technical/tracing/recall"
+      expected: "financial.total_estimated_cost calculated correctly"
+
+    - name: "Recall simulation identifies affected warehouses"
+      setup: "LPs distributed across 3 warehouses"
+      action: "POST /api/v1/technical/tracing/recall"
+      expected: "locations array has 3 entries with warehouse details"
+
+    - name: "Recall simulation role check"
+      setup: "User with VIEWER role"
+      action: "POST /api/v1/technical/tracing/recall"
+      expected: "403 Forbidden"
+
+  genealogy_api:
+    - name: "Genealogy tree returns JSONB structure"
+      setup: "LP-001 with 2 children, 1 grandchild"
+      action: "GET /api/v1/technical/tracing/genealogy/LP-001"
+      expected: "Returns TraceNode[] with nested children structure"
+
+    - name: "Genealogy tree indicates relationship type"
+      setup: "LP-001 split into LP-002, LP-003 (split relationship)"
+      action: "GET /api/v1/technical/tracing/genealogy/LP-001"
+      expected: "relationship_type='split' on child nodes"
+
+  export_api:
+    - name: "Matrix CSV export"
+      setup: "LP-001 with trace results"
+      action: "GET /api/v1/technical/tracing/matrix/LP-001/export?format=csv"
+      expected: "CSV file downloaded with correct columns"
+
+    - name: "Recall PDF export"
+      setup: "Recall simulation completed"
+      action: "GET /api/v1/technical/tracing/recall/:id/export?format=pdf"
+      expected: "PDF file downloaded with all sections"
+
+    - name: "Recall FDA JSON export"
+      setup: "Recall simulation with shipped products"
+      action: "GET /api/v1/technical/tracing/recall/:id/export?format=fda_json"
+      expected: "FDA-compliant JSON file downloaded"
+
+# Database Test Cases
+database_tests:
+  recursive_cte:
+    - name: "trace_forward CTE returns correct structure"
+      setup: "Insert LP hierarchy in license_plates and lp_genealogy"
+      action: "Execute trace_forward(p_lp_id, p_org_id, 20)"
+      expected: "Returns rows with correct depth and path arrays"
+
+    - name: "trace_forward prevents infinite loops"
+      setup: "Insert circular reference in lp_genealogy"
+      action: "Execute trace_forward"
+      expected: "Query completes, path array prevents revisiting nodes"
+
+    - name: "trace_backward returns ancestors"
+      setup: "Insert LP hierarchy"
+      action: "Execute trace_backward(p_lp_id, p_org_id, 20)"
+      expected: "Returns ancestor LPs in correct order"
+
+    - name: "RLS filters results by org_id"
+      setup: "Insert LPs for Org A and Org B"
+      action: "Execute trace_forward as Org A user"
+      expected: "Only Org A LPs returned"
+
+# E2E Test Cases
+e2e_tests:
+  search_flow:
+    - name: "Forward trace search displays results in list view"
+      steps:
+        - "Navigate to /technical/traceability"
+        - "Select 'Forward' direction"
+        - "Enter LP ID in search field"
+        - "Click 'Search Traceability'"
+        - "Wait for results"
+      expected: "List view shows trace results with depth, parent, child columns"
+
+    - name: "Switch to tree view displays visualization"
+      steps:
+        - "Complete forward trace search"
+        - "Click 'Tree View' tab"
+      expected: "Interactive tree visualization displayed with nodes"
+
+    - name: "Switch to matrix view displays table"
+      steps:
+        - "Complete forward trace search"
+        - "Click 'Matrix View' tab"
+      expected: "Matrix table displayed with Lot ID, Product, Batch columns"
+
+    - name: "Recall simulation displays all sections"
+      steps:
+        - "Select 'Recall Simulation' direction"
+        - "Enter LP ID"
+        - "Click search"
+      expected: |
+        - Affected Inventory section visible
+        - Location Analysis section visible
+        - Customer Impact section visible
+        - Financial Impact section visible
+        - Regulatory Compliance section visible
+
+    - name: "Export CSV downloads file"
+      steps:
+        - "Complete trace search"
+        - "Click 'Export CSV' button"
+      expected: "CSV file downloaded with correct filename format"
+
+# Performance Test Cases
+performance_tests:
+  - name: "Forward trace <3s for 1000 nodes"
+    setup: "Create 1000-node genealogy tree"
+    action: "POST /api/v1/technical/tracing/forward"
+    expected: "Response time < 3 seconds"
+    priority: "P0"
+
+  - name: "Backward trace <3s for 100 ancestor levels"
+    setup: "Create 100-level ancestor chain"
+    action: "POST /api/v1/technical/tracing/backward"
+    expected: "Response time < 3 seconds"
+    priority: "P1"
+
+  - name: "Recall simulation <5s for typical dataset"
+    setup: "Create 500-node tree with 10 shipped customers"
+    action: "POST /api/v1/technical/tracing/recall"
+    expected: "Response time < 5 seconds"
+    priority: "P0"
+
+  - name: "Tree visualization renders <2s for 500 nodes"
+    setup: "Load tree with 500 nodes"
+    action: "Render TraceResultsTree component"
+    expected: "Initial render < 2 seconds"
+    priority: "P1"
+
+  - name: "Matrix virtual scrolling handles 10000 rows"
+    setup: "Load matrix with 10000 rows"
+    action: "Scroll through TraceResultsMatrix"
+    expected: "Smooth scrolling, no lag"
+    priority: "P2"
+
+# Definition of Done
+definition_of_done:
+  - "Forward trace returns correct descendants with depth levels"
+  - "Backward trace returns correct ancestors"
+  - "Recall simulation calculates affected inventory, customers, financial impact"
+  - "Genealogy tree prevents cycles (path tracking)"
+  - "Max depth parameter limits recursion (performance)"
+  - "List view displays trace results with pagination"
+  - "Tree view displays interactive genealogy visualization"
+  - "Matrix view displays tabular format with export"
+  - "CSV export downloads with all columns"
+  - "RLS enforces org isolation on all queries"
+  - "Cross-tenant trace attempts return 404"
+  - "Trace query completes in <3s for 100 levels/1000 nodes"
+  - "Recall simulation completes in <5s for typical datasets"
+  - "Loading states displayed during trace operations"
+  - "Error states handled with retry option"
+  - "Accessibility: keyboard navigation, ARIA labels for tree view"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Critical traceability functions require good coverage"
+  integration:
+    target: 90
+    reason: "API correctness is critical for regulatory compliance"
+  e2e:
+    target: 70
+    reason: "Key user flows must be tested"
+  performance:
+    target: 100
+    reason: "All performance requirements must be validated"
+  files:
+    - "lib/services/traceability-service.ts: 80%"
+    - "lib/services/recall-simulation-service.ts: 80%"
+    - "API routes: 90% (critical regulatory feature)"
+    - "Database functions: 100% (trace_forward, trace_backward)"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Epic 05 delayed - cannot test until LP tables exist"
+    mitigation: "Create mock LP data for unit tests; integration tests wait for Epic 05"
+    severity: "high"
+    test_coverage: "Mock data in unit tests"
+
+  - id: "RISK-02"
+    description: "Performance degradation with deep trees"
+    mitigation: "Performance tests validate <3s requirement; add max_depth limits"
+    severity: "medium"
+    test_coverage: "performance_tests"
+
+  - id: "RISK-03"
+    description: "Cycle in genealogy data causes infinite loop"
+    mitigation: "Path tracking in CTE prevents cycles; test circular references"
+    severity: "high"
+    test_coverage: "database_tests.recursive_cte"
+
+  - id: "RISK-04"
+    description: "Cross-tenant data leakage"
+    mitigation: "RLS policies + explicit org_id filtering; security tests"
+    severity: "critical"
+    test_coverage: "AC-19, AC-20"

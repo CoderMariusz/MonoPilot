@@ -1,0 +1,148 @@
+# Story 01.15 - Frontend Specification
+# Purpose: Security settings page, session management, password change
+# Agent: FRONTEND-DEV
+
+pages:
+  - path: "app/(authenticated)/settings/security/page.tsx"
+    description: "Security settings page with sessions and password sections"
+    sections:
+      - "Active Sessions section"
+      - "Change Password section"
+
+components:
+  base_path: "components/settings/security"
+
+  sessions:
+    - name: "ActiveSessionsList.tsx"
+      description: "List of active sessions with actions"
+      props:
+        - "sessions: Session[]"
+        - "currentSessionId: string"
+        - "onTerminate: (sessionId: string) => void"
+        - "onTerminateAll: () => void"
+        - "isLoading: boolean"
+      features:
+        - "Displays device type, IP, last activity"
+        - "'Current session' badge"
+        - "Revoke button per session"
+        - "'Logout All Devices' button"
+
+    - name: "SessionCard.tsx"
+      description: "Individual session display card"
+      props:
+        - "session: Session"
+        - "isCurrent: boolean"
+        - "onTerminate: () => void"
+      layout: |
+        Chrome on Windows              [Current]
+        IP: 192.168.1.100
+        Last active: 2 minutes ago
+        Started: Dec 15, 2024, 10:30 AM
+                                     [Revoke]
+
+    - name: "TerminateSessionDialog.tsx"
+      description: "Confirmation for single session termination"
+      props:
+        - "session: Session"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+
+    - name: "TerminateAllSessionsDialog.tsx"
+      description: "Confirmation for bulk termination"
+      props:
+        - "sessionCount: number"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+
+  password:
+    - name: "ChangePasswordForm.tsx"
+      description: "Password change form with validation"
+      props:
+        - "onSuccess: () => void"
+        - "forceChange?: boolean"
+      fields:
+        - "current_password: password input"
+        - "new_password: password input with requirements"
+        - "confirm_password: password input"
+      features:
+        - "Real-time validation"
+        - "Password requirements checklist"
+        - "Strength indicator"
+
+    - name: "PasswordRequirements.tsx"
+      description: "Real-time requirements checklist"
+      props:
+        - "password: string"
+        - "showStrength?: boolean"
+      display: |
+        Password Requirements:
+        [x] At least 8 characters
+        [x] One uppercase letter (A-Z)
+        [x] One lowercase letter (a-z)
+        [ ] One number (0-9)
+        [ ] One special character (!@#$%^&*)
+
+        Strength: [====----] Medium
+
+    - name: "PasswordStrengthIndicator.tsx"
+      description: "Visual strength meter"
+      props:
+        - "strength: 'weak' | 'medium' | 'strong'"
+      colors:
+        - "weak: red"
+        - "medium: yellow"
+        - "strong: green"
+
+    - name: "ForcePasswordChangeModal.tsx"
+      description: "Modal for expired password"
+      props:
+        - "onSuccess: () => void"
+      features:
+        - "Blocks navigation until changed"
+        - "Displays expiry message"
+
+# Hooks
+hooks:
+  - path: "lib/hooks/use-sessions.ts"
+    exports:
+      - "useSessions(): UseQueryResult<Session[]>"
+      - "useTerminateSession(): UseMutationResult"
+      - "useTerminateAllSessions(): UseMutationResult"
+
+  - path: "lib/hooks/use-password.ts"
+    exports:
+      - "useChangePassword(): UseMutationResult"
+      - "usePasswordPolicy(): UseQueryResult<PasswordPolicy>"
+      - "useValidatePassword(): UseMutationResult"
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SET-030"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-030-session-management.md"
+      description: "Active sessions list with device info and revoke capability"
+      components:
+        - "SessionsDataTable"
+        - "SessionRow"
+        - "DeviceIcon"
+        - "RevokeButton"
+        - "RevokeAllButton"
+    - id: "SET-031"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-031-password-security-settings.md"
+      description: "Password policy configuration and security settings"
+      components:
+        - "PasswordPolicyForm"
+        - "PasswordStrengthIndicator"
+        - "SecuritySettingsPanel"
+        - "TwoFactorToggle"
+
+  states:
+    loading: "Skeleton rows for sessions table"
+    empty: "No active sessions message"
+    error: "Error loading sessions with retry button"
+    success: "Sessions table with device info visible"
+
+  patterns:
+    table: "ShadCN DataTable for sessions"
+    form: "ShadCN Form for password policy settings"
+    confirmation: "ShadCN AlertDialog for session revocation"

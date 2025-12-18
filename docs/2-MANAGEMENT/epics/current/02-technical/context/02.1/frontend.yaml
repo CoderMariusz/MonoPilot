@@ -1,0 +1,483 @@
+# Story 02.1 - Frontend Specification
+# Purpose: Pages, components, services, validation, types
+# Agent: FRONTEND-DEV
+
+# This is a full-stack story with significant frontend work
+is_backend_focused: false
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/products/page.tsx"
+    description: "Products list page with DataTable, filters, search"
+    wireframe: "TEC-001"
+    components:
+      - "ProductsDataTable"
+      - "ProductFilters"
+      - "ProductModal"
+      - "ProductTypeBadge"
+      - "ProductStatusBadge"
+    states:
+      - "loading"
+      - "empty"
+      - "error"
+      - "success"
+
+# Components
+components:
+  - path: "apps/frontend/components/technical/products/ProductsDataTable.tsx"
+    description: "Main data table with sorting, filtering, pagination"
+    wireframe: "TEC-001"
+    props:
+      - { name: "products", type: "Product[]" }
+      - { name: "pagination", type: "PaginationInfo" }
+      - { name: "onPageChange", type: "(page: number) => void" }
+      - { name: "onSort", type: "(field: string, order: 'asc' | 'desc') => void" }
+      - { name: "onRowAction", type: "(action: string, product: Product) => void" }
+    features:
+      - "Column sorting (code, name, type, version, created_at)"
+      - "Row expansion for details (GTIN, supplier, stock, allergens)"
+      - "Actions menu per row"
+      - "Responsive columns (hide less important on mobile)"
+
+  - path: "apps/frontend/components/technical/products/ProductModal.tsx"
+    description: "Create/Edit product modal with full form"
+    wireframe: "TEC-002"
+    props:
+      - { name: "open", type: "boolean" }
+      - { name: "onClose", type: "() => void" }
+      - { name: "product", type: "Product | null", description: "null for create mode" }
+      - { name: "onSuccess", type: "(product: Product) => void" }
+    features:
+      - "Create and Edit modes"
+      - "Form validation with Zod"
+      - "Locked fields in edit mode (code, product_type_id)"
+      - "Version increment warning banner"
+      - "Nested modals for supplier/category quick-add"
+      - "Version history side panel"
+
+  - path: "apps/frontend/components/technical/products/ProductTypeSelect.tsx"
+    description: "Product type dropdown with badge preview"
+    props:
+      - { name: "value", type: "string" }
+      - { name: "onChange", type: "(value: string) => void" }
+      - { name: "disabled", type: "boolean" }
+    features:
+      - "Dropdown with all product types"
+      - "Badge preview with color"
+      - "Locked state for edit mode"
+
+  - path: "apps/frontend/components/technical/products/ProductStatusBadge.tsx"
+    description: "Status badge component (Active/Inactive/Discontinued)"
+    props:
+      - { name: "status", type: "ProductStatus" }
+    styles:
+      active: "bg-green-100 text-green-800"
+      inactive: "bg-gray-100 text-gray-800"
+      discontinued: "bg-red-100 text-red-800"
+
+  - path: "apps/frontend/components/technical/products/ProductTypeBadge.tsx"
+    description: "Product type badge component (RM/WIP/FG/PKG/BP)"
+    props:
+      - { name: "type", type: "ProductType" }
+    styles:
+      RM: "bg-blue-100 text-blue-800"
+      WIP: "bg-yellow-100 text-yellow-800"
+      FG: "bg-green-100 text-green-800"
+      PKG: "bg-purple-100 text-purple-800"
+      BP: "bg-orange-100 text-orange-800"
+
+  - path: "apps/frontend/components/technical/products/ProductFilters.tsx"
+    description: "Search and filter bar"
+    wireframe: "TEC-001"
+    props:
+      - { name: "filters", type: "ProductFilters" }
+      - { name: "onChange", type: "(filters: ProductFilters) => void" }
+    features:
+      - "Search input (min 2 chars, debounced 300ms)"
+      - "Type filter dropdown"
+      - "Status filter dropdown"
+      - "Sort dropdown"
+      - "Clear filters button"
+
+  - path: "apps/frontend/components/technical/products/ProductActions.tsx"
+    description: "Row actions dropdown menu"
+    wireframe: "TEC-001"
+    props:
+      - { name: "product", type: "Product" }
+      - { name: "onAction", type: "(action: string) => void" }
+    actions:
+      - "view"
+      - "edit"
+      - "manage_allergens"
+      - "view_boms"
+      - "view_history"
+      - "clone"
+      - "change_status"
+      - "delete"
+
+  - path: "apps/frontend/components/technical/products/ProductPriceInput.tsx"
+    description: "Currency input for std_price field (FR-2.13)"
+    props:
+      - { name: "value", type: "number | null" }
+      - { name: "onChange", type: "(value: number | null) => void" }
+      - { name: "currency", type: "string" }
+      - { name: "error", type: "string | undefined" }
+    features:
+      - "Currency symbol prefix"
+      - "4 decimal places max"
+      - "Numeric input only"
+
+  - path: "apps/frontend/components/technical/products/CostWarningBanner.tsx"
+    description: "Warning banner for RM/PKG without cost_per_unit (FR-2.15)"
+    props:
+      - { name: "productType", type: "ProductTypeCode" }
+      - { name: "hasCost", type: "boolean" }
+    behavior:
+      - "Shows warning only for RM or PKG products"
+      - "Shows only when cost_per_unit is null/undefined"
+      - "Non-blocking (warning, not error)"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/product.ts"
+    content: |
+      export type ProductTypeCode = 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP';
+      export type ProductStatus = 'active' | 'inactive' | 'discontinued';
+      export type ExpiryPolicy = 'fixed' | 'rolling' | 'none';
+
+      export interface ProductType {
+        id: string;
+        org_id: string;
+        code: ProductTypeCode;
+        name: string;
+        is_default: boolean;
+        is_active: boolean;
+        created_at: string;
+      }
+
+      export interface Product {
+        id: string;
+        org_id: string;
+        code: string;
+        name: string;
+        description: string | null;
+        product_type_id: string;
+        product_type?: ProductType;
+        base_uom: string;
+        status: ProductStatus;
+        version: number;
+        barcode: string | null;
+        gtin: string | null;
+        category_id: string | null;
+        lead_time_days: number;
+        moq: number | null;
+        std_price: number | null;
+        cost_per_unit: number | null;
+        min_stock: number | null;
+        max_stock: number | null;
+        expiry_policy: ExpiryPolicy;
+        shelf_life_days: number | null;
+        storage_conditions: string | null;
+        is_perishable: boolean;
+        created_at: string;
+        updated_at: string;
+        created_by: string;
+        updated_by: string;
+      }
+
+      export interface CreateProductInput {
+        code: string;
+        name: string;
+        description?: string | null;
+        product_type_id: string;
+        base_uom: string;
+        barcode?: string | null;
+        gtin?: string | null;
+        category_id?: string | null;
+        lead_time_days?: number;
+        moq?: number | null;
+        std_price?: number | null;
+        cost_per_unit?: number | null;
+        min_stock?: number | null;
+        max_stock?: number | null;
+        expiry_policy?: ExpiryPolicy;
+        shelf_life_days?: number | null;
+        storage_conditions?: string | null;
+        status?: ProductStatus;
+      }
+
+      export interface UpdateProductInput {
+        name?: string;
+        description?: string | null;
+        base_uom?: string;
+        barcode?: string | null;
+        gtin?: string | null;
+        category_id?: string | null;
+        lead_time_days?: number;
+        moq?: number | null;
+        std_price?: number | null;
+        cost_per_unit?: number | null;
+        min_stock?: number | null;
+        max_stock?: number | null;
+        expiry_policy?: ExpiryPolicy;
+        shelf_life_days?: number | null;
+        storage_conditions?: string | null;
+        status?: ProductStatus;
+      }
+
+      export interface ProductListParams {
+        search?: string;
+        type?: ProductTypeCode;
+        status?: ProductStatus;
+        sort?: string;
+        order?: 'asc' | 'desc';
+        page?: number;
+        limit?: number;
+      }
+
+      export interface PaginatedProductResult {
+        data: Product[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          total_pages: number;
+        };
+      }
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/product.ts"
+    content: |
+      import { z } from 'zod';
+
+      // GTIN-14 check digit validation
+      function isValidGTIN14(gtin: string): boolean {
+        if (!/^\d{14}$/.test(gtin)) return false;
+        const digits = gtin.split('').map(Number);
+        const checkDigit = digits.pop()!;
+        let sum = 0;
+        for (let i = 0; i < digits.length; i++) {
+          sum += digits[i] * (i % 2 === 0 ? 3 : 1);
+        }
+        const calculated = (10 - (sum % 10)) % 10;
+        return calculated === checkDigit;
+      }
+
+      // Create product schema
+      export const createProductSchema = z.object({
+        code: z.string()
+          .min(2, 'SKU must be at least 2 characters')
+          .max(50, 'SKU must be at most 50 characters')
+          .regex(/^[A-Z0-9-]+$/, 'SKU must be uppercase alphanumeric with dashes'),
+        name: z.string()
+          .min(2, 'Name must be at least 2 characters')
+          .max(255, 'Name must be at most 255 characters'),
+        description: z.string().max(1000).nullable().optional(),
+        product_type_id: z.string().uuid('Invalid product type'),
+        base_uom: z.string().min(1, 'Unit of measure is required'),
+        barcode: z.string().max(100).nullable().optional(),
+        gtin: z.string()
+          .refine(val => !val || isValidGTIN14(val), {
+            message: 'Invalid GTIN-14 format (must be 14 digits with valid check digit)'
+          })
+          .nullable()
+          .optional(),
+        category_id: z.string().uuid().nullable().optional(),
+        lead_time_days: z.number()
+          .int()
+          .min(0, 'Lead time must be >= 0')
+          .max(365, 'Lead time must be <= 365 days')
+          .default(7),
+        moq: z.number()
+          .positive('MOQ must be > 0 if provided')
+          .nullable()
+          .optional(),
+        std_price: z.number()
+          .min(0, 'Standard price cannot be negative')
+          .refine(val => {
+            if (val === null || val === undefined) return true;
+            const decimals = (val.toString().split('.')[1] || '').length;
+            return decimals <= 4;
+          }, 'Maximum 4 decimal places allowed')
+          .nullable()
+          .optional(),
+        cost_per_unit: z.number()
+          .min(0, 'Cost per unit cannot be negative')
+          .refine(val => {
+            if (val === null || val === undefined) return true;
+            const decimals = (val.toString().split('.')[1] || '').length;
+            return decimals <= 4;
+          }, 'Maximum 4 decimal places allowed')
+          .nullable()
+          .optional(),
+        min_stock: z.number().min(0).nullable().optional(),
+        max_stock: z.number().min(0).nullable().optional(),
+        expiry_policy: z.enum(['fixed', 'rolling', 'none']).default('none'),
+        shelf_life_days: z.number()
+          .int()
+          .min(1, 'Shelf life must be at least 1 day')
+          .max(3650, 'Shelf life must be at most 10 years')
+          .nullable()
+          .optional(),
+        storage_conditions: z.string().max(500).nullable().optional(),
+        status: z.enum(['active', 'inactive']).default('active'),
+      }).refine(data => {
+        // Shelf life required when expiry policy is set
+        if (data.expiry_policy !== 'none' && !data.shelf_life_days) {
+          return false;
+        }
+        return true;
+      }, {
+        message: 'Shelf life is required when expiry policy is set',
+        path: ['shelf_life_days']
+      }).refine(data => {
+        // min_stock <= max_stock
+        if (data.min_stock != null && data.max_stock != null && data.min_stock > data.max_stock) {
+          return false;
+        }
+        return true;
+      }, {
+        message: 'Minimum stock cannot exceed maximum stock',
+        path: ['min_stock']
+      });
+
+      // Update product schema (code and product_type_id are readonly)
+      export const updateProductSchema = createProductSchema
+        .omit({ code: true, product_type_id: true })
+        .partial();
+
+      // List params schema
+      export const productListParamsSchema = z.object({
+        search: z.string().min(2).nullable().optional(),
+        type: z.enum(['RM', 'WIP', 'FG', 'PKG', 'BP']).nullable().optional(),
+        status: z.enum(['active', 'inactive', 'discontinued']).nullable().optional(),
+        sort: z.string().default('created_at'),
+        order: z.enum(['asc', 'desc']).default('desc'),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(20),
+      });
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-products.ts"
+    description: "React Query hook for products list"
+    exports:
+      - name: "useProducts"
+        params: ["params: ProductListParams"]
+        returns: "UseQueryResult<PaginatedProductResult>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { ProductService } from '@/lib/services/product-service';
+
+      export function useProducts(params: ProductListParams) {
+        return useQuery({
+          queryKey: ['products', params],
+          queryFn: () => ProductService.list(params),
+          staleTime: 60 * 1000, // 1 minute
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-product.ts"
+    description: "React Query hook for single product"
+    exports:
+      - name: "useProduct"
+        params: ["id: string"]
+        returns: "UseQueryResult<Product>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { ProductService } from '@/lib/services/product-service';
+
+      export function useProduct(id: string) {
+        return useQuery({
+          queryKey: ['product', id],
+          queryFn: () => ProductService.getById(id),
+          enabled: !!id,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-product-types.ts"
+    description: "React Query hook for product types"
+    exports:
+      - name: "useProductTypes"
+        returns: "UseQueryResult<ProductType[]>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { ProductTypeService } from '@/lib/services/product-type-service';
+
+      export function useProductTypes() {
+        return useQuery({
+          queryKey: ['product-types'],
+          queryFn: () => ProductTypeService.list(),
+          staleTime: 5 * 60 * 1000, // 5 minutes (rarely changes)
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-product-mutations.ts"
+    description: "React Query mutations for product CRUD"
+    exports:
+      - name: "useCreateProduct"
+        returns: "UseMutationResult<Product, Error, CreateProductInput>"
+      - name: "useUpdateProduct"
+        returns: "UseMutationResult<Product, Error, { id: string; data: UpdateProductInput }>"
+      - name: "useDeleteProduct"
+        returns: "UseMutationResult<void, Error, string>"
+
+# UX Notes
+ux:
+  wireframes:
+    - id: "TEC-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-001-products-list.md"
+      components:
+        - "DataTable"
+        - "Search/Filter Bar"
+        - "Status Badges"
+        - "Type Badges"
+        - "Allergen Indicators"
+        - "Actions Menu"
+        - "Pagination"
+    - id: "TEC-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-002-product-modal.md"
+      components:
+        - "Modal Container"
+        - "Form Fields"
+        - "Section Headers"
+        - "Validation Icons"
+        - "Warning Banners"
+        - "Nested Modals"
+        - "Version History Panel"
+
+  patterns:
+    table: "ShadCN DataTable with TanStack Table"
+    modal: "ShadCN Dialog with form"
+    form: "React Hook Form + Zod validation"
+    toast: "ShadCN Toast for success/error notifications"
+
+  states:
+    loading:
+      - "Skeleton rows in table (4 rows)"
+      - "Loading text: 'Loading products...'"
+      - "Disabled filters"
+    empty:
+      - "Empty illustration (package icon)"
+      - "Title: 'No Products Found'"
+      - "Description: 'You haven't created any products yet...'"
+      - "CTA: 'Create Your First Product'"
+      - "Secondary: 'Import Products' link"
+    error:
+      - "Error illustration (warning icon)"
+      - "Title: 'Failed to Load Products'"
+      - "Description: 'Unable to retrieve product list...'"
+      - "CTAs: 'Retry' and 'Contact Support'"
+    success:
+      - "DataTable with products"
+      - "Functional filters"
+      - "Pagination if >20 products"
+
+  accessibility:
+    - "Touch targets >= 48x48dp for all buttons/inputs"
+    - "WCAG AA contrast (4.5:1) for badges"
+    - "Screen reader: row announces 'Product: {code}, {name}, Type: {type}...'"
+    - "Keyboard: Tab navigation, Enter to open modal, Escape to close"
+    - "ARIA: table with proper headers, role='grid' for sortable columns"
+    - "Focus management: first field on modal open, first error on validation fail"

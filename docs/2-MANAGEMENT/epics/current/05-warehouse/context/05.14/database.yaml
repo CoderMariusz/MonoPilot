@@ -1,0 +1,151 @@
+# Story 05.14 - Database Schema
+# Purpose: Tables, RLS policies, indexes, migrations
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_add_label_print_settings.sql"
+    type: "migration"
+    description: "Add label print columns to warehouse_settings"
+  - path: "supabase/migrations/XXX_create_label_print_logs.sql"
+    type: "migration"
+    description: "Create label_print_logs table for audit"
+
+# Schema changes to existing tables
+schema_updates:
+  warehouse_settings:
+    description: "Add label printing configuration columns"
+    columns_to_add:
+      - name: "print_label_on_receipt"
+        type: "BOOLEAN"
+        default: "true"
+        description: "Auto-print labels when GRN completed"
+      - name: "label_copies_default"
+        type: "INTEGER"
+        default: "1"
+        description: "Default number of label copies"
+      - name: "label_size"
+        type: "TEXT"
+        default: "'4x6'"
+        check: "label_size IN ('4x6', '4x3', '3x2')"
+        description: "Label dimensions in inches"
+      - name: "printer_ip"
+        type: "TEXT"
+        nullable: true
+        description: "Zebra printer IP address (Phase 2)"
+      - name: "printer_port"
+        type: "INTEGER"
+        default: "9100"
+        description: "Zebra printer port (default ZPL over TCP)"
+    migration_sql: |
+      ALTER TABLE warehouse_settings
+      ADD COLUMN IF NOT EXISTS print_label_on_receipt BOOLEAN DEFAULT true,
+      ADD COLUMN IF NOT EXISTS label_copies_default INTEGER DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS label_size TEXT DEFAULT '4x6'
+        CHECK (label_size IN ('4x6', '4x3', '3x2')),
+      ADD COLUMN IF NOT EXISTS printer_ip TEXT,
+      ADD COLUMN IF NOT EXISTS printer_port INTEGER DEFAULT 9100;
+
+# New tables
+tables:
+  - name: "label_print_logs"
+    description: "Audit log for label print requests"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "lp_id", type: "UUID", constraints: "REFERENCES license_plates(id) ON DELETE SET NULL" }
+      - { name: "pallet_id", type: "UUID", constraints: "REFERENCES pallets(id) ON DELETE SET NULL", notes: "Phase 3 - pallet labels" }
+      - { name: "label_type", type: "TEXT", constraints: "NOT NULL CHECK (label_type IN ('lp', 'pallet', 'grn'))" }
+      - { name: "copies", type: "INTEGER", constraints: "NOT NULL DEFAULT 1" }
+      - { name: "printed_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "printed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "auto_print", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "printer_ip", type: "TEXT", constraints: "" }
+      - { name: "print_method", type: "TEXT", constraints: "DEFAULT 'download' CHECK (print_method IN ('download', 'tcp', 'queue'))" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_label_print_logs_org ON label_print_logs(org_id)"
+      - "idx_label_print_logs_lp ON label_print_logs(lp_id) WHERE lp_id IS NOT NULL"
+      - "idx_label_print_logs_date ON label_print_logs(printed_at)"
+    migration_sql: |
+      CREATE TABLE IF NOT EXISTS label_print_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        lp_id UUID REFERENCES license_plates(id) ON DELETE SET NULL,
+        pallet_id UUID REFERENCES pallets(id) ON DELETE SET NULL,
+        label_type TEXT NOT NULL CHECK (label_type IN ('lp', 'pallet', 'grn')),
+        copies INTEGER NOT NULL DEFAULT 1,
+        printed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        printed_by UUID REFERENCES users(id),
+        auto_print BOOLEAN DEFAULT false,
+        printer_ip TEXT,
+        print_method TEXT DEFAULT 'download' CHECK (print_method IN ('download', 'tcp', 'queue'))
+      );
+
+      CREATE INDEX idx_label_print_logs_org ON label_print_logs(org_id);
+      CREATE INDEX idx_label_print_logs_lp ON label_print_logs(lp_id) WHERE lp_id IS NOT NULL;
+      CREATE INDEX idx_label_print_logs_date ON label_print_logs(printed_at);
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "label_print_logs"
+      name: "label_print_logs_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "label_print_logs"
+      name: "label_print_logs_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "label_print_logs"
+      name: "label_print_logs_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')"
+
+  rls_migration_sql: |
+    ALTER TABLE label_print_logs ENABLE ROW LEVEL SECURITY;
+
+    CREATE POLICY "label_print_logs_org_isolation" ON label_print_logs
+    FOR SELECT TO authenticated
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+    CREATE POLICY "label_print_logs_insert" ON label_print_logs
+    FOR INSERT TO authenticated
+    WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+    CREATE POLICY "label_print_logs_delete" ON label_print_logs
+    FOR DELETE TO authenticated
+    USING (
+      org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+    );
+
+# Data queries for label generation
+queries:
+  get_lp_label_data:
+    description: "Fetch LP with product and location joins for label"
+    sql: |
+      SELECT
+        lp.id,
+        lp.lp_number,
+        lp.quantity,
+        lp.uom,
+        lp.batch_number,
+        lp.supplier_batch_number,
+        lp.expiry_date,
+        lp.manufacture_date,
+        lp.gtin,
+        p.name AS product_name,
+        p.code AS product_code,
+        l.code AS location_code,
+        l.name AS location_name,
+        w.name AS warehouse_name
+      FROM license_plates lp
+      JOIN products p ON lp.product_id = p.id
+      LEFT JOIN locations l ON lp.location_id = l.id
+      LEFT JOIN warehouses w ON lp.warehouse_id = w.id
+      WHERE lp.id = $1
+        AND lp.org_id = (SELECT org_id FROM users WHERE id = auth.uid());

@@ -1,0 +1,380 @@
+# Story 07.6 - Validation Schemas & Business Rules
+
+validation:
+  schemas:
+    - name: "OverrideAllergenRequest"
+      description: "Schema for POST /api/shipping/sales-orders/:id/override-allergen"
+      zod_schema: |
+        import { z } from 'zod';
+
+        export const OverrideAllergenRequestSchema = z.object({
+          reason: z.string()
+            .min(20, 'Reason must be at least 20 characters')
+            .max(500, 'Reason must not exceed 500 characters')
+            .trim(),
+          confirmed: z.boolean()
+            .refine(v => v === true, { message: 'Must confirm override authorization' })
+        });
+
+        export type OverrideAllergenRequest = z.infer<typeof OverrideAllergenRequestSchema>;
+      fields:
+        - name: "reason"
+          type: "string"
+          min_length: 20
+          max_length: 500
+          required: true
+          description: "Explanation for why allergen conflict is acceptable"
+          error_messages:
+            - "Reason is required"
+            - "Reason must be at least 20 characters"
+            - "Reason must not exceed 500 characters"
+        - name: "confirmed"
+          type: "boolean"
+          required: true
+          must_be_true: true
+          description: "User confirms understanding of override responsibility"
+          error_messages:
+            - "Must confirm override authorization"
+
+    - name: "AllergenConflict"
+      description: "Single allergen conflict from validation results"
+      fields:
+        - name: "line_id"
+          type: "string (UUID)"
+          description: "Sales order line ID"
+        - name: "line_number"
+          type: "integer"
+          description: "Line number (1-indexed) for UI display"
+          constraints: "> 0"
+        - name: "product_id"
+          type: "string (UUID)"
+          description: "Product ID"
+        - name: "product_code"
+          type: "string"
+          description: "Product SKU/code"
+          max_length: 50
+        - name: "product_name"
+          type: "string"
+          description: "Product display name"
+          max_length: 255
+        - name: "allergen_id"
+          type: "string (UUID)"
+          description: "Allergen ID from allergens table"
+        - name: "allergen_code"
+          type: "string"
+          description: "Allergen code (PEANUT, MILK, etc.)"
+          max_length: 20
+        - name: "allergen_name"
+          type: "string"
+          description: "Allergen display name (Peanuts, Milk, etc.)"
+          max_length: 100
+
+    - name: "ValidateAllergensResponse"
+      description: "Response from allergen validation"
+      fields:
+        - name: "valid"
+          type: "boolean"
+          description: "True if no conflicts (can proceed)"
+        - name: "conflicts"
+          type: "AllergenConflict[]"
+          description: "Array of detected conflicts (empty if valid=true)"
+        - name: "customer_restrictions"
+          type: "string[] (allergen IDs)"
+          description: "Customer's allergen restrictions"
+        - name: "validated_at"
+          type: "string (ISO 8601)"
+          description: "Validation timestamp"
+        - name: "validated_by"
+          type: "string"
+          description: "User or system name that performed validation"
+
+  business_rules:
+    - id: "BR-001"
+      name: "Allergen Validation Scope"
+      description: "Only 'Contains' allergen declarations trigger conflicts"
+      rule: |
+        WHEN checking product allergens against customer restrictions:
+        - Include allergens with relation_type = 'contains'
+        - Exclude allergens with relation_type = 'may_contain'
+        - Only match exact allergen_id comparison
+      validation_point: "Service layer (checkAllergenConflicts function)"
+      example: |
+        Product "Peanut Brittle" has:
+        - allergen: PEANUT, relation_type: 'contains' ✓ (triggers conflict)
+        - allergen: TREE_NUT, relation_type: 'may_contain' ✗ (no conflict)
+
+    - id: "BR-002"
+      name: "Customer with No Restrictions"
+      description: "Validation passes automatically if customer has no allergen restrictions"
+      rule: |
+        IF customer.allergen_restrictions IS NULL OR EMPTY:
+          RETURN { valid: true, conflicts: [] }
+      validation_point: "Service layer (early return)"
+      business_impact: "No blocking for unrestricted customers"
+
+    - id: "BR-003"
+      name: "Sales Order Confirmation Block"
+      description: "SO confirmation blocked until allergen validation passes"
+      rule: |
+        BEFORE updating sales_orders.status = 'confirmed':
+        - RUN allergen validation
+        - IF valid OR override_approved:
+          ALLOW confirmation
+        - ELSE:
+          REJECT confirmation + display alert
+      validation_point: "API endpoint (/sales-orders/:id/confirm)"
+      database_check: "(allergen_validated = true) OR (allow_allergen_override = true)"
+
+    - id: "BR-004"
+      name: "Validation Reset on Line Change"
+      description: "Any line add/edit resets allergen_validated flag"
+      rule: |
+        WHEN adding/editing/deleting sales_order_line:
+        - SET sales_orders.allergen_validated = false
+        - SET sales_orders.allergen_validation_date = NULL
+        - RUN validation (async, non-blocking)
+      validation_point: "POST/PUT/DELETE line endpoints"
+      business_impact: "Forces re-validation after each change"
+
+    - id: "BR-005"
+      name: "Override Authority"
+      description: "Only Manager and Admin roles can override allergen blocks"
+      rule: |
+        BEFORE allowing override:
+        - CHECK user.role IN ['Manager', 'Admin']
+        - IF NOT: REJECT with 403 Forbidden
+        - IF YES: ALLOW override after reason validation
+      validation_point: "RLS policy + endpoint check"
+      enforcement: "Database RLS + API role check"
+
+    - id: "BR-006"
+      name: "Override Reason Capture"
+      description: "Override must include reason (20-500 chars) for audit trail"
+      rule: |
+        WHEN creating override:
+        - Validate reason field
+        - Min length: 20 characters
+        - Max length: 500 characters
+        - Store in sales_orders.allergen_override_reason
+        - Log to audit_logs.reason
+      validation_point: "OverrideAllergenRequest schema + API endpoint"
+      audit_trail: "Every override reason stored for compliance"
+
+    - id: "BR-007"
+      name: "Override Audit Logging"
+      description: "All overrides logged with user, timestamp, and reason"
+      rule: |
+        WHEN override applied:
+        - Create audit_logs entry:
+          entity_type: 'sales_order'
+          entity_id: SO id
+          action: 'allergen_override'
+          user_id: current user
+          reason: entered reason
+          timestamp: now()
+          ip_address: request IP (optional)
+        - Update sales_orders with override metadata
+      validation_point: "OverrideAllergenService.overrideAllergenBlock()"
+      compliance: "Full audit trail for food safety compliance"
+
+    - id: "BR-008"
+      name: "Performance Target"
+      description: "Allergen validation completes within 1 second"
+      rule: |
+        FOR sales_order WITH 50 lines AND customer WITH 5 allergen restrictions:
+        - Validation time: < 1000ms
+        - Includes database queries + conflict detection
+      validation_point: "Performance testing + monitoring"
+      optimization: "Indexed queries, eager loading product allergens"
+
+    - id: "BR-009"
+      name: "Customer Order History Pagination"
+      description: "Order history uses cursor-based pagination (20 items per page)"
+      rule: |
+        GET /api/shipping/customers/:id/orders:
+        - Default: page=1, limit=20
+        - Max limit: 100
+        - Sort: order_date DESC (newest first)
+        - Pagination info included in response
+      validation_point: "API endpoint query parameters"
+      performance: "< 300ms response time"
+
+  validation_rules:
+    - field: "allergen_restrictions"
+      type: "Array of allergen IDs"
+      constraints:
+        - "Array can be empty (no restrictions)"
+        - "Each ID must reference valid allergen record"
+        - "Duplicate IDs not allowed"
+        - "Max 50 allergens per customer"
+      error_handling: "400 Bad Request if invalid allergen ID"
+
+    - field: "allergen_validated"
+      type: "Boolean"
+      constraints:
+        - "Default: false for new orders"
+        - "Cannot be true without validation result"
+        - "Reset to false on line change"
+      error_handling: "500 Internal Server Error if constraint violated"
+
+    - field: "allow_allergen_override"
+      type: "Boolean"
+      constraints:
+        - "Default: false for new orders"
+        - "Can only be true if allergen_override_reason is set"
+        - "Can only be set by Manager+ role"
+      error_handling: "Enforce via RLS policy + application logic"
+
+    - field: "allergen_override_reason"
+      type: "Text"
+      constraints:
+        - "Required if allow_allergen_override = true"
+        - "Min: 20 characters"
+        - "Max: 500 characters"
+        - "Cannot be empty string"
+      error_handling: "400 Bad Request if validation fails"
+      example: "Customer confirmed they can accept milk products for this order per phone call on 2025-12-16"
+
+  error_handling:
+    - code: "ALLERGEN_CONFLICT"
+      status: 200
+      description: "Validation returned conflicts but endpoint succeeded"
+      response: |
+        {
+          "valid": false,
+          "conflicts": [...],
+          "message": "Allergen conflicts detected"
+        }
+      handling: "Display AllergenAlert component to user"
+
+    - code: "INVALID_REASON"
+      status: 400
+      description: "Override reason fails validation"
+      response: |
+        {
+          "error": "Reason must be between 20-500 characters",
+          "field": "reason"
+        }
+      handling: "Display field error in form"
+
+    - code: "PERMISSION_DENIED"
+      status: 403
+      description: "User lacks Manager+ role for override"
+      response: |
+        {
+          "error": "Only Manager or Admin roles can override allergen blocks"
+        }
+      handling: "Hide override button, show info text"
+
+    - code: "SALES_ORDER_NOT_FOUND"
+      status: 404
+      description: "SO doesn't exist or user lacks access"
+      response: |
+        {
+          "error": "Sales order not found"
+        }
+      handling: "Navigate to error page or close modal"
+
+  type_definitions:
+    AllergenConflict:
+      typescript: |
+        interface AllergenConflict {
+          line_id: string;
+          line_number: number;
+          product_id: string;
+          product_code: string;
+          product_name: string;
+          allergen_id: string;
+          allergen_code: string;
+          allergen_name: string;
+        }
+
+    ValidateAllergensResponse:
+      typescript: |
+        interface ValidateAllergensResponse {
+          valid: boolean;
+          conflicts: AllergenConflict[];
+          customer_restrictions: string[];
+          validated_at: string;
+          validated_by: string;
+        }
+
+    OverrideAllergenRequest:
+      typescript: |
+        interface OverrideAllergenRequest {
+          reason: string; // min 20, max 500 chars
+          confirmed: boolean; // must be true
+        }
+
+    OverrideAllergenResponse:
+      typescript: |
+        interface OverrideAllergenResponse {
+          success: boolean;
+          allergen_validated: boolean;
+          allow_allergen_override: boolean;
+          overridden_by: string;
+          overridden_at: string;
+          audit_log_id: string;
+        }
+
+# Acceptance Criteria Validation Mapping
+acceptance_criteria:
+  AC-1:
+    name: "Allergen Validation on SO Confirmation"
+    validates:
+      - "BL-001 (Allergen Validation Scope)"
+      - "BL-003 (SO Confirmation Block)"
+    test_scenario: |
+      Given: Customer with peanuts + milk allergens
+      When: SO with conflicting products confirmed
+      Then: Validation blocks, AllergenAlert displays
+      And: sales_orders.allergen_validated = false
+      And: SO status remains 'draft'
+
+  AC-5:
+    name: "Manager Override with Reason"
+    validates:
+      - "BL-005 (Override Authority)"
+      - "BL-006 (Override Reason Capture)"
+      - "BL-007 (Override Audit Logging)"
+    test_scenario: |
+      Given: AllergenAlert with Manager role
+      When: Manager enters reason + confirms override
+      Then: Override applied, audit log created
+      And: sales_orders.allow_allergen_override = true
+      And: SO confirmation now unblocked
+
+  AC-9:
+    name: "Customer Order History Pagination"
+    validates:
+      - "BL-009 (Order History Pagination)"
+    test_scenario: |
+      Given: Customer with 45 orders
+      When: Order History tab loads
+      Then: First 20 orders display
+      And: Pagination shows "Page 1 of 3"
+      And: Click "Next" loads next 20
+
+# Validation Testing Strategy
+testing:
+  unit_tests:
+    - test: "Validation passes for no customer restrictions"
+      validates: "BR-002"
+    - test: "Validation detects 'contains' allergens"
+      validates: "BL-001"
+    - test: "Override reason validation (min 20 chars)"
+      validates: "BL-006"
+    - test: "Only Manager/Admin can override"
+      validates: "BL-005"
+    - test: "Audit log created on override"
+      validates: "BL-007"
+
+  integration_tests:
+    - test: "Full validation + override flow"
+      validates: "BL-001, BL-003, BL-005, BL-006, BL-007"
+    - test: "Order history pagination"
+      validates: "BL-009"
+
+  e2e_tests:
+    - test: "User sees allergen alert, overrides with reason, SO confirms"
+      validates: "All BLs"

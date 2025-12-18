@@ -1,0 +1,547 @@
+# Story 02.1 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/product-service.test.ts"
+    type: "unit"
+    description: "Unit tests for product CRUD operations"
+  - path: "apps/frontend/lib/services/__tests__/product-type-service.test.ts"
+    type: "unit"
+    description: "Unit tests for product type operations"
+  - path: "apps/frontend/lib/validation/__tests__/product.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/app/api/v1/technical/products/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for products API endpoints"
+  - path: "supabase/tests/products-rls.test.sql"
+    type: "integration"
+    description: "Integration tests for products RLS policies"
+  - path: "e2e/technical/products.spec.ts"
+    type: "e2e"
+    description: "E2E tests for product CRUD flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Product Creation
+  - id: "AC-01"
+    category: "Product Creation"
+    given: "a user with create permissions"
+    when: "they submit a valid product form"
+    then: "a new product is created with version 1 and status 'active'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    category: "Product Creation"
+    given: "a user creating a product"
+    when: "they enter an SKU that already exists in their org"
+    then: "an error 'SKU already exists' is displayed and form submission is blocked"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    category: "Product Creation"
+    given: "a user creating a product"
+    when: "they select a product type (RM/WIP/FG/PKG/BP)"
+    then: "the product is saved with that type which becomes immutable"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    category: "Product Creation"
+    given: "required fields (code, name, product_type_id, base_uom)"
+    when: "any is missing"
+    then: "validation errors are shown and form cannot be submitted"
+    test_type: "unit"
+    priority: "P0"
+
+  # Product Editing
+  - id: "AC-05"
+    category: "Product Editing"
+    given: "an existing product"
+    when: "a user opens the edit modal"
+    then: "the SKU field is locked and cannot be modified"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06"
+    category: "Product Editing"
+    given: "an existing product"
+    when: "a user opens the edit modal"
+    then: "the product type field is locked and cannot be modified"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-07"
+    category: "Product Editing"
+    given: "a user updating a product"
+    when: "they save changes"
+    then: "the updated_at timestamp is updated"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-08"
+    category: "Product Editing"
+    given: "a user updating a product"
+    when: "they change the status to 'inactive'"
+    then: "the product status is updated (warning shown if active BOMs exist)"
+    test_type: "integration"
+    priority: "P1"
+
+  # Product Listing
+  - id: "AC-09"
+    category: "Product Listing"
+    given: "products exist in the organization"
+    when: "a user visits /technical/products"
+    then: "products are displayed in a paginated DataTable (20 per page)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-10"
+    category: "Product Listing"
+    given: "a user on the products list"
+    when: "they enter a search term"
+    then: "products are filtered by SKU (code) or name (real-time, min 2 chars)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-11"
+    category: "Product Listing"
+    given: "a user on the products list"
+    when: "they select a product type filter"
+    then: "only products of that type are displayed"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-12"
+    category: "Product Listing"
+    given: "a user on the products list"
+    when: "they select a status filter"
+    then: "only products with that status are displayed"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    category: "Product Listing"
+    given: "a user on the products list"
+    when: "they click column headers"
+    then: "products are sorted by that column (asc/desc toggle)"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Product Deletion
+  - id: "AC-14"
+    category: "Product Deletion"
+    given: "a product with no BOMs, work orders, or inventory"
+    when: "a user deletes it"
+    then: "the product is soft-deleted and removed from the list"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    category: "Product Deletion"
+    given: "a product referenced by BOMs or inventory"
+    when: "a user attempts to delete it"
+    then: "an error is displayed and deletion is blocked"
+    test_type: "integration"
+    priority: "P0"
+
+  # Product Types
+  - id: "AC-16"
+    category: "Product Types"
+    given: "the system is initialized"
+    when: "product types are queried"
+    then: "default types (RM, WIP, FG, PKG, BP) are available"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-17"
+    category: "Product Types"
+    given: "a user creating a product"
+    when: "they select a product type"
+    then: "the type badge is displayed correctly with color coding"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Technical Settings
+  - id: "AC-18"
+    category: "Technical Settings"
+    given: "a product with expiry_policy set to 'fixed' or 'rolling'"
+    when: "shelf_life_days is empty"
+    then: "validation requires shelf_life_days to be filled"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-19"
+    category: "Technical Settings"
+    given: "a product with min_stock and max_stock"
+    when: "min_stock > max_stock"
+    then: "validation error is displayed on both fields"
+    test_type: "unit"
+    priority: "P0"
+
+  # Standard Price (FR-2.13)
+  - id: "AC-20"
+    category: "Standard Price"
+    given: "a user creating or editing a product"
+    when: "the form loads"
+    then: "the std_price field is displayed in the Costing section"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-21"
+    category: "Standard Price"
+    given: "a user enters std_price"
+    when: "the value is negative"
+    then: "validation error 'Standard price cannot be negative' is displayed"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-22"
+    category: "Standard Price"
+    given: "a user enters std_price"
+    when: "the value has more than 4 decimal places"
+    then: "validation error 'Maximum 4 decimal places allowed' is displayed"
+    test_type: "unit"
+    priority: "P0"
+
+  # Cost Validation for RM/PKG (FR-2.15)
+  - id: "AC-23"
+    category: "Cost Validation"
+    given: "a user creating a product with type RM (Raw Material)"
+    when: "cost_per_unit is left empty"
+    then: "a warning 'Cost per unit recommended for raw materials' is displayed (non-blocking)"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-24"
+    category: "Cost Validation"
+    given: "a user creating a product with type PKG (Packaging)"
+    when: "cost_per_unit is left empty"
+    then: "a warning 'Cost per unit recommended for packaging materials' is displayed (non-blocking)"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-25"
+    category: "Cost Validation"
+    given: "a user creating a product with type FG or WIP"
+    when: "cost_per_unit is empty"
+    then: "no warning is displayed (cost calculated from BOM)"
+    test_type: "e2e"
+    priority: "P1"
+
+  # API Validation
+  - id: "AC-26"
+    category: "API Validation"
+    given: "an API request with invalid GTIN-14"
+    when: "submitted"
+    then: "a 400 error with validation message is returned"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-27"
+    category: "API Validation"
+    given: "an API request with lead_time_days < 0"
+    when: "submitted"
+    then: "a 400 error is returned"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-28"
+    category: "API Validation"
+    given: "an API request with moq <= 0"
+    when: "submitted"
+    then: "a 400 error is returned"
+    test_type: "integration"
+    priority: "P0"
+
+  # Multi-tenancy
+  - id: "AC-29"
+    category: "Multi-tenancy"
+    given: "User A from Org A"
+    when: "they request products"
+    then: "only Org A products are returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-30"
+    category: "Multi-tenancy"
+    given: "User A from Org A"
+    when: "they request Product X from Org B by ID"
+    then: "404 Not Found is returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  product_service:
+    - name: "list returns paginated products"
+      setup: "Mock API response with products array"
+      expected: "Returns PaginatedProductResult with correct shape"
+
+    - name: "create sends correct payload"
+      setup: "Mock successful API response"
+      params: ["CreateProductInput"]
+      expected: "Returns created Product"
+
+    - name: "update sends only changed fields"
+      setup: "Mock successful API response"
+      params: ["id: string", "UpdateProductInput"]
+      expected: "Returns updated Product"
+
+    - name: "delete calls correct endpoint"
+      setup: "Mock 204 response"
+      params: ["id: string"]
+      expected: "Resolves void"
+
+    - name: "checkSkuExists returns true for duplicate"
+      setup: "Mock API response with existing product"
+      params: ["sku: string"]
+      expected: "Returns true"
+
+    - name: "checkSkuExists returns false for unique"
+      setup: "Mock API response with no results"
+      params: ["sku: string"]
+      expected: "Returns false"
+
+  product_type_service:
+    - name: "list returns all product types"
+      setup: "Mock API response with 5 types"
+      expected: "Returns array of ProductType"
+
+  validation_schemas:
+    - name: "createProductSchema validates required fields"
+      setup: "Empty object"
+      expected: "Throws with errors for code, name, product_type_id, base_uom"
+
+    - name: "createProductSchema validates SKU format"
+      setup: "{ code: 'invalid sku!' }"
+      expected: "Throws with regex error"
+
+    - name: "createProductSchema validates GTIN-14 check digit"
+      setup: "{ gtin: '12345678901234' } (invalid check digit)"
+      expected: "Throws with GTIN error"
+
+    - name: "createProductSchema validates shelf life requirement"
+      setup: "{ expiry_policy: 'fixed', shelf_life_days: null }"
+      expected: "Throws with shelf life required error"
+
+    - name: "createProductSchema validates min/max stock"
+      setup: "{ min_stock: 100, max_stock: 50 }"
+      expected: "Throws with min > max error"
+
+    - name: "createProductSchema validates std_price decimals"
+      setup: "{ std_price: 10.12345 }"
+      expected: "Throws with decimal places error"
+
+    - name: "updateProductSchema allows partial updates"
+      setup: "{ name: 'New Name' }"
+      expected: "Validates successfully"
+
+    - name: "updateProductSchema does not allow code"
+      setup: "{ code: 'NEW-SKU' }"
+      expected: "Throws (code not in schema)"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/v1/technical/products returns paginated list"
+      setup: "Create 25 products"
+      action: "GET /api/v1/technical/products?page=1&limit=20"
+      expected: "Returns 20 products, total=25, total_pages=2"
+
+    - name: "GET /api/v1/technical/products filters by search"
+      setup: "Create products: SKU-001 (Flour), SKU-002 (Sugar)"
+      action: "GET /api/v1/technical/products?search=flour"
+      expected: "Returns only SKU-001"
+
+    - name: "GET /api/v1/technical/products filters by type"
+      setup: "Create RM and FG products"
+      action: "GET /api/v1/technical/products?type=RM"
+      expected: "Returns only RM products"
+
+    - name: "POST /api/v1/technical/products creates product"
+      setup: "Valid CreateProductInput"
+      action: "POST /api/v1/technical/products"
+      expected: "Returns 201 with created product, version=1"
+
+    - name: "POST /api/v1/technical/products rejects duplicate SKU"
+      setup: "Create product with SKU-001"
+      action: "POST /api/v1/technical/products with SKU-001"
+      expected: "Returns 400 with SKU_ALREADY_EXISTS"
+
+    - name: "PUT /api/v1/technical/products/:id updates product"
+      setup: "Create product"
+      action: "PUT /api/v1/technical/products/:id with { name: 'New Name' }"
+      expected: "Returns 200 with updated name"
+
+    - name: "PUT /api/v1/technical/products/:id rejects code change"
+      setup: "Create product"
+      action: "PUT /api/v1/technical/products/:id with { code: 'NEW-SKU' }"
+      expected: "Returns 400 with IMMUTABLE_FIELD"
+
+    - name: "DELETE /api/v1/technical/products/:id deletes unused product"
+      setup: "Create product with no references"
+      action: "DELETE /api/v1/technical/products/:id"
+      expected: "Returns 204"
+
+  rls_isolation:
+    - name: "User can only read own organization's products"
+      setup: |
+        - Create Org A with User A and Product A
+        - Create Org B with User B and Product B
+      action: "User A queries products table"
+      expected: "Only Product A returned, Product B not visible"
+
+    - name: "User can create product in own org"
+      setup: "Create Org A with User A"
+      action: "User A inserts product"
+      expected: "Product created with org_id = Org A"
+
+    - name: "Cross-tenant read returns empty (not error)"
+      setup: |
+        - Create Org A with User A
+        - Create Org B with Product B
+      action: "User A queries products.select().eq('id', Product B.id)"
+      expected: "Returns empty array (RLS filters it out)"
+
+    - name: "Cross-tenant update fails silently"
+      setup: |
+        - Create Org A with User A
+        - Create Org B with Product B
+      action: "User A updates Product B"
+      expected: "Returns 0 rows affected (RLS blocks)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full product creation flow"
+    steps:
+      - "Navigate to /technical/products"
+      - "Click '+ Create Product'"
+      - "Fill required fields (SKU, Name, Type, UoM)"
+      - "Click 'Create Product'"
+    expected:
+      - "Modal closes"
+      - "Success toast shown"
+      - "New product appears in list"
+
+  - name: "Product edit flow with locked fields"
+    steps:
+      - "Navigate to /technical/products"
+      - "Click edit on existing product"
+      - "Verify SKU field is disabled"
+      - "Verify Type field is disabled"
+      - "Change name"
+      - "Click 'Save Changes'"
+    expected:
+      - "Name is updated"
+      - "Version badge shows increment warning"
+
+  - name: "Search and filter flow"
+    steps:
+      - "Navigate to /technical/products (with multiple products)"
+      - "Enter search term"
+      - "Verify list updates"
+      - "Select type filter"
+      - "Verify list updates"
+      - "Clear filters"
+    expected:
+      - "Search filters by code/name"
+      - "Type filter shows only matching products"
+      - "Clear restores full list"
+
+  - name: "Delete product with confirmation"
+    steps:
+      - "Navigate to /technical/products"
+      - "Click delete on unused product"
+      - "Confirm deletion"
+    expected:
+      - "Confirmation modal shown"
+      - "Product removed from list"
+      - "Success toast shown"
+
+  - name: "Delete blocked for product with BOMs"
+    steps:
+      - "Navigate to /technical/products"
+      - "Click delete on product with BOMs"
+    expected:
+      - "Error toast: 'Cannot delete product with active BOMs'"
+      - "Product remains in list"
+
+# Definition of Done
+definition_of_done:
+  - "All CRUD operations work correctly (create, read, update, delete)"
+  - "SKU uniqueness enforced at API and database level"
+  - "SKU and product type immutable after creation"
+  - "Product type badges display with correct colors"
+  - "Status badges display with correct colors"
+  - "Search filters products by code/name (real-time, debounced)"
+  - "Type and status filters work correctly"
+  - "Pagination works (20 items per page default)"
+  - "Sorting works on all sortable columns"
+  - "Form validation displays inline errors"
+  - "GTIN-14 validation with check digit algorithm"
+  - "Lead time and MOQ validation (per ADR-010)"
+  - "Min/max stock validation (min <= max)"
+  - "Shelf life required when expiry policy is set"
+  - "std_price field displayed and validates correctly (FR-2.13)"
+  - "cost_per_unit warning shown for RM/PKG products (FR-2.15)"
+  - "RLS enforces org isolation"
+  - "Cross-tenant access returns 404 (not 403)"
+  - "Unit tests for product service (coverage >= 80%)"
+  - "Integration tests for API endpoints"
+  - "E2E tests for product CRUD flow"
+  - "Loading states displayed during API calls"
+  - "Error states handled gracefully with retry option"
+  - "Empty state shown when no products exist"
+  - "Toast notifications on success/error"
+  - "Accessibility: keyboard navigation, ARIA labels, focus management"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Good coverage for service and validation logic"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS policies must be thoroughly tested"
+  e2e:
+    target: 60
+    reason: "Core user flows covered"
+  files:
+    - "lib/services/product-service.ts: 80%"
+    - "lib/services/product-type-service.ts: 80%"
+    - "lib/validation/product.ts: 95%"
+    - "app/api/v1/technical/products/route.ts: 80%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak data across tenants"
+    mitigation: "Comprehensive integration tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-02"
+    description: "GTIN-14 validation edge cases"
+    mitigation: "Unit tests with various GTIN formats including edge cases"
+    severity: "medium"
+    test_coverage: "unit_tests.validation_schemas"
+
+  - id: "RISK-03"
+    description: "Concurrent SKU creation could bypass uniqueness check"
+    mitigation: "Database UNIQUE constraint as final safeguard"
+    severity: "low"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-04"
+    description: "Large product lists could cause performance issues"
+    mitigation: "Pagination enforced, max 100 per page"
+    severity: "low"
+    test_coverage: "Integration test with 1000+ products (optional)"

@@ -296,6 +296,7 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
       routing_id: input.routing_id || null,
       units_per_box: input.units_per_box || null,
       boxes_per_pallet: input.boxes_per_pallet || null,
+      yield_percent: input.yield_percent || 100,
       created_by: userInfo.userId,
       updated_by: userInfo.userId
     })
@@ -697,4 +698,145 @@ export async function calculateLaborCost(
   const total_labor_cost = breakdown.reduce((sum, op) => sum + op.cost, 0)
 
   return { total_labor_cost, breakdown }
+}
+
+// ============================================================================
+// BOM YIELD CALCULATION - FR-2.34
+// ============================================================================
+
+export interface YieldCalculation {
+  plannedQuantity: number
+  yieldPercent: number
+  actualQuantity: number
+  wasteQuantity: number
+}
+
+/**
+ * Calculate actual output quantity accounting for yield percentage
+ * FR-2.34 Simple scope: Basic yield calculation
+ *
+ * Formula: actualOutput = plannedOutput × (yield_percent / 100)
+ *
+ * @param bomId - BOM ID to get yield_percent from
+ * @param plannedQuantity - Planned production quantity
+ * @returns Yield calculation breakdown
+ */
+export async function calculateBOMYield(
+  bomId: string,
+  plannedQuantity: number
+): Promise<YieldCalculation> {
+  const supabase = await createServerSupabase()
+
+  // Get BOM yield setting
+  const { data: bom, error } = await supabase
+    .from('boms')
+    .select('yield_percent')
+    .eq('id', bomId)
+    .single()
+
+  if (error) {
+    console.error('Error fetching BOM for yield calculation:', error)
+    throw new Error(`Failed to fetch BOM: ${error.message}`)
+  }
+
+  const yieldPercent = bom?.yield_percent || 100
+  const actualQuantity = (plannedQuantity * yieldPercent) / 100
+  const wasteQuantity = plannedQuantity - actualQuantity
+
+  return {
+    plannedQuantity,
+    yieldPercent,
+    actualQuantity,
+    wasteQuantity
+  }
+}
+
+// ============================================================================
+// BOM SCALING - FR-2.35
+// ============================================================================
+
+export interface ScaledBOMItem {
+  itemId: string
+  productCode: string
+  productName: string
+  originalQty: number
+  scaledQty: number
+  uom: string
+}
+
+export interface BOMScaleResult {
+  originalOutputQty: number
+  newOutputQty: number
+  multiplier: number
+  scaledItems: ScaledBOMItem[]
+}
+
+/**
+ * Scale BOM quantities by multiplier
+ * FR-2.35 Simple scope: One-time batch adjustment
+ *
+ * Multiplies output_qty and all bom_items quantities by given multiplier.
+ * Returns scaled results without saving (read-only calculation).
+ *
+ * @param bomId - BOM ID to scale
+ * @param multiplier - Scaling factor (e.g., 2.5 for 2.5x batch)
+ * @returns Scaled output and item quantities
+ */
+export async function scaleBOM(
+  bomId: string,
+  multiplier: number
+): Promise<BOMScaleResult> {
+  if (multiplier <= 0) {
+    throw new Error('Multiplier must be positive')
+  }
+
+  const supabase = await createServerSupabase()
+
+  // Get BOM with items
+  const { data: bom, error } = await supabase
+    .from('boms')
+    .select(`
+      output_qty,
+      output_uom,
+      items:bom_items(
+        id,
+        quantity,
+        uom,
+        product:products!component_id(id, code, name)
+      )
+    `)
+    .eq('id', bomId)
+    .single()
+
+  if (error) {
+    console.error('Error fetching BOM for scaling:', error)
+    throw new Error(`Failed to fetch BOM: ${error.message}`)
+  }
+
+  if (!bom) {
+    throw new Error('BOM not found')
+  }
+
+  // Scale output
+  const newOutputQty = bom.output_qty * multiplier
+
+  // Scale all items
+  const scaledItems: ScaledBOMItem[] = (bom.items || []).map((item: any) => {
+    const product = item.product
+    return {
+      itemId: item.id,
+      productCode: product.code,
+      productName: product.name,
+      originalQty: item.quantity,
+      scaledQty: item.quantity * multiplier,
+      uom: item.uom
+    }
+  })
+
+  return {
+    originalOutputQty: bom.output_qty,
+    newOutputQty,
+    multiplier,
+    scaledItems
+  }
 }

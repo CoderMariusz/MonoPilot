@@ -1,0 +1,114 @@
+# Story 03.8 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.8"
+  name: "Transfer Orders CRUD + Lines"
+  slug: "to-crud-lines"
+  epic: "03-planning"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, triggers, indexes
+  - api.yaml         # Endpoints, validation, errors
+  - frontend.yaml    # Pages, components, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "rls_pattern"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses", "warehouse-service"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products", "product-service", "product_types"]
+  soft:
+    - story: "03.16"
+      name: "Planning Settings"
+      provides: ["planning_settings", "to_number_format"]
+  blocked_by: []
+  blocks:
+    - story: "03.9a"
+      name: "Partial Shipments"
+    - story: "03.9b"
+      name: "LP Pre-Selection for TO"
+    - story: "05.x"
+      name: "TO Shipping Execution (Warehouse Module)"
+    - story: "05.y"
+      name: "TO Receiving Execution (Warehouse Module)"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections:
+      - "FR-PLAN-012"  # TO CRUD
+      - "FR-PLAN-013"  # TO Line Management
+      - "FR-PLAN-014"  # TO Status Lifecycle
+      - "Section 6: Transfer Orders"
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Database Schema", "API Design", "Row Level Security"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.8.to-crud-lines.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-010-transfer-order-list.md"
+      id: "PLAN-010"
+      description: "TO List Page"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-011-transfer-order-create-edit-modal.md"
+      id: "PLAN-011"
+      description: "TO Create/Edit Modal"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-012-transfer-order-detail.md"
+      id: "PLAN-012"
+      description: "TO Detail Page"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for multi-tenancy"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "transfer_orders + transfer_order_lines tables + RLS + triggers + indexes"
+  - type: "api"
+    count: 8
+    description: "CRUD endpoints + lines management + status actions"
+  - type: "service"
+    count: 1
+    description: "transfer-order-service.ts"
+  - type: "validation"
+    count: 1
+    description: "transfer-order.ts (Zod schemas)"
+  - type: "pages"
+    count: 2
+    description: "TO list + TO detail page"
+  - type: "components"
+    count: 12
+    description: "DataTable, Modal, Detail, Lines, Actions, Badges"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Master-detail pattern: transfer_orders (header) + transfer_order_lines (lines)"
+  - "Status lifecycle: draft -> planned -> shipped -> received -> closed"
+  - "Business rule: from_warehouse_id != to_warehouse_id (DB constraint + Zod)"
+  - "Business rule: planned_receive_date >= planned_ship_date (DB constraint + Zod)"
+  - "Business rule: No duplicate products per TO (UNIQUE constraint)"
+  - "TO number auto-generation: TO-YYYY-NNNNN format via trigger"
+  - "RLS follows ADR-013: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Permissions: ADMIN, WH_MANAGER = full CRUD; others = read-only"
+  - "MVP excludes: partial shipments (03.9a), LP pre-selection (03.9b)"
+  - "Ship/Receive actions stub API for Epic 05 integration"

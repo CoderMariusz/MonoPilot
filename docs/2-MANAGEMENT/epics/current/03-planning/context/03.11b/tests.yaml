@@ -1,0 +1,441 @@
+# Story 03.11b - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+# Status: DEFERRED - Requires Epic 05
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/wo-reservation-service.test.ts"
+    type: "unit"
+    description: "Unit tests for reservation service and FIFO/FEFO algorithms"
+
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/__tests__/reservations.test.ts"
+    type: "integration"
+    description: "Integration tests for reservation API endpoints"
+
+  - path: "supabase/tests/wo-material-reservations.test.sql"
+    type: "integration"
+    description: "RLS and trigger tests for wo_material_reservations table"
+
+  - path: "apps/frontend/__tests__/e2e/wo-reservations.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for reservation workflow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Auto-Reserve Materials on WO Release"
+    given: "a Work Order with status = 'planned' and wo_materials defined"
+    when: "user changes WO status to 'released'"
+    then: "system automatically reserves LPs for each wo_material using FIFO/FEFO"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "FIFO Picking Algorithm"
+    given: "warehouse_settings.enable_fifo = true AND enable_fefo = false"
+    when: "reserving LPs for material"
+    then: "LPs selected by oldest created_at (receipt date) first"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "FEFO Picking Algorithm"
+    given: "warehouse_settings.enable_fefo = true"
+    when: "reserving LPs for material"
+    then: "LPs selected by soonest expiry_date first (FEFO overrides FIFO)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Reservation Record Creation"
+    given: "LP-001 reserved for wo_material 'Flour' with qty 50 kg"
+    when: "reservation created"
+    then: "wo_material_reservations record created with correct fields"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "LP Availability Filter"
+    given: "license_plates query for reservation"
+    when: "selecting LPs"
+    then: "only LPs with status='available', qa_status='passed', matching warehouse_id"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "Over-Reservation Prevention"
+    given: "LP-001 has quantity = 100 kg"
+    when: "WO-A reserves 80 kg, WO-B attempts to reserve 50 kg"
+    then: "WO-B can reserve with warning (soft reservation allows overlap)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-07"
+    title: "Manual LP Reservation"
+    given: "WO detail page with materials list"
+    when: "user clicks 'Reserve LPs' and selects LP"
+    then: "reservation created via POST API"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-08"
+    title: "Manual LP Release"
+    given: "WO material with reserved LP-001 (50 kg)"
+    when: "user clicks 'Release' on LP-001 reservation"
+    then: "reservation released, wo_material.reserved_qty decremented"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-09"
+    title: "Reserved LPs Display"
+    given: "WO detail page -> materials section"
+    when: "expanding a material row"
+    then: "ReservedLPsList shows all reserved LPs with details"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-10"
+    title: "Auto-Release on WO Cancel"
+    given: "WO-001 with 5 material reservations"
+    when: "WO status changed to 'cancelled'"
+    then: "all reservations set to status = 'released'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    title: "Partial Allocation Handling"
+    given: "wo_material requires 200 kg, total available LPs = 150 kg"
+    when: "auto-reservation runs"
+    then: "150 kg reserved, warning logged, WO proceeds"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-12"
+    title: "API Validation - 404"
+    given: "reservation request for non-existent wo_material_id"
+    when: "API called"
+    then: "returns 404 Not Found"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-13"
+    title: "API Validation - 403 RLS"
+    given: "reservation for WO belonging to different org_id"
+    when: "API called"
+    then: "returns 403 Forbidden (RLS enforced)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-14"
+    title: "API Validation - 409 Conflict"
+    given: "reservation after WO completed/closed"
+    when: "API called"
+    then: "returns 409 Conflict"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-15"
+    title: "Performance - Auto-Reserve"
+    given: "WO with 50 materials"
+    when: "auto-reservation triggered"
+    then: "all reservations completed within 5 seconds"
+    test_type: "performance"
+    priority: "P2"
+
+  - id: "AC-16"
+    title: "Performance - List Display"
+    given: "ReservedLPsList for material"
+    when: "queried"
+    then: "response within 500ms for up to 50 reserved LPs"
+    test_type: "performance"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  fifo_algorithm:
+    - name: "selects oldest LP first"
+      setup: |
+        const lps = [
+          { id: '1', created_at: '2025-01-05', quantity: 50 },
+          { id: '2', created_at: '2025-01-01', quantity: 50 },
+          { id: '3', created_at: '2025-01-03', quantity: 50 },
+        ];
+      action: "selectLPsFIFO(lps, 80)"
+      expected: "result[0].id === '2', result[1].id === '3'"
+
+    - name: "allocates partial quantity from last LP"
+      setup: |
+        const lps = [
+          { id: '1', created_at: '2025-01-01', quantity: 50 },
+          { id: '2', created_at: '2025-01-02', quantity: 50 },
+        ];
+      action: "selectLPsFIFO(lps, 70)"
+      expected: "result[0] = { id: '1', quantity: 50 }, result[1] = { id: '2', quantity: 20 }"
+
+    - name: "handles insufficient inventory"
+      setup: "const lps = [{ id: '1', created_at: '2025-01-01', quantity: 50 }]"
+      action: "selectLPsFIFO(lps, 100)"
+      expected: "result.totalReserved === 50, result.shortage === 50"
+
+    - name: "handles empty LP list"
+      setup: "const lps = []"
+      action: "selectLPsFIFO(lps, 100)"
+      expected: "result = [], totalReserved = 0, shortage = 100"
+
+  fefo_algorithm:
+    - name: "selects soonest expiry first"
+      setup: |
+        const lps = [
+          { id: '1', expiry_date: '2025-03-01', quantity: 50 },
+          { id: '2', expiry_date: '2025-02-15', quantity: 50 },
+          { id: '3', expiry_date: '2025-02-28', quantity: 50 },
+        ];
+      action: "selectLPsFEFO(lps, 80)"
+      expected: "result[0].id === '2', result[1].id === '3'"
+
+    - name: "sorts NULL expiry dates last"
+      setup: |
+        const lps = [
+          { id: '1', expiry_date: null, quantity: 50 },
+          { id: '2', expiry_date: '2025-02-15', quantity: 50 },
+        ];
+      action: "selectLPsFEFO(lps, 80)"
+      expected: "result[0].id === '2', result[1].id === '1'"
+
+    - name: "uses FIFO as tiebreaker for same expiry"
+      setup: |
+        const lps = [
+          { id: '1', expiry_date: '2025-02-15', created_at: '2025-01-05', quantity: 50 },
+          { id: '2', expiry_date: '2025-02-15', created_at: '2025-01-01', quantity: 50 },
+        ];
+      action: "selectLPsFEFO(lps, 80)"
+      expected: "result[0].id === '2' (older created_at wins tie)"
+
+    - name: "handles all NULL expiry dates with FIFO"
+      setup: |
+        const lps = [
+          { id: '1', expiry_date: null, created_at: '2025-01-05', quantity: 50 },
+          { id: '2', expiry_date: null, created_at: '2025-01-01', quantity: 50 },
+        ];
+      action: "selectLPsFEFO(lps, 80)"
+      expected: "Falls back to FIFO: result[0].id === '2'"
+
+  coverage_calculation:
+    - name: "returns full status at 100%"
+      action: "calculateCoverage(100, 100)"
+      expected: "{ percent: 100, shortage: 0, status: 'full' }"
+
+    - name: "returns partial status with shortage"
+      action: "calculateCoverage(100, 80)"
+      expected: "{ percent: 80, shortage: 20, status: 'partial' }"
+
+    - name: "returns none status at 0%"
+      action: "calculateCoverage(100, 0)"
+      expected: "{ percent: 0, shortage: 100, status: 'none' }"
+
+    - name: "handles over-reservation"
+      action: "calculateCoverage(100, 120)"
+      expected: "{ percent: 120, shortage: 0, status: 'full' }"
+
+  can_modify_reservations:
+    - name: "returns true for draft WO"
+      action: "canModifyReservations('draft')"
+      expected: "true"
+
+    - name: "returns true for planned WO"
+      action: "canModifyReservations('planned')"
+      expected: "true"
+
+    - name: "returns true for released WO"
+      action: "canModifyReservations('released')"
+      expected: "true"
+
+    - name: "returns true for in_progress WO"
+      action: "canModifyReservations('in_progress')"
+      expected: "true"
+
+    - name: "returns false for completed WO"
+      action: "canModifyReservations('completed')"
+      expected: "false"
+
+    - name: "returns false for closed WO"
+      action: "canModifyReservations('closed')"
+      expected: "false"
+
+# Integration Test Cases
+integration_tests:
+  create_reservation:
+    - name: "creates reservation for released WO"
+      setup: |
+        - Create released WO with materials
+        - Create available LP for material product
+      action: "POST /api/planning/work-orders/:id/materials/:materialId/reservations"
+      body: "{ lp_id: lp.id, quantity: 50 }"
+      expected:
+        - "status: 200"
+        - "reservation.reserved_qty === 50"
+        - "wo_material.reserved_qty updated to 50"
+
+    - name: "rejects reservation for completed WO"
+      setup: "Create completed WO with materials"
+      action: "POST /api/planning/work-orders/:id/materials/:materialId/reservations"
+      expected:
+        - "status: 409"
+        - "error contains 'Cannot modify reservations'"
+
+    - name: "warns but allows over-reservation"
+      setup: |
+        - Create LP with quantity = 100
+        - WO-A reserves 80 kg
+      action: "POST for WO-B reserving 50 kg from same LP"
+      expected:
+        - "status: 200"
+        - "response.warnings contains 'LP over-reserved'"
+
+  reserve_all:
+    - name: "auto-reserves all materials using FIFO"
+      setup: |
+        - Create released WO with 2 materials (flour: 100kg, sugar: 50kg)
+        - Create LPs: flour (120kg), sugar (60kg)
+      action: "POST /api/planning/work-orders/:id/reserve-all"
+      expected:
+        - "status: 200"
+        - "materials_processed: 2"
+        - "fully_reserved: 2"
+        - "shortages: []"
+
+    - name: "reports shortages for partial allocation"
+      setup: |
+        - Create released WO with material (flour: 200kg)
+        - Create LP: flour (150kg)
+      action: "POST /api/planning/work-orders/:id/reserve-all"
+      expected:
+        - "status: 200"
+        - "partially_reserved: 1"
+        - "shortages[0].shortage === 50"
+
+  release_reservation:
+    - name: "releases reservation and updates reserved_qty"
+      setup: |
+        - Create WO with reservation (50kg)
+        - wo_material.reserved_qty = 50
+      action: "DELETE /api/planning/work-orders/:id/reservations/:reservationId"
+      expected:
+        - "status: 200"
+        - "wo_material.reserved_qty === 0"
+        - "reservation.status === 'released'"
+
+  rls_isolation:
+    - name: "blocks cross-org reservation access"
+      setup: |
+        - Create Org A with WO and reservations
+        - Create Org B user
+      action: "User B queries Org A reservations"
+      expected: "Returns empty array (RLS blocks)"
+
+    - name: "blocks cross-org reservation creation"
+      setup: |
+        - Create Org A with WO
+        - Create Org B user
+      action: "User B attempts to create reservation for Org A WO"
+      expected: "status: 403 or RLS blocks insert"
+
+  trigger_test:
+    - name: "trigger updates reserved_qty on insert"
+      setup: "Create wo_material with reserved_qty = 0"
+      action: "Insert wo_material_reservation with reserved_qty = 50"
+      expected: "wo_material.reserved_qty === 50"
+
+    - name: "trigger updates reserved_qty on delete"
+      setup: "wo_material with reservation (50kg), reserved_qty = 50"
+      action: "Delete reservation"
+      expected: "wo_material.reserved_qty === 0"
+
+    - name: "trigger handles status change to released"
+      setup: "wo_material with active reservation (50kg)"
+      action: "Update reservation status to 'released'"
+      expected: "wo_material.reserved_qty === 0 (only active counted)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "complete reservation workflow"
+    steps:
+      - "Navigate to WO detail page"
+      - "Click 'Reserve Materials' button"
+      - "Verify auto-reservation runs"
+      - "Expand material row"
+      - "Verify reserved LPs displayed"
+      - "Click Release on one LP"
+      - "Confirm release in dialog"
+      - "Verify reservation removed from list"
+      - "Verify reserved quantity updated"
+
+  - name: "manual LP reservation"
+    steps:
+      - "Navigate to WO detail page"
+      - "Expand material row"
+      - "Click 'Reserve LPs' button"
+      - "Select LP from available list"
+      - "Enter quantity"
+      - "Submit reservation"
+      - "Verify LP appears in reserved list"
+
+  - name: "shortage warning display"
+    steps:
+      - "Create WO with material requiring 200 kg"
+      - "Create LP with only 100 kg"
+      - "Trigger auto-reservation"
+      - "Verify shortage warning shown"
+      - "Verify yellow 'Partially Reserved' badge"
+
+# Definition of Done
+definition_of_done:
+  - "Migration creates wo_material_reservations table with all fields"
+  - "Trigger updates wo_materials.reserved_qty on reservation changes"
+  - "RLS policy enforces org isolation"
+  - "FIFO algorithm selects oldest LPs first"
+  - "FEFO algorithm selects soonest-expiry LPs first"
+  - "NULL expiry dates sorted last in FEFO"
+  - "Auto-reservation triggered on WO release"
+  - "Auto-release triggered on WO cancel"
+  - "Manual reservation via modal works"
+  - "Manual release via button works"
+  - "Over-reservation shows warning (soft block only)"
+  - "Partial allocation shows warning with shortage amount"
+  - "ReservedLPsList displays in <500ms for 50 LPs"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover algorithm edge cases"
+  - "Performance: Auto-reserve 50 materials in <5 seconds"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "FIFO/FEFO algorithms are critical for inventory management"
+  integration:
+    target: 85
+    reason: "API and RLS must be thoroughly tested"
+  e2e:
+    target: 70
+    reason: "Key user workflows covered"
+  files:
+    - "lib/services/wo-reservation-service.ts: 90%"
+    - "API routes: 85%"
+    - "RLS policies: 100% of policy rules tested"
+    - "Components: 75%"
+
+# Performance Requirements
+performance:
+  - metric: "Auto-reserve 50 materials"
+    target: "<5 seconds"
+    test_type: "load"
+
+  - metric: "ReservedLPsList query"
+    target: "<500ms for 50 LPs"
+    test_type: "performance"
+
+  - metric: "Available LPs query"
+    target: "<300ms"
+    test_type: "performance"

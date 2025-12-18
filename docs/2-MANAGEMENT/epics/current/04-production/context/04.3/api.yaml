@@ -1,0 +1,536 @@
+# Story 04.3 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # Start Operation
+  - method: "POST"
+    path: "/api/production/operations/:id/start"
+    description: "Start operation - transition from pending to in_progress"
+    file: "apps/frontend/app/api/production/operations/[id]/start/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "admin", "owner"]
+
+    params:
+      - name: "id"
+        type: "UUID"
+        location: "path"
+        required: true
+        description: "Operation ID"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        type: "StartOperationInput"
+        schema:
+          started_at:
+            type: "string"
+            format: "datetime"
+            required: false
+            description: "Override timestamp (defaults to NOW())"
+
+    response:
+      status: 200
+      type: "WOOperation"
+      schema:
+        id: "UUID"
+        wo_id: "UUID"
+        sequence: "number"
+        operation_name: "string"
+        status: "in_progress"
+        started_at: "string (ISO timestamp)"
+        started_by: "UUID"
+        expected_duration_minutes: "number | null"
+        # ... other operation fields
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS_TRANSITION"
+        message: "Operation must be pending to start"
+        when: "Operation status is not 'pending'"
+        response: |
+          {
+            "error": "Operation must be pending to start",
+            "current_status": "completed"
+          }
+
+      - status: 400
+        code: "WO_NOT_STARTED"
+        message: "Work Order must be started first"
+        when: "Parent WO status is not 'in_progress'"
+        response: |
+          {
+            "error": "Work Order must be started first",
+            "wo_status": "released"
+          }
+
+      - status: 409
+        code: "SEQUENCE_VIOLATION"
+        message: "Previous operation must be completed first"
+        when: "require_operation_sequence=true and prior operation not completed/skipped"
+        response: |
+          {
+            "error": "Previous operation must be completed first",
+            "required_sequence": 2,
+            "current_sequence": 3
+          }
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Operation not found"
+        when: "Operation doesn't exist or belongs to different org"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User role cannot start operations"
+
+  # Complete Operation
+  - method: "POST"
+    path: "/api/production/operations/:id/complete"
+    description: "Complete operation - transition from in_progress to completed"
+    file: "apps/frontend/app/api/production/operations/[id]/complete/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "admin", "owner"]
+
+    params:
+      - name: "id"
+        type: "UUID"
+        location: "path"
+        required: true
+        description: "Operation ID"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        type: "CompleteOperationInput"
+        schema:
+          actual_yield_percent:
+            type: "number"
+            required: true
+            min: 0
+            max: 100
+            description: "Actual yield percentage"
+          completed_at:
+            type: "string"
+            format: "datetime"
+            required: false
+            description: "Override timestamp (defaults to NOW())"
+          notes:
+            type: "string"
+            required: false
+            maxLength: 2000
+            description: "Completion notes"
+
+    response:
+      status: 200
+      type: "WOOperationComplete"
+      schema:
+        id: "UUID"
+        wo_id: "UUID"
+        sequence: "number"
+        operation_name: "string"
+        status: "completed"
+        started_at: "string (ISO timestamp)"
+        completed_at: "string (ISO timestamp)"
+        started_by: "UUID"
+        completed_by: "UUID"
+        expected_duration_minutes: "number | null"
+        actual_duration_minutes: "number"
+        expected_yield_percent: "number | null"
+        actual_yield_percent: "number"
+        duration_variance_minutes: "number"
+        yield_variance_percent: "number"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS_TRANSITION"
+        message: "Operation must be in progress to complete"
+        when: "Operation status is not 'in_progress'"
+        response: |
+          {
+            "error": "Operation must be in progress to complete",
+            "current_status": "pending"
+          }
+
+      - status: 400
+        code: "MISSING_YIELD"
+        message: "Actual yield is required"
+        when: "actual_yield_percent not provided"
+        response: |
+          {
+            "error": "Actual yield is required",
+            "field": "actual_yield_percent"
+          }
+
+      - status: 400
+        code: "INVALID_YIELD"
+        message: "Yield must be between 0 and 100%"
+        when: "actual_yield_percent outside valid range"
+        response: |
+          {
+            "error": "Yield must be between 0 and 100%",
+            "value": 105,
+            "min": 0,
+            "max": 100
+          }
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Operation not found"
+        when: "Operation doesn't exist or belongs to different org"
+
+  # Get Operation Logs
+  - method: "GET"
+    path: "/api/production/operations/:id/logs"
+    description: "Get audit trail for an operation"
+    file: "apps/frontend/app/api/production/operations/[id]/logs/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    params:
+      - name: "id"
+        type: "UUID"
+        location: "path"
+        required: true
+        description: "Operation ID"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "OperationLogsResponse"
+      schema:
+        logs:
+          type: "array"
+          items:
+            id: "UUID"
+            event_type: "started | completed | updated | skipped"
+            timestamp: "string (ISO timestamp)"
+            user_id: "UUID"
+            user_name: "string"
+            old_status: "string"
+            new_status: "string"
+            metadata:
+              actual_yield_percent: "number | null"
+              duration_minutes: "number | null"
+            notes: "string | null"
+        total: "number"
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Operation not found"
+        when: "Operation doesn't exist or belongs to different org"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/operation-service.ts"
+    description: "Operation execution service - start, complete, validate, logs"
+    exports:
+      - name: "startOperation"
+        type: "async function"
+        params:
+          - "operationId: string"
+          - "options?: StartOperationOptions"
+        returns: "Promise<WOOperation>"
+        description: "Start operation - validates status, WO status, sequence"
+
+      - name: "completeOperation"
+        type: "async function"
+        params:
+          - "operationId: string"
+          - "input: CompleteOperationInput"
+        returns: "Promise<WOOperation>"
+        description: "Complete operation - validates status, captures yield/duration"
+
+      - name: "canStartOperation"
+        type: "async function"
+        params:
+          - "operationId: string"
+        returns: "Promise<ValidationResult>"
+        description: "Check if operation can be started (status, WO, sequence)"
+
+      - name: "validateOperationSequence"
+        type: "async function"
+        params:
+          - "operation: WOOperation"
+        returns: "Promise<ValidationResult>"
+        description: "Validate sequence enforcement rules"
+
+      - name: "getOperationLogs"
+        type: "async function"
+        params:
+          - "operationId: string"
+        returns: "Promise<OperationLog[]>"
+        description: "Get audit trail for operation"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/operation.ts"
+    description: "Operation TypeScript interfaces"
+    content: |
+      export interface WOOperation {
+        id: string;
+        wo_id: string;
+        organization_id: string;
+        sequence: number;
+        operation_name: string;
+        operation_id: string | null;  // Reference to routing operation
+        description: string | null;
+        instructions: string | null;
+        machine_id: string | null;
+        status: OperationStatus;
+        started_at: string | null;
+        started_by: string | null;
+        completed_at: string | null;
+        completed_by: string | null;
+        expected_duration_minutes: number | null;
+        actual_duration_minutes: number | null;
+        expected_yield_percent: number | null;
+        actual_yield_percent: number | null;
+        notes: string | null;
+        created_at: string;
+        updated_at: string;
+      }
+
+      export type OperationStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+      export interface StartOperationOptions {
+        started_at?: string;
+      }
+
+      export interface CompleteOperationInput {
+        actual_yield_percent: number;
+        completed_at?: string;
+        notes?: string;
+      }
+
+      export interface ValidationResult {
+        allowed: boolean;
+        reason?: string;
+        warnings?: string[];
+      }
+
+      export interface OperationLog {
+        id: string;
+        operation_id: string;
+        event_type: 'started' | 'completed' | 'updated' | 'skipped';
+        timestamp: string;
+        user_id: string;
+        user_name: string;
+        old_status: string;
+        new_status: string;
+        metadata: {
+          actual_yield_percent?: number;
+          duration_minutes?: number;
+        };
+        notes: string | null;
+      }
+
+      export interface WOOperationComplete extends WOOperation {
+        duration_variance_minutes: number;
+        yield_variance_percent: number;
+      }
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/operation-execution.ts"
+    description: "Zod validation schemas for operation execution"
+    content: |
+      import { z } from 'zod';
+
+      export const startOperationSchema = z.object({
+        started_at: z.string().datetime().optional(),
+      });
+
+      export const completeOperationSchema = z.object({
+        actual_yield_percent: z.number()
+          .min(0, 'Yield cannot be negative')
+          .max(100, 'Yield cannot exceed 100%'),
+        completed_at: z.string().datetime().optional(),
+        notes: z.string().max(2000, 'Notes too long').optional(),
+      });
+
+      export type StartOperationInput = z.infer<typeof startOperationSchema>;
+      export type CompleteOperationInput = z.infer<typeof completeOperationSchema>;
+
+# Implementation Patterns
+patterns:
+  start_operation: |
+    // apps/frontend/app/api/production/operations/[id]/start/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { startOperationSchema } from '@/lib/validation/operation-execution';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // 1. Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // 2. Parse and validate body
+      const body = await request.json();
+      const parsed = startOperationSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
+      }
+
+      // 3. Get operation (RLS filters by org)
+      const { data: operation, error: opError } = await supabase
+        .from('wo_operations')
+        .select('*, work_order:work_orders!wo_id(id, status)')
+        .eq('id', params.id)
+        .single();
+
+      if (opError || !operation) {
+        return NextResponse.json({ error: 'Operation not found' }, { status: 404 });
+      }
+
+      // 4. Validate status
+      if (operation.status !== 'pending') {
+        return NextResponse.json({
+          error: 'Operation must be pending to start',
+          current_status: operation.status
+        }, { status: 400 });
+      }
+
+      // 5. Validate WO status
+      if (operation.work_order.status !== 'in_progress') {
+        return NextResponse.json({
+          error: 'Work Order must be started first',
+          wo_status: operation.work_order.status
+        }, { status: 400 });
+      }
+
+      // 6. Check sequence enforcement
+      const { data: settings } = await supabase
+        .from('production_settings')
+        .select('require_operation_sequence')
+        .single();
+
+      if (settings?.require_operation_sequence) {
+        const { data: priorOps } = await supabase
+          .from('wo_operations')
+          .select('id, sequence, status')
+          .eq('wo_id', operation.wo_id)
+          .lt('sequence', operation.sequence)
+          .not('status', 'in', '("completed", "skipped")');
+
+        if (priorOps && priorOps.length > 0) {
+          return NextResponse.json({
+            error: 'Previous operation must be completed first',
+            required_sequence: priorOps[0].sequence,
+            current_sequence: operation.sequence
+          }, { status: 409 });
+        }
+      }
+
+      // 7. Update operation
+      const started_at = parsed.data.started_at || new Date().toISOString();
+      const { data: updated, error: updateError } = await supabase
+        .from('wo_operations')
+        .update({
+          status: 'in_progress',
+          started_at,
+          started_by: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', params.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return NextResponse.json({ error: 'Failed to start operation' }, { status: 500 });
+      }
+
+      return NextResponse.json(updated);
+    }
+
+  complete_operation: |
+    // apps/frontend/app/api/production/operations/[id]/complete/route.ts
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // ... auth check ...
+
+      const body = await request.json();
+      const parsed = completeOperationSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
+      }
+
+      // Get operation
+      const { data: operation, error: opError } = await supabase
+        .from('wo_operations')
+        .select('*')
+        .eq('id', params.id)
+        .single();
+
+      if (opError || !operation) {
+        return NextResponse.json({ error: 'Operation not found' }, { status: 404 });
+      }
+
+      // Validate status
+      if (operation.status !== 'in_progress') {
+        return NextResponse.json({
+          error: 'Operation must be in progress to complete',
+          current_status: operation.status
+        }, { status: 400 });
+      }
+
+      // Calculate duration
+      const completed_at = parsed.data.completed_at || new Date().toISOString();
+      const started = new Date(operation.started_at);
+      const completed = new Date(completed_at);
+      const duration_minutes = Math.round((completed.getTime() - started.getTime()) / 60000);
+
+      // Update operation
+      const { data: updated, error: updateError } = await supabase
+        .from('wo_operations')
+        .update({
+          status: 'completed',
+          completed_at,
+          completed_by: user.id,
+          actual_duration_minutes: duration_minutes,
+          actual_yield_percent: parsed.data.actual_yield_percent,
+          notes: parsed.data.notes || operation.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', params.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return NextResponse.json({ error: 'Failed to complete operation' }, { status: 500 });
+      }
+
+      // Calculate variances
+      const duration_variance = duration_minutes - (operation.expected_duration_minutes || 0);
+      const yield_variance = parsed.data.actual_yield_percent - (operation.expected_yield_percent || 0);
+
+      return NextResponse.json({
+        ...updated,
+        duration_variance_minutes: duration_variance,
+        yield_variance_percent: yield_variance,
+      });
+    }

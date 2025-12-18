@@ -1,0 +1,338 @@
+# Story 06.6 - Frontend Specification
+# Purpose: Components, hooks, types, wireframe mappings
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/test-result.ts"
+    content: |
+      export interface TestResult {
+        id: string;
+        org_id: string;
+        inspection_id: string;
+        parameter_id: string;
+        measured_value: string;
+        numeric_value?: number;
+        result_status: 'pass' | 'fail' | 'marginal';
+        deviation_pct?: number;
+        tested_by: string;
+        tested_at: string;
+        equipment_id?: string;
+        calibration_date?: string;
+        notes?: string;
+        attachment_url?: string;
+        created_at: string;
+        created_by?: string;
+        updated_at?: string;
+        // Relations
+        parameter?: QualitySpecParameter;
+        tester?: User;
+        equipment?: Machine;
+      }
+
+      export interface TestResultCreate {
+        inspection_id: string;
+        parameter_id: string;
+        measured_value: string;
+        numeric_value?: number;
+        equipment_id?: string;
+        calibration_date?: string;
+        notes?: string;
+        attachment_url?: string;
+      }
+
+      export interface TestResultBatchCreate {
+        inspection_id: string;
+        results: Omit<TestResultCreate, 'inspection_id'>[];
+      }
+
+      export interface ParameterValidationResult {
+        result_status: 'pass' | 'fail' | 'marginal';
+        deviation_pct?: number;
+        numeric_value?: number;
+      }
+
+      export interface InspectionTestSummary {
+        total: number;
+        pass: number;
+        fail: number;
+        marginal: number;
+        pass_rate: number;
+      }
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/quality/inspections/[id]/test-results/page.tsx"
+    description: "Test results recording page (embedded in inspection flow)"
+    wireframes:
+      - id: "QA-004"
+        description: "Test Result Recording (Embedded in Inspection)"
+      - id: "QA-005"
+        description: "Incoming Inspection with Test Results"
+      - id: "QA-006"
+        description: "In-Process Inspection with Test Results"
+    components:
+      - "TestResultsForm"
+      - "TestResultsTable"
+      - "TestResultsSummary"
+
+# Components
+components:
+  - path: "apps/frontend/components/quality/test-results/TestResultsForm.tsx"
+    description: "Form for recording test results with auto-validation"
+    wireframe_mapping: "QA-004: Test Result Recording section"
+    features:
+      - "Template selector dropdown"
+      - "Dynamic parameter list based on selected template"
+      - "Measured value input field (auto-detects numeric/text/boolean)"
+      - "Equipment selector (optional/required per parameter)"
+      - "Auto-calculation of pass/fail/marginal on blur"
+      - "Result badge display (green/red/yellow)"
+      - "Specification range/target display"
+      - "Inspector notes textarea"
+      - "Attachment URL input"
+      - "Save & Continue button"
+    states:
+      loading: "Spinner, disabled inputs"
+      success: "Results saved toast notification"
+      error: "Error message with retry"
+      validation: "Red border on invalid inputs, error message below field"
+    validation:
+      - "measured_value required"
+      - "numeric_value must be valid number for numeric parameters"
+      - "equipment required if parameter.equipment_required = true"
+      - "notes required if result is fail or marginal"
+
+  - path: "apps/frontend/components/quality/test-results/TestResultsTable.tsx"
+    description: "Table displaying test results with status badges"
+    wireframe_mapping: "QA-004: Test Results - Flour Analysis section"
+    columns:
+      - name: "Parameter"
+        width: "25%"
+        content: "parameter_name with critical badge"
+      - name: "Unit"
+        width: "10%"
+        content: "unit from parameter"
+      - name: "Specification"
+        width: "20%"
+        content: "min/max range or target value"
+      - name: "Measured Value"
+        width: "15%"
+        content: "measured_value with numeric formatting"
+      - name: "Result"
+        width: "15%"
+        content: "Badge: Pass (green), Fail (red), Marginal (yellow)"
+      - name: "Equipment"
+        width: "15%"
+        content: "equipment_name or '-'"
+    features:
+      - "Sort by parameter name or result status"
+      - "Filter by result status (all, pass, fail, marginal)"
+      - "Row colors based on result (green/red/yellow background)"
+      - "Hover tooltip shows deviation_pct for marginal/fail"
+      - "Click row to show detail panel"
+    states:
+      empty: "No results message"
+      loading: "Skeleton rows (5)"
+      error: "Error message with retry"
+
+  - path: "apps/frontend/components/quality/test-results/TestResultsSummary.tsx"
+    description: "Summary stats for test results (total, pass, fail, marginal, pass_rate)"
+    wireframe_mapping: "QA-004: Overall Result section"
+    features:
+      - "4-column stat grid: Total, Passed, Failed, Marginal"
+      - "Pass rate progress bar"
+      - "Overall result banner (All Pass / Any Fail / Review Needed)"
+      - "Color coding: green (pass), red (fail), yellow (review)"
+    refresh:
+      trigger: "After test result creation/update"
+      method: "React Query invalidate"
+
+  - path: "apps/frontend/components/quality/test-results/TestResultDetailPanel.tsx"
+    description: "Side panel showing full test result details"
+    features:
+      - "Parameter spec details (min/max/target/unit)"
+      - "Measured value display"
+      - "Result status with color coding"
+      - "Deviation percentage (if marginal/fail)"
+      - "Equipment used with calibration date"
+      - "Inspector name and timestamp"
+      - "Notes display"
+      - "Attachment preview (if present)"
+    states:
+      open: "Slide-in from right"
+      closed: "Slide-out"
+
+  - path: "apps/frontend/components/quality/test-results/TestResultFailureAlert.tsx"
+    description: "Alert panel shown when inspection fails"
+    wireframe_mapping: "QA-004: With Failed Result section"
+    features:
+      - "Failed parameters list"
+      - "Disposition options: Reject, Accept with deviation, Rework"
+      - "Required notes field for failure"
+      - "Checkbox to create NCR"
+      - "QA Manager notification indicator"
+
+  - path: "apps/frontend/components/quality/test-results/ParameterInput.tsx"
+    description: "Input component for single parameter measured value"
+    features:
+      - "Dynamic input type: number (numeric), text, select (boolean)"
+      - "On blur: validate and display result status"
+      - "Show spec range and target value"
+      - "Display current deviation if fail/marginal"
+      - "Equipment selector if applicable"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-test-results.ts"
+    description: "React Query hook for test results"
+    exports:
+      - name: "useTestResults"
+        params: ["inspectionId"]
+        returns: "UseQueryResult<TestResult[]>"
+      - name: "useTestResultsMutation"
+        returns: "UseMutationResult<TestResult, Error, TestResultCreate>"
+      - name: "useTestResultsBatch"
+        returns: "UseMutationResult<TestResult[], Error, TestResultBatchCreate>"
+      - name: "useInspectionSummary"
+        params: ["inspectionId"]
+        returns: "UseQueryResult<InspectionTestSummary>"
+
+# UX Wireframe Mappings
+ux:
+  wireframes:
+    - id: "QA-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-004-test-templates.md"
+      sections:
+        - name: "Test Result Recording (Embedded in Inspection)"
+          line_start: 234
+          line_end: 298
+          description: "Success state with all tests passing"
+          components:
+            - "TestResultsForm"
+            - "TestResultsTable"
+            - "TestResultsSummary"
+          features:
+            - "Template selector"
+            - "Parameter list with specs"
+            - "Measured value inputs"
+            - "Auto-calculation on blur"
+            - "Result badges (pass/fail/marginal)"
+            - "Equipment selector per parameter"
+            - "Inspector notes"
+            - "Overall result banner"
+            - "Save & Continue button"
+        - name: "With Failed Result"
+          line_start: 300
+          line_end: 362
+          description: "Failed inspection with alert panel"
+          components:
+            - "TestResultsForm"
+            - "TestResultsTable"
+            - "TestResultsSummary"
+            - "TestResultFailureAlert"
+          features:
+            - "Failed test highlighting (red)"
+            - "Marginal test highlighting (yellow)"
+            - "Deviation percentage display"
+            - "Failure alert panel with disposition options"
+            - "Required notes for failure"
+            - "NCR creation checkbox"
+            - "QA Manager notification"
+
+    - id: "QA-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-005-incoming-inspection.md"
+      sections:
+        - name: "Incoming Inspection Detail"
+          description: "Integration context for test result recording"
+          components:
+            - "TestResultsForm"
+            - "TestResultsTable"
+            - "TestResultsSummary"
+          note: "Test results embedded as Step 3/4 in inspection wizard"
+
+    - id: "QA-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-006-in-process-inspection.md"
+      sections:
+        - name: "In-Process Inspection Detail"
+          description: "Integration context for test result recording"
+          components:
+            - "TestResultsForm"
+            - "TestResultsTable"
+            - "TestResultsSummary"
+          note: "Test results embedded in inspection detail view"
+
+  states:
+    no_template_selected: "Form hidden, prompt to select template"
+    template_selected: "Parameter list displayed with input fields"
+    all_pass: "Green banner 'All Tests Passed', all rows green"
+    any_fail: "Red banner 'FAILED (N failed out of M)', red rows highlighted"
+    marginal_detected: "Yellow banner 'Review Required', yellow rows highlighted"
+    saving: "Button disabled, spinner, 'Saving...' text"
+    saved: "Toast notification 'Results saved', form cleared or proceed to next step"
+    validation_error: "Red border on invalid field, error message below"
+
+  patterns:
+    form: "ShadCN Form with react-hook-form"
+    table: "ShadCN DataTable (sortable, filterable)"
+    summary: "Custom grid layout with KPI cards"
+    banner: "ShadCN Alert (success/warning/destructive)"
+    alert_panel: "ShadCN Sheet or Dialog for failure disposition"
+    input: "ShadCN Input with number type detection"
+    select: "ShadCN Select for template/equipment"
+    badge: "ShadCN Badge for result status"
+    toast: "Sonner toast for success/error messages"
+
+# Mobile/Responsive Design
+responsive:
+  desktop:
+    breakpoint: ">1024px"
+    layout: "Full form + side table"
+    columns: "All visible"
+    notes: "Optimal UX, full feature set"
+
+  tablet:
+    breakpoint: "768px - 1024px"
+    layout: "Stacked form and table"
+    columns: "Parameter, Measured, Result (essential only)"
+    notes: "Touch-friendly, collapsible sections"
+
+  mobile:
+    breakpoint: "<768px"
+    layout: "Single parameter per card, swipeable"
+    columns: "Parameter name, Spec, Measured, Result"
+    notes: |
+      - One parameter per screen for focused data entry
+      - Swipe gestures to navigate between parameters
+      - Large touch targets (48x48dp minimum)
+      - Numeric keyboard for measured values
+      - Result badge shows immediately after value entry
+
+# Performance Considerations
+performance:
+  - "Load test results in <500ms (React Query caching)"
+  - "Auto-calculate pass/fail on blur (debounced 100ms)"
+  - "Lazy load equipment list on demand"
+  - "Virtual scrolling for large parameter lists (50+)"
+  - "Memoize TestResultsTable rows to prevent re-renders"
+
+# Accessibility
+accessibility:
+  - "All inputs have associated labels"
+  - "Result status announcement via aria-live"
+  - "Color not sole indicator of pass/fail (use icons + text)"
+  - "Touch targets minimum 44x44dp (mobile)"
+  - "Keyboard navigation: Tab through inputs, Enter to submit"
+  - "Screen reader: Announce parameter name, spec range, measured value, result status"
+  - "Error messages associated with input (aria-describedby)"
+  - "Modal focus trap for detail panel"
+
+# Integration Points
+integrations:
+  quality_inspections: "Test results update inspection.overall_result"
+  quality_holds: "Failed results trigger automatic quality hold creation"
+  quality_specifications: "Parameter details fetched from spec"
+  users: "tested_by populated from current user"
+  machines: "Equipment list populated from machines table"
+  notifications: "Alert QA Manager on critical parameter failure (future)"
+  ncr_creation: "Optional NCR auto-creation on failure (future)"

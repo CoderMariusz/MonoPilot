@@ -1,0 +1,175 @@
+# Story 02.9 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.9"
+  name: "BOM-Routing Link + Cost Calculation"
+  slug: "bom-routing-costs"
+  epic: "02-technical"
+  phase: "1A"  # MVP
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (existing), routing cost fields documented
+  - api.yaml         # Endpoints, costing-service.ts integration
+  - frontend.yaml    # Components, wireframe integration (TEC-013)
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id filter", "RLS pattern", "auth context"]
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms table", "bom_id FK", "BOM service"]
+    - story: "02.5"
+      name: "BOM Items Core"
+      provides: ["bom_items table", "ingredient quantities", "scrap_percent"]
+    - story: "02.8"
+      name: "Routing Operations"
+      provides: ["routings table", "routing_operations table", "labor_cost_per_hour", "cleanup_time"]
+  blocked_by: []
+  blocks:
+    - story: "02.10"
+      name: "Nutrition Calculation"
+    - story: "04.x"
+      name: "Work Order Cost Tracking (Production)"
+    - story: "09.x"
+      name: "Finance Module Cost Variance"
+
+# External Dependencies
+external_dependencies:
+  migrations:
+    - migration: "043"
+      description: "Routing cost fields (setup_cost, working_cost_per_unit, overhead_percent, currency)"
+      status: "deployed"
+    - migration: "045"
+      description: "boms.routing_id FK to routings table"
+      status: "deployed"
+    - migration: "046"
+      description: "products.std_price, products.expiry_policy"
+      status: "deployed"
+  services:
+    - service: "costing-service.ts"
+      path: "apps/frontend/lib/services/costing-service.ts"
+      status: "implemented"
+      provides:
+        - "calculateTotalBOMCost()"
+        - "calculateUnitCost()"
+        - "compareBOMCosts()"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.36"  # BOM cost rollup (material + labor + routing)
+      - "FR-2.37"  # BOM routing reference (routing_id)
+      - "FR-2.50"  # Operation labor cost calculation
+      - "FR-2.51"  # Routing setup cost configuration
+      - "FR-2.52"  # Routing working cost per unit/batch
+      - "FR-2.53"  # Routing overhead percentage
+      - "FR-2.70"  # Recipe costing (ingredient costs)
+      - "FR-2.72"  # Cost rollup (multi-level BOM)
+      - "FR-2.73"  # Labor cost per operation
+      - "FR-2.74"  # Overhead allocation
+      - "FR-2.77"  # Routing-level cost calculation
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Cost Calculation Logic", "routings table", "routing_operations table"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.9.bom-routing-costs.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-009-routing-level-costs.md"
+      relevance: "PRIMARY - Cost fields: setup_cost, working_cost_per_unit, overhead_percent"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-013-recipe-costing.md"
+      relevance: "Recipe Costing View with cost breakdown components"
+  patterns:
+    - path: "apps/frontend/lib/services/costing-service.ts"
+      relevance: "EXISTING - Cost calculation service (integrate, not create)"
+    - path: "apps/frontend/lib/services/bom-service.ts"
+      relevance: "BOM service pattern"
+    - path: "apps/frontend/lib/services/routing-service.ts"
+      relevance: "Routing service pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 3
+    description: "GET /api/technical/boms/:id/cost, POST recalculate-cost, GET /api/technical/routings/:id/cost"
+  - type: "component"
+    count: 5
+    description: "CostSummary, CostBreakdownTable, MarginAnalysis, StaleCostWarning, RecalculateButton"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for cost request/response"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + API tests"
+
+# Scope Boundaries
+scope:
+  in_scope:
+    - "BOM-to-routing linkage display (boms.routing_id)"
+    - "GET /api/technical/boms/:id/cost (get calculated costs)"
+    - "POST /api/technical/boms/:id/recalculate-cost (trigger recalculation)"
+    - "GET /api/technical/routings/:id/cost (routing-only cost)"
+    - "Material cost calculation: SUM(ingredient cost x quantity)"
+    - "Operation labor cost: SUM(duration x labor_cost_per_hour)"
+    - "Setup/cleanup time cost calculation"
+    - "Routing-level setup cost (fixed per run)"
+    - "Routing-level working cost per unit"
+    - "Overhead allocation (routing.overhead_percent)"
+    - "Total product cost calculation"
+    - "Cost breakdown view on BOM detail page"
+    - "Stale cost warning display"
+    - "Margin analysis (actual vs target)"
+    - "RecalculateButton with loading state"
+  out_of_scope:
+    - "Multi-currency support (Phase 1)"
+    - "Cost versioning/history (Phase 1)"
+    - "Batch cost locking (Phase 1)"
+    - "Cost variance analysis (Phase 2)"
+    - "Historical cost trends/charts (Phase 2)"
+    - "Cost scenario modeling (Phase 2)"
+    - "Cost optimization suggestions (Phase 2)"
+    - "Work order actual cost capture (Phase 2)"
+
+# Technical notes
+technical_notes:
+  - "costing-service.ts already implemented - this story adds API routes and UI"
+  - "Migration 045 deployed - boms.routing_id FK exists"
+  - "Migration 043 deployed - routing cost fields exist"
+  - "Cost formula: Material + (Setup + Working*qty) * (1 + Overhead%) + Labor"
+  - "Ingredient costs from products.cost_per_unit (not separate table)"
+  - "Labor rate hierarchy: BOM line override > routing operation default > org default"
+  - "Stale detection: Mark cost stale when ingredient/BOM/routing changes"
+  - "Hide Phase 1+ features completely per Epic 02.0 guidance"
+  - "Performance target: <2 seconds for BOMs with up to 50 items"
+  - "Currency: Single currency per routing (default PLN)"
+
+# PRD Requirements Coverage
+prd_coverage:
+  - { fr_id: "FR-2.36", description: "BOM cost rollup (material + labor + routing)", priority: "P0", status: "covered" }
+  - { fr_id: "FR-2.37", description: "BOM routing reference (routing_id)", priority: "P0", status: "covered" }
+  - { fr_id: "FR-2.50", description: "Operation labor cost calculation", priority: "P1", status: "covered" }
+  - { fr_id: "FR-2.51", description: "Routing setup cost configuration", priority: "P1", status: "covered" }
+  - { fr_id: "FR-2.52", description: "Routing working cost per unit/batch", priority: "P1", status: "covered" }
+  - { fr_id: "FR-2.53", description: "Routing overhead percentage", priority: "P2", status: "covered" }
+  - { fr_id: "FR-2.70", description: "Recipe costing (ingredient costs)", priority: "P0", status: "covered" }
+  - { fr_id: "FR-2.72", description: "Cost rollup (multi-level BOM)", priority: "P0", status: "covered" }
+  - { fr_id: "FR-2.73", description: "Labor cost per operation", priority: "P1", status: "covered" }
+  - { fr_id: "FR-2.74", description: "Overhead allocation", priority: "P1", status: "covered" }
+  - { fr_id: "FR-2.77", description: "Routing-level cost calculation", priority: "P1", status: "covered" }
+  # Deferred to Phase 2
+  - { fr_id: "FR-2.71", description: "Cost variance analysis (std vs actual)", priority: "P1", status: "deferred_phase2" }
+  - { fr_id: "FR-2.75", description: "Historical cost tracking", priority: "P1", status: "deferred_phase2" }

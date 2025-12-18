@@ -1,0 +1,419 @@
+# Story 02.10b - Frontend Specification
+# Purpose: Components, services, types for traceability queries and visualization
+# Agent: FRONTEND-DEV
+# Status: DEFERRED - requires Epic 05 tables
+
+# Note: This story extends the framework created in 02.10a with actual data visualization
+is_backend_focused: false
+
+# TypeScript Types to Create
+types:
+  - path: "apps/frontend/lib/types/traceability.ts"
+    status: "deferred"
+    description: "Extended types for traceability queries (adds to 02.10a types)"
+    content: |
+      // Extends types from 02.10a
+
+      export interface TraceNode {
+        lp: LicensePlate;
+        product_code: string;
+        product_name: string;
+        relationship_type: 'split' | 'combine' | 'transform' | null;
+        quantity_from_parent: number | null;
+        work_order_id: string | null;
+        children: TraceNode[];
+        depth: number;
+      }
+
+      export interface TraceResult {
+        root_lp: LicensePlate;
+        trace_tree: TraceNode[];
+        summary: TraceSummary;
+      }
+
+      export interface TraceSummary {
+        total_descendants?: number;
+        total_ancestors?: number;
+        total_work_orders: number;
+        total_customers?: number;
+        max_depth: number;
+      }
+
+      export interface RecallSimulationResult {
+        simulation_id: string;
+        root_lp: LicensePlate;
+        forward_trace: TraceNode[];
+        backward_trace: TraceNode[];
+        summary: RecallSummary;
+        locations: LocationAnalysis[];
+        customers: CustomerImpact[];
+        financial: FinancialImpact;
+        regulatory: RegulatoryInfo;
+        execution_time_ms: number;
+        created_at: string;
+      }
+
+      export interface RecallSummary {
+        total_affected_lps: number;
+        total_quantity: number;
+        total_estimated_value: number;
+        status_breakdown: {
+          available: number;
+          in_production: number;
+          shipped: number;
+          consumed: number;
+          quarantine: number;
+        };
+        affected_warehouses: number;
+        affected_customers: number;
+      }
+
+      export interface LocationAnalysis {
+        warehouse_id: string;
+        warehouse_name: string;
+        affected_lps: number;
+        total_quantity: number;
+        zones: string[];
+      }
+
+      export interface CustomerImpact {
+        customer_id: string;
+        customer_name: string;
+        contact_email: string | null;
+        shipped_quantity: number;
+        ship_date: string;
+        notification_status: 'draft' | 'pending' | 'sent';
+      }
+
+      export interface FinancialImpact {
+        product_value: number;
+        retrieval_cost: number;
+        disposal_cost: number;
+        lost_revenue: number;
+        total_estimated_cost: number;
+        confidence_interval: string;
+      }
+
+      export interface RegulatoryInfo {
+        reportable_to_fda: boolean;
+        report_due_date: string | null;
+        report_status: 'draft' | 'not_filed' | 'filed';
+        affected_product_types: string[];
+      }
+
+      export type LPStatus = 'available' | 'in_production' | 'shipped' | 'consumed' | 'quarantine';
+
+      export interface LicensePlate {
+        id: string;
+        lp_number: string;
+        product_id: string;
+        product_code?: string;
+        product_name?: string;
+        lot_number: string;
+        quantity: number;
+        uom: string;
+        status: LPStatus;
+        expiry_date: string | null;
+        manufacturing_date: string | null;
+        warehouse_id: string | null;
+        location_id: string | null;
+      }
+
+      export interface TraceRequest {
+        lp_id?: string;
+        batch_number?: string;
+        max_depth?: number;
+        include_shipped?: boolean;
+        include_consumed?: boolean;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/technical/traceability/TraceResultsList.tsx"
+    description: "List view of trace results with pagination"
+    status: "deferred"
+    props:
+      - "traceResult: TraceResult"
+      - "direction: 'forward' | 'backward'"
+      - "onExport: (format: string) => void"
+      - "isLoading: boolean"
+    features:
+      - "Paginated table display (10 rows per page)"
+      - "Columns: Depth, Parent Lot, Child Lot, WO, Date, Status"
+      - "Row click expands details"
+      - "Export CSV button"
+      - "Virtual scrolling for large datasets (1000+)"
+
+  - path: "apps/frontend/components/technical/traceability/TraceResultsTree.tsx"
+    description: "Interactive tree visualization using React Flow or D3.js"
+    status: "deferred"
+    props:
+      - "traceResult: TraceResult"
+      - "direction: 'forward' | 'backward'"
+      - "onNodeClick: (node: TraceNode) => void"
+      - "isLoading: boolean"
+    features:
+      - "Pan and zoom controls"
+      - "Color-coded status indicators"
+      - "Expand/collapse nodes"
+      - "Node click shows details modal"
+      - "Legend for status colors"
+      - "Keyboard navigation (arrow keys, +/- for zoom)"
+      - "ARIA tree roles for accessibility"
+    libraries:
+      - "reactflow (recommended) OR d3.js"
+      - "@tanstack/react-virtual (for large trees)"
+
+  - path: "apps/frontend/components/technical/traceability/TraceResultsMatrix.tsx"
+    description: "Matrix/table view for traceability audit trail"
+    status: "deferred"
+    props:
+      - "traceResult: TraceResult"
+      - "direction: 'forward' | 'backward'"
+      - "onExport: (format: string) => void"
+    features:
+      - "Columns: Lot ID, Product, Batch, Mfg Date, Consumed In, Produced From"
+      - "Sortable columns"
+      - "Export to CSV, Excel, PDF"
+      - "Virtual scrolling for large datasets"
+      - "Print-friendly layout"
+
+  - path: "apps/frontend/components/technical/traceability/RecallSimulationPanel.tsx"
+    description: "Full recall simulation results display"
+    status: "deferred"
+    props:
+      - "simulation: RecallSimulationResult"
+      - "onExport: (format: string) => void"
+      - "onGenerateNotifications: () => void"
+    features:
+      - "Section 1: Affected Inventory (stats cards + status breakdown)"
+      - "Section 2: Location Analysis (warehouse table)"
+      - "Section 3: Customer Impact (table + notification button)"
+      - "Section 4: Financial Impact (line items + total)"
+      - "Section 5: Regulatory Compliance (FDA status)"
+      - "Export buttons (PDF, FDA JSON/XML)"
+      - "Execution time display"
+
+  - path: "apps/frontend/components/technical/traceability/GenealogyTree.tsx"
+    description: "Tree visualization component (shared with TraceResultsTree)"
+    status: "deferred"
+    props:
+      - "nodes: TraceNode[]"
+      - "direction: 'forward' | 'backward'"
+      - "onNodeSelect: (node: TraceNode) => void"
+      - "selectedNodeId: string | null"
+    features:
+      - "D3.js-style tree layout"
+      - "Node rendering with status colors"
+      - "Edge labels (quantity consumed)"
+      - "Zoom controls"
+      - "Reset view button"
+      - "Expand/collapse all buttons"
+
+  - path: "apps/frontend/components/technical/traceability/TraceNodeDetails.tsx"
+    description: "Modal for displaying node details"
+    status: "deferred"
+    props:
+      - "node: TraceNode"
+      - "isOpen: boolean"
+      - "onClose: () => void"
+    features:
+      - "Full LP details display"
+      - "Product info"
+      - "Work order link"
+      - "Location info"
+      - "Status history"
+      - "Actions: View WO, View Product, View Location"
+
+  - path: "apps/frontend/components/technical/traceability/TraceViewTabs.tsx"
+    description: "Tab component for switching between List/Tree/Matrix views"
+    status: "deferred"
+    props:
+      - "activeView: 'list' | 'tree' | 'matrix'"
+      - "onViewChange: (view: string) => void"
+      - "disabled?: boolean"
+    features:
+      - "Icon + text for each tab"
+      - "Keyboard navigation"
+      - "Disabled state during loading"
+
+  - path: "apps/frontend/components/technical/traceability/TraceSummaryCard.tsx"
+    description: "Summary statistics card component"
+    status: "deferred"
+    props:
+      - "summary: TraceSummary | RecallSummary"
+      - "rootLp: LicensePlate"
+    features:
+      - "Root LP details"
+      - "4 stat cards (descendants/ancestors, depth, WOs, customers)"
+      - "Status indicator"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-trace-forward.ts"
+    description: "React Query hook for forward trace"
+    status: "deferred"
+    exports:
+      - name: "useTraceForward"
+        returns: "UseMutationResult<TraceResult, Error, TraceRequest>"
+    pattern: |
+      import { useMutation } from '@tanstack/react-query';
+      import { traceForward } from '@/lib/services/traceability-service';
+
+      export function useTraceForward() {
+        return useMutation({
+          mutationFn: traceForward,
+          onError: (error) => {
+            console.error('Forward trace failed:', error);
+          },
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-trace-backward.ts"
+    description: "React Query hook for backward trace"
+    status: "deferred"
+    exports:
+      - name: "useTraceBackward"
+        returns: "UseMutationResult<TraceResult, Error, TraceRequest>"
+
+  - path: "apps/frontend/lib/hooks/use-recall-simulation.ts"
+    description: "React Query hook for recall simulation"
+    status: "deferred"
+    exports:
+      - name: "useRecallSimulation"
+        returns: "UseMutationResult<RecallSimulationResult, Error, TraceRequest>"
+
+  - path: "apps/frontend/lib/hooks/use-genealogy-tree.ts"
+    description: "React Query hook for genealogy tree"
+    status: "deferred"
+    exports:
+      - name: "useGenealogyTree"
+        returns: "UseQueryResult<TraceNode[]>"
+    params:
+      - "lpId: string"
+      - "direction: 'forward' | 'backward'"
+      - "maxDepth?: number"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/traceability-service.ts"
+    description: "Extended traceability service (adds to 02.10a)"
+    status: "deferred"
+    exports:
+      - name: "traceForward"
+        type: "async function"
+        implementation: |
+          export async function traceForward(request: TraceRequest): Promise<TraceResult> {
+            const response = await fetch('/api/v1/technical/tracing/forward', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(request),
+            });
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || 'Forward trace failed');
+            }
+            return response.json();
+          }
+
+      - name: "traceBackward"
+        type: "async function"
+
+      - name: "runRecallSimulation"
+        type: "async function"
+
+      - name: "getGenealogyTree"
+        type: "async function"
+
+      - name: "exportMatrix"
+        type: "async function"
+        implementation: |
+          export async function exportMatrix(
+            lpId: string,
+            format: 'csv' | 'excel' | 'pdf',
+            direction: 'forward' | 'backward' | 'both' = 'forward'
+          ): Promise<Blob> {
+            const response = await fetch(
+              `/api/v1/technical/tracing/matrix/${lpId}/export?format=${format}&direction=${direction}`
+            );
+            if (!response.ok) {
+              throw new Error('Export failed');
+            }
+            return response.blob();
+          }
+
+      - name: "exportRecallReport"
+        type: "async function"
+
+# UX Notes
+ux:
+  wireframes:
+    - id: "TEC-016"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-016-traceability-search.md"
+      components:
+        - "TraceabilitySearch (from 02.10a)"
+        - "TraceResultsList"
+        - "TraceResultsTree"
+        - "TraceResultsMatrix"
+        - "RecallSimulationPanel"
+        - "GenealogyTree"
+
+  patterns:
+    table: "ShadCN DataTable with pagination, sorting, virtual scrolling"
+    tree: "React Flow for interactive tree visualization"
+    modal: "ShadCN Dialog for node details"
+    tabs: "ShadCN Tabs for List/Tree/Matrix views"
+    cards: "ShadCN Card for summary statistics"
+    export: "File download via Blob and URL.createObjectURL"
+
+  states:
+    - loading: "Spinner with progress bar, status messages"
+    - empty: "No results message with suggestions"
+    - error: "Error banner with retry button"
+    - success: "Results displayed in selected view mode"
+
+  accessibility:
+    - "Tree: role='tree', role='treeitem' on nodes"
+    - "Tree: aria-expanded on expandable nodes"
+    - "Keyboard: Tab through form, Arrow keys in tree, Enter to select"
+    - "Focus: Trap in modals, return focus on close"
+    - "Color: Status not indicated by color alone (icons + text)"
+    - "Screen reader: Announce trace completion, affected count"
+
+  responsive:
+    mobile:
+      - "Search form: Stack vertically"
+      - "List view: Show 3 columns, expand row for details"
+      - "Tree view: Touch gestures (pinch zoom, pan)"
+      - "Stat cards: 2x2 grid"
+    tablet:
+      - "Search form: 2 columns"
+      - "Full table columns"
+      - "Standard tree controls"
+    desktop:
+      - "Search form: 3 columns inline"
+      - "Side panel for node details"
+      - "Floating quick actions"
+
+# Status Colors
+status_colors:
+  available: "#16A34A"      # Green
+  in_production: "#3B82F6"  # Blue
+  shipped: "#DC2626"        # Red
+  consumed: "#6B7280"       # Gray
+  quarantine: "#F59E0B"     # Yellow
+
+# Dependencies
+dependencies:
+  npm:
+    - "reactflow: ^11.10.0"  # Tree visualization
+    - "@tanstack/react-virtual: ^3.0.0"  # Virtual scrolling
+    - "papaparse: ^5.4.0"  # CSV export
+    - "jspdf: ^2.5.0"  # PDF export
+    - "jspdf-autotable: ^3.8.0"  # PDF tables
+    - "xlsx: ^0.18.0"  # Excel export
+
+  internal:
+    - "02.10a: TraceabilitySearch component, search page framework"
+    - "ShadCN: DataTable, Dialog, Tabs, Card, Button"
+    - "React Query: Data fetching and caching"

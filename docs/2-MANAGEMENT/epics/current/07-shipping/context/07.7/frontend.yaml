@@ -1,0 +1,467 @@
+# Story 07.7 - Frontend Implementation
+# Purpose: Components, pages, types, hooks, UX flows
+# Agent: FRONTEND-DEV (UI focus)
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/page.tsx"
+    description: "SO detail page - trigger point for allocation modal"
+    modifications:
+      - "Add 'Allocations' tab to SO detail tabs"
+      - "Add [Allocate] button in header (if SO status = confirmed)"
+      - "Add [Undo] button in header (5-minute window after allocation)"
+      - "Show allocation status badge (none/partial/full)"
+
+components:
+  allocation_modal:
+    - path: "apps/frontend/components/shipping/AllocationModal.tsx"
+      description: "Main allocation modal container (entry point)"
+      props:
+        so_id: "string (UUID)"
+        on_close: "() => void"
+        on_success: "() => void"
+      child_components:
+        - AllocationFreshnessIndicator
+        - AllocationStrategySelector
+        - AllocationSalesOrderLines
+        - AllocationLPTable
+        - AllocationSummary
+        - AllocationDecision
+
+  allocation_freshness:
+    - path: "apps/frontend/components/shipping/AllocationFreshnessIndicator.tsx"
+      description: "Last updated timestamp + [Refresh] button"
+      props:
+        last_updated: "string (ISO 8601)"
+        on_refresh: "() => Promise<void>"
+        is_loading: "boolean"
+      displays:
+        - "Last updated: X seconds ago"
+        - "[↻ Refresh] button (fetches fresh data)"
+        - "Stale warning if > 5 minutes old"
+
+  allocation_strategy:
+    - path: "apps/frontend/components/shipping/AllocationStrategySelector.tsx"
+      description: "FIFO vs FEFO radio selector + threshold explanation"
+      props:
+        strategy: "'FIFO'|'FEFO'"
+        on_strategy_change: "(strategy: string) => void"
+        fefo_threshold_days: "number"
+      displays:
+        - "Radio buttons: FIFO (default) | FEFO"
+        - "Strategy description (brief explanation)"
+        - "FEFO threshold explanation + config link"
+
+  allocation_lines:
+    - path: "apps/frontend/components/shipping/AllocationSalesOrderLines.tsx"
+      description: "SO lines accordion - one section per line"
+      props:
+        lines: "SOLine[]"
+        allocations: "AllocationRecord[]"
+        lps: "LicensePlate[]"
+      displays:
+        - "Line number, product name, qty required"
+        - "Status badge (✓ Full | ⚠ Partial | ✗ None)"
+        - "Qty available vs required"
+        - "Nested LP table per line"
+
+  allocation_table:
+    - path: "apps/frontend/components/shipping/AllocationLPTable.tsx"
+      description: "License plate table per SO line"
+      props:
+        line_id: "string"
+        available_lps: "LicensePlate[]"
+        allocations: "AllocationRecord[]"
+        strategy: "'FIFO'|'FEFO'"
+        on_qty_change: "(lpId: string, qty: number) => void"
+        on_lp_toggle: "(lpId: string, checked: boolean) => void"
+      columns:
+        - "[ ] Checkbox (select for allocation)"
+        - "LP# (clickable → LP detail)"
+        - "Location (zone-aisle-bin)"
+        - "Qty Available"
+        - "Receipt/Expiry Date (sorted by strategy)"
+        - "Batch # (responsive visibility)"
+        - "Selected Qty (editable inline or via modal)"
+      responsive:
+        desktop: "Full columns, batch in column or hover"
+        tablet: "Compact, batch in tooltip"
+        mobile: "Stacked cards, batch inline"
+
+  allocation_progress:
+    - path: "apps/frontend/components/shipping/AllocationProgress.tsx"
+      description: "Progress bar per line (allocated/required %)"
+      props:
+        line_id: "string"
+        quantity_allocated: "number"
+        quantity_required: "number"
+      displays:
+        - "Progress bar: allocated / required"
+        - "Percentage label"
+        - "Shortfall warning if partial"
+
+  allocation_summary:
+    - path: "apps/frontend/components/shipping/AllocationSummary.tsx"
+      description: "Allocation summary metrics"
+      props:
+        summary: "AllocationSummary"
+      displays:
+        - "Total lines (fully/partially/not allocated with counts)"
+        - "Total qty (allocated/required)"
+        - "Coverage %"
+        - "LPs selected count"
+
+  allocation_decision:
+    - path: "apps/frontend/components/shipping/AllocationDecision.tsx"
+      description: "Hold vs Backorder decision (if insufficient stock)"
+      props:
+        has_shortfall: "boolean"
+        shortfall_qty: "number"
+        on_hold: "() => void"
+        on_backorder: "() => void"
+      displays:
+        - "⚠ Insufficient inventory warning"
+        - "Option 1: Hold SO + notify production"
+        - "Option 2: Create backorder (recommended)"
+        - "Buttons: [Cancel] [Hold] [Backorder]"
+
+  backorder_alert:
+    - path: "apps/frontend/components/shipping/BackorderAlert.tsx"
+      description: "Alert banner for backorder items"
+      props:
+        backorders: "BackorderRecord[]"
+      displays:
+        - "⚠ Backorder notification"
+        - "List of backordered items with qty"
+        - "[Production Schedule] link"
+
+  allocation_buttons:
+    - path: "apps/frontend/components/shipping/AllocationActions.tsx"
+      description: "Action buttons footer (Auto-Allocate, Manual, Allocate, Cancel)"
+      props:
+        strategy: "'FIFO'|'FEFO'"
+        has_manual_changes: "boolean"
+        is_loading: "boolean"
+        on_auto_allocate: "() => void"
+        on_manual_select: "() => void"
+        on_allocate: "() => void"
+        on_cancel: "() => void"
+      buttons:
+        - "[Cancel] - Close modal"
+        - "[Previous Strategy] - Switch strategy (if FEFO selected)"
+        - "[Auto-Allocate] - Run allocation algorithm"
+        - "[Manual Selection] - Toggle manual mode"
+        - "[Allocate Selected] - Confirm allocation"
+        - "[Confirm & Hold] - Hold SO if partial"
+
+  undo_button:
+    - path: "apps/frontend/components/shipping/AllocationUndoButton.tsx"
+      description: "[Undo] button in SO detail header (5-minute window)"
+      props:
+        so_id: "string"
+        allocated_at: "string (ISO 8601)"
+        on_success: "() => void"
+      displays:
+        - "[↶ Undo] button (if within 5 minutes)"
+        - "Tooltip: Undo allocation within X minutes"
+        - "Disabled if > 5 minutes elapsed"
+
+  release_allocation_modal:
+    - path: "apps/frontend/components/shipping/ReleaseAllocationModal.tsx"
+      description: "Modal for explicit allocation release (anytime)"
+      props:
+        so_id: "string"
+        allocation_ids: "string[]"
+        on_release: "(reason: string) => void"
+        on_cancel: "() => void"
+      displays:
+        - "Title: Release Allocation"
+        - "Warning: This will release inventory back to stock"
+        - "Reason dropdown (optional)"
+        - "Buttons: [Cancel] [Release]"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/useAllocation.ts"
+    description: "Hook for allocation modal state and API calls"
+    exports:
+      - name: "useAllocation"
+        params: ["soId: string"]
+        returns:
+          allocation_data: "AllocationData | null"
+          is_loading: "boolean"
+          error: "Error | null"
+          refresh: "() => Promise<void>"
+          allocate: "(request: AllocateRequest) => Promise<AllocationResult>"
+          release: "(reason?: string) => Promise<ReleaseResult>"
+          updateStrategy: "(strategy: string) => Promise<void>"
+
+  - path: "apps/frontend/lib/hooks/useAllocationModal.ts"
+    description: "Hook for allocation modal UI state"
+    exports:
+      - name: "useAllocationModal"
+        returns:
+          is_open: "boolean"
+          strategy: "'FIFO'|'FEFO'"
+          manual_mode: "boolean"
+          selected_lps: "Map<string, number>"
+          set_strategy: "(strategy: string) => void"
+          toggle_manual_mode: "() => void"
+          set_lp_qty: "(lpId: string, qty: number) => void"
+          toggle_lp_checkbox: "(lpId: string) => void"
+
+  - path: "apps/frontend/lib/hooks/useAllocationFreshness.ts"
+    description: "Hook for inventory freshness tracking"
+    exports:
+      - name: "useAllocationFreshness"
+        params: ["allocation_data: AllocationData"]
+        returns:
+          last_updated: "Date"
+          seconds_ago: "number"
+          is_stale: "boolean"
+          refresh_interval: "number | null"
+          set_auto_refresh: "(enabled: boolean, interval?: number) => void"
+
+types:
+  - path: "apps/frontend/lib/types/allocation-ui.ts"
+    description: "UI-specific types for allocation"
+    exports:
+      - name: "AllocationUIState"
+        fields:
+          is_open: "boolean"
+          strategy: "'FIFO'|'FEFO'"
+          manual_mode: "boolean"
+          selected_allocations: "Map<string, number>"
+          is_loading: "boolean"
+          error: "string | null"
+          last_updated: "Date"
+
+      - name: "AllocationData"
+        fields:
+          sales_order_id: "string"
+          lines: "SOLine[]"
+          available_lps: "Map<string, LicensePlate[]>"
+          last_updated: "string"
+          fefo_threshold_days: "number"
+          allocation_summary: "AllocationSummary"
+
+      - name: "SOLine"
+        fields:
+          id: "string"
+          product_id: "string"
+          product_name: "string"
+          quantity_ordered: "number"
+          quantity_allocated: "number"
+          quantity_available: "number"
+          allocation_status: "'full'|'partial'|'none'"
+
+      - name: "LicensePlate"
+        fields:
+          id: "string"
+          lp_number: "string"
+          location: "string"
+          on_hand_quantity: "number"
+          available_quantity: "number"
+          receipt_date: "string"
+          best_before_date: "string"
+          lot_number: "string | null"
+          batch_number: "string | null"
+          expiry_days_remaining: "number"
+          is_fefo_warning: "boolean"
+
+# UX States
+states:
+  loading:
+    description: "Skeleton loaders while fetching allocation data"
+    components:
+      - "Skeleton loader for freshness indicator"
+      - "Skeleton loaders for SO lines"
+      - "Animated shimmer LP table"
+      - "Skeleton summary section"
+    duration: "~1-2 seconds"
+    display_timing: "Show progress % if > 3 seconds"
+
+  empty:
+    description: "No available inventory for product"
+    components:
+      - "Empty state icon (📦 with prohibition)"
+      - "Headline: 'No Available Inventory'"
+      - "Explanation: 'This product is out of stock'"
+      - "Action buttons: [Hold Order] [Check Schedule] [Alternatives]"
+
+  error:
+    description: "Failed to fetch allocation data"
+    components:
+      - "Red error banner (top)"
+      - "Error message + error code"
+      - "Buttons: [Retry] [Dismiss]"
+      - "Footer: Last attempt timestamp"
+
+  success:
+    description: "Allocation data loaded successfully"
+    components:
+      - "All sections populated with data"
+      - "Freshness indicator + [Refresh] button"
+      - "Strategy selector (FIFO/FEFO)"
+      - "SO lines with LP tables"
+      - "Allocation summary"
+      - "Action buttons enabled"
+
+  permission_denied:
+    description: "User lacks allocation permission"
+    components:
+      - "Yellow/orange warning banner"
+      - "Message: 'Insufficient permissions'"
+      - "Read-only view of allocation suggestions"
+      - "Button: [Request Permission]"
+
+# Responsive Breakpoints
+responsive:
+  desktop:
+    breakpoint: ">1024px"
+    layout:
+      modal_width: "90vw, max 1200px"
+      columns_visible: "all"
+      batch_display: "column or hover tooltip"
+      lp_table_layout: "full table"
+    adjustments:
+      - "Show full LP details in table"
+      - "Batch number visible in column"
+      - "Horizontal scroll if needed"
+
+  tablet:
+    breakpoint: "768-1024px"
+    layout:
+      modal_width: "95vw, max 900px"
+      columns_visible: "essential only"
+      batch_display: "hover tooltip"
+      lp_table_layout: "compact table"
+    adjustments:
+      - "Hide batch column (show in tooltip)"
+      - "Reduce column padding"
+      - "Stack buttons vertically"
+
+  mobile:
+    breakpoint: "<768px"
+    layout:
+      modal_width: "100vw (full-screen)"
+      columns_visible: "minimal"
+      batch_display: "inline in card"
+      lp_table_layout: "stacked cards"
+    adjustments:
+      - "Convert LP table to stacked cards"
+      - "Strategy selector: vertical radio buttons"
+      - "SO lines as expandable cards"
+      - "Batch inline in card: 'Batch: B-001'"
+      - "Full-width buttons at bottom"
+      - "Font sizes: 12px body, 14px headings"
+
+# Accessibility
+accessibility:
+  touch_targets:
+    minimum: "48x48dp"
+    checkboxes: "48x48dp"
+    radio_buttons: "48x48dp"
+    buttons: "48x48dp"
+    lp_link: "48x48dp"
+
+  contrast:
+    minimum: "4.5:1"
+    status_badges: "4.5:1"
+    fefo_warning: "4.5:1 (yellow)"
+
+  screen_reader:
+    - "Modal: role='dialog' aria-labelledby='allocation-title' aria-modal='true'"
+    - "Strategy radio group: aria-label='Allocation Strategy: FIFO or FEFO'"
+    - "Checkbox: aria-label='Select LP-{number} for allocation'"
+    - "Status badge: aria-label='Status: Fully Allocated (100%)'"
+    - "Freshness: aria-label='Last updated {X} seconds ago'"
+
+  keyboard:
+    - "Tab: cycle through interactive elements"
+    - "Enter: activate radio button, toggle checkbox, submit form"
+    - "Space: check/uncheck checkbox"
+    - "Arrow keys: navigate radio buttons (Up/Down)"
+    - "Escape: close modal"
+    - "Alt+A: Quick allocate"
+    - "Alt+C: Cancel"
+    - "Alt+R: Refresh"
+
+  focus_trap:
+    - "aria-modal='true' indicates focus trap"
+    - "Tab cycles only within modal"
+    - "Escape closes modal, returns focus to trigger"
+    - "Tab order: Strategy → Auto-Allocate → Manual → SO Lines → LP Table → Summary → Buttons"
+
+# Validation Rules (Frontend)
+validation:
+  allocation_qty:
+    - "Must be > 0"
+    - "Must be <= LP available_quantity"
+    - "Cannot allocate more than SO line requires"
+
+  partial_qty_edit:
+    - "Inline edit: Click field, type qty, press Enter"
+    - "Modal edit: Click [Edit Qty], enter qty, confirm"
+    - "Auto-recalculate summary on change"
+
+  strategy_selection:
+    - "At least one strategy must be selected (default FIFO)"
+    - "Cannot change strategy after auto-allocate (unless reset)"
+
+  manual_selection:
+    - "At least one LP must be checked"
+    - "Cannot allocate more than required per line"
+
+  freshness:
+    - "If > 5 minutes old, show warning + [Refresh]"
+    - "Allow allocation to proceed with stale data (user responsibility)"
+
+# Business Logic (Frontend)
+business_logic:
+  auto_allocate:
+    - "Run allocation algorithm (FIFO or FEFO)"
+    - "Pre-check all LPs for user review"
+    - "Auto-fill Selected Qty based on strategy"
+
+  manual_override:
+    - "User can uncheck LPs to exclude from allocation"
+    - "User can edit quantities (inline or modal)"
+    - "Recalculate summary on each change"
+
+  partial_lp_allocation:
+    - "User clicks qty field or [Edit Qty] button"
+    - "Modal/inline edit allows entering partial qty"
+    - "Validation: 0 < qty <= lp_available_qty"
+    - "Auto-recalculate totals"
+
+  fefo_expiry_warning:
+    - "Mark LPs with expiry_days_remaining < fefo_threshold_days as yellow"
+    - "Show: '⚠ Expires in X days'"
+    - "User can optionally ignore warning (checkbox)"
+
+  allocation_summary:
+    - "Real-time calculation as user selects LPs"
+    - "Show breakdown: fully/partially/not allocated"
+    - "Coverage %: allocated / required"
+    - "Shortfall qty if insufficient"
+
+  hold_vs_backorder:
+    - "If insufficient inventory (qty_allocated < qty_required):"
+    - "  Option 1: Hold SO + Notify Production"
+    - "  Option 2: Create Backorder (recommended)"
+    - "User selects one, click [Confirm & Hold] or [Backorder]"
+
+# Performance Targets
+performance:
+  fetch_allocation_data: "<500ms"
+  fifo_fefo_sort: "<200ms"
+  auto_allocate: "<300ms"
+  modal_render: "<200ms (with skeleton loaders)"
+  partial_qty_edit: "<100ms (summary recalculation)"
+  refresh_inventory: "<300ms"
+
+# Cache Strategy (Frontend)
+caching:
+  allocation_data: "1 min TTL (with timestamp)"
+  lp_availability: "2 min TTL"
+  product_strategy: "24 hour TTL"
+  shipping_settings: "1 hour TTL"

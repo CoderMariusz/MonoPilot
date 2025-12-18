@@ -1,0 +1,137 @@
+# Story 02.5a - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.5a"
+  name: "BOM Items Core (MVP)"
+  slug: "bom-items-core"
+  epic: "02-technical"
+  phase: "1A"  # MVP
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  parent_story: "02.5"  # Split from parent 02.5
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, triggers, constraints
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, hooks
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id filter", "RLS pattern", "auth context"]
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms table", "bom_id FK", "BOM service"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK", "product lookup"]
+    - story: "02.7"
+      name: "Routings CRUD"
+      provides: ["routings table", "routing_operations table", "operation_seq FK"]
+  blocked_by: []
+  blocks:
+    - story: "02.5b"
+      name: "BOM Items Advanced (Conditional/Byproducts)"
+    - story: "02.6"
+      name: "Alternative Ingredients"
+    - story: "02.9"
+      name: "BOM Costing"
+    - story: "02.14"
+      name: "Multi-level BOM Explosion"
+
+# External Dependencies
+external_dependencies:
+  migrations:
+    - migration: "049"
+      description: "UoM validation trigger and quantity check constraint (deployed)"
+      status: "deployed"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.21", "FR-2.26", "FR-2.38", "FR-2.39"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Database Schema - bom_items", "API Design - BOMs Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.5a.bom-items-core.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-bom-items-detail.md"
+      relevance: "BOM Items Table, Add/Edit Item Modal (MVP subset)"
+  patterns:
+    - path: "apps/frontend/lib/services/bom-service.ts"
+      relevance: "Existing BOM service pattern"
+    - path: "apps/frontend/components/technical/bom/BOMTable.tsx"
+      relevance: "Existing BOM table pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 4
+    description: "CRUD endpoints /api/v1/technical/boms/:id/items/*"
+  - type: "service"
+    count: 1
+    description: "bom-items-service.ts"
+  - type: "component"
+    count: 3
+    description: "BOMItemsTable, BOMItemModal, BOMItemRow"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for BOM items"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + API tests"
+
+# Scope Boundaries
+scope:
+  in_scope:
+    - "GET /api/technical/boms/:id/items (list items)"
+    - "POST /api/technical/boms/:id/items (add item)"
+    - "PUT /api/technical/boms/:id/items/:itemId (update item)"
+    - "DELETE /api/technical/boms/:id/items/:itemId (delete item)"
+    - "BOM items table with basic display"
+    - "Add/Edit BOM item modal with MVP fields"
+    - "UoM validation warning (FR-2.38)"
+    - "Quantity validation > 0 (FR-2.39)"
+    - "Operation assignment dropdown"
+    - "Sequence auto-increment"
+    - "Permission enforcement"
+  out_of_scope:
+    - "Conditional items (02.5b)"
+    - "By-products management (02.5b)"
+    - "Line-specific items (02.5b)"
+    - "Alternative ingredients (02.6)"
+    - "Multi-level BOM explosion (02.14)"
+    - "Bulk import from CSV"
+    - "Drag-drop reordering"
+    - "BOM cost calculation (02.9)"
+
+# Technical notes
+technical_notes:
+  - "MVP substory split from 02.5 - focuses on core CRUD only"
+  - "Migration 049 already deployed - use existing constraints/triggers"
+  - "UoM mismatch is WARNING only (not blocking error)"
+  - "Quantity > 0 enforced by database constraint"
+  - "Sequence auto-increments by 10 (max + 10)"
+  - "Hide Phase 1+ fields completely in MVP modal (no Coming Soon)"
+  - "Permission checks: technical.R for read, technical.C/U/D for write"
+
+# PRD Requirements Coverage
+prd_coverage:
+  - { fr_id: "FR-2.21", description: "BOM items (ingredient, qty, unit, sequence)", priority: "P0", status: "covered" }
+  - { fr_id: "FR-2.31", description: "BOM item operation assignment", priority: "P0", status: "covered" }
+  - { fr_id: "FR-2.38", description: "BOM item UoM validation", priority: "P1", status: "covered" }
+  - { fr_id: "FR-2.39", description: "BOM item quantity validation", priority: "P0", status: "covered" }
+  # Deferred to 02.5b
+  - { fr_id: "FR-2.26", description: "Conditional BOM items", priority: "P1", status: "deferred_to_02.5b" }
+  - { fr_id: "FR-2.27", description: "BOM byproducts", priority: "P1", status: "deferred_to_02.5b" }

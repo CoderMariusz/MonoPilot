@@ -1,0 +1,126 @@
+# Story 01.5b - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# NO NEW TABLE - Column already exists from 01.5a
+existing_columns:
+  - table: "users"
+    column: "warehouse_access_ids"
+    type: "UUID[]"
+    constraints: "NULL (default)"
+    description: "Array of warehouse IDs user can access. NULL = all warehouses (admin/super_admin)"
+    added_in: "Story 01.5a"
+
+# Optional: Audit log table for warehouse access changes
+optional_tables:
+  - name: "user_warehouse_access_log"
+    description: "Audit trail for warehouse access changes"
+    recommended: true
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "user_id", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "warehouse_id", type: "UUID", constraints: "REFERENCES warehouses(id)" }
+      - { name: "action", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "changed_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "changed_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    indexes:
+      - "idx_user_warehouse_access_log_user ON user_warehouse_access_log(user_id)"
+      - "idx_user_warehouse_access_log_warehouse ON user_warehouse_access_log(warehouse_id)"
+      - "idx_user_warehouse_access_log_created ON user_warehouse_access_log(changed_at)"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    actions:
+      - "granted"
+      - "revoked"
+      - "all_warehouses_enabled"
+      - "all_warehouses_disabled"
+
+# Business Logic Rules
+business_logic:
+  warehouse_access_ids_interpretation:
+    - condition: "NULL + role IN ('SUPER_ADMIN', 'ADMIN')"
+      meaning: "All warehouses accessible"
+    - condition: "NULL + role NOT IN ('SUPER_ADMIN', 'ADMIN')"
+      meaning: "No warehouses (warning shown in UI)"
+    - condition: "[] (empty array)"
+      meaning: "Explicit no warehouses"
+    - condition: "[id1, id2, ...]"
+      meaning: "Specific warehouses only"
+
+# RLS Policy Updates (extending existing warehouse policies)
+rls_policy_extensions:
+  - table: "inventory_items"
+    policy_name: "inventory_warehouse_access"
+    operation: "SELECT"
+    using: |
+      warehouse_id IN (
+        SELECT unnest(warehouse_access_ids)
+        FROM users
+        WHERE id = auth.uid()
+      )
+      OR
+      -- Admin/Super Admin with NULL (all access)
+      (
+        (SELECT warehouse_access_ids FROM users WHERE id = auth.uid()) IS NULL
+        AND
+        (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+        IN ('SUPER_ADMIN', 'ADMIN')
+      )
+    description: "Filter inventory items by user's warehouse access"
+
+  - table: "license_plates"
+    policy_name: "lp_warehouse_access"
+    operation: "SELECT"
+    using: |
+      warehouse_id IN (
+        SELECT unnest(warehouse_access_ids)
+        FROM users
+        WHERE id = auth.uid()
+      )
+      OR
+      (
+        (SELECT warehouse_access_ids FROM users WHERE id = auth.uid()) IS NULL
+        AND
+        (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+        IN ('SUPER_ADMIN', 'ADMIN')
+      )
+    description: "Filter license plates by user's warehouse access"
+
+# Migrations
+migrations:
+  - path: "supabase/migrations/XXX_user_warehouse_access_log.sql"
+    type: "migration"
+    description: "Optional audit log table for warehouse access changes"
+    required: false
+  - path: "supabase/migrations/XXX_rls_warehouse_access.sql"
+    type: "migration"
+    description: "RLS policies for warehouse-scoped operations"
+    required: true
+
+# Indexes (if audit table created)
+indexes:
+  - "idx_user_warehouse_access_log_user ON user_warehouse_access_log(user_id)"
+  - "idx_user_warehouse_access_log_warehouse ON user_warehouse_access_log(warehouse_id)"
+  - "idx_user_warehouse_access_log_created ON user_warehouse_access_log(changed_at)"
+
+# Cascading Delete Behavior
+cascading_deletes:
+  - trigger: "Warehouse deleted"
+    action: "Remove warehouse_id from users.warehouse_access_ids arrays"
+    implementation: |
+      -- Trigger to clean up warehouse references
+      CREATE OR REPLACE FUNCTION cleanup_warehouse_access()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        UPDATE users
+        SET warehouse_access_ids = array_remove(warehouse_access_ids, OLD.id)
+        WHERE warehouse_access_ids @> ARRAY[OLD.id];
+        RETURN OLD;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER tr_warehouses_cleanup_access
+      BEFORE DELETE ON warehouses
+      FOR EACH ROW
+      EXECUTE FUNCTION cleanup_warehouse_access();

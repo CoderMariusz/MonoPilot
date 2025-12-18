@@ -1,0 +1,532 @@
+# Story 06.7 - API Specification
+# Purpose: REST endpoints, request/response schemas, error handling, validation
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/quality"
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/sampling-plans"
+    description: "List sampling plans (paginated, filtered, searchable)"
+    file: "apps/frontend/app/api/quality/sampling-plans/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_params:
+      - name: "search"
+        type: "string"
+        required: false
+        description: "Filter by plan name or product name (partial match)"
+
+      - name: "inspection_type"
+        type: "string"
+        enum: ["incoming", "in_process", "final", "all"]
+        default: "all"
+        description: "Filter by inspection type"
+
+      - name: "status"
+        type: "string"
+        enum: ["active", "inactive", "all"]
+        default: "all"
+        description: "Filter by active/inactive status"
+
+      - name: "product_id"
+        type: "string"
+        required: false
+        description: "Filter by specific product"
+
+      - name: "sort"
+        type: "string"
+        enum: ["name", "product", "lot_size", "sample_size", "aql", "created_at"]
+        default: "created_at"
+
+      - name: "order"
+        type: "string"
+        enum: ["asc", "desc"]
+        default: "desc"
+
+      - name: "page"
+        type: "number"
+        default: 1
+        description: "Pagination page (1-indexed)"
+
+      - name: "limit"
+        type: "number"
+        default: 20
+        max: 100
+        description: "Items per page"
+
+    response:
+      status: 200
+      schema: "PaginatedResult<SamplingPlanSummary>"
+      example:
+        data:
+          - id: "uuid"
+            name: "Incoming Flour Inspection"
+            product_name: "Wheat Flour"
+            inspection_type: "incoming"
+            lot_size_min: 50
+            lot_size_max: 500
+            sample_size: 13
+            acceptance_number: 1
+            rejection_number: 2
+            aql_level: "II"
+            is_active: true
+        total: 12
+        page: 1
+        limit: 20
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Authentication required"
+
+      - status: 400
+        code: "INVALID_QUERY"
+        message: "Invalid query parameters (e.g., invalid page number)"
+
+  - method: "POST"
+    path: "/api/quality/sampling-plans"
+    description: "Create new sampling plan"
+    auth: "required"
+    roles: ["ADMIN", "QA_MANAGER"]
+
+    request:
+      schema: "CreateSamplingPlanRequest"
+      fields:
+        - name: "name"
+          type: "string"
+          required: true
+          validation: "3-200 chars, unique per org"
+
+        - name: "description"
+          type: "string"
+          required: false
+
+        - name: "inspection_type"
+          type: "enum"
+          required: true
+          values: ["incoming", "in_process", "final"]
+
+        - name: "product_id"
+          type: "UUID"
+          required: false
+          validation: "References products table"
+
+        - name: "aql_level"
+          type: "enum"
+          required: true
+          values: ["I", "II", "III"]
+          description: "General Inspection Level (ISO 2859)"
+
+        - name: "lot_size_min"
+          type: "integer"
+          required: true
+          validation: "> 0, < lot_size_max"
+
+        - name: "lot_size_max"
+          type: "integer"
+          required: true
+          validation: "> lot_size_min"
+
+        - name: "sample_size"
+          type: "integer"
+          required: true
+          validation: "> 0, <= lot_size_max"
+
+        - name: "acceptance_number"
+          type: "integer"
+          required: true
+          validation: ">= 0, < rejection_number"
+
+        - name: "rejection_number"
+          type: "integer"
+          required: true
+          validation: "> 0, > acceptance_number"
+
+        - name: "is_active"
+          type: "boolean"
+          required: false
+          default: true
+
+    response:
+      status: 201
+      schema: "SamplingPlan"
+
+    business_logic:
+      - "Validate name uniqueness within org"
+      - "If product_id provided, deactivate conflicting plans (same product + inspection_type)"
+      - "Validate lot size range: min < max"
+      - "Validate acceptance < rejection"
+      - "Auto-fill created_by from auth.uid()"
+      - "Return 409 CONFLICT if duplicate found"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        fields: ["name", "lot_size_min", "sample_size", "acceptance_number"]
+
+      - status: 409
+        code: "DUPLICATE_CODE"
+        message: "A sampling plan with this name already exists for your organization"
+
+      - status: 403
+        code: "PERMISSION_DENIED"
+        message: "Insufficient permissions to create sampling plans"
+
+  - method: "GET"
+    path: "/api/quality/sampling-plans/:id"
+    description: "Get sampling plan detail"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      schema: "SamplingPlan"
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Sampling plan not found"
+
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Access denied (RLS violation)"
+
+  - method: "PUT"
+    path: "/api/quality/sampling-plans/:id"
+    description: "Update sampling plan"
+    auth: "required"
+    roles: ["ADMIN", "QA_MANAGER"]
+
+    request:
+      schema: "UpdateSamplingPlanRequest (partial)"
+      notes:
+        - "All fields optional (partial update)"
+        - "Validation same as creation"
+
+    response:
+      status: 200
+      schema: "SamplingPlan"
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Sampling plan not found"
+
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid field values"
+
+  - method: "DELETE"
+    path: "/api/quality/sampling-plans/:id"
+    description: "Soft delete sampling plan (deactivate)"
+    auth: "required"
+    roles: ["ADMIN", "QA_MANAGER"]
+
+    business_logic:
+      - "Check if plan used by inspections created in last 30 days"
+      - "If referenced, return 400 with count"
+      - "If not referenced, set is_active = false (soft delete)"
+
+    response:
+      status: 204
+
+    errors:
+      - status: 400
+        code: "REFERENCED"
+        message: "Cannot delete sampling plan used by 5 active inspections"
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Sampling plan not found"
+
+  - method: "GET"
+    path: "/api/quality/sampling-plans/suggest"
+    description: "Auto-suggest active sampling plan based on product, inspection type, and lot size"
+    auth: "required"
+    roles: ["*"]
+
+    query_params:
+      - name: "product_id"
+        type: "UUID"
+        required: true
+
+      - name: "inspection_type"
+        type: "enum"
+        required: true
+        values: ["incoming", "in_process", "final"]
+
+      - name: "lot_size"
+        type: "integer"
+        required: true
+        validation: "> 0"
+
+    response:
+      status: 200
+      schema: "SamplingPlan | null"
+      business_logic:
+        - "Query: product_id matches AND inspection_type matches AND is_active=true AND lot_size BETWEEN lot_size_min AND lot_size_max"
+        - "Return first match or null if no plan found"
+
+    errors:
+      - status: 400
+        code: "INVALID_QUERY"
+        message: "Invalid query parameters"
+
+  - method: "POST"
+    path: "/api/quality/sampling-records"
+    description: "Record individual sample during inspection"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      schema: "CreateSamplingRecordRequest"
+      fields:
+        - name: "inspection_id"
+          type: "UUID"
+          required: true
+          validation: "Must reference existing inspection"
+
+        - name: "plan_id"
+          type: "UUID"
+          required: true
+          validation: "Must reference active sampling plan"
+
+        - name: "sample_identifier"
+          type: "string"
+          required: false
+          validation: "If omitted, auto-generate SMP-{product}-{date}-{sequence}"
+
+        - name: "location_description"
+          type: "string"
+          required: false
+          max_length: 500
+          example: "Pallet 3, Row 2, Unit 5"
+
+        - name: "notes"
+          type: "string"
+          required: false
+          max_length: 1000
+
+    response:
+      status: 201
+      schema: "SamplingRecord"
+
+    business_logic:
+      - "Auto-fill sampled_by from auth.uid()"
+      - "Auto-fill sampled_at with current timestamp"
+      - "Auto-generate sample_identifier if not provided"
+      - "Validate inspection exists and is in correct status"
+      - "Validate plan_id matches inspection's product"
+      - "Check UNIQUE constraint on (inspection_id, sample_identifier)"
+
+    errors:
+      - status: 400
+        code: "DUPLICATE_SAMPLE"
+        message: "Sample #{N} already recorded for this inspection"
+
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid inspection or plan ID"
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Inspection or sampling plan not found"
+
+  - method: "GET"
+    path: "/api/quality/sampling-records/inspection/:inspectionId"
+    description: "List all samples recorded for an inspection"
+    auth: "required"
+    roles: ["*"]
+
+    query_params:
+      - name: "sort"
+        type: "string"
+        enum: ["sequence", "sampled_at"]
+        default: "sequence"
+
+    response:
+      status: 200
+      schema: "SamplingRecordsResponse"
+      example:
+        sampling_records:
+          - id: "uuid"
+            sample_identifier: "S-001"
+            location_description: "Pallet 1"
+            sampled_by: "uuid"
+            sampled_by_name: "John Smith"
+            sampled_at: "2025-01-15T10:15:00Z"
+            notes: "Good quality"
+        total_samples: 13
+        required_samples: 13
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Inspection not found"
+
+  - method: "GET"
+    path: "/api/quality/iso-2859-reference"
+    description: "Get ISO 2859 sample size reference table (read-only)"
+    auth: "required"
+    roles: ["*"]
+
+    query_params:
+      - name: "inspection_level"
+        type: "enum"
+        required: false
+        values: ["I", "II", "III", "all"]
+        default: "II"
+
+      - name: "aql_level"
+        type: "decimal"
+        required: false
+        values: ["0.65", "1.0", "1.5", "2.5", "4.0", "6.5", "10.0"]
+        description: "If provided, return only rows for this AQL level"
+
+    response:
+      status: 200
+      schema: "ISO2859ReferenceResponse"
+      example:
+        reference_table:
+          - lot_size_min: 51
+            lot_size_max: 90
+            sample_size_code: "D"
+            inspection_level: "II"
+            sample_size: 8
+            aql_25: { Ac: 1, Re: 2 }
+
+    notes:
+      - "Static, non-paginated response"
+      - "Used for ISO 2859 table helper modal"
+      - "No database query needed (in-memory lookup)"
+
+# Validation Schemas (Zod)
+validation:
+  CreateSamplingPlanSchema:
+    rules:
+      - name: "string.min(3).max(200)"
+      - description: "string.max(1000).optional()"
+      - inspection_type: "enum(['incoming', 'in_process', 'final'])"
+      - product_id: "string.uuid().optional()"
+      - aql_level: "enum(['I', 'II', 'III'])"
+      - lot_size_min: "number.int().positive()"
+      - lot_size_max: "number.int().positive()"
+      - sample_size: "number.int().positive()"
+      - acceptance_number: "number.int().nonnegative()"
+      - rejection_number: "number.int().positive()"
+      - is_active: "boolean.optional()"
+    custom_validations:
+      - "lot_size_min < lot_size_max"
+      - "acceptance_number < rejection_number"
+      - "sample_size <= lot_size_max"
+
+  CreateSamplingRecordSchema:
+    rules:
+      - inspection_id: "string.uuid()"
+      - plan_id: "string.uuid()"
+      - sample_identifier: "string.optional().min(1).max(50)"
+      - location_description: "string.optional().max(500)"
+      - notes: "string.optional().max(1000)"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/sampling-plan-service.ts"
+    description: "Sampling plan business logic and CRUD operations"
+    exports:
+      - name: "SamplingPlanService"
+        type: "class"
+        methods:
+          - name: "list"
+            params: ["params: SamplingPlanListParams"]
+            returns: "Promise<PaginatedResult<SamplingPlanSummary>>"
+
+          - name: "getById"
+            params: ["id: string"]
+            returns: "Promise<SamplingPlan | null>"
+
+          - name: "create"
+            params: ["data: CreateSamplingPlanRequest"]
+            returns: "Promise<SamplingPlan>"
+
+          - name: "update"
+            params: ["id: string", "data: UpdateSamplingPlanRequest"]
+            returns: "Promise<SamplingPlan>"
+
+          - name: "delete"
+            params: ["id: string"]
+            returns: "Promise<void>"
+
+          - name: "suggest"
+            params: ["product_id: string", "inspection_type: InspectionType", "lot_size: number"]
+            returns: "Promise<SamplingPlan | null>"
+
+          - name: "canDelete"
+            params: ["id: string"]
+            returns: "Promise<{ allowed: boolean; reason?: string; count?: number }>"
+
+  - path: "apps/frontend/lib/services/iso-2859-service.ts"
+    description: "ISO 2859 table lookups and AQL calculations"
+    exports:
+      - name: "ISO2859Service"
+        type: "class"
+        methods:
+          - name: "getTable"
+            params: ["inspectionLevel?: string", "aqlLevel?: number"]
+            returns: "Promise<ISO2859Entry[]>"
+
+          - name: "lookup"
+            params: ["lotSize: number", "inspectionLevel: string", "aqlLevel: number"]
+            returns: "Promise<{ sample_size: number; acceptance_number: number; rejection_number: number }>"
+
+          - name: "calculateDecision"
+            params: ["defectsFound: number", "acceptance_number: number", "rejection_number: number"]
+            returns: "'accept' | 'reject' | 'review'"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/sampling.ts"
+    description: "TypeScript interfaces for sampling plans and records"
+    exports:
+      - name: "SamplingPlan"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "name: string"
+          - "inspection_type: 'incoming' | 'in_process' | 'final'"
+          - "product_id: string | null"
+          - "product_name: string | null"
+          - "aql_level: 'I' | 'II' | 'III' | null"
+          - "lot_size_min: number"
+          - "lot_size_max: number"
+          - "sample_size: number"
+          - "acceptance_number: number"
+          - "rejection_number: number"
+          - "is_active: boolean"
+          - "created_at: string"
+          - "updated_at: string"
+
+      - name: "SamplingRecord"
+        fields:
+          - "id: string"
+          - "inspection_id: string"
+          - "plan_id: string"
+          - "sample_identifier: string"
+          - "location_description: string | null"
+          - "sampled_by: string"
+          - "sampled_by_name: string"
+          - "sampled_at: string"
+          - "notes: string | null"
+
+# Error Handling
+error_codes:
+  UNAUTHORIZED: "User not authenticated"
+  FORBIDDEN: "User lacks permission (RLS or role-based)"
+  NOT_FOUND: "Resource not found"
+  VALIDATION_ERROR: "Request validation failed"
+  DUPLICATE_CODE: "Plan name already exists in organization"
+  REFERENCED: "Cannot delete resource used by other entities"
+  IMMUTABLE_FIELD: "Cannot modify immutable field"
+  INVALID_QUERY: "Invalid query parameters"

@@ -1,0 +1,234 @@
+# Story 02.11 - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers
+# Agent: BACKEND-DEV (database focus)
+
+# Migration 047 already exists - extend with ALTER TABLE
+migrations:
+  - path: "supabase/migrations/0XX_extend_product_shelf_life.sql"
+    type: "migration"
+    description: "Add extended shelf life fields to product_shelf_life table"
+  - path: "supabase/migrations/0XX_create_shelf_life_audit_log.sql"
+    type: "migration"
+    description: "Create audit log table for shelf life changes"
+  - path: "supabase/migrations/0XX_shelf_life_recalc_trigger.sql"
+    type: "migration"
+    description: "Trigger to flag products for recalculation when ingredient changes"
+
+tables:
+  - name: "product_shelf_life"
+    description: "Extended shelf life configuration per product (migration 047 base + extensions)"
+    status: "EXISTS - EXTEND"
+    base_migration: "047"
+    columns:
+      # Existing columns (migration 047)
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE" }
+      - { name: "calculated_days", type: "INTEGER", constraints: "" }
+      - { name: "override_days", type: "INTEGER", constraints: "" }
+      - { name: "final_days", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "calculation_method", type: "TEXT", constraints: "DEFAULT 'manual' CHECK (calculation_method IN ('manual', 'auto_min_ingredients'))" }
+      - { name: "shortest_ingredient_id", type: "UUID", constraints: "REFERENCES products(id)" }
+      - { name: "storage_conditions", type: "TEXT", constraints: "" }
+      - { name: "calculated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES auth.users(id)" }
+      # New columns to add
+      - { name: "override_reason", type: "TEXT", constraints: "", new: true }
+      - { name: "processing_impact_days", type: "INTEGER", constraints: "DEFAULT 0", new: true }
+      - { name: "safety_buffer_percent", type: "DECIMAL(5,2)", constraints: "DEFAULT 20.00", new: true }
+      - { name: "safety_buffer_days", type: "INTEGER", constraints: "", new: true }
+      - { name: "storage_temp_min", type: "DECIMAL(5,2)", constraints: "", new: true }
+      - { name: "storage_temp_max", type: "DECIMAL(5,2)", constraints: "", new: true }
+      - { name: "storage_humidity_min", type: "DECIMAL(5,2)", constraints: "", new: true }
+      - { name: "storage_humidity_max", type: "DECIMAL(5,2)", constraints: "", new: true }
+      - { name: "storage_conditions_json", type: "JSONB", constraints: "DEFAULT '[]'::jsonb", new: true }
+      - { name: "storage_instructions", type: "TEXT", constraints: "", new: true }
+      - { name: "shelf_life_mode", type: "TEXT", constraints: "DEFAULT 'fixed' CHECK (shelf_life_mode IN ('fixed', 'rolling'))", new: true }
+      - { name: "label_format", type: "TEXT", constraints: "DEFAULT 'best_before_day' CHECK (label_format IN ('best_before_day', 'best_before_month', 'use_by'))", new: true }
+      - { name: "picking_strategy", type: "TEXT", constraints: "DEFAULT 'FEFO' CHECK (picking_strategy IN ('FIFO', 'FEFO'))", new: true }
+      - { name: "min_remaining_for_shipment", type: "INTEGER", constraints: "", new: true }
+      - { name: "enforcement_level", type: "TEXT", constraints: "DEFAULT 'warn' CHECK (enforcement_level IN ('suggest', 'warn', 'block'))", new: true }
+      - { name: "expiry_warning_days", type: "INTEGER", constraints: "DEFAULT 7", new: true }
+      - { name: "expiry_critical_days", type: "INTEGER", constraints: "DEFAULT 3", new: true }
+      - { name: "needs_recalculation", type: "BOOLEAN", constraints: "DEFAULT false", new: true }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES auth.users(id)", new: true }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_product_shelf_life_org_id ON product_shelf_life(org_id)"
+      - "idx_product_shelf_life_product_id ON product_shelf_life(product_id)"
+      - "idx_product_shelf_life_needs_recalc ON product_shelf_life(org_id, needs_recalculation) WHERE needs_recalculation = true"
+    constraints:
+      - "UNIQUE(org_id, product_id)"
+      - "CHECK (calculated_days IS NULL OR calculated_days > 0)"
+      - "CHECK (override_days IS NULL OR override_days > 0)"
+      - "CHECK (final_days > 0)"
+      - "CHECK (storage_temp_min IS NULL OR storage_temp_max IS NULL OR storage_temp_min <= storage_temp_max)"
+      - "CHECK (storage_humidity_min IS NULL OR storage_humidity_max IS NULL OR storage_humidity_min <= storage_humidity_max)"
+      - "CHECK (expiry_critical_days <= expiry_warning_days)"
+
+  - name: "shelf_life_audit_log"
+    description: "Audit trail for all shelf life changes"
+    status: "NEW"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE" }
+      - { name: "action_type", type: "TEXT", constraints: "NOT NULL CHECK (action_type IN ('calculate', 'override', 'update_config', 'recalculate', 'clear_override'))" }
+      - { name: "old_value", type: "JSONB", constraints: "" }
+      - { name: "new_value", type: "JSONB", constraints: "" }
+      - { name: "change_reason", type: "TEXT", constraints: "" }
+      - { name: "changed_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "changed_by", type: "UUID", constraints: "NOT NULL REFERENCES auth.users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_shelf_life_audit_product ON shelf_life_audit_log(product_id, changed_at DESC)"
+      - "idx_shelf_life_audit_org ON shelf_life_audit_log(org_id, changed_at DESC)"
+      - "idx_shelf_life_audit_action ON shelf_life_audit_log(action_type)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "product_shelf_life"
+      name: "product_shelf_life_select_own"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_shelf_life"
+      name: "product_shelf_life_insert_own"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_shelf_life"
+      name: "product_shelf_life_update_own"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_shelf_life"
+      name: "product_shelf_life_delete_own"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "shelf_life_audit_log"
+      name: "shelf_life_audit_select_own"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "shelf_life_audit_log"
+      name: "shelf_life_audit_insert_own"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Triggers
+triggers:
+  - name: "flag_products_for_shelf_life_recalc"
+    description: "When ingredient shelf_life_days changes, flag all products using it for recalculation"
+    table: "products"
+    event: "AFTER UPDATE OF shelf_life_days"
+    condition: "OLD.shelf_life_days IS DISTINCT FROM NEW.shelf_life_days"
+    function: |
+      CREATE OR REPLACE FUNCTION flag_products_for_shelf_life_recalc()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Flag all products using this ingredient in their BOM
+        UPDATE product_shelf_life psl
+        SET
+          needs_recalculation = true,
+          updated_at = NOW()
+        WHERE psl.product_id IN (
+          SELECT DISTINCT b.product_id
+          FROM boms b
+          JOIN bom_items bi ON bi.bom_id = b.id
+          WHERE bi.component_id = NEW.id
+            AND b.status = 'Active'
+            AND b.org_id = NEW.org_id
+        )
+        AND psl.org_id = NEW.org_id
+        AND psl.calculation_method = 'auto_min_ingredients';
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  - name: "update_shelf_life_timestamp"
+    description: "Auto-update updated_at on product_shelf_life changes"
+    table: "product_shelf_life"
+    event: "BEFORE UPDATE"
+    function: |
+      CREATE OR REPLACE FUNCTION update_shelf_life_timestamp()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+# SQL for extending product_shelf_life table
+alter_table_sql: |
+  -- Extend product_shelf_life with new columns for Story 02.11
+
+  ALTER TABLE product_shelf_life
+  ADD COLUMN IF NOT EXISTS override_reason TEXT,
+  ADD COLUMN IF NOT EXISTS processing_impact_days INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS safety_buffer_percent DECIMAL(5,2) DEFAULT 20.00,
+  ADD COLUMN IF NOT EXISTS safety_buffer_days INTEGER,
+  ADD COLUMN IF NOT EXISTS storage_temp_min DECIMAL(5,2),
+  ADD COLUMN IF NOT EXISTS storage_temp_max DECIMAL(5,2),
+  ADD COLUMN IF NOT EXISTS storage_humidity_min DECIMAL(5,2),
+  ADD COLUMN IF NOT EXISTS storage_humidity_max DECIMAL(5,2),
+  ADD COLUMN IF NOT EXISTS storage_conditions_json JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS storage_instructions TEXT,
+  ADD COLUMN IF NOT EXISTS shelf_life_mode TEXT DEFAULT 'fixed',
+  ADD COLUMN IF NOT EXISTS label_format TEXT DEFAULT 'best_before_day',
+  ADD COLUMN IF NOT EXISTS picking_strategy TEXT DEFAULT 'FEFO',
+  ADD COLUMN IF NOT EXISTS min_remaining_for_shipment INTEGER,
+  ADD COLUMN IF NOT EXISTS enforcement_level TEXT DEFAULT 'warn',
+  ADD COLUMN IF NOT EXISTS expiry_warning_days INTEGER DEFAULT 7,
+  ADD COLUMN IF NOT EXISTS expiry_critical_days INTEGER DEFAULT 3,
+  ADD COLUMN IF NOT EXISTS needs_recalculation BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES auth.users(id);
+
+  -- Add constraints
+  ALTER TABLE product_shelf_life
+  ADD CONSTRAINT shelf_life_mode_check CHECK (shelf_life_mode IN ('fixed', 'rolling')),
+  ADD CONSTRAINT label_format_check CHECK (label_format IN ('best_before_day', 'best_before_month', 'use_by')),
+  ADD CONSTRAINT picking_strategy_check CHECK (picking_strategy IN ('FIFO', 'FEFO')),
+  ADD CONSTRAINT enforcement_level_check CHECK (enforcement_level IN ('suggest', 'warn', 'block')),
+  ADD CONSTRAINT temp_range_check CHECK (storage_temp_min IS NULL OR storage_temp_max IS NULL OR storage_temp_min <= storage_temp_max),
+  ADD CONSTRAINT humidity_range_check CHECK (storage_humidity_min IS NULL OR storage_humidity_max IS NULL OR storage_humidity_min <= storage_humidity_max),
+  ADD CONSTRAINT expiry_threshold_check CHECK (expiry_critical_days <= expiry_warning_days);
+
+  -- Index for recalculation queue
+  CREATE INDEX IF NOT EXISTS idx_product_shelf_life_needs_recalc
+  ON product_shelf_life(org_id, needs_recalculation) WHERE needs_recalculation = true;
+
+# SQL for shelf_life_audit_log table
+create_audit_table_sql: |
+  -- Create shelf_life_audit_log table
+
+  CREATE TABLE IF NOT EXISTS shelf_life_audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    action_type TEXT NOT NULL CHECK (action_type IN ('calculate', 'override', 'update_config', 'recalculate', 'clear_override')),
+    old_value JSONB,
+    new_value JSONB,
+    change_reason TEXT,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    changed_by UUID NOT NULL REFERENCES auth.users(id)
+  );
+
+  -- Indexes
+  CREATE INDEX idx_shelf_life_audit_product ON shelf_life_audit_log(product_id, changed_at DESC);
+  CREATE INDEX idx_shelf_life_audit_org ON shelf_life_audit_log(org_id, changed_at DESC);
+  CREATE INDEX idx_shelf_life_audit_action ON shelf_life_audit_log(action_type);
+
+  -- RLS
+  ALTER TABLE shelf_life_audit_log ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "shelf_life_audit_select_own" ON shelf_life_audit_log
+  FOR SELECT USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "shelf_life_audit_insert_own" ON shelf_life_audit_log
+  FOR INSERT WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));

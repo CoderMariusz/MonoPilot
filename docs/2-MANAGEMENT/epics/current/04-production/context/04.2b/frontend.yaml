@@ -1,0 +1,459 @@
+# Story 04.2b - WO Pause/Resume
+# Frontend components, services, and UI specifications
+
+# Pages (existing - no new pages)
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/page.tsx"
+    description: "Work Order Execution Detail page (existing)"
+    modifications:
+      - "Import and render WOPauseButton component"
+      - "Import and render WOResumeButton component"
+      - "Import and render WOPauseHistory component"
+      - "Fetch production settings for allow_pause_wo"
+
+# Components
+components:
+  # WOPauseButton
+  - name: "WOPauseButton"
+    path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOPauseButton.tsx"
+    description: "Button to pause an in-progress work order, opens pause modal"
+    props:
+      - name: "workOrderId"
+        type: "string"
+        required: true
+      - name: "workOrderStatus"
+        type: "WorkOrderStatus"
+        required: true
+      - name: "allowPause"
+        type: "boolean"
+        required: true
+      - name: "onPauseSuccess"
+        type: "(pauseData: WOPauseResponse) => void"
+        required: true
+    state:
+      - name: "isModalOpen"
+        type: "boolean"
+        default: false
+      - name: "isLoading"
+        type: "boolean"
+        default: false
+      - name: "error"
+        type: "string | null"
+        default: null
+    behavior:
+      visibility:
+        - "Hidden if allowPause = false"
+        - "Hidden if status != 'in_progress'"
+      disabled:
+        - "Disabled if status = 'paused'"
+        - "Disabled if status = 'completed'"
+      click_action: "Opens PauseModal"
+    dependencies:
+      - "ShadCN Button"
+      - "ShadCN Dialog"
+      - "PauseReasonSelect"
+      - "wo-pause-service"
+
+  # WOResumeButton
+  - name: "WOResumeButton"
+    path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOResumeButton.tsx"
+    description: "Button to resume a paused work order, shows confirmation modal"
+    props:
+      - name: "workOrderId"
+        type: "string"
+        required: true
+      - name: "workOrderStatus"
+        type: "WorkOrderStatus"
+        required: true
+      - name: "currentPause"
+        type: "WOPause | null"
+        required: false
+        description: "Current active pause info for display"
+      - name: "onResumeSuccess"
+        type: "(resumeData: WOResumeResponse) => void"
+        required: true
+    state:
+      - name: "isModalOpen"
+        type: "boolean"
+        default: false
+      - name: "isLoading"
+        type: "boolean"
+        default: false
+      - name: "error"
+        type: "string | null"
+        default: null
+    behavior:
+      visibility:
+        - "Only visible if status = 'paused'"
+      click_action: "Opens confirmation modal"
+    dependencies:
+      - "ShadCN Button"
+      - "ShadCN AlertDialog"
+      - "wo-pause-service"
+
+  # WOPauseHistory
+  - name: "WOPauseHistory"
+    path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOPauseHistory.tsx"
+    description: "Table showing pause history for the work order"
+    props:
+      - name: "workOrderId"
+        type: "string"
+        required: true
+    state:
+      - name: "pauseHistory"
+        type: "WOPause[]"
+        default: []
+      - name: "totalDowntime"
+        type: "number"
+        default: 0
+      - name: "isLoading"
+        type: "boolean"
+        default: true
+      - name: "error"
+        type: "string | null"
+        default: null
+    columns:
+      - header: "Pause Reason"
+        accessor: "pause_reason"
+        format: "Label from code"
+      - header: "Paused At"
+        accessor: "paused_at"
+        format: "DateTime (local)"
+      - header: "Resumed At"
+        accessor: "resumed_at"
+        format: "DateTime (local) or 'Currently Paused'"
+      - header: "Duration"
+        accessor: "duration_minutes"
+        format: "X min or 'In Progress'"
+      - header: "Paused By"
+        accessor: "paused_by_user"
+        format: "First Last"
+      - header: "Resumed By"
+        accessor: "resumed_by_user"
+        format: "First Last or '-'"
+    behavior:
+      empty_state: "No pause history for this work order"
+      loading_state: "Skeleton rows"
+    dependencies:
+      - "ShadCN Table"
+      - "ShadCN Skeleton"
+      - "wo-pause-service"
+
+  # PauseReasonSelect
+  - name: "PauseReasonSelect"
+    path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/PauseReasonSelect.tsx"
+    description: "Dropdown select for pause reasons"
+    props:
+      - name: "value"
+        type: "PauseReason | undefined"
+        required: false
+      - name: "onChange"
+        type: "(value: PauseReason) => void"
+        required: true
+      - name: "error"
+        type: "string | undefined"
+        required: false
+      - name: "disabled"
+        type: "boolean"
+        required: false
+        default: false
+    options:
+      - value: "machine_breakdown"
+        label: "Machine Breakdown"
+      - value: "material_shortage"
+        label: "Material Shortage"
+      - value: "break"
+        label: "Break/Lunch"
+      - value: "quality_issue"
+        label: "Quality Issue"
+      - value: "other"
+        label: "Other"
+    dependencies:
+      - "ShadCN Select"
+
+# Modals (from wireframe PROD-002)
+modals:
+  # Pause WO Modal
+  - name: "PauseModal"
+    embedded_in: "WOPauseButton"
+    title: "Pause Work Order"
+    wireframe_section: "4.2 Pause WO Modal"
+    fields:
+      - name: "pause_reason"
+        type: "select"
+        component: "PauseReasonSelect"
+        label: "Pause Reason *"
+        required: true
+        validation: "Required - validation error if empty"
+      - name: "notes"
+        type: "textarea"
+        label: "Notes (Optional)"
+        required: false
+        max_length: 500
+        placeholder: "Add any additional details about this pause..."
+    buttons:
+      - label: "Cancel"
+        action: "Close modal"
+        variant: "outline"
+      - label: "Pause"
+        action: "Submit pause request"
+        variant: "default"
+        disabled_when: "No reason selected or loading"
+    validation_behavior:
+      - "Show error below select if submitted without reason"
+      - "Error message: 'Pause reason is required'"
+    success_behavior:
+      - "Close modal"
+      - "Show toast: 'Work order paused'"
+      - "Trigger parent onPauseSuccess callback"
+      - "Update WO status display"
+    error_behavior:
+      - "Show error toast with message"
+      - "Keep modal open for retry"
+
+  # Resume WO Modal
+  - name: "ResumeModal"
+    embedded_in: "WOResumeButton"
+    title: "Resume Work Order"
+    wireframe_section: "4.3 Resume WO Modal"
+    display_info:
+      - label: "Paused Since"
+        value: "paused_at (formatted as date/time)"
+      - label: "Pause Duration"
+        value: "Calculated from paused_at to now"
+      - label: "Pause Reason"
+        value: "pause_reason (label)"
+      - label: "Notes"
+        value: "notes (if any)"
+    buttons:
+      - label: "Cancel"
+        action: "Close modal"
+        variant: "outline"
+      - label: "Confirm Resume"
+        action: "Submit resume request"
+        variant: "default"
+        disabled_when: "loading"
+    success_behavior:
+      - "Close modal"
+      - "Show toast: 'Work order resumed'"
+      - "Trigger parent onResumeSuccess callback"
+      - "Update WO status display"
+    error_behavior:
+      - "Show error toast with message"
+      - "Keep modal open for retry"
+
+# Services
+services:
+  - name: "wo-pause-service"
+    path: "apps/frontend/lib/services/wo-pause-service.ts"
+    description: "Service for WO pause/resume operations"
+    functions:
+      - name: "isPauseEnabled"
+        signature: "isPauseEnabled(orgId: string): Promise<boolean>"
+        description: "Check if pause is enabled for org"
+        api_call: "GET /api/production/settings"
+        returns: "boolean (allow_pause_wo value)"
+
+      - name: "getPauseReasons"
+        signature: "getPauseReasons(orgId: string): Promise<PauseReason[]>"
+        description: "Get configurable pause reasons"
+        returns: "Array of { code, label }"
+        notes: "Currently hardcoded, future: configurable"
+
+      - name: "pauseWorkOrder"
+        signature: |
+          pauseWorkOrder(
+            woId: string,
+            userId: string,
+            userRole: string,
+            orgId: string,
+            pauseReason: PauseReason,
+            notes?: string
+          ): Promise<PauseResult>
+        description: "Pause work order"
+        api_call: "POST /api/production/work-orders/:id/pause"
+        error_handling:
+          - "Throw WOPauseError on validation failure"
+          - "Throw WOPauseError on API error"
+
+      - name: "resumeWorkOrder"
+        signature: |
+          resumeWorkOrder(
+            woId: string,
+            userId: string,
+            userRole: string,
+            orgId: string
+          ): Promise<ResumeResult>
+        description: "Resume paused work order"
+        api_call: "POST /api/production/work-orders/:id/resume"
+        error_handling:
+          - "Throw WOPauseError on API error"
+
+      - name: "getPauseHistory"
+        signature: "getPauseHistory(woId: string, orgId: string): Promise<PauseHistoryItem[]>"
+        description: "Get pause history for work order"
+        api_call: "GET /api/production/work-orders/:id/pause-history"
+
+      - name: "getDowntimeSummary"
+        signature: |
+          getDowntimeSummary(
+            woId: string,
+            orgId: string
+          ): Promise<{
+            total_minutes: number
+            by_reason: { reason: string; minutes: number }[]
+          }>
+        description: "Get downtime summary for work order"
+        api_call: "Derived from pause-history response"
+
+# Types
+types:
+  file: "apps/frontend/lib/types/production.ts"
+  definitions:
+    PauseReason:
+      type: "enum"
+      values:
+        - "machine_breakdown"
+        - "material_shortage"
+        - "break"
+        - "quality_issue"
+        - "other"
+
+    WOPause:
+      type: "interface"
+      properties:
+        id: "string"
+        pause_reason: "PauseReason | null"
+        notes: "string | null"
+        paused_at: "string"
+        resumed_at: "string | null"
+        duration_minutes: "number | null"
+        paused_by_user: "{ id: string; first_name: string; last_name: string } | null"
+        resumed_by_user: "{ id: string; first_name: string; last_name: string } | null"
+
+    PauseResult:
+      type: "interface"
+      properties:
+        id: "string"
+        wo_number: "string"
+        status: "'paused'"
+        paused_at: "string"
+        paused_by_user_id: "string"
+        paused_by_user: "{ id: string; first_name: string; last_name: string }"
+        pause_reason: "PauseReason"
+        notes: "string | null"
+
+    ResumeResult:
+      type: "interface"
+      properties:
+        id: "string"
+        wo_number: "string"
+        status: "'in_progress'"
+        pause_history: "WOPause[]"
+
+    WOPauseError:
+      type: "class"
+      extends: "Error"
+      properties:
+        code: "string"
+        message: "string"
+
+# UI States (from wireframe)
+ui_states:
+  # Action Bar button states
+  action_bar:
+    pause_button:
+      visible_when:
+        - "allow_pause_wo = true"
+        - "status = 'in_progress'"
+      hidden_when:
+        - "allow_pause_wo = false"
+        - "status = 'paused'"
+        - "status = 'completed'"
+        - "status = 'draft'"
+        - "status = 'released'"
+      disabled_when:
+        - "Never (hidden instead)"
+
+    resume_button:
+      visible_when:
+        - "status = 'paused'"
+      hidden_when:
+        - "status != 'paused'"
+
+  # Loading states
+  loading:
+    pause_button: "Shows spinner, disabled"
+    resume_button: "Shows spinner, disabled"
+    pause_history: "Skeleton table rows"
+
+  # Error states
+  error:
+    pause_modal: "Error message below form"
+    resume_modal: "Error message in modal"
+    pause_history: "Error message with retry button"
+
+  # Success states
+  success:
+    pause: "Toast notification, modal closes, UI updates"
+    resume: "Toast notification, modal closes, UI updates"
+
+# Accessibility
+accessibility:
+  aria_labels:
+    pause_button: "Pause work order"
+    resume_button: "Resume work order"
+    pause_reason_select: "Select pause reason"
+    notes_textarea: "Additional notes about pause"
+  keyboard_navigation:
+    - "Tab through all interactive elements"
+    - "Enter to submit forms"
+    - "Escape to close modals"
+  focus_management:
+    - "Focus first input when modal opens"
+    - "Return focus to trigger button when modal closes"
+
+# Responsive Design
+responsive:
+  desktop:
+    pause_button: "Full text 'Pause'"
+    resume_button: "Full text 'Resume'"
+    pause_history: "Full table with all columns"
+  tablet:
+    pause_button: "Full text 'Pause'"
+    resume_button: "Full text 'Resume'"
+    pause_history: "Condensed table, hide Notes column"
+  mobile:
+    pause_button: "Icon only with tooltip"
+    resume_button: "Icon only with tooltip"
+    pause_history: "Card view instead of table"
+
+# Toast Notifications
+toasts:
+  pause_success:
+    type: "success"
+    message: "Work order paused"
+    duration: 3000
+  resume_success:
+    type: "success"
+    message: "Work order resumed"
+    duration: 3000
+  pause_error:
+    type: "error"
+    message: "{error.message}"
+    duration: 5000
+  resume_error:
+    type: "error"
+    message: "{error.message}"
+    duration: 5000
+
+# Dependencies (npm packages)
+npm_dependencies:
+  existing:
+    - "@radix-ui/react-dialog"
+    - "@radix-ui/react-alert-dialog"
+    - "@radix-ui/react-select"
+    - "sonner (toast)"
+    - "date-fns (formatting)"
+    - "zod (validation)"
+  new: []

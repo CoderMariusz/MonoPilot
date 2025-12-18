@@ -1,0 +1,126 @@
+# Story 07.6 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.6"
+  name: "SO Allergen Validation"
+  slug: "so-allergen-validation"
+  epic: "07-shipping"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "frontend + backend + database"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml        # This file - metadata, dependencies
+  - database.yaml      # Tables (allergen validation columns, audit_logs), migrations, RLS
+  - api.yaml           # Endpoints (validate-allergens, override-allergen, order history)
+  - frontend.yaml      # Components (AllergenAlert, AllergenOverrideModal, CustomerOrderHistory)
+  - validation.yaml    # Zod schemas for override requests, validation rules
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table with org_id and roles"
+        - "RLS foundation"
+    - story: "02.1"
+      name: "Product Module"
+      provides:
+        - "products table"
+    - story: "02.3"
+      name: "Product Allergens"
+      provides:
+        - "allergens table"
+        - "product_allergens table (contains/may_contain)"
+    - story: "07.1"
+      name: "Customers CRUD"
+      provides:
+        - "customers table with allergen_restrictions JSONB"
+    - story: "07.2"
+      name: "Sales Orders Core"
+      provides:
+        - "sales_orders table"
+        - "sales_order_lines table"
+  optional:
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides:
+        - "Manager, Admin roles for override"
+      impact: "Override feature disabled if missing"
+  blocked_by: []
+  dependents:
+    - story: "07.9"
+      name: "Pick Confirmation Desktop"
+      requires: "Allergen validation results for pick warnings"
+    - story: "07.11"
+      name: "Packing Station Workflow"
+      requires: "Allergen validation and blocking at packing"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.30 to FR-7.36", "Allergen Management", "Food Safety Rules"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["Sales Order Allergen Validation", "Override Audit Trail"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.6.so-allergen-validation.md"
+  wireframes:
+    - id: "SHIP-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-004-allergen-restrictions.md"
+      sections: ["SO Confirmation Alert", "Manager Override Modal", "AllergenAlert Component"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS for sales_orders and audit_logs multi-tenant isolation"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add allergen validation columns to sales_orders, create audit_logs table"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for allergen override request"
+  - type: "service"
+    count: 1
+    description: "AllergenValidationService with validation and override logic"
+  - type: "api"
+    count: 3
+    description: "POST /validate-allergens, POST /override-allergen, GET /customers/:id/orders"
+  - type: "component"
+    count: 3
+    description: "AllergenAlert, AllergenOverrideModal, CustomerOrderHistory"
+  - type: "test"
+    count: 3
+    description: "Unit tests (validation logic), Integration tests (API), E2E tests (full workflow)"
+
+# Technical notes
+technical_notes:
+  - "Validation scope: Only 'Contains' allergens trigger conflicts, not 'May Contain'"
+  - "Validation triggers: On SO confirm, on line add/edit (non-blocking), manual button"
+  - "Override authority: Only Manager and Admin roles can override allergen blocks"
+  - "Override audit trail: All overrides logged in audit_logs with user, timestamp, reason"
+  - "Validation reset: Any line change (add/edit/delete) resets allergen_validated to false"
+  - "Confirmation block: SO confirmation blocked if allergen_validated = false, unless allow_allergen_override = true"
+  - "Customer no restrictions: If customer.allergen_restrictions is null/empty, validation passes"
+  - "Performance: Validation must complete within 1 second for orders with 50 lines"
+
+# Implementation notes
+implementation_notes:
+  - "Do NOT modify customers or products tables - use existing data from Story 07.1, 07.2"
+  - "Validation layer: Use Zod for schema validation + Supabase RLS for data access"
+  - "Allergen validation function: checkAllergenConflicts(customer_id, product_ids) returns conflicts array"
+  - "Override modal: Capture reason (min 20 chars) for audit trail"
+  - "Customer order history: Basic read-only table with pagination (20 orders/page)"
+  - "RLS policies: audit_logs table must enforce org_id isolation"
+  - "Blocking logic: SO confirmation blocked until allergen_validated = true OR allow_allergen_override = true"
+  - "UI states: loading, empty (no conflicts), error, success (with conflict list)"

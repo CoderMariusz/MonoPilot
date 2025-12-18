@@ -1,0 +1,189 @@
+# Quick Fix Workflow
+# Streamlined workflow for small fixes (<1 hour)
+#
+# Documentation: @.claude/workflows/documentation/BUG-WORKFLOW.md
+
+name: quick-fix
+description: Fast-track workflow for minor fixes and improvements
+trigger: "bug_fix | hotfix | small_change | typo"
+
+# Expected duration: <1 hour
+# Parallelization: None (single-track)
+
+prerequisites:
+  - issue_clearly_defined
+  - scope_is_small
+  - no_architectural_changes
+
+# Criteria for quick-fix eligibility
+eligibility:
+  max_files_changed: 3
+  max_lines_changed: 100
+  no_new_dependencies: true
+  no_schema_changes: true
+  no_api_contract_changes: true
+
+steps:
+  - id: assess
+    agent: SENIOR-DEV
+    type: assess_fix
+    description: "Assess fix scope and approach"
+    input:
+      context_refs:
+        - "Issue description or bug report"
+    output:
+      assessment:
+        - estimated_scope: "small | medium | large"
+        - files_affected: []
+        - approach: "description"
+        - bug_type: "backend | frontend"
+    decision:
+      small: write_reproduction_test
+      medium_or_large: escalate_to_story
+
+  - id: write_reproduction_test
+    agent: TEST-WRITER
+    type: write_failing_test
+    description: "Write test that reproduces the bug (RED phase)"
+    model: haiku
+    input:
+      context_refs:
+        - "Bug description"
+        - "Steps to reproduce"
+        - "Related test files"
+    output:
+      deliverables:
+        - "Failing reproduction test"
+    checkpoint:
+      - "Test reproduces the bug"
+      - "Test FAILS with current code"
+    gate:
+      name: "BUG_REPRODUCED"
+      criteria:
+        - "Reproduction test written"
+        - "Test fails (proves bug exists)"
+      on_pass: implement
+    next: implement
+
+  - id: implement
+    agent_selection:
+      backend_bug: BACKEND-DEV
+      frontend_bug: FRONTEND-DEV
+      default: BACKEND-DEV
+    type: fix_with_tests
+    description: "Implement fix to make reproduction test pass"
+    model: haiku
+    input:
+      context_refs:
+        - "Affected source files"
+        - "Reproduction test"
+    output:
+      deliverables:
+        - "Fixed source files"
+    checkpoint:
+      - "Fix addresses root cause"
+      - "Reproduction test now passes"
+      - "All existing tests still pass"
+    gate:
+      name: "FIX_IMPLEMENTED"
+      criteria:
+        - "Reproduction test passes"
+        - "All tests pass"
+      on_pass: review
+    next: review
+
+  - id: review
+    agent: CODE-REVIEWER
+    type: quick_review
+    description: "Fast review for small changes"
+    model: haiku
+    input:
+      context_refs:
+        - "Changed files (diff)"
+        - "Reproduction test"
+    decision:
+      approved: verify
+      request_changes: implement
+    checkpoint:
+      - "No security issues"
+      - "Tests adequate"
+      - "Code quality OK"
+    gate:
+      name: "REVIEW_APPROVED"
+      criteria:
+        - "Code review passed"
+        - "No security issues"
+        - "Test coverage adequate"
+      on_pass: verify
+
+  - id: verify
+    agent: QA-AGENT
+    type: quick_verify
+    description: "Quick verification that fix works"
+    model: haiku
+    input:
+      context_refs:
+        - "Bug description"
+        - "Fixed code"
+    activities:
+      - "Verify bug is fixed"
+      - "Quick smoke test of affected area"
+      - "Confirm no obvious regressions"
+    decision:
+      pass: complete
+      fail: implement
+    gate:
+      name: "QA_VERIFIED"
+      criteria:
+        - "Bug confirmed fixed"
+        - "No new issues introduced"
+      on_pass: complete
+
+  - id: complete
+    type: fix_complete
+    summary: "Fix implemented, reviewed, and verified"
+    actions:
+      - "Update issue status"
+      - "Create commit"
+      - "Close bug"
+
+  - id: escalate_to_story
+    type: escalation
+    description: "Fix is too large for quick-fix workflow"
+    action: "Create story, route to story-delivery workflow"
+    next_workflow: "engineering/story-delivery.yaml"
+
+# Quality Gates Summary
+quality_gates:
+  BUG_REPRODUCED:
+    step: write_reproduction_test
+    agent: TEST-WRITER
+    blocker: "Cannot implement fix without failing test"
+  FIX_IMPLEMENTED:
+    step: implement
+    agent: BACKEND-DEV | FRONTEND-DEV
+    blocker: "Cannot proceed to review"
+  REVIEW_APPROVED:
+    step: review
+    agent: CODE-REVIEWER
+    blocker: "Must fix and resubmit"
+  QA_VERIFIED:
+    step: verify
+    agent: QA-AGENT
+    blocker: "Cannot close bug"
+
+# Shortcuts for common fixes
+shortcuts:
+  typo_fix:
+    skip_to: write_reproduction_test
+    skip_review: false
+
+  config_change:
+    skip_to: write_reproduction_test
+    require_review: true
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 0
+  escalate_to: user

@@ -1,0 +1,504 @@
+# Story 05.8 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/asn-service.test.ts"
+    type: "unit"
+    description: "Unit tests for ASN CRUD and business logic"
+  - path: "apps/frontend/lib/validation/__tests__/asn-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/__tests__/integration/api/warehouse/asns.test.ts"
+    type: "integration"
+    description: "Integration tests for ASN API endpoints"
+  - path: "apps/frontend/__tests__/e2e/warehouse/asns.spec.ts"
+    type: "e2e"
+    description: "E2E tests for ASN workflows"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Settings Toggle (enable_asn)"
+    scenarios:
+      - given: "warehouse settings exist"
+        when: "enable_asn is true"
+        then: "ASN menu item appears in warehouse navigation"
+        and: "ASN-related UI and workflows are accessible"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "warehouse settings exist"
+        when: "enable_asn is false"
+        then: "ASN menu item is hidden"
+        and: "ASN API endpoints return 403 Forbidden"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-02"
+    name: "ASN List Page"
+    scenarios:
+      - given: "planner navigates to /warehouse/asns"
+        when: "page loads"
+        then: "ASN list displays within 300ms"
+        and: "table shows columns: ASN Number, PO Number, Supplier, Expected Date, Status, Items Count, Created"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "ASN list with 20+ records"
+        when: "planner enters search 'ASN-2024'"
+        then: "only ASNs matching number, PO number, or supplier name display within 200ms"
+        test_type: "e2e"
+        priority: "P1"
+
+      - given: "ASN list displayed"
+        when: "planner selects filter 'Pending'"
+        then: "only pending ASNs appear"
+        test_type: "e2e"
+        priority: "P1"
+
+      - given: "100 ASNs exist"
+        when: "planner views ASN list"
+        then: "20 ASNs display per page with pagination controls"
+        test_type: "e2e"
+        priority: "P1"
+
+  - id: "AC-03"
+    name: "Create ASN Header"
+    scenarios:
+      - given: "planner clicks '+ New ASN'"
+        when: "page loads"
+        then: "form displays: PO dropdown, supplier (read-only from PO), expected date, carrier, tracking number, notes"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "planner selects PO 'PO-2024-00123'"
+        when: "PO selected"
+        then: "supplier auto-fills from PO"
+        and: "expected date defaults to PO expected_delivery_date"
+        and: "ASN items auto-populate from PO lines with expected_qty = ordered_qty - received_qty"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "planner saves a new ASN"
+        when: "ASN is created"
+        then: "ASN number generated as 'ASN-2024-00001' (next sequence)"
+        and: "ASN number is immutable after creation"
+        and: "status is set to 'pending'"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "planner selects PO with all lines fully received"
+        when: "ASN creation attempted"
+        then: "error 'Cannot create ASN for fully received PO' displays"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-04"
+    name: "ASN-to-PO Linkage and Auto-Population"
+    scenarios:
+      - given: "PO has 3 lines: Flour (100 kg, 20 received), Sugar (50 kg, 0 received), Salt (25 kg, 25 received - fully received)"
+        when: "ASN created from this PO"
+        then: "ASN items show: Flour (80 kg expected), Sugar (50 kg expected)"
+        and: "Salt line is NOT included (already fully received)"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-05"
+    name: "ASN Item Management"
+    scenarios:
+      - given: "planner is on ASN detail page (status='pending')"
+        when: "'Add Line' button clicked"
+        then: "line form appears with: product dropdown, expected_qty, UoM, supplier_lp_number, supplier_batch_number, GTIN, expiry_date, notes"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "ASN already has line for 'RM-FLOUR-001'"
+        when: "planner attempts to add same product again"
+        then: "error 'Product already exists in ASN items' displays"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "ASN status is 'received' or 'cancelled'"
+        when: "planner attempts to edit or delete items"
+        then: "error 'Cannot modify ASN in {status} status' displays"
+        and: "all item fields are read-only"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-06"
+    name: "ASN Status Lifecycle"
+    scenarios:
+      - given: "ASN created"
+        when: "ASN saved"
+        then: "status is 'pending'"
+        test_type: "unit"
+        priority: "P0"
+
+      - given: "ASN status='pending'"
+        when: "partial receipt completed (received_qty > 0 but < expected_qty for at least one item)"
+        then: "ASN status updates to 'partial'"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "ASN fully received"
+        when: "all items have received_qty >= expected_qty"
+        then: "ASN status updates to 'received'"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "ASN status='pending'"
+        when: "planner clicks 'Cancel ASN' button"
+        then: "confirmation dialog 'Cancel this ASN?' displays"
+        and: "upon confirm, status updates to 'cancelled'"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "ASN status='received' or 'cancelled'"
+        when: "planner attempts to modify ASN"
+        then: "error 'Cannot modify ASN in {status} status' displays"
+        and: "form is read-only"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-07"
+    name: "Carrier and Tracking Number"
+    scenarios:
+      - given: "ASN with carrier='FedEx' and tracking_number='1234567890'"
+        when: "planner views ASN detail"
+        then: "carrier and tracking number displayed prominently"
+        and: "tracking number is clickable link (if carrier supports tracking URL)"
+        test_type: "e2e"
+        priority: "P1"
+
+  - id: "AC-08"
+    name: "Expected Today Dashboard Widget"
+    scenarios:
+      - given: "ASN with expected_date = TODAY and status='pending' or 'partial'"
+        when: "warehouse dashboard loads"
+        then: "ASN appears in 'Expected Today' widget"
+        and: "widget shows: ASN number, supplier, items count, carrier"
+        test_type: "integration"
+        priority: "P1"
+
+  - id: "AC-09"
+    name: "GRN Pre-fill from ASN"
+    scenarios:
+      - given: "ASN received"
+        when: "planner initiates GRN creation from ASN"
+        then: "GRN pre-populated with ASN item details"
+        and: "GRN items show: product_id, expected_qty from ASN, supplier_batch, GTIN, expiry_date"
+        and: "GRN.asn_id set to ASN ID"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-10"
+    name: "ASN Detail View"
+    scenarios:
+      - given: "planner clicks ASN number from list"
+        when: "detail page loads"
+        then: "page displays: ASN number (header), PO number (link), supplier name, expected date, actual date (if received), carrier, tracking number, status badge, notes"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "ASN with 5 items, 3 partially received"
+        when: "planner views ASN detail"
+        then: "progress bar shows: '3 / 5 items partially received' or 'Fully Received' if all complete"
+        test_type: "e2e"
+        priority: "P1"
+
+  - id: "AC-11"
+    name: "ASN Edit and Delete"
+    scenarios:
+      - given: "ASN status='pending'"
+        when: "planner clicks 'Edit' button"
+        then: "form fields become editable (except ASN number, supplier, PO)"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "ASN status='pending' with no receipts"
+        when: "planner clicks 'Delete' button"
+        then: "confirmation dialog 'Permanently delete this ASN?' displays"
+        and: "upon confirm, ASN and ASN items deleted"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "ASN status='partial' or 'received'"
+        when: "planner clicks 'Delete' button"
+        then: "error 'Cannot delete ASN with received items' displays"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-12"
+    name: "Data Validation"
+    scenarios:
+      - given: "ASN item with expected_qty"
+        when: "planner enters negative or zero quantity"
+        then: "error 'Expected quantity must be greater than 0' displays"
+        test_type: "unit"
+        priority: "P0"
+
+      - given: "ASN item with expiry_date"
+        when: "planner enters expiry date in the past"
+        then: "warning 'Expiry date is in the past' displays (allow save with warning)"
+        test_type: "e2e"
+        priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  asn_service:
+    - name: "generateASNNumber returns correct format"
+      setup: "Mock database with existing ASNs"
+      expected: "Returns ASN-YYYY-NNNNN format with next sequence"
+
+    - name: "createASN generates unique ASN number"
+      setup: "Mock successful API response"
+      expected: "ASN created with auto-generated number"
+
+    - name: "createASN validates required fields"
+      setup: "Input missing po_id"
+      expected: "Throws validation error"
+
+    - name: "createASNFromPO excludes fully received lines"
+      setup: "PO with mixed received quantities"
+      expected: "Only unreceived lines included in ASN items"
+
+    - name: "updateASN blocks modification when status != pending"
+      setup: "ASN with status='partial'"
+      expected: "Throws 'Cannot modify ASN' error"
+
+    - name: "deleteASN blocked with received items"
+      setup: "ASN with received_qty > 0"
+      expected: "Throws 'Cannot delete ASN with received items' error"
+
+    - name: "cancelASN blocked when status != pending"
+      setup: "ASN with status='partial'"
+      expected: "Throws 'Cannot cancel ASN with received items' error"
+
+    - name: "addASNItem blocks duplicate product"
+      setup: "ASN with existing product_id"
+      expected: "Throws 'Product already exists' error"
+
+    - name: "updateASNStatus calculates correct status"
+      setup: "ASN items with various received quantities"
+      expected:
+        - "pending when no items received"
+        - "partial when some items partially received"
+        - "received when all items fully received"
+
+    - name: "getTrackingUrl returns correct URL for known carriers"
+      setup: "carrier='FedEx', tracking='123456'"
+      expected: "Returns FedEx tracking URL"
+
+    - name: "getTrackingUrl returns null for unknown carriers"
+      setup: "carrier='Unknown', tracking='123456'"
+      expected: "Returns null"
+
+  validation_schemas:
+    - name: "asnSchema validates po_id required"
+      input: "{}"
+      expected: "Validation error: Invalid purchase order ID"
+
+    - name: "asnSchema validates expected_date not in past"
+      input: "{ expected_date: '2020-01-01' }"
+      expected: "Validation error: Expected delivery date must be today or in the future"
+
+    - name: "asnItemSchema validates expected_qty positive"
+      input: "{ expected_qty: 0 }"
+      expected: "Validation error: Expected quantity must be greater than 0"
+
+    - name: "asnItemSchema validates GTIN format"
+      input: "{ gtin: '123' }"
+      expected: "Validation error: GTIN must be 14 digits"
+
+    - name: "createASNSchema requires at least one item"
+      input: "{ items: [] }"
+      expected: "Validation error: At least one item is required"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /asns returns paginated list"
+      setup: "Create 25 ASNs"
+      action: "GET /api/warehouse/asns?page=1&limit=20"
+      expected: "Returns 20 ASNs with pagination metadata"
+
+    - name: "GET /asns with status filter"
+      setup: "Create ASNs with various statuses"
+      action: "GET /api/warehouse/asns?status=pending"
+      expected: "Returns only pending ASNs"
+
+    - name: "GET /asns returns 403 when feature disabled"
+      setup: "warehouse_settings.enable_asn = false"
+      action: "GET /api/warehouse/asns"
+      expected: "Returns 403 with 'Feature disabled' message"
+
+    - name: "POST /asns creates ASN with items"
+      setup: "Valid CreateASNInput"
+      action: "POST /api/warehouse/asns"
+      expected: "Returns 201 with ASN including generated number"
+
+    - name: "POST /asns/from-po/:poId creates ASN from PO"
+      setup: "PO with unreceived lines"
+      action: "POST /api/warehouse/asns/from-po/{poId}"
+      expected: "Returns 201 with ASN items auto-populated"
+
+    - name: "POST /asns/from-po/:poId returns 400 for fully received PO"
+      setup: "PO with all lines fully received"
+      action: "POST /api/warehouse/asns/from-po/{poId}"
+      expected: "Returns 400 with 'Cannot create ASN for fully received PO'"
+
+    - name: "PUT /asns/:id updates ASN header"
+      setup: "ASN with status='pending'"
+      action: "PUT /api/warehouse/asns/{id}"
+      expected: "Returns 200 with updated ASN"
+
+    - name: "PUT /asns/:id returns 400 for non-pending status"
+      setup: "ASN with status='partial'"
+      action: "PUT /api/warehouse/asns/{id}"
+      expected: "Returns 400 with 'Cannot modify ASN' message"
+
+    - name: "DELETE /asns/:id deletes pending ASN"
+      setup: "ASN with status='pending' and no receipts"
+      action: "DELETE /api/warehouse/asns/{id}"
+      expected: "Returns 204"
+
+    - name: "DELETE /asns/:id returns 400 for ASN with receipts"
+      setup: "ASN with received_qty > 0"
+      action: "DELETE /api/warehouse/asns/{id}"
+      expected: "Returns 400 with 'Cannot delete ASN with received items'"
+
+    - name: "POST /asns/:id/cancel cancels pending ASN"
+      setup: "ASN with status='pending'"
+      action: "POST /api/warehouse/asns/{id}/cancel"
+      expected: "Returns 200 with status='cancelled'"
+
+    - name: "GET /asns/expected-today returns today's ASNs"
+      setup: "Create ASNs with various expected dates"
+      action: "GET /api/warehouse/asns/expected-today"
+      expected: "Returns only ASNs with expected_date = today and status in (pending, partial)"
+
+    - name: "Cross-tenant access returns 404"
+      setup: "ASN from Org A, User from Org B"
+      action: "GET /api/warehouse/asns/{id}"
+      expected: "Returns 404 (not 403)"
+
+  rls_policies:
+    - name: "User can only see own org ASNs"
+      setup: "Create ASNs in Org A and Org B"
+      action: "User A queries asns table"
+      expected: "Only Org A ASNs returned"
+
+    - name: "Non-admin cannot delete ASN"
+      setup: "User with warehouse_operator role"
+      action: "DELETE /api/warehouse/asns/{id}"
+      expected: "RLS blocks operation"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create ASN from PO flow"
+    steps:
+      - "Navigate to /warehouse/asns"
+      - "Click 'New ASN'"
+      - "Select PO from dropdown"
+      - "Verify supplier auto-fills"
+      - "Verify items auto-populate"
+      - "Enter carrier and tracking number"
+      - "Click Save"
+      - "Verify ASN created with status='pending'"
+      - "Verify redirected to ASN detail page"
+    expected: "ASN created successfully with toast notification"
+
+  - name: "Edit ASN flow"
+    steps:
+      - "Navigate to ASN detail page"
+      - "Click Edit button"
+      - "Modify expected date"
+      - "Modify carrier"
+      - "Click Save"
+    expected: "ASN updated successfully"
+
+  - name: "Add item to ASN flow"
+    steps:
+      - "Navigate to ASN detail page (status=pending)"
+      - "Click 'Add Line' button"
+      - "Search and select product"
+      - "Enter expected quantity"
+      - "Click Add"
+    expected: "Item added to ASN"
+
+  - name: "Cancel ASN flow"
+    steps:
+      - "Navigate to ASN detail page (status=pending)"
+      - "Click Cancel button"
+      - "Confirm in dialog"
+    expected: "ASN status changes to cancelled"
+
+  - name: "Filter and search ASN list"
+    steps:
+      - "Navigate to /warehouse/asns"
+      - "Enter search term"
+      - "Select status filter"
+      - "Select date range"
+    expected: "List filters correctly"
+
+  - name: "ASN feature hidden when disabled"
+    steps:
+      - "Set warehouse_settings.enable_asn = false"
+      - "Navigate to /warehouse"
+    expected: "ASN menu item not visible"
+
+# Definition of Done
+definition_of_done:
+  - "`asns` table created with all columns, constraints, indexes"
+  - "`asn_items` table created with all columns, constraints, indexes"
+  - "`warehouse_settings.enable_asn` column added"
+  - "ASN number auto-generation working (ASN-YYYY-NNNNN format)"
+  - "RLS policies enforce org isolation"
+  - "RLS policies enforce role-based access"
+  - "All API endpoints implemented and working"
+  - "Feature flag (enable_asn) enforced on all endpoints"
+  - "ASN-to-PO linkage working (auto-populate items)"
+  - "ASN status lifecycle working (pending -> partial -> received)"
+  - "Cannot modify ASN in received/cancelled status"
+  - "Cannot add duplicate product to ASN items"
+  - "Validation schemas validate all inputs"
+  - "Unit test coverage >= 80%"
+  - "Integration tests pass for all endpoints"
+  - "E2E smoke test passes"
+  - "Cross-tenant access returns 404"
+  - "Response times: List <300ms, Detail <200ms, Create <500ms"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic critical for ASN workflows"
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+  files:
+    - "lib/services/asn-service.ts: 80%"
+    - "lib/validation/warehouse-schemas.ts: 90%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak ASN data"
+    mitigation: "Comprehensive integration tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_policies"
+
+  - id: "RISK-02"
+    description: "ASN status auto-update could fail on GRN creation"
+    mitigation: "Database function with proper error handling, integration tests"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"
+
+  - id: "RISK-03"
+    description: "Auto-populate from PO could include fully received lines"
+    mitigation: "Unit tests for createASNFromPO function"
+    severity: "medium"
+    test_coverage: "unit_tests.asn_service"

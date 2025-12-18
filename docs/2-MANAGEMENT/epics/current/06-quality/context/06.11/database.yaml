@@ -1,0 +1,420 @@
+# Story 06.11 Database Context
+# Final Inspection & Batch Release
+# Tables, RLS policies, migrations, triggers, indexes
+
+database:
+  migrations:
+    - name: "Update license_plates - add release_status fields"
+      type: "alter_table"
+      description: |
+        Add release_status, released_by, released_at, release_notes columns to license_plates.
+        These may already exist from Epic 05 - check before creating.
+      columns:
+        - name: "release_status"
+          type: "TEXT"
+          default: "'pending'"
+          check: "release_status IN ('pending', 'released', 'hold', 'rejected')"
+          nullable: false
+          comment: "QA batch release status: pending (awaiting approval), released (approved for shipment), hold (investigation), rejected"
+        - name: "released_by"
+          type: "UUID"
+          references: "users(id)"
+          nullable: true
+          comment: "User who approved batch release"
+        - name: "released_at"
+          type: "TIMESTAMPTZ"
+          nullable: true
+          comment: "Timestamp when batch released for shipment"
+        - name: "release_notes"
+          type: "TEXT"
+          nullable: true
+          comment: "Notes from batch release approval (restrictions, conditions)"
+
+    - name: "Create batch_release_records table"
+      type: "create_table"
+      description: |
+        Main batch release approval record. Tracks all releases with full audit trail.
+        Links WO → Final Inspection → Release Decision → LPs
+      schema:
+        table_name: "batch_release_records"
+        columns:
+          # Identity
+          - name: "id"
+            type: "UUID"
+            primary_key: true
+            default: "gen_random_uuid()"
+          - name: "org_id"
+            type: "UUID"
+            references: "organizations(id)"
+            index: true
+            rls: true
+          - name: "release_number"
+            type: "TEXT"
+            nullable: false
+            unique: "org_id, release_number"
+            comment: "REL-{YYYY}-{NNNNN} format"
+
+          # Batch Reference
+          - name: "batch_number"
+            type: "TEXT"
+            nullable: false
+            index: "org_id, batch_number"
+          - name: "wo_id"
+            type: "UUID"
+            references: "work_orders(id)"
+            nullable: true
+            index: true
+          - name: "product_id"
+            type: "UUID"
+            references: "products(id)"
+            nullable: false
+            index: true
+
+          # Inspection Reference
+          - name: "final_inspection_id"
+            type: "UUID"
+            references: "quality_inspections(id)"
+            nullable: true
+
+          # Release Checklist Status (7 items)
+          - name: "checklist_final_inspection"
+            type: "BOOLEAN"
+            default: "false"
+            comment: "Final inspection passed"
+          - name: "checklist_ccp_records"
+            type: "BOOLEAN"
+            default: "false"
+            comment: "All CCPs complete and within limits"
+          - name: "checklist_in_process_inspections"
+            type: "BOOLEAN"
+            default: "false"
+            comment: "All in-process inspections passed"
+          - name: "checklist_operation_checkpoints"
+            type: "BOOLEAN"
+            default: "false"
+            comment: "All operation checkpoints signed off"
+          - name: "checklist_quality_holds"
+            type: "BOOLEAN"
+            default: "false"
+            comment: "No active quality holds"
+          - name: "checklist_traceability"
+            type: "BOOLEAN"
+            default: "false"
+            comment: "Full batch genealogy available"
+          - name: "checklist_specification_compliance"
+            type: "BOOLEAN"
+            default: "false"
+            comment: "All specifications met"
+
+          # Release Decision
+          - name: "release_decision"
+            type: "TEXT"
+            default: "'pending'"
+            check: "release_decision IN ('pending', 'approved', 'rejected', 'conditional')"
+            nullable: false
+          - name: "release_reason"
+            type: "TEXT"
+            nullable: true
+
+          # Conditional Release Details
+          - name: "conditional_reason"
+            type: "TEXT"
+            nullable: true
+            comment: "Why release is conditional (e.g., 'Minor color variation')"
+          - name: "conditional_restrictions"
+            type: "TEXT"
+            nullable: true
+            comment: "Usage restrictions (e.g., 'Ship to Distributor A only')"
+          - name: "conditional_expires_at"
+            type: "TIMESTAMPTZ"
+            nullable: true
+            comment: "When conditional restrictions expire"
+
+          # Quantities
+          - name: "total_quantity"
+            type: "DECIMAL(15,4)"
+            nullable: true
+            comment: "Total batch quantity"
+          - name: "released_quantity"
+            type: "DECIMAL(15,4)"
+            nullable: true
+            comment: "Quantity approved for release"
+          - name: "rejected_quantity"
+            type: "DECIMAL(15,4)"
+            nullable: true
+            comment: "Quantity rejected"
+
+          # Approval Workflow
+          - name: "submitted_by"
+            type: "UUID"
+            references: "users(id)"
+            nullable: true
+            comment: "Inspector who submitted for approval"
+          - name: "submitted_at"
+            type: "TIMESTAMPTZ"
+            nullable: true
+          - name: "approved_by"
+            type: "UUID"
+            references: "users(id)"
+            nullable: true
+            comment: "QA Manager who approved release"
+          - name: "approved_at"
+            type: "TIMESTAMPTZ"
+            nullable: true
+          - name: "approval_notes"
+            type: "TEXT"
+            nullable: true
+
+          # E-Signature Ready Fields (Phase 3)
+          - name: "signature_meaning"
+            type: "TEXT"
+            nullable: true
+            comment: "'I approve release of this batch' - FDA 21 CFR Part 11"
+          - name: "signature_timestamp"
+            type: "TIMESTAMPTZ"
+            nullable: true
+
+          # Audit
+          - name: "created_at"
+            type: "TIMESTAMPTZ"
+            default: "now()"
+            nullable: false
+          - name: "created_by"
+            type: "UUID"
+            references: "users(id)"
+            nullable: true
+          - name: "updated_at"
+            type: "TIMESTAMPTZ"
+            default: "now()"
+            nullable: false
+          - name: "updated_by"
+            type: "UUID"
+            references: "users(id)"
+            nullable: true
+
+    - name: "Create batch_release_lps junction table"
+      type: "create_table"
+      description: |
+        Links batch release record to individual license plates.
+        Allows per-LP decisions (all released, some on hold, etc).
+      schema:
+        table_name: "batch_release_lps"
+        columns:
+          - name: "id"
+            type: "UUID"
+            primary_key: true
+            default: "gen_random_uuid()"
+          - name: "release_id"
+            type: "UUID"
+            references: "batch_release_records(id)"
+            on_delete: "CASCADE"
+            nullable: false
+            index: true
+          - name: "lp_id"
+            type: "UUID"
+            references: "license_plates(id)"
+            nullable: false
+            index: true
+          - name: "quantity"
+            type: "DECIMAL(15,4)"
+            nullable: true
+          - name: "release_status"
+            type: "TEXT"
+            default: "'released'"
+            check: "release_status IN ('released', 'hold', 'rejected')"
+            nullable: false
+          - name: "notes"
+            type: "TEXT"
+            nullable: true
+          - name: "created_at"
+            type: "TIMESTAMPTZ"
+            default: "now()"
+            nullable: false
+          - name: "unique_constraint"
+            type: "UNIQUE"
+            columns: ["release_id", "lp_id"]
+
+    - name: "Create release_number_sequences table"
+      type: "create_table"
+      description: |
+        Maintains sequence counter for release number generation (REL-{YYYY}-{NNNNN}).
+        One record per org per year.
+      schema:
+        table_name: "release_number_sequences"
+        columns:
+          - name: "id"
+            type: "UUID"
+            primary_key: true
+            default: "gen_random_uuid()"
+          - name: "org_id"
+            type: "UUID"
+            references: "organizations(id)"
+            on_delete: "CASCADE"
+            nullable: false
+          - name: "year"
+            type: "INTEGER"
+            nullable: false
+          - name: "current_value"
+            type: "BIGINT"
+            default: "0"
+            nullable: false
+          - name: "updated_at"
+            type: "TIMESTAMPTZ"
+            default: "now()"
+            nullable: false
+          - name: "unique_constraint"
+            type: "UNIQUE"
+            columns: ["org_id", "year"]
+
+  indexes:
+    # batch_release_records indexes
+    - table: "batch_release_records"
+      name: "idx_batch_release_org_status"
+      columns: ["org_id", "release_decision"]
+    - table: "batch_release_records"
+      name: "idx_batch_release_batch"
+      columns: ["org_id", "batch_number"]
+    - table: "batch_release_records"
+      name: "idx_batch_release_wo"
+      columns: ["wo_id"]
+      where: "wo_id IS NOT NULL"
+    - table: "batch_release_records"
+      name: "idx_batch_release_product"
+      columns: ["product_id"]
+    - table: "batch_release_records"
+      name: "idx_batch_release_pending"
+      columns: ["org_id", "release_decision"]
+      where: "release_decision = 'pending'"
+    - table: "batch_release_records"
+      name: "idx_batch_release_approved_by"
+      columns: ["approved_by"]
+      where: "approved_by IS NOT NULL"
+
+    # license_plates indexes
+    - table: "license_plates"
+      name: "idx_lp_release_status"
+      columns: ["org_id", "release_status"]
+      where: "release_status = 'released'"
+
+    # batch_release_lps indexes
+    - table: "batch_release_lps"
+      name: "idx_batch_release_lps_release"
+      columns: ["release_id"]
+    - table: "batch_release_lps"
+      name: "idx_batch_release_lps_lp"
+      columns: ["lp_id"]
+
+  rls_policies:
+    - table: "batch_release_records"
+      enabled: true
+      policies:
+        - name: "batch_release_select"
+          action: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "batch_release_insert"
+          action: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "batch_release_update"
+          action: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "batch_release_delete"
+          action: "DELETE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND release_decision = 'pending'"
+          comment: "Only pending releases can be deleted (admin cleanup)"
+
+    - table: "batch_release_lps"
+      enabled: true
+      policies:
+        - name: "batch_release_lps_policy"
+          action: "ALL"
+          using: |
+            release_id IN (
+              SELECT id FROM batch_release_records
+              WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            )
+
+    - table: "release_number_sequences"
+      enabled: true
+      policies:
+        - name: "release_seq_org"
+          action: "ALL"
+          to: "authenticated"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  functions:
+    - name: "generate_release_number"
+      params: ["p_org_id UUID"]
+      returns: "TEXT"
+      description: "Generate next release number (REL-{YYYY}-{NNNNN})"
+      language: "plpgsql"
+      logic: |
+        - Get current year
+        - Upsert sequence record (INSERT ... ON CONFLICT DO UPDATE)
+        - Increment current_value
+        - Format: 'REL-' || year || '-' || LPAD(value, 5, '0')
+        - Return formatted number
+
+    - name: "create_final_inspection_on_wo_complete"
+      trigger_event: "AFTER UPDATE on work_orders"
+      description: "Auto-create final inspection when WO completes (if setting enabled)"
+      logic: |
+        - Check: NEW.status='completed' AND OLD.status!='completed'
+        - Query quality_settings: require_final_inspection
+        - If false: return (skip creation)
+        - Get product specification (active for product_id)
+        - Generate inspection_number: generate_inspection_number('final')
+        - INSERT quality_inspections:
+          - type: 'final'
+          - reference_type: 'wo'
+          - reference_id: WO.id
+          - batch_number: WO.batch_number
+          - lot_size: WO.produced_qty
+          - status: 'scheduled'
+          - priority: 'high'
+          - created_by: WO.completed_by
+
+    - name: "update_lp_release_status_on_batch_release"
+      trigger_event: "AFTER UPDATE on batch_release_records"
+      description: "Update LP release_status when batch release approved/rejected"
+      logic: |
+        - Check: NEW.release_decision='approved' AND OLD.release_decision!='approved'
+        - For each LP in batch_release_lps WHERE release_id=NEW.id:
+          - If release_status='released': UPDATE license_plates SET release_status='released', released_by=NEW.approved_by, released_at=NOW()
+          - If release_status='rejected': UPDATE license_plates SET release_status='rejected'
+          - If release_status='hold': UPDATE license_plates SET release_status='hold'
+
+  sequences:
+    - name: "inspection_number_sequences"
+      description: "Generate inspection numbers (INS-{TYPE}-{YYYY}-{NNNNN})"
+      format: "INS-{TYPE}-{YYYY}-{NNNNN}"
+      example: "INS-FIN-2025-00001"
+
+    - name: "release_number_sequences"
+      description: "Generate release numbers (REL-{YYYY}-{NNNNN})"
+      format: "REL-{YYYY}-{NNNNN}"
+      example: "REL-2025-00001"
+
+  audit_logging:
+    - table: "quality_audit_log"
+      events:
+        - action: "final_inspection_created"
+          entity_type: "quality_inspections"
+          triggers: "create_final_inspection_on_wo_complete()"
+        - action: "final_inspection_completed"
+          entity_type: "quality_inspections"
+          when: "inspection completed with pass/fail/conditional result"
+        - action: "batch_release_created"
+          entity_type: "batch_release_records"
+          when: "release record created (submitted for approval)"
+        - action: "batch_release_approved"
+          entity_type: "batch_release_records"
+          when: "QA Manager approves release"
+        - action: "batch_release_rejected"
+          entity_type: "batch_release_records"
+          when: "QA Manager rejects release"
+        - action: "batch_release_held"
+          entity_type: "batch_release_records"
+          when: "Batch placed on hold pending investigation"
+        - action: "lp_release_status_updated"
+          entity_type: "license_plates"
+          when: "LP release_status changes (trigger from batch_release_records)"

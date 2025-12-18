@@ -1,0 +1,537 @@
+# Story 02.5b - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/bom-items-service.phase1b.test.ts"
+    type: "unit"
+    description: "Unit tests for Phase 1B service functions"
+    phase: "1B new"
+
+  - path: "apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for bulk import endpoint"
+    phase: "1B new"
+
+  - path: "apps/frontend/components/technical/bom/__tests__/BOMByproductsSection.test.tsx"
+    type: "component"
+    description: "Component tests for byproducts section"
+    phase: "1B new"
+
+  - path: "apps/frontend/components/technical/bom/__tests__/ConditionalFlagsSelect.test.tsx"
+    type: "component"
+    description: "Component tests for conditional flags selector"
+    phase: "1B new"
+
+  - path: "apps/frontend/components/technical/bom/__tests__/ProductionLinesCheckbox.test.tsx"
+    type: "component"
+    description: "Component tests for production lines checkbox"
+    phase: "1B new"
+
+  - path: "supabase/tests/bom-items-advanced.test.sql"
+    type: "database"
+    description: "Database tests for Phase 1B constraints"
+    phase: "1B new"
+
+# Acceptance Criteria (from story 02.5b.bom-items-advanced.md)
+acceptance_criteria:
+  # AC-1: Conditional Items (FR-2.26)
+  - id: "AC-01.1"
+    feature: "Conditional Items"
+    prd_ref: "FR-2.26"
+    given: "user opens item modal"
+    when: "conditional flags section shown"
+    then: "multi-select dropdown displays available flags (organic, vegan, gluten-free, kosher, halal)"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-01.2"
+    feature: "Conditional Items"
+    prd_ref: "FR-2.26"
+    given: "user selects flags [organic, vegan] for item"
+    when: "save completes"
+    then: "condition_flags JSONB stores {\"organic\": true, \"vegan\": true}"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-01.3"
+    feature: "Conditional Items"
+    prd_ref: "FR-2.26"
+    given: "BOM item has condition_flags"
+    when: "items table row renders"
+    then: "sub-row displays \"Flags: organic, vegan\" with appropriate badges"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-2: By-products (FR-2.27)
+  - id: "AC-02.1"
+    feature: "By-products"
+    prd_ref: "FR-2.27"
+    given: "user clicks \"[+ Add Byproduct]\""
+    when: "modal opens"
+    then: "byproduct form displays: product selector (BP type only), quantity, uom, yield_percent (auto-calculated), notes"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-02.2"
+    feature: "By-products"
+    prd_ref: "FR-2.27"
+    given: "user enters byproduct quantity 2 kg for BOM output 100 kg"
+    when: "yield_percent calculated"
+    then: "displays \"2.0% (2 kg / 100 kg)\""
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02.3"
+    feature: "By-products"
+    prd_ref: "FR-2.27"
+    given: "byproduct saved"
+    when: "items table renders"
+    then: "byproduct appears in separate \"Byproducts\" section with is_output=true badge"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-02.4"
+    feature: "By-products"
+    prd_ref: "FR-2.27"
+    given: "byproduct has is_by_product=true"
+    when: "BOM items listed"
+    then: "byproducts grouped separately from input items"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02.5"
+    feature: "By-products"
+    prd_ref: "FR-2.27"
+    given: "byproduct deleted"
+    when: "confirmation accepted"
+    then: "byproduct removed from table"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-3: Line-Specific Items (FR-2.33)
+  - id: "AC-03.1"
+    feature: "Line-Specific Items"
+    prd_ref: "FR-2.33"
+    given: "user opens item modal"
+    when: "production lines section shown"
+    then: "checkbox group displays all active production lines for the organization"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-03.2"
+    feature: "Line-Specific Items"
+    prd_ref: "FR-2.33"
+    given: "user selects no lines (empty)"
+    when: "save completes"
+    then: "line_ids = NULL (available on all lines)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03.3"
+    feature: "Line-Specific Items"
+    prd_ref: "FR-2.33"
+    given: "user selects \"Line 2 - Pastry Production\" only"
+    when: "save completes"
+    then: "line_ids = [\"line-2-uuid\"]"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03.4"
+    feature: "Line-Specific Items"
+    prd_ref: "FR-2.33"
+    given: "item has line_ids = [\"line-2-uuid\"]"
+    when: "items table row renders"
+    then: "shows \"Lines: Pastry Production\" badge"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-4: LP Consumption Mode
+  - id: "AC-04.1"
+    feature: "LP Consumption Mode"
+    given: "user opens item modal"
+    when: "LP mode section shown"
+    then: "checkbox \"Consume whole LP\" displayed with tooltip explaining behavior"
+    test_type: "component"
+    priority: "P1"
+
+  - id: "AC-04.2"
+    feature: "LP Consumption Mode"
+    given: "user checks \"Consume whole LP\""
+    when: "save completes"
+    then: "consume_whole_lp = true"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-04.3"
+    feature: "LP Consumption Mode"
+    given: "item has consume_whole_lp = true"
+    when: "items table row renders"
+    then: "shows \"Whole LP\" indicator"
+    test_type: "component"
+    priority: "P2"
+
+  # AC-5: Bulk Import
+  - id: "AC-05.1"
+    feature: "Bulk Import"
+    given: "user clicks \"[Import Items]\""
+    when: "import modal opens"
+    then: "CSV template download link shown with format: product_code, quantity, uom, sequence, scrap_percent, operation_seq"
+    test_type: "component"
+    priority: "P1"
+
+  - id: "AC-05.2"
+    feature: "Bulk Import"
+    given: "user uploads valid CSV with 10 items"
+    when: "import processed"
+    then: "all 10 items created with success message \"10 items imported\""
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05.3"
+    feature: "Bulk Import"
+    given: "CSV has invalid row (unknown product_code)"
+    when: "import processed"
+    then: "error report shows \"Row 3: Product 'UNKNOWN' not found\""
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05.4"
+    feature: "Bulk Import"
+    given: "CSV has partial success (8 valid, 2 invalid)"
+    when: "import processed"
+    then: "shows \"8 items imported, 2 errors\" with downloadable error report"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05.5"
+    feature: "Bulk Import"
+    given: "CSV has more than 500 items"
+    when: "import attempted"
+    then: "error \"Maximum 500 items allowed per bulk import\""
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-6: Enhanced Items Display
+  - id: "AC-06.1"
+    feature: "Enhanced Display"
+    given: "BOM item has condition_flags, line_ids, scrap_percent"
+    when: "row renders"
+    then: "expandable sub-row displays all attributes: \"Flags: organic, vegan\", \"Lines: Pastry Production, Bread Line\", \"Scrap: 2.0%\""
+    test_type: "component"
+    priority: "P1"
+
+  - id: "AC-06.2"
+    feature: "Enhanced Display"
+    given: "byproducts exist for BOM"
+    when: "items section renders"
+    then: "shows two sections: \"Ingredients/Components\" and \"Byproducts\""
+    test_type: "component"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  bom_items_service:
+    - name: "calculateYieldPercent returns correct percentage"
+      setup: "byproductQty=2, bomOutputQty=100"
+      expected: "Returns 2.0"
+      priority: "P0"
+
+    - name: "calculateYieldPercent handles zero output"
+      setup: "byproductQty=2, bomOutputQty=0"
+      expected: "Returns 0"
+      priority: "P1"
+
+    - name: "calculateYieldPercent rounds to 2 decimal places"
+      setup: "byproductQty=3.333, bomOutputQty=100"
+      expected: "Returns 3.33"
+      priority: "P1"
+
+    - name: "parseCSVItems parses valid CSV correctly"
+      setup: "CSV with 3 valid rows"
+      expected: "Returns array of 3 CreateBOMItemRequest objects"
+      priority: "P0"
+
+    - name: "parseCSVItems handles missing optional fields"
+      setup: "CSV with only required fields"
+      expected: "Returns items with defaults for optional fields"
+      priority: "P1"
+
+    - name: "parseCSVItems rejects invalid quantity"
+      setup: "CSV with quantity=0 in row 2"
+      expected: "Throws validation error for row 2"
+      priority: "P0"
+
+  conditional_flags:
+    - name: "JSONB stores multiple flags correctly"
+      setup: "flags = {organic: true, vegan: true}"
+      expected: "Stored and retrieved correctly"
+      priority: "P0"
+
+    - name: "JSONB allows custom flags"
+      setup: "flags = {organic: true, custom_flag: true}"
+      expected: "Custom flag stored without error"
+      priority: "P2"
+
+    - name: "null flags vs empty object"
+      setup: "flags = null vs flags = {}"
+      expected: "Both valid, null preferred for no flags"
+      priority: "P2"
+
+  line_ids:
+    - name: "null line_ids means all lines"
+      setup: "line_ids = null"
+      expected: "Item available on all production lines"
+      priority: "P0"
+
+    - name: "specific line_ids restricts to those lines"
+      setup: "line_ids = ['line-1', 'line-2']"
+      expected: "Item only available on Line 1 and Line 2"
+      priority: "P0"
+
+    - name: "empty array treated as null"
+      setup: "line_ids = []"
+      expected: "Normalized to null (all lines)"
+      priority: "P1"
+
+# Integration Test Cases
+integration_tests:
+  bulk_import:
+    - name: "POST /api/technical/boms/:id/items/bulk creates items"
+      setup: |
+        - BOM with id exists
+        - Valid CSV data with 5 items
+      action: "POST with items array"
+      expected: "201 status, created=5, errors=[]"
+      priority: "P0"
+
+    - name: "Bulk import with partial failure returns 207"
+      setup: |
+        - BOM exists
+        - 5 items, 2 with invalid product_id
+      action: "POST with mixed valid/invalid items"
+      expected: "207 status, created=3, errors array with 2 entries"
+      priority: "P0"
+
+    - name: "Bulk import rejects >500 items"
+      setup: "Array with 501 items"
+      action: "POST with items array"
+      expected: "400 status, error message about limit"
+      priority: "P0"
+
+    - name: "Bulk import auto-increments sequence"
+      setup: "Existing items with max sequence 30"
+      action: "POST 3 items without sequence"
+      expected: "New items get sequences 40, 50, 60"
+      priority: "P1"
+
+    - name: "Bulk import calculates yield for byproducts"
+      setup: "BOM output=100kg, byproduct qty=5kg without yield_percent"
+      action: "POST byproduct item"
+      expected: "yield_percent auto-set to 5.0"
+      priority: "P1"
+
+  byproducts:
+    - name: "GET /api/technical/boms/:id/items separates byproducts"
+      setup: "BOM with 5 items, 2 byproducts"
+      action: "GET items"
+      expected: "items array has 3 entries, byproducts array has 2 entries"
+      priority: "P0"
+
+    - name: "Byproduct requires yield_percent"
+      setup: "is_by_product=true, yield_percent=null"
+      action: "POST item"
+      expected: "400 error: yield_percent required for byproducts"
+      priority: "P0"
+
+    - name: "Regular item ignores yield_percent"
+      setup: "is_by_product=false, yield_percent=5"
+      action: "POST item"
+      expected: "201 success, yield_percent stored but not used"
+      priority: "P2"
+
+  line_specific:
+    - name: "Item with line_ids only returns for those lines"
+      setup: "Item with line_ids=['line-1']"
+      action: "GET items filtered by line-2"
+      expected: "Item NOT included in result"
+      priority: "P0"
+
+    - name: "Item with null line_ids returns for all lines"
+      setup: "Item with line_ids=null"
+      action: "GET items filtered by any line"
+      expected: "Item included in result"
+      priority: "P0"
+
+    - name: "Invalid line_id rejected"
+      setup: "line_ids=['non-existent-uuid']"
+      action: "POST item"
+      expected: "400 error: invalid line_ids"
+      priority: "P1"
+
+  conditional_flags:
+    - name: "Conditional flags saved as JSONB"
+      setup: "condition_flags={organic: true, vegan: true}"
+      action: "POST item"
+      expected: "201 success, flags stored correctly"
+      priority: "P0"
+
+    - name: "Filter items by conditional flag"
+      setup: "3 items, 2 with organic flag"
+      action: "Query items with organic flag"
+      expected: "Returns 2 items"
+      priority: "P1"
+
+# Component Test Cases
+component_tests:
+  BOMByproductsSection:
+    - name: "renders byproducts table when items exist"
+      props: "byproducts=[2 items]"
+      expected: "Table with 2 rows displayed"
+      priority: "P0"
+
+    - name: "shows empty state when no byproducts"
+      props: "byproducts=[]"
+      expected: "Empty state message displayed"
+      priority: "P0"
+
+    - name: "calculates total yield correctly"
+      props: "byproducts with yields 2% and 1%"
+      expected: "Footer shows 'Total yield: 3%'"
+      priority: "P1"
+
+    - name: "hides add button when canEdit=false"
+      props: "canEdit=false"
+      expected: "Add Byproduct button not visible"
+      priority: "P1"
+
+  ConditionalFlagsSelect:
+    - name: "renders all available flags"
+      setup: "5 flags from API"
+      expected: "5 checkboxes displayed"
+      priority: "P0"
+
+    - name: "checks flags matching value prop"
+      props: "value={organic: true, vegan: true}"
+      expected: "organic and vegan checkboxes checked"
+      priority: "P0"
+
+    - name: "calls onChange when flag toggled"
+      action: "Click vegan checkbox"
+      expected: "onChange called with updated flags object"
+      priority: "P0"
+
+    - name: "handles disabled state"
+      props: "disabled=true"
+      expected: "All checkboxes disabled"
+      priority: "P1"
+
+  ProductionLinesCheckbox:
+    - name: "renders all production lines"
+      setup: "3 lines from API"
+      expected: "3 checkboxes displayed"
+      priority: "P0"
+
+    - name: "shows 'all lines' message when none selected"
+      props: "value=null"
+      expected: "Help text shows 'available on all lines'"
+      priority: "P0"
+
+    - name: "calls onChange with null when all unchecked"
+      action: "Uncheck last selected line"
+      expected: "onChange called with null"
+      priority: "P0"
+
+  BOMBulkImportModal:
+    - name: "allows CSV file selection"
+      action: "Click upload area, select CSV"
+      expected: "File name displayed"
+      priority: "P0"
+
+    - name: "rejects non-CSV files"
+      action: "Select .xlsx file"
+      expected: "Error message: 'Please select a CSV file'"
+      priority: "P0"
+
+    - name: "shows progress during import"
+      action: "Click Import with valid file"
+      expected: "Progress bar shown"
+      priority: "P1"
+
+    - name: "displays success message"
+      setup: "Mock successful import"
+      expected: "Success alert with count"
+      priority: "P0"
+
+    - name: "displays error list for failures"
+      setup: "Mock partial failure"
+      expected: "Error list with row numbers"
+      priority: "P0"
+
+# Definition of Done
+definition_of_done:
+  - "Conditional flags save as JSONB correctly"
+  - "Conditional flags display in items table sub-row"
+  - "Byproducts section displays separately with yield%"
+  - "Byproduct yield auto-calculates on quantity change"
+  - "Line-specific items save line_ids array"
+  - "Line-specific items display line names in sub-row"
+  - "Consume whole LP checkbox works"
+  - "Bulk import creates multiple items from CSV"
+  - "Bulk import shows error report for invalid rows"
+  - "All Phase 1B fields visible in edit modal"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover new service functions (>80% coverage)"
+  - "TEC-006a wireframe fully implemented"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Service functions must be well tested"
+    files:
+      - "lib/services/bom-items-service.ts (Phase 1B functions): 80%"
+      - "lib/validation/bom-items.ts (Phase 1B schemas): 90%"
+
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+    files:
+      - "api/v1/technical/boms/[id]/items/bulk/route.ts: 85%"
+      - "api/v1/technical/boms/[id]/items/route.ts (extended): 80%"
+
+  component:
+    target: 75
+    reason: "UI components should cover main scenarios"
+    files:
+      - "components/technical/bom/BOMByproductsSection.tsx: 80%"
+      - "components/technical/bom/ConditionalFlagsSelect.tsx: 75%"
+      - "components/technical/bom/ProductionLinesCheckbox.tsx: 75%"
+      - "components/technical/bom/BOMBulkImportModal.tsx: 70%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "JSONB condition_flags querying performance"
+    mitigation: "Use GIN index if queries become slow"
+    severity: "low"
+    test_coverage: "Performance test with 1000 items with flags"
+
+  - id: "RISK-02"
+    description: "Bulk import timeout for large files"
+    mitigation: "500 item limit, batch processing, progress feedback"
+    severity: "medium"
+    test_coverage: "Load test with 500 items"
+
+  - id: "RISK-03"
+    description: "Production lines soft dependency"
+    mitigation: "line_ids is nullable, graceful handling when no lines exist"
+    severity: "low"
+    test_coverage: "Test with no production lines configured"
+
+  - id: "RISK-04"
+    description: "CSV parsing edge cases"
+    mitigation: "Robust CSV parser, clear error messages"
+    severity: "medium"
+    test_coverage: "Test malformed CSV, encoding issues, special characters"

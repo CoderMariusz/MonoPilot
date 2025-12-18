@@ -1,0 +1,155 @@
+# Story 05.13 - Frontend Specification
+# Purpose: Types, service integration (minimal - backend-focused story)
+# Agent: FRONTEND-DEV (types focus)
+
+# Note: This is primarily a backend story. Frontend work is minimal.
+is_backend_focused: true
+
+# TypeScript Types to Create/Extend
+types:
+  - path: "apps/frontend/lib/types/warehouse.ts"
+    action: "EXTEND"
+    description: "Add over-receipt validation types"
+    new_types: |
+      // Over-receipt validation result from service
+      export interface OverReceiptValidation {
+        isValid: boolean;
+        percentage: number;
+        message: string;
+        isOverReceipt: boolean;
+      }
+
+      // Warning returned in GRN creation response
+      export interface OverReceiptWarning {
+        poLineId: string;
+        orderedQty: number;
+        totalReceived: number;
+        overReceiptPct: number;
+        message: string;
+      }
+
+      // Extended GRN creation response (from 05.11)
+      export interface CreateGRNFromPOResponse {
+        grn: GRN;
+        items: GRNItem[];
+        po_status: string;
+        over_receipt_warnings: OverReceiptWarning[];  // NEW: Added by 05.13
+      }
+
+      // Extended GRN item (from 05.11)
+      export interface GRNItem {
+        id: string;
+        grn_id: string;
+        product_id: string;
+        product_name: string;
+        po_line_id: string;
+        ordered_qty: number;
+        received_qty: number;
+        uom: string;
+        lp_id: string;
+        lp_number: string;
+        batch_number: string | null;
+        expiry_date: string | null;
+        location_id: string;
+        qa_status: string;
+        over_receipt_flag: boolean;       // NEW: Added by 05.13
+        over_receipt_percentage: number;  // NEW: Added by 05.13
+      }
+
+# UI Components (none new - enhancements to 05.11 components)
+components: []
+
+# UI Enhancements to 05.11 Components
+component_enhancements:
+  - component: "ReceivingStep3EnterDetails.tsx"
+    path: "apps/frontend/components/warehouse/receiving/ReceivingStep3EnterDetails.tsx"
+    source_story: "05.11"
+    enhancements:
+      - description: "Show real-time over-receipt warning as user enters quantities"
+        implementation: |
+          // Add inline warning when quantity exceeds ordered
+          // Calculate percentage and show warning badge
+
+  - component: "ReceivingStep4Confirm.tsx"
+    path: "apps/frontend/components/warehouse/receiving/ReceivingStep4Confirm.tsx"
+    source_story: "05.11"
+    enhancements:
+      - description: "Display over-receipt warnings in review summary"
+        implementation: |
+          // Show yellow warning banner for lines with over-receipt
+          // List affected lines with percentage
+
+  - component: "ReceivingStep5Success.tsx"
+    path: "apps/frontend/components/warehouse/receiving/ReceivingStep5Success.tsx"
+    source_story: "05.11"
+    enhancements:
+      - description: "Display over-receipt warnings in success view"
+        implementation: |
+          // Show info badge if any lines had over-receipt
+          // Indicate audit trail recorded
+
+  - component: "OverReceiptWarning.tsx"
+    path: "apps/frontend/components/warehouse/receiving/OverReceiptWarning.tsx"
+    source_story: "05.11"
+    description: "Already exists from 05.11 - no changes needed"
+
+# Hooks (no new hooks)
+hooks: []
+
+# Service Integration
+services:
+  - path: "apps/frontend/lib/services/grn-service.ts"
+    action: "EXTEND"
+    description: "Frontend service calls enhanced API"
+    notes:
+      - "No frontend service changes needed"
+      - "API response structure includes over_receipt_warnings"
+      - "Error handling for OVER_RECEIPT_EXCEEDS_TOLERANCE"
+
+# Error Handling (frontend)
+error_handling:
+  - error_code: "OVER_RECEIPT_NOT_ALLOWED"
+    display: "Cannot receive more than ordered. Over-receipt is disabled."
+    toast_type: "error"
+    action: "Block form submission, highlight affected field"
+
+  - error_code: "OVER_RECEIPT_EXCEEDS_TOLERANCE"
+    display: "Quantity exceeds allowed tolerance. Please reduce quantity."
+    toast_type: "error"
+    action: "Block form submission, show max allowed"
+
+  - error_code: "MULTI_LINE_VALIDATION_FAILED"
+    display: "Some lines exceed over-receipt tolerance. Review highlighted lines."
+    toast_type: "error"
+    action: "Highlight failed lines in red"
+
+# UX Notes
+ux:
+  wireframes: []  # No new wireframes - uses 05.11 GRN modals with warnings
+  notes:
+    - "Over-receipt warnings integrated into existing 05.11 receiving wizard"
+    - "Real-time validation as user types quantity"
+    - "Yellow warning badge for within-tolerance over-receipt"
+    - "Red error for exceeds-tolerance over-receipt"
+    - "Clear message showing max allowed quantity"
+  states:
+    - "validation_pending: User entering quantity"
+    - "under_receipt: Green checkmark (always OK)"
+    - "exact_match: Green checkmark (always OK)"
+    - "over_within_tolerance: Yellow warning badge"
+    - "over_exceeds_tolerance: Red error, submit blocked"
+    - "over_not_allowed: Red error, submit blocked"
+
+# Accessibility
+accessibility:
+  - "Error messages read by screen reader"
+  - "Warning badges have aria-label"
+  - "Form validation prevents submission with invalid data"
+  - "Clear focus indication on error fields"
+
+# Mobile/Responsive
+responsive:
+  notes:
+    - "Warning banners stack vertically on mobile"
+    - "Error messages display below input field"
+    - "No special mobile handling needed"

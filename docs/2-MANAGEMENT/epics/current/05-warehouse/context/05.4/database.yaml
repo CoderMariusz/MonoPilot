@@ -1,0 +1,160 @@
+# Story 05.4 - Database Schema
+# Purpose: Tables, RLS policies, indexes for LP Status Management
+# Agent: BACKEND-DEV (database focus)
+
+# Note: license_plates table already exists from 05.1
+# This story manages the status/qa_status fields and adds audit trail
+
+migrations:
+  - path: "supabase/migrations/XXX_create_lp_status_audit.sql"
+    type: "migration"
+    description: "LP status audit trail table with RLS"
+
+# Existing Table (from 05.1) - Fields This Story Manages
+existing_table:
+  name: "license_plates"
+  managed_fields:
+    - name: "status"
+      type: "TEXT"
+      constraints: "NOT NULL DEFAULT 'available'"
+      values: ["available", "reserved", "consumed", "blocked"]
+      description: "LP lifecycle status"
+    - name: "qa_status"
+      type: "TEXT"
+      constraints: "NOT NULL DEFAULT 'pending'"
+      values: ["pending", "passed", "failed", "quarantine"]
+      description: "Quality assurance status"
+
+# New Table
+tables:
+  - name: "lp_status_audit"
+    description: "Audit trail for all LP status and QA status changes"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id) ON DELETE CASCADE" }
+      - { name: "field_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "old_value", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "new_value", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "reason", type: "TEXT", constraints: "" }
+      - { name: "changed_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "changed_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_status_audit_lp ON lp_status_audit(lp_id, changed_at DESC)"
+      - "idx_status_audit_org ON lp_status_audit(org_id, changed_at DESC)"
+      - "idx_status_audit_field ON lp_status_audit(lp_id, field_name)"
+    constraints:
+      - "CONSTRAINT valid_field_name CHECK (field_name IN ('status', 'qa_status'))"
+
+# RLS Policies
+rls_policies:
+  pattern: "Users Table Lookup (ADR-013)"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "lp_status_audit"
+      name: "audit_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only read audit entries for their org"
+
+    - table: "lp_status_audit"
+      name: "audit_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only create audit entries for their org"
+
+# Status Transition Matrix
+status_transitions:
+  description: "Valid LP status transitions"
+  matrix:
+    available:
+      can_transition_to: ["reserved", "consumed", "blocked"]
+      blocked_transitions: []
+    reserved:
+      can_transition_to: ["available", "consumed"]
+      blocked_transitions: ["blocked"]
+      reason: "Must release reservation before blocking"
+    consumed:
+      can_transition_to: []
+      blocked_transitions: ["available", "reserved", "blocked"]
+      reason: "Terminal state - no transitions allowed"
+    blocked:
+      can_transition_to: ["available"]
+      blocked_transitions: ["reserved", "consumed"]
+
+# QA Status Transition Matrix
+qa_status_transitions:
+  description: "Valid QA status transitions with side effects"
+  matrix:
+    pending:
+      can_transition_to: ["passed", "failed", "quarantine"]
+      side_effects:
+        passed: null
+        failed: { status: "blocked", auto_reason: "Auto-blocked: QA failed" }
+        quarantine: null
+    passed:
+      can_transition_to: ["failed", "quarantine"]
+      side_effects:
+        failed: { status: "blocked", auto_reason: "Auto-blocked: QA failed" }
+        quarantine: null
+    failed:
+      can_transition_to: ["quarantine"]
+      side_effects:
+        quarantine: null
+    quarantine:
+      can_transition_to: ["passed", "failed"]
+      side_effects:
+        passed: { status: "available", auto_reason: "Auto-unblocked: QA passed after quarantine" }
+        failed: { status: "blocked", auto_reason: "Auto-blocked: QA failed after quarantine" }
+
+# Migration SQL Template
+migration_sql: |
+  -- Migration: Create lp_status_audit table
+  -- Story: 05.4 LP Status Management
+
+  CREATE TABLE IF NOT EXISTS lp_status_audit (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id),
+    lp_id UUID NOT NULL REFERENCES license_plates(id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,
+    old_value TEXT NOT NULL,
+    new_value TEXT NOT NULL,
+    reason TEXT,
+    changed_by UUID NOT NULL REFERENCES users(id),
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT valid_field_name CHECK (field_name IN ('status', 'qa_status'))
+  );
+
+  -- Indexes for performance
+  CREATE INDEX idx_status_audit_lp ON lp_status_audit(lp_id, changed_at DESC);
+  CREATE INDEX idx_status_audit_org ON lp_status_audit(org_id, changed_at DESC);
+  CREATE INDEX idx_status_audit_field ON lp_status_audit(lp_id, field_name);
+
+  -- RLS
+  ALTER TABLE lp_status_audit ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policies
+  CREATE POLICY "audit_org_isolation" ON lp_status_audit
+    FOR SELECT USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "audit_insert" ON lp_status_audit
+    FOR INSERT WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Comment
+  COMMENT ON TABLE lp_status_audit IS 'Audit trail for LP status and QA status changes (Story 05.4)';
+
+# Database Types
+database_types:
+  lp_status:
+    type: "enum"
+    values: ["available", "reserved", "consumed", "blocked"]
+    typescript: "type LPStatus = 'available' | 'reserved' | 'consumed' | 'blocked';"
+
+  qa_status:
+    type: "enum"
+    values: ["pending", "passed", "failed", "quarantine"]
+    typescript: "type QAStatus = 'pending' | 'passed' | 'failed' | 'quarantine';"

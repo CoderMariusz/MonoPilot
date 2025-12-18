@@ -1,0 +1,111 @@
+# Story 02.8 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.8"
+  name: "Routing Operations (Steps) Management"
+  slug: "routing-operations"
+  epic: "02-technical"
+  phase: "0"  # MVP
+  complexity: "L"
+  estimate_days: 5
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, migration notes
+  - api.yaml         # Endpoints, request/response schemas
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.7"
+      name: "Routings CRUD"
+      provides: ["routings table", "routing-service.ts", "routing detail page"]
+      reason: "routing_operations.routing_id FK requires routings table to exist"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations table", "users table", "RLS pattern"]
+      reason: "Multi-tenant isolation via org_id"
+
+  optional:
+    - story: "01.x"
+      name: "Machines CRUD (Settings Phase 1B)"
+      provides: ["machines table"]
+      reason: "machine_id FK is NULLABLE - operations work without machines"
+      note: "If machines table empty, UI shows empty state with Settings link"
+
+  blocked_by: []
+
+  blocks:
+    - story: "02.9"
+      name: "BOM-Routing Integration"
+    - story: "04.x"
+      name: "Work Order Operations"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.41", "FR-2.43", "FR-2.44", "FR-2.45", "FR-2.48"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Database Schema", "API Design", "routing_operations"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.8.routing-operations.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-008a-routing-detail.md"
+      relevance: "PRIMARY - Operations table, modal, summary panel"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-008-routing-modal.md"
+      relevance: "Context - Routing header editing"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-009-routing-level-costs.md"
+      relevance: "Routing cost calculation including operations"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for routing_operations"
+  migrations:
+    - path: "supabase/migrations/044_add_routing_fields.sql"
+      relevance: "Added cleanup_time and instructions fields"
+    - path: "supabase/migrations/050_enable_parallel_operations.sql"
+      relevance: "CRITICAL - Removed unique sequence constraint for parallel ops"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "operation_attachments table + storage bucket config"
+  - type: "api"
+    count: 7
+    description: "Operations CRUD + reorder + attachments endpoints"
+  - type: "service"
+    count: 1
+    description: "routing-operations-service.ts"
+  - type: "page"
+    count: 1
+    description: "Routing detail page with operations management"
+  - type: "component"
+    count: 9
+    description: "OperationsTable, OperationModal, MachineDropdown, AttachmentUpload, etc."
+  - type: "validation"
+    count: 2
+    description: "Operation form schema, attachment schema"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "machine_id is NULLABLE - operations work without machines configured"
+  - "Migration 050 removed unique sequence constraint - parallel operations allowed"
+  - "Parallel ops: same sequence number = run simultaneously"
+  - "Duration calculation for parallel ops: use MAX per sequence group, not SUM"
+  - "Cost calculation: SUM all ops including parallel (both incur cost)"
+  - "cleanup_time and instructions fields added in migration 044"
+  - "Attachments: max 5 per operation, 10MB each, PDF/PNG/JPG/DOCX only"
+  - "Use wireframe TEC-008a as primary UI reference"

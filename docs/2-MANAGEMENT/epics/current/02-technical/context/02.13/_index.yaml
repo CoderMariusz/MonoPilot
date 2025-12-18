@@ -1,0 +1,122 @@
+# Story 02.13 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.13"
+  name: "Nutrition Calculation: Facts Panel & Label Generation"
+  slug: "nutrition-calculation"
+  epic: "02-technical"
+  phase: "2C-2"
+  complexity: "L"
+  estimate_days: 8
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (product_nutrition, ingredient_nutrition), columns, RLS
+  - api.yaml         # Endpoints, schemas, nutrition-service.ts
+  - frontend.yaml    # Components (NutritionPanel, Calculator, Labels), services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id", "user_id", "RLS policies"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product-service.ts"]
+    - story: "02.3"
+      name: "Product Allergens"
+      provides: ["product_allergens table", "allergen data"]
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms table", "bom-service.ts"]
+    - story: "02.5"
+      name: "BOM Items"
+      provides: ["bom_items table", "ingredient quantities"]
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.80", "FR-2.81", "FR-2.82", "FR-2.84"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Nutrition Tables", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.13.nutrition-calculation.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-009-nutrition-panel.md"
+      relevance: "Nutrition facts panel, FDA label format, serving calculator"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-011-nutrition-calculator.md"
+      relevance: "Calculation engine, ingredient breakdown, yield adjustment"
+  patterns:
+    - path: "apps/frontend/lib/services/costing-service.ts"
+      relevance: "Similar weighted calculation from BOM pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "product_nutrition + ingredient_nutrition tables with RLS"
+  - type: "api"
+    count: 7
+    description: "Nutrition CRUD, calculation, override, label, RACC endpoints"
+  - type: "service"
+    count: 3
+    description: "nutrition-service.ts, serving-calculator-service.ts, label-export-service.ts"
+  - type: "component"
+    count: 7
+    description: "NutritionPanelModal, NutritionFactsPreview, OverrideForm, ServingCalculator, etc."
+  - type: "validation"
+    count: 2
+    description: "nutrition-schema.ts, ingredient-nutrition-schema.ts"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + calculation accuracy + RLS isolation tests"
+
+# Technical notes
+technical_notes:
+  - "Weighted average calculation: SUM(ingredient_nutrition * quantity) / output_weight"
+  - "Yield adjustment: concentration_factor = expected_output / actual_output"
+  - "Per 100g: (total_nutrients / actual_output_g) * 100"
+  - "Per serving: per_100g_values * (serving_size_g / 100)"
+  - "FDA 2016 label format with required nutrients: Vit D, Ca, Fe, K (not A, C)"
+  - "FDA RACC table for serving size validation (139 categories)"
+  - "Allergen label integration from product_allergens (contains/may_contain)"
+  - "Cache nutrition data: 10 min TTL, invalidate on BOM change"
+  - "Manual override with audit trail: source, reference, user, timestamp"
+
+# FDA Daily Values (for % DV calculation)
+fda_daily_values:
+  energy_kcal: 2000
+  fat_g: 78
+  saturated_fat_g: 20
+  cholesterol_mg: 300
+  sodium_mg: 2300
+  carbohydrate_g: 275
+  fiber_g: 28
+  sugar_g: 50  # Added sugars
+  protein_g: 50
+  vitamin_d_mcg: 20
+  calcium_mg: 1300
+  iron_mg: 18
+  potassium_mg: 4700
+
+# Calculation formula
+calculation_formula: |
+  For each nutrient N:
+    1. total_N = SUM(ingredient_N_per_100g * ingredient_qty_kg * 10)
+    2. yield_factor = expected_output_kg / actual_output_kg
+    3. adjusted_N = total_N * yield_factor
+    4. per_100g_N = adjusted_N / (actual_output_kg * 10)
+    5. per_serving_N = per_100g_N * (serving_size_g / 100)
+    6. percent_dv_N = (per_serving_N / daily_value_N) * 100

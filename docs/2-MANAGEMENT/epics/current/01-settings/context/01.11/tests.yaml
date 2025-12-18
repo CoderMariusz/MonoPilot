@@ -1,0 +1,187 @@
+# Story 01.11 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/production-line-service.test.ts"
+    type: "unit"
+    description: "Unit tests for production line service and capacity calculation"
+  - path: "apps/frontend/app/api/v1/settings/production-lines/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for production line API endpoints"
+  - path: "apps/frontend/e2e/settings/production-lines.spec.ts"
+    type: "e2e"
+    description: "E2E tests for production line CRUD flows"
+
+# Acceptance Criteria (key examples from flat file)
+acceptance_criteria:
+  list_page:
+    - id: "AC-LL-01"
+      given: "admin navigates to /settings/production-lines"
+      when: "page loads"
+      then: "line list displays within 300ms with all columns"
+      priority: "P0"
+
+    - id: "AC-LL-02"
+      given: "line list has 50 items"
+      when: "admin filters by warehouse 'MAIN'"
+      then: "only lines in MAIN warehouse display within 200ms"
+      priority: "P1"
+
+  create_line:
+    - id: "AC-LC-01"
+      given: "admin clicks 'Add Line'"
+      when: "modal opens"
+      then: "form displays all required fields"
+      priority: "P0"
+
+    - id: "AC-LC-02"
+      given: "line code 'LINE-A' exists"
+      when: "admin enters duplicate code"
+      then: "error 'Line code must be unique' displays inline"
+      priority: "P0"
+
+  machine_assignment:
+    - id: "AC-MA-01"
+      given: "production line modal open"
+      when: "admin clicks 'Add Machine' dropdown"
+      then: "available machines display with code, name, status"
+      priority: "P0"
+
+    - id: "AC-MA-02"
+      given: "line already has machine 'MIX-001'"
+      when: "same machine selected in dropdown"
+      then: "machine is disabled in dropdown with tooltip 'Already assigned'"
+      priority: "P1"
+
+  machine_sequence:
+    - id: "AC-MS-01"
+      given: "line has 3 machines: MIX-001 (seq 1), FILL-001 (seq 2), PKG-001 (seq 3)"
+      when: "admin drags MIX-001 from position 1 to position 3"
+      then: "sequence updates to: FILL-001 (1), PKG-001 (2), MIX-001 (3)"
+      priority: "P0"
+
+    - id: "AC-MS-02"
+      given: "drag operation in progress"
+      when: "machine dropped at new position"
+      then: "all sequence numbers renumber automatically (1, 2, 3... no gaps)"
+      priority: "P0"
+
+  capacity_calculation:
+    - id: "AC-CC-01"
+      given: "line has machines: MIX-001 (1000/hr), FILL-001 (500/hr), PKG-001 (800/hr)"
+      when: "capacity calculated"
+      then: "line capacity displays as 500 units/hour (bottleneck)"
+      priority: "P0"
+
+    - id: "AC-CC-02"
+      given: "line has no machines assigned"
+      when: "capacity displayed"
+      then: "capacity shows 'Not calculated' or '--'"
+      priority: "P1"
+
+  product_compatibility:
+    - id: "AC-PC-01"
+      given: "no products selected"
+      when: "line saved"
+      then: "line can run ANY product (no restrictions)"
+      priority: "P0"
+
+    - id: "AC-PC-02"
+      given: "3 products selected: WWB-001, RYE-001, MUF-001"
+      when: "line saved"
+      then: "line can ONLY run those 3 products (restricted)"
+      priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  capacity_calculation:
+    - name: "calculateBottleneckCapacity returns minimum capacity"
+      expected: "Correct bottleneck machine identified"
+
+    - name: "calculateBottleneckCapacity returns null for no machines"
+      expected: "Returns null capacity"
+
+    - name: "calculateBottleneckCapacity excludes null capacities"
+      expected: "Machines with null capacity excluded from calculation"
+
+  validation:
+    - name: "Zod schema validates code format (uppercase, alphanumeric, hyphens)"
+      expected: "Invalid codes rejected"
+
+    - name: "renumberSequences eliminates gaps"
+      expected: "Sequence is 1, 2, 3... with no gaps"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/v1/settings/production-lines returns paginated results"
+      test_id: "IT-01"
+      expected: "Paginated list returned"
+
+    - name: "POST /api/v1/settings/production-lines creates line with machine assignments"
+      test_id: "IT-04"
+      expected: "Line created with machines"
+
+    - name: "POST /api/v1/settings/production-lines returns 409 for duplicate code"
+      test_id: "IT-05"
+      expected: "409 conflict error"
+
+    - name: "PATCH /api/v1/settings/production-lines/:id/machines/reorder updates sequences"
+      test_id: "IT-08"
+      expected: "Sequences updated"
+
+    - name: "DELETE /api/v1/settings/production-lines/:id returns 400 if WOs exist"
+      test_id: "IT-09"
+      expected: "400 error with message"
+
+    - name: "RLS prevents cross-org access"
+      test_id: "IT-10"
+      expected: "Empty results for other org"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create line with 2 machines, verify machine count in list"
+    test_id: "E2E-01"
+    steps:
+      - "Navigate to /settings/production-lines"
+      - "Click 'Add Line'"
+      - "Fill form, add 2 machines"
+      - "Submit"
+    expected: "Line appears in list with machine count = 2"
+
+  - name: "Drag machine to reorder, verify sequence visually updates"
+    test_id: "E2E-02"
+    expected: "Sequence updates in UI"
+
+  - name: "Search products, select 3, save, verify compatibility saved"
+    test_id: "E2E-03"
+    expected: "3 products saved as compatible"
+
+# Definition of Done
+definition_of_done:
+  - "Production line list page loads within 300ms for 50 lines"
+  - "Create line with code uniqueness validation works"
+  - "Machine assignment with drag-drop reorder functional"
+  - "Sequence numbers update correctly on reorder"
+  - "Capacity calculated as bottleneck (min of machines)"
+  - "Product compatibility editor with search works"
+  - "'Select All' respects search filter"
+  - "WO creation validates product-line compatibility"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover capacity calculation logic (>80%)"
+  - "E2E tests for create, reorder, delete flows"
+  - "RLS policies verified in tests"
+  - "Keyboard accessibility for drag-drop"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/production-line-service.ts: 80%"
+  integration:
+    target: 80
+    files:
+      - "app/api/v1/settings/production-lines/route.ts: 80%"

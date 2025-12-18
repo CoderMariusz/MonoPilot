@@ -1,0 +1,55 @@
+{
+  "version": "1.0.0",
+  "queries": [
+    {
+      "query": "How to implement JWT authentication in Node.js?",
+      "tags": ["authentication", "jwt", "nodejs", "security"],
+      "priority": "high"
+    },
+    {
+      "query": "What is the best way to structure a React component?",
+      "tags": ["react", "components", "best-practices"],
+      "priority": "high"
+    },
+    {
+      "query": "How to handle errors in Express.js middleware?",
+      "tags": ["express", "error-handling", "nodejs"],
+      "priority": "medium"
+    },
+    {
+      "query": "Explain TypeScript generics with examples",
+      "tags": ["typescript", "generics", "types"],
+      "priority": "medium"
+    },
+    {
+      "query": "How to optimize database queries in PostgreSQL?",
+      "tags": ["postgresql", "optimization", "database"],
+      "priority": "medium"
+    },
+    {
+      "query": "What are React hooks and how to use them?",
+      "tags": ["react", "hooks", "state-management"],
+      "priority": "high"
+    },
+    {
+      "query": "How to implement pagination in REST API?",
+      "tags": ["api", "pagination", "rest"],
+      "priority": "medium"
+    },
+    {
+      "query": "Best practices for Git branching strategy",
+      "tags": ["git", "workflow", "best-practices"],
+      "priority": "low"
+    },
+    {
+      "query": "How to deploy Next.js app to production?",
+      "tags": ["nextjs", "deployment", "production"],
+      "priority": "medium"
+    },
+    {
+      "query": "Explain Supabase RLS policies",
+      "tags": ["supabase", "security", "rls"],
+      "priority": "high"
+    }
+  ]
+}

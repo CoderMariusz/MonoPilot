@@ -1,0 +1,204 @@
+# Story 06.10 - In-Process Inspection: API Endpoints & Service Layer
+# Generated: 2025-12-18
+
+api:
+  endpoints:
+    endpoint_001:
+      method: "GET"
+      path: "/api/quality/inspections/in-process"
+      name: "List in-process inspections with filters"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER", "PROD_OPERATOR"]
+      query_params:
+        - name: "wo_id"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by Work Order ID"
+        - name: "wo_operation_id"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by WO operation ID"
+        - name: "status"
+          type: "enum"
+          enum: ["scheduled", "in_progress", "completed", "cancelled"]
+          required: false
+          description: "Filter by inspection status"
+        - name: "priority"
+          type: "enum"
+          enum: ["low", "normal", "high", "urgent"]
+          required: false
+          description: "Filter by priority"
+        - name: "inspector_id"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by assigned inspector"
+        - name: "product_id"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by product"
+        - name: "search"
+          type: "string"
+          required: false
+          description: "Search by WO number or product name (debounced 300ms)"
+
+      response:
+        status: 200
+        body:
+          type: "object"
+          fields:
+            - data: "array of InProcessInspection objects"
+            - pagination:
+                - total: "number"
+                - page: "number"
+                - limit: "number"
+                - total_pages: "number"
+
+      errors:
+        - status: 400
+          code: "INVALID_FILTERS"
+          message: "Invalid filter parameters"
+        - status: 401
+          code: "UNAUTHORIZED"
+          message: "Authentication required"
+
+      performance_target: "< 500ms for 500 inspections with pagination"
+
+    endpoint_002:
+      method: "GET"
+      path: "/api/quality/inspections/wo/:woId"
+      name: "List all inspections for a Work Order"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER", "PROD_OPERATOR"]
+      url_params:
+        - name: "woId"
+          type: "string (UUID)"
+          required: true
+          description: "Work Order ID"
+
+      response:
+        status: 200
+        body:
+          type: "object"
+          fields:
+            - wo:
+                - id: "UUID"
+                - wo_number: "string"
+                - status: "string"
+                - product_name: "string"
+                - batch_number: "string"
+            - inspections: "array of QualityInspection"
+            - summary:
+                - total_operations: "number"
+                - inspections_completed: "number"
+                - inspections_passed: "number"
+                - inspections_failed: "number"
+                - inspections_pending: "number"
+                - overall_status: "'pass' | 'fail' | 'pending' | 'conditional'"
+
+      errors:
+        - status: 404
+          code: "WO_NOT_FOUND"
+          message: "Work Order not found or not accessible"
+
+      performance_target: "< 300ms for WO with 10 operations"
+
+    endpoint_003:
+      method: "GET"
+      path: "/api/quality/inspections/operation/:operationId"
+      name: "Get inspection for specific WO operation"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER", "PROD_OPERATOR"]
+
+    endpoint_004:
+      method: "POST"
+      path: "/api/quality/inspections"
+      name: "Create in-process inspection manually"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER"]
+      body:
+        type: "CreateInProcessInspectionRequest"
+        fields:
+          - wo_id: "UUID - required"
+          - wo_operation_id: "UUID - required"
+          - product_id: "UUID - optional (auto-filled from WO if not provided)"
+          - spec_id: "UUID - optional"
+          - batch_number: "string - optional (auto-filled from WO if not provided)"
+          - priority: "enum [low, normal, high, urgent] - default: normal"
+          - scheduled_date: "string (YYYY-MM-DD) - optional"
+          - inspector_id: "UUID - optional (can self-assign)"
+          - notes: "string (max 2000 chars) - optional"
+
+      validation:
+        - "wo_id must reference valid WO in same org"
+        - "WO must have status = 'in_progress'"
+        - "wo_operation_id must reference valid operation in WO"
+        - "No other active inspection for same operation"
+
+      response:
+        status: 201
+        body:
+          type: "QualityInspection"
+
+      errors:
+        - status: 400
+          code: "WO_NOT_IN_PROGRESS"
+          message: "Work Order must be in progress for in-process inspection"
+        - status: 400
+          code: "OPERATION_ALREADY_HAS_INSPECTION"
+          message: "Operation already has a pending inspection"
+
+    endpoint_005:
+      method: "POST"
+      path: "/api/quality/inspections/:id/start"
+      name: "Start in-process inspection"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    endpoint_006:
+      method: "POST"
+      path: "/api/quality/inspections/:id/complete"
+      name: "Complete in-process inspection with result"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER"]
+      description: "Complete inspection with WO operation update and production notification"
+
+    endpoint_007:
+      method: "POST"
+      path: "/api/quality/inspections/:id/assign"
+      name: "Assign or reassign inspector to inspection"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    endpoint_008:
+      method: "GET"
+      path: "/api/quality/inspections/:id"
+      name: "Get in-process inspection detail with WO context"
+      auth: "Bearer token required"
+      roles: ["QA_INSPECTOR", "QA_MANAGER", "PROD_OPERATOR"]
+
+  services:
+    service_001:
+      name: "InProcessInspectionService"
+      file: "lib/services/in-process-inspection-service.ts"
+      extends: "InspectionService"
+      key_methods:
+        - "listInProcess(params) - List with WO/operation filters"
+        - "getByWorkOrder(woId) - Get all inspections for WO with summary"
+        - "getByOperation(operationId) - Get inspection for operation"
+        - "createInProcess(input) - Create with WO validation"
+        - "completeInProcess(id, input, userId) - Complete with WO update"
+        - "updateOperationQAStatus(operationId, result, inspectionId) - Update wo_operation"
+        - "canStartNextOperation(woId, currentSequence) - Check blocking"
+        - "getWOQualitySummary(woId) - Get quality summary"
+        - "notifyProductionOnCompletion(inspectionId, result) - Send notification"
+
+  validation_schemas:
+    - createInProcessInspectionSchema: "Zod schema for creation validation"
+    - completeInProcessInspectionSchema: "Zod schema with conditional refinement"
+    - inProcessListQuerySchema: "Zod schema for query parameters"
+
+  performance_targets:
+    in_process_list: "< 500ms for 500 inspections"
+    wo_inspections: "< 300ms for WO with 10 operations"
+    create_inspection: "< 300ms including validation and triggers"
+    complete_inspection: "< 300ms including WO update and notification queue"

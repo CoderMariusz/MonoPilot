@@ -1,0 +1,185 @@
+# Story 03.13 - Database Schema
+# Purpose: Database dependencies and queries (no new tables)
+# Agent: BACKEND-DEV (database focus)
+
+# This story does NOT create new tables.
+# It queries existing tables from Epic 03 and Epic 05.
+
+migrations: []  # No migrations needed for this story
+
+# Tables Used (not created)
+tables_used:
+  - name: "work_orders"
+    source: "03.10"
+    columns_needed:
+      - "id"
+      - "organization_id"
+      - "status"
+      - "bom_id"
+    usage: "Lookup WO to get materials"
+
+  - name: "wo_materials"
+    source: "03.11a"
+    columns_needed:
+      - "id"
+      - "wo_id"
+      - "product_id"
+      - "required_qty"
+      - "reserved_qty"
+      - "uom"
+      - "sequence"
+    usage: "Get required quantities per material for availability calculation"
+
+  - name: "products"
+    source: "02.1"
+    columns_needed:
+      - "id"
+      - "code"
+      - "name"
+    usage: "JOIN for material display names"
+
+  - name: "license_plates"
+    source: "05.1"
+    columns_needed:
+      - "id"
+      - "organization_id"
+      - "product_id"
+      - "quantity"
+      - "status"
+      - "expiry_date"
+    usage: "SUM available quantities per product"
+
+  - name: "planning_settings"
+    source: "03.17"
+    columns_needed:
+      - "org_id"
+      - "wo_material_check"
+    usage: "Check if material availability feature is enabled"
+
+# Main Availability Query
+queries:
+  main_availability:
+    description: "Calculate material availability for a Work Order"
+    sql: |
+      -- Main availability query (per material)
+      -- Note: Requires license_plates table from Epic 05
+      SELECT
+        wm.id as wo_material_id,
+        wm.product_id,
+        p.code as product_code,
+        p.name as product_name,
+        wm.required_qty,
+        wm.uom,
+        COALESCE(available.qty, 0) as available_qty,
+        COALESCE(reserved.qty, 0) as reserved_by_others,
+        wm.reserved_qty as reserved_for_this_wo,
+        COALESCE(expired.qty, 0) as expired_excluded_qty
+      FROM wo_materials wm
+      JOIN products p ON p.id = wm.product_id
+      LEFT JOIN (
+        -- Sum available LPs (not expired)
+        SELECT
+          lp.product_id,
+          SUM(lp.quantity) as qty
+        FROM license_plates lp
+        WHERE lp.organization_id = :org_id
+          AND lp.status = 'available'
+          AND lp.qa_status = 'passed'
+          AND (lp.expiry_date IS NULL OR lp.expiry_date >= CURRENT_DATE)
+        GROUP BY lp.product_id
+      ) available ON available.product_id = wm.product_id
+      LEFT JOIN (
+        -- Sum reservations for OTHER work orders
+        SELECT
+          wm2.product_id,
+          SUM(wm2.reserved_qty) as qty
+        FROM wo_materials wm2
+        JOIN work_orders wo2 ON wo2.id = wm2.wo_id
+        WHERE wo2.organization_id = :org_id
+          AND wo2.id != :this_wo_id
+          AND wo2.status NOT IN ('completed', 'closed', 'cancelled')
+          AND wm2.reserved_qty > 0
+        GROUP BY wm2.product_id
+      ) reserved ON reserved.product_id = wm.product_id
+      LEFT JOIN (
+        -- Sum expired LP quantities (for reporting)
+        SELECT
+          lp.product_id,
+          SUM(lp.quantity) as qty
+        FROM license_plates lp
+        WHERE lp.organization_id = :org_id
+          AND lp.status = 'available'
+          AND lp.expiry_date IS NOT NULL
+          AND lp.expiry_date < CURRENT_DATE
+        GROUP BY lp.product_id
+      ) expired ON expired.product_id = wm.product_id
+      WHERE wm.wo_id = :wo_id
+      ORDER BY wm.sequence;
+    params:
+      - name: "org_id"
+        type: "UUID"
+        source: "OrgContext"
+      - name: "wo_id"
+        type: "UUID"
+        source: "Request path param"
+      - name: "this_wo_id"
+        type: "UUID"
+        source: "Same as wo_id"
+    indexes_used:
+      - "idx_lp_org_status ON license_plates(org_id, status)"
+      - "idx_lp_org_product ON license_plates(org_id, product_id)"
+      - "idx_lp_expiry ON license_plates(expiry_date)"
+      - "idx_wo_materials_wo ON wo_materials(wo_id)"
+    performance_target: "<500ms for 50 materials, <1s for 200 materials"
+
+  settings_check:
+    description: "Check if material availability feature is enabled"
+    sql: |
+      SELECT wo_material_check
+      FROM planning_settings
+      WHERE org_id = :org_id
+      LIMIT 1;
+    params:
+      - name: "org_id"
+        type: "UUID"
+        source: "OrgContext"
+
+# Calculation Logic (in service layer, not SQL)
+calculation_logic:
+  available_qty:
+    formula: "SUM(LP.quantity where status='available' AND qa_status='passed' AND not expired) - SUM(reservations for other WOs) + this_wo.reserved_qty"
+    note: "Don't double-count own reservations as unavailable"
+
+  coverage_percent:
+    formula: "(available_qty / required_qty) * 100"
+    edge_cases:
+      - condition: "required_qty = 0"
+        result: "100%"
+      - condition: "available_qty < 0"
+        result: "0%"
+
+  shortage_qty:
+    formula: "required_qty - available_qty"
+    interpretation:
+      positive: "Shortage - need more"
+      negative: "Surplus - have extra"
+
+  status_thresholds:
+    sufficient: ">= 100%"
+    low_stock: "50% to 99%"
+    shortage: "1% to 49%"
+    no_stock: "0%"
+
+  overall_status:
+    logic: "Worst case wins - if any material is 'shortage', overall is 'shortage'"
+    priority: ["no_stock", "shortage", "low_stock", "sufficient"]
+
+# RLS Policies (existing, no changes)
+rls_policies:
+  note: "All queries use existing RLS policies from respective tables"
+  pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+  tables:
+    - license_plates: "lp_select_org policy from 05.1"
+    - wo_materials: "wo_materials org isolation from 03.11a"
+    - work_orders: "work_orders org isolation from 03.10"
+    - planning_settings: "planning_settings_select from 03.17"

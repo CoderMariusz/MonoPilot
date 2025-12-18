@@ -1,0 +1,456 @@
+# Story 05.14 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/label-print-service.test.ts"
+    type: "unit"
+    description: "Unit tests for LabelPrintService"
+  - path: "apps/frontend/lib/templates/__tests__/lp-label-template.test.ts"
+    type: "unit"
+    description: "Unit tests for ZPL template generation"
+  - path: "apps/frontend/__tests__/integration/api/warehouse/label-print.test.ts"
+    type: "integration"
+    description: "Integration tests for print label API endpoints"
+  - path: "apps/frontend/__tests__/e2e/warehouse/label-print.spec.ts"
+    type: "e2e"
+    description: "E2E tests for print label flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-1"
+    title: "ZPL Template Generation for LP Labels"
+    given: "LP 'LP00000001' exists with product, qty, batch, expiry, location"
+    when: "POST /api/warehouse/lps/{lp_id}/print-label"
+    then:
+      - "Response status = 200 OK"
+      - "Response contains zpl, lp_number, product_name"
+      - "ZPL includes CODE128 barcode with 'LP00000001'"
+      - "ZPL includes QR code with JSON data"
+      - "ZPL includes text fields: Product, Qty, Batch, Expiry, Location"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2"
+    title: "ZPL template format for 4x6 inch label"
+    given: "ZPL generated"
+    when: "ZPL validated"
+    then:
+      - "ZPL starts with ^XA"
+      - "ZPL ends with ^XZ"
+      - "Barcode positioned at ^FO50,50"
+      - "Total ZPL length < 2KB"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-3"
+    title: "Print single LP label with default copies"
+    given: "warehouse_settings.label_copies_default = 1"
+    when: "POST /api/warehouse/lps/{lp_id}/print-label"
+    then:
+      - "ZPL generated for 1 copy"
+      - "Response time < 500ms"
+      - "Audit log records action='label_printed'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-4"
+    title: "Print LP label with custom copies"
+    given: "warehouse_settings.label_copies_default = 1"
+    when: "POST /api/warehouse/lps/{lp_id}/print-label?copies=3"
+    then:
+      - "ZPL generated for 3 copies"
+      - "Response includes copies=3"
+      - "ZPL contains ^PQ3 command"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-5"
+    title: "Print label for non-existent LP"
+    when: "POST /api/warehouse/lps/{invalid_uuid}/print-label"
+    then:
+      - "Response status = 404 Not Found"
+      - "Error message = 'License Plate not found'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-6"
+    title: "RLS enforcement - cross-tenant access"
+    given: "User A from Org A, LP belongs to Org B"
+    when: "User A requests POST /api/warehouse/lps/{orgB_lp_id}/print-label"
+    then: "Response status = 404 Not Found (RLS enforced)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-7"
+    title: "LP without batch number"
+    given: "LP exists with batch_number = NULL"
+    when: "Print label requested"
+    then:
+      - "ZPL generated successfully"
+      - "Batch field shows '--' or 'N/A'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-8"
+    title: "LP without expiry date"
+    given: "LP exists with expiry_date = NULL"
+    when: "Print label requested"
+    then:
+      - "ZPL generated successfully"
+      - "Expiry field shows '--' or 'N/A'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-9"
+    title: "LP with long product name"
+    given: "LP exists with product_name = 60 character string"
+    when: "Print label requested"
+    then:
+      - "ZPL truncates product name to 40 characters"
+      - "Full name available in QR code JSON"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-10"
+    title: "Validate copies parameter"
+    when: "POST /api/warehouse/lps/{id}/print-label?copies=0"
+    then:
+      - "Response status = 400 Bad Request"
+      - "Error message = 'Copies must be between 1 and 100'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    title: "Validate copies parameter max"
+    when: "POST /api/warehouse/lps/{id}/print-label?copies=150"
+    then:
+      - "Response status = 400 Bad Request"
+      - "Error message = 'Copies must be between 1 and 100'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    title: "Desktop UI - Print button on LP detail page"
+    given: "User viewing LP detail page for 'LP00000001'"
+    when: "Page loads"
+    then:
+      - "'Print Label' button visible in header actions"
+      - "Button has printer icon"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-13"
+    title: "Click print button opens print modal"
+    given: "User on LP detail page"
+    when: "User clicks 'Print Label'"
+    then:
+      - "Print modal opens"
+      - "Modal displays LP info (product, qty, batch, expiry)"
+      - "Copies input present with default from settings"
+      - "Download ZPL button available"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-14"
+    title: "Download ZPL from modal"
+    given: "Print modal open"
+    when: "User clicks 'Download ZPL'"
+    then:
+      - "ZPL file downloaded as 'LP00000001.zpl'"
+      - "File contains valid ZPL content"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-15"
+    title: "Bulk print LPs"
+    given: "3 LPs selected"
+    when: "POST /api/warehouse/lps/print-bulk with 3 LP IDs"
+    then:
+      - "Response contains format, total_labels=3"
+      - "ZIP file or concatenated ZPL returned"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-16"
+    title: "Bulk print validation - empty array"
+    when: "POST /api/warehouse/lps/print-bulk with lp_ids=[]"
+    then:
+      - "Response status = 400 Bad Request"
+      - "Error message = 'At least one LP required'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-17"
+    title: "Bulk print validation - exceeds max"
+    when: "POST /api/warehouse/lps/print-bulk with 101 LP IDs"
+    then:
+      - "Response status = 400 Bad Request"
+      - "Error message = 'Maximum 100 LPs per bulk request'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-18"
+    title: "ZPL generation performance"
+    when: "Generating ZPL for single LP"
+    then: "Operation completes in < 100ms"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-19"
+    title: "Bulk ZPL generation performance"
+    given: "50 LPs selected for bulk print"
+    when: "Generating all ZPL files"
+    then: "Operation completes in < 3 seconds"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-20"
+    title: "API response time"
+    when: "POST /api/warehouse/lps/{id}/print-label"
+    then: "Response time < 500ms"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  label_print_service:
+    - name: "generateLPLabel() returns valid ZPL"
+      setup: "Mock LP data with all fields"
+      expected: "ZPL starts with ^XA, ends with ^XZ"
+
+    - name: "generateLPLabel() substitutes all variables"
+      setup: "LP data with product, qty, batch, expiry, location"
+      expected: "All {{VAR}} replaced with actual values"
+
+    - name: "generateLPLabel() handles null batch"
+      setup: "LP data with batch_number = null"
+      expected: "Batch field shows '--'"
+
+    - name: "generateLPLabel() handles null expiry"
+      setup: "LP data with expiry_date = null"
+      expected: "Expiry field shows '--'"
+
+    - name: "generateLPLabel() truncates long product name"
+      setup: "LP data with 60-char product name"
+      expected: "Product name truncated to 40 chars with '...'"
+
+    - name: "generateLPLabel() escapes special characters"
+      setup: "LP data with product name containing ^, ~, \\"
+      expected: "Characters properly escaped in ZPL"
+
+    - name: "generateLPLabel() includes correct copies"
+      setup: "copies = 3"
+      expected: "ZPL includes ^PQ3 command"
+
+    - name: "generateQRData() returns valid JSON"
+      setup: "LP data with all fields"
+      expected: "Valid JSON string with lp, product, qty, batch, expiry"
+
+    - name: "buildZPL() formats dates correctly"
+      setup: "expiry_date = '2026-06-01'"
+      expected: "Date displayed as YYYY-MM-DD format"
+
+    - name: "escapeZPL() escapes caret character"
+      setup: "text = 'Product ^A'"
+      expected: "Returns 'Product \\^A'"
+
+    - name: "escapeZPL() escapes tilde character"
+      setup: "text = 'Product ~B'"
+      expected: "Returns 'Product \\~B'"
+
+  lp_label_template:
+    - name: "LP_LABEL_TEMPLATE_4x6 contains required ZPL commands"
+      expected:
+        - "Contains ^XA (start)"
+        - "Contains ^XZ (end)"
+        - "Contains ^BCN (CODE128 barcode)"
+        - "Contains ^BQN (QR code)"
+        - "Contains ^PQ (print quantity)"
+
+    - name: "buildLPLabelZPL() replaces all placeholders"
+      setup: "Full LP data object, copies = 2"
+      expected:
+        - "No {{...}} placeholders remain"
+        - "LP number in barcode"
+        - "Product name in text"
+        - "^PQ2 for copies"
+
+# Integration Test Cases
+integration_tests:
+  print_label_api:
+    - name: "POST /lps/:id/print-label returns 200 with ZPL"
+      setup: "Create LP in test org"
+      action: "POST /api/warehouse/lps/{lpId}/print-label"
+      expected:
+        - "Status 200"
+        - "Response contains zpl, lp_number, product_name"
+
+    - name: "POST /lps/:id/print-label?copies=3 returns ZPL with 3 copies"
+      setup: "Create LP in test org"
+      action: "POST /api/warehouse/lps/{lpId}/print-label?copies=3"
+      expected:
+        - "Status 200"
+        - "ZPL contains ^PQ3"
+
+    - name: "POST /lps/:id/print-label with invalid LP returns 404"
+      action: "POST /api/warehouse/lps/{randomUUID}/print-label"
+      expected:
+        - "Status 404"
+        - "error = 'License Plate not found'"
+
+    - name: "POST /lps/:id/print-label enforces RLS"
+      setup:
+        - "Create Org A with User A, LP_A"
+        - "Create Org B with User B"
+      action: "User B requests print-label for LP_A"
+      expected: "Status 404 (LP not visible via RLS)"
+
+    - name: "POST /lps/:id/print-label?copies=0 returns 400"
+      setup: "Create LP in test org"
+      action: "POST /api/warehouse/lps/{lpId}/print-label?copies=0"
+      expected:
+        - "Status 400"
+        - "error contains 'Copies must be between 1 and 100'"
+
+    - name: "POST /lps/:id/print-label?copies=150 returns 400"
+      setup: "Create LP in test org"
+      action: "POST /api/warehouse/lps/{lpId}/print-label?copies=150"
+      expected:
+        - "Status 400"
+        - "error contains 'Copies must be between 1 and 100'"
+
+    - name: "Label print logged in label_print_logs"
+      setup: "Create LP in test org"
+      action: "POST /api/warehouse/lps/{lpId}/print-label"
+      expected:
+        - "New record in label_print_logs"
+        - "lp_id matches"
+        - "label_type = 'lp'"
+
+  print_bulk_api:
+    - name: "POST /lps/print-bulk with 5 LPs returns ZIP"
+      setup: "Create 5 LPs in test org"
+      action: "POST /api/warehouse/lps/print-bulk with lp_ids array"
+      expected:
+        - "Status 200"
+        - "Response contains format, total_labels=5"
+
+    - name: "POST /lps/print-bulk with 0 LPs returns 400"
+      action: "POST /api/warehouse/lps/print-bulk with lp_ids=[]"
+      expected:
+        - "Status 400"
+        - "error = 'At least one LP required'"
+
+    - name: "POST /lps/print-bulk with 101 LPs returns 400"
+      setup: "Generate array of 101 UUIDs"
+      action: "POST /api/warehouse/lps/print-bulk"
+      expected:
+        - "Status 400"
+        - "error = 'Maximum 100 LPs per bulk request'"
+
+# E2E Test Cases
+e2e_tests:
+  label_print_flow:
+    - name: "Print label from LP detail page"
+      steps:
+        - "Navigate to /warehouse/lps/{lpId}"
+        - "Click 'Print Label' button"
+        - "Verify modal opens with LP info"
+        - "Set copies to 2"
+        - "Click 'Download ZPL'"
+        - "Verify file downloaded"
+      expected: "ZPL file downloaded with LP number as filename"
+
+    - name: "Change copies in modal"
+      steps:
+        - "Open print modal"
+        - "Click + button to increase copies"
+        - "Click - button to decrease copies"
+        - "Type number directly in input"
+      expected: "Copies input updates correctly with validation"
+
+    - name: "Preview label in modal"
+      steps:
+        - "Open print modal"
+        - "Observe preview section"
+      expected: "Preview shows barcode placeholder, product name, qty, batch, expiry, location"
+
+    - name: "Bulk print from LP list"
+      steps:
+        - "Navigate to /warehouse/lps"
+        - "Select 3 LPs using checkboxes"
+        - "Click 'Print Labels' bulk action"
+        - "Verify bulk print modal opens"
+        - "Click 'Download All ZPL'"
+      expected: "ZIP file downloaded with 3 .zpl files"
+
+    - name: "Update label settings"
+      steps:
+        - "Navigate to /settings/warehouse"
+        - "Find Label Print Settings section"
+        - "Change label_copies_default to 2"
+        - "Toggle print_label_on_receipt"
+        - "Save changes"
+      expected: "Settings saved successfully"
+
+# Definition of Done
+definition_of_done:
+  - "ZPL generation produces valid Zebra printer commands"
+  - "All {{VAR}} placeholders substituted correctly"
+  - "CODE128 barcode contains LP number"
+  - "QR code contains JSON with LP metadata"
+  - "Null batch/expiry handled gracefully (show '--')"
+  - "Long product names truncated to 40 chars"
+  - "Special characters escaped in ZPL"
+  - "Copies parameter validated (1-100)"
+  - "RLS enforces org isolation"
+  - "Print requests logged to label_print_logs"
+  - "API response time < 500ms"
+  - "Unit test coverage >= 80% on service"
+  - "Integration tests pass for all endpoints"
+  - "E2E tests pass for print flow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "ZPL generation is critical for printer compatibility"
+  integration:
+    target: 90
+    reason: "API endpoints must be thoroughly tested"
+  e2e:
+    target: 70
+    reason: "Core user flows must work end-to-end"
+  files:
+    - "lib/services/label-print-service.ts: 80%"
+    - "lib/templates/lp-label-template.ts: 90%"
+    - "lib/validation/label-print.ts: 100%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "ZPL syntax errors may cause printer failures"
+    mitigation: "Comprehensive ZPL validation tests, test with physical printer"
+    severity: "medium"
+    test_coverage: "unit_tests.lp_label_template"
+
+  - id: "RISK-02"
+    description: "Special characters in product names may break ZPL"
+    mitigation: "Thorough escaping and test coverage for special chars"
+    severity: "medium"
+    test_coverage: "unit_tests.label_print_service.escapeZPL"
+
+  - id: "RISK-03"
+    description: "Large bulk requests may timeout"
+    mitigation: "Limit to 100 LPs, async processing if needed"
+    severity: "low"
+    test_coverage: "integration_tests.print_bulk_api"
+
+  - id: "RISK-04"
+    description: "QR code too large for label"
+    mitigation: "Limit QR data size, use appropriate error correction"
+    severity: "low"
+    test_coverage: "unit_tests.label_print_service.generateQRData"

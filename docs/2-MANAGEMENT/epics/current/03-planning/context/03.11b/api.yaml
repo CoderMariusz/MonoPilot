@@ -1,0 +1,379 @@
+# Story 03.11b - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+# Status: DEFERRED - Requires Epic 05
+
+endpoints:
+  # GET /api/planning/work-orders/:id/materials/:materialId/reservations
+  - method: "GET"
+    path: "/api/planning/work-orders/:id/materials/:materialId/reservations"
+    description: "Returns all LP reservations for a specific wo_material"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/materials/[materialId]/reservations/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner", "production_operator", "viewer"]
+
+    params:
+      id: "UUID - Work Order ID"
+      materialId: "UUID - WO Material ID"
+
+    response:
+      status: 200
+      type: "ReservationsListResponse"
+      schema:
+        reservations:
+          type: "array"
+          items:
+            id: "UUID"
+            wo_material_id: "UUID"
+            lp_id: "UUID"
+            lp_number: "string"
+            reserved_qty: "number"
+            status: "string (active|released|consumed)"
+            reserved_at: "string (ISO datetime)"
+            location_name: "string | null"
+            expiry_date: "string | null"
+        total_reserved: "number"
+        required_qty: "number"
+        coverage_percent: "number"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", when: "No valid JWT token" }
+      - { status: 403, code: "FORBIDDEN", when: "RLS violation - different org" }
+      - { status: 404, code: "NOT_FOUND", when: "WO or Material not found" }
+
+  # POST /api/planning/work-orders/:id/materials/:materialId/reservations
+  - method: "POST"
+    path: "/api/planning/work-orders/:id/materials/:materialId/reservations"
+    description: "Create manual LP reservation for a wo_material"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/materials/[materialId]/reservations/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner", "production_operator"]
+
+    params:
+      id: "UUID - Work Order ID"
+      materialId: "UUID - WO Material ID"
+
+    request:
+      body:
+        lp_id: "UUID - License Plate ID"
+        quantity: "number - Quantity to reserve"
+
+    response:
+      status: 200
+      type: "CreateReservationResponse"
+      schema:
+        reservation:
+          id: "UUID"
+          wo_material_id: "UUID"
+          lp_id: "UUID"
+          reserved_qty: "number"
+          status: "string"
+          reserved_at: "string"
+        message: "string"
+        warnings: "string[] | null"
+
+    errors:
+      - { status: 400, code: "BAD_REQUEST", when: "Validation error or reserved > LP quantity" }
+      - { status: 401, code: "UNAUTHORIZED", when: "No valid JWT token" }
+      - { status: 403, code: "FORBIDDEN", when: "RLS violation" }
+      - { status: 404, code: "NOT_FOUND", when: "WO, Material, or LP not found" }
+      - { status: 409, code: "CONFLICT", when: "WO completed/closed - cannot modify reservations" }
+
+  # DELETE /api/planning/work-orders/:id/reservations/:reservationId
+  - method: "DELETE"
+    path: "/api/planning/work-orders/:id/reservations/:reservationId"
+    description: "Release (un-reserve) a specific LP reservation"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/reservations/[reservationId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner"]
+
+    params:
+      id: "UUID - Work Order ID"
+      reservationId: "UUID - Reservation ID"
+
+    response:
+      status: 200
+      type: "ReleaseReservationResponse"
+      schema:
+        success: "boolean"
+        released_qty: "number"
+        message: "string"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", when: "No valid JWT token" }
+      - { status: 403, code: "FORBIDDEN", when: "RLS violation" }
+      - { status: 404, code: "NOT_FOUND", when: "WO or Reservation not found" }
+      - { status: 409, code: "CONFLICT", when: "WO completed/closed - cannot modify reservations" }
+
+  # POST /api/planning/work-orders/:id/reserve-all
+  - method: "POST"
+    path: "/api/planning/work-orders/:id/reserve-all"
+    description: "Trigger auto-reservation for all materials using FIFO/FEFO"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/reserve-all/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner"]
+
+    params:
+      id: "UUID - Work Order ID"
+
+    response:
+      status: 200
+      type: "ReserveAllResponse"
+      schema:
+        success: "boolean"
+        materials_processed: "number"
+        fully_reserved: "number"
+        partially_reserved: "number"
+        shortages:
+          type: "array"
+          items:
+            material_name: "string"
+            required_qty: "number"
+            reserved_qty: "number"
+            shortage: "number"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", when: "No valid JWT token" }
+      - { status: 403, code: "FORBIDDEN", when: "RLS violation" }
+      - { status: 404, code: "NOT_FOUND", when: "WO not found" }
+      - { status: 409, code: "CONFLICT", when: "WO completed/closed - cannot modify reservations" }
+
+  # GET /api/planning/work-orders/:id/materials/:materialId/available-lps
+  - method: "GET"
+    path: "/api/planning/work-orders/:id/materials/:materialId/available-lps"
+    description: "Get available LPs for manual reservation selection"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/materials/[materialId]/available-lps/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner", "production_operator"]
+
+    params:
+      id: "UUID - Work Order ID"
+      materialId: "UUID - WO Material ID"
+
+    query:
+      algorithm: "string (fifo|fefo) - optional, defaults to warehouse setting"
+
+    response:
+      status: 200
+      type: "AvailableLPsResponse"
+      schema:
+        lps:
+          type: "array"
+          items:
+            id: "UUID"
+            lp_number: "string"
+            quantity: "number"
+            available_qty: "number (quantity minus existing reservations)"
+            location: "string"
+            expiry_date: "string | null"
+            created_at: "string"
+        total_available: "number"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", when: "No valid JWT token" }
+      - { status: 403, code: "FORBIDDEN", when: "RLS violation" }
+      - { status: 404, code: "NOT_FOUND", when: "WO or Material not found" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/wo-reservation-service.ts"
+    description: "Reservation business logic with FIFO/FEFO algorithms"
+    exports:
+      - name: "autoReserveWOMaterials"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<ReservationResult>"
+        description: "Auto-reserve LPs for all materials in a WO using FIFO/FEFO"
+
+      - name: "reserveLP"
+        type: "async function"
+        params:
+          - "woMaterialId: string"
+          - "lpId: string"
+          - "quantity: number"
+          - "userId: string"
+        returns: "Promise<WOMaterialReservation>"
+        description: "Reserve specific LP for a WO material (manual reservation)"
+
+      - name: "releaseReservation"
+        type: "async function"
+        params:
+          - "reservationId: string"
+          - "userId: string"
+        returns: "Promise<void>"
+        description: "Release (un-reserve) a reservation"
+
+      - name: "releaseAllWOReservations"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<number>"
+        description: "Release all reservations for a WO (called on WO cancellation)"
+
+      - name: "getAvailableLPs"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "warehouseId: string"
+          - "algorithm: 'fifo' | 'fefo'"
+        returns: "Promise<AvailableLP[]>"
+        description: "Get available LPs for a product using FIFO/FEFO ordering"
+
+      - name: "canModifyReservations"
+        type: "function"
+        params:
+          - "woStatus: string"
+        returns: "boolean"
+        description: "Check if WO reservations can be modified"
+
+      - name: "calculateCoverage"
+        type: "function"
+        params:
+          - "requiredQty: number"
+          - "reservedQty: number"
+        returns: "{ percent: number; shortage: number; status: 'full' | 'partial' | 'none' }"
+        description: "Calculate reservation coverage for a material"
+
+# Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/wo-reservations.ts"
+  schemas:
+    - name: "createReservationSchema"
+      fields:
+        lp_id:
+          type: "string"
+          validation: "uuid"
+          required: true
+        quantity:
+          type: "number"
+          validation: "positive, max 6 decimal places"
+          required: true
+
+    - name: "reservationResponseSchema"
+      fields:
+        id: { type: "string", validation: "uuid" }
+        wo_material_id: { type: "string", validation: "uuid" }
+        lp_id: { type: "string", validation: "uuid" }
+        reserved_qty: { type: "number", validation: "positive" }
+        status: { type: "enum", values: ["active", "released", "consumed"] }
+        reserved_at: { type: "string", validation: "datetime" }
+        lp_number: { type: "string" }
+        location_name: { type: "string", nullable: true }
+        expiry_date: { type: "string", nullable: true }
+
+    - name: "reserveAllResponseSchema"
+      fields:
+        success: { type: "boolean" }
+        materials_processed: { type: "number", validation: "int nonnegative" }
+        fully_reserved: { type: "number", validation: "int nonnegative" }
+        partially_reserved: { type: "number", validation: "int nonnegative" }
+        shortages:
+          type: "array"
+          items:
+            material_name: "string"
+            required_qty: "number"
+            reserved_qty: "number"
+            shortage: "number"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/wo-reservation.ts"
+    description: "WO Reservation TypeScript interfaces"
+    exports:
+      - "WOMaterialReservation"
+      - "ReservationResult"
+      - "AvailableLP"
+      - "ReservationCoverage"
+      - "ReservationStatus"
+
+# Implementation patterns
+patterns:
+  fifo_selection: |
+    // Select LPs by oldest created_at (receipt date)
+    async function selectLPsFIFO(
+      lps: AvailableLP[],
+      requiredQty: number
+    ): Promise<LPSelection[]> {
+      const sorted = [...lps].sort((a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      return allocateLPs(sorted, requiredQty);
+    }
+
+  fefo_selection: |
+    // Select LPs by soonest expiry_date, NULL last, FIFO tiebreaker
+    async function selectLPsFEFO(
+      lps: AvailableLP[],
+      requiredQty: number
+    ): Promise<LPSelection[]> {
+      const sorted = [...lps].sort((a, b) => {
+        // NULL expiry dates go last
+        if (a.expiry_date === null && b.expiry_date !== null) return 1;
+        if (a.expiry_date !== null && b.expiry_date === null) return -1;
+        if (a.expiry_date === null && b.expiry_date === null) {
+          // Both null - use FIFO
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        // Compare expiry dates
+        const expiryDiff = new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
+        if (expiryDiff !== 0) return expiryDiff;
+        // Same expiry - FIFO tiebreaker
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+      return allocateLPs(sorted, requiredQty);
+    }
+
+  allocation_algorithm: |
+    // Allocate LPs to fulfill required quantity
+    function allocateLPs(
+      sortedLPs: AvailableLP[],
+      requiredQty: number
+    ): LPSelection[] {
+      const selections: LPSelection[] = [];
+      let remaining = requiredQty;
+
+      for (const lp of sortedLPs) {
+        if (remaining <= 0) break;
+
+        const allocateQty = Math.min(lp.available_qty, remaining);
+        if (allocateQty > 0) {
+          selections.push({
+            lp_id: lp.id,
+            lp_number: lp.lp_number,
+            quantity: allocateQty,
+          });
+          remaining -= allocateQty;
+        }
+      }
+
+      return selections;
+    }
+
+  auto_reserve_on_release: |
+    // Trigger auto-reservation when WO status changes to 'released'
+    // Called from WO status update endpoint
+    async function onWORelease(woId: string): Promise<void> {
+      const result = await autoReserveWOMaterials(woId);
+      if (result.shortages.length > 0) {
+        // Log warning but proceed - partial reservation OK
+        console.warn(`WO ${woId} released with material shortages:`, result.shortages);
+      }
+    }
+
+  auto_release_on_cancel: |
+    // Release all reservations when WO cancelled
+    // Called from WO status update endpoint
+    async function onWOCancel(woId: string): Promise<void> {
+      const released = await releaseAllWOReservations(woId);
+      console.log(`Released ${released} reservations for cancelled WO ${woId}`);
+    }
+
+# WO Status integration
+wo_status_hooks:
+  - trigger: "status_change_to_released"
+    action: "autoReserveWOMaterials(woId)"
+    description: "Auto-reserve LPs for all materials when WO released"
+  - trigger: "status_change_to_cancelled"
+    action: "releaseAllWOReservations(woId)"
+    description: "Release all reservations when WO cancelled"

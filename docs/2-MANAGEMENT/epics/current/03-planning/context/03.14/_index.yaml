@@ -1,0 +1,116 @@
+# Story 03.14 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.14"
+  name: "WO Scheduling"
+  slug: "wo-scheduling"
+  epic: "03-planning"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+
+# Simplified scope - NOT the full APS story (03.14.wo-scheduling.md is DEFERRED APS)
+# This story focuses on BASIC scheduling: date/time assignment via PATCH endpoint
+description: |
+  Implements basic WO scheduling functionality - allowing planners to assign
+  scheduled_start_time and scheduled_end_time to work orders. This is the
+  foundation for Gantt chart drag-drop and manual schedule assignment.
+
+  NOTE: The full APS (Advanced Planning and Scheduling) story in 03.14.wo-scheduling.md
+  is DEFERRED to Phase 2. This context covers the MVP scheduling endpoint only.
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, columns (existing work_orders table)
+  - api.yaml         # PATCH /work-orders/:id/schedule endpoint
+  - frontend.yaml    # Types, form components for scheduling
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "03.10"
+      name: "WO CRUD"
+      provides:
+        - "work_orders table"
+        - "scheduled_start_time column"
+        - "scheduled_end_time column"
+        - "planned_start_date column"
+        - "production_line_id column"
+      status: "required"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "org_id context"
+        - "RLS patterns"
+      status: "required"
+    - story: "01.9"
+      name: "Production Lines CRUD"
+      provides:
+        - "production_lines table"
+      status: "required"
+
+  blocked_by: []
+
+  blocks:
+    - story: "03.15"
+      name: "WO Gantt Chart View"
+      reason: "Gantt needs schedule API for drag-drop reschedule"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-022", "FR-PLAN-023"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Work Orders", "API Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.14.wo-scheduling.md"
+    note: "Full APS story - DEFERRED. This context implements MVP scheduling only."
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      section: "Dates section - scheduled_start_time, scheduled_end_time"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-016-wo-gantt-view.md"
+      section: "Drag-drop reschedule interaction"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/_index.yaml"
+    - "apps/frontend/app/api/planning/work-orders/[id]/route.ts"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 1
+    description: "PATCH /api/planning/work-orders/:id/schedule endpoint"
+  - type: "validation"
+    count: 1
+    description: "scheduleWOSchema in work-order-schemas.ts"
+  - type: "service"
+    count: 1
+    description: "scheduleWorkOrder method in work-order-service.ts"
+  - type: "test"
+    count: 2
+    description: "Unit tests + integration tests for scheduling"
+
+# Technical notes
+technical_notes:
+  - "Uses existing work_orders table - no new tables needed"
+  - "Fields already exist: scheduled_start_time, scheduled_end_time (from 03.10)"
+  - "Validation: end_time > start_time, both required if either provided"
+  - "Optional: production_line_id can be updated in same call"
+  - "Status constraint: Cannot schedule if status = 'completed' or 'cancelled'"
+  - "Return updated WO with all relations after schedule update"
+
+# PRD FR Coverage
+prd_coverage:
+  - id: "FR-PLAN-022"
+    description: "Work Order scheduling dates"
+    coverage: "100% - scheduled_start_time, scheduled_end_time"
+  - id: "FR-PLAN-023"
+    description: "Configurable WO Statuses"
+    coverage: "PARTIAL - Status validation only (no schedule if completed)"

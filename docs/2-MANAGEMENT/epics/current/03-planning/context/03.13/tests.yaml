@@ -1,0 +1,414 @@
+# Story 03.13 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/material-availability-service.test.ts"
+    type: "unit"
+    description: "Unit tests for availability calculation functions"
+  - path: "apps/frontend/app/api/planning/work-orders/[id]/availability/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for availability API endpoint"
+  - path: "__tests__/e2e/planning/wo-availability.spec.ts"
+    type: "e2e"
+    description: "E2E tests for availability panel UI"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Availability Calculation Algorithm"
+    given: "WO has wo_materials with required quantities"
+    when: "availability endpoint is called"
+    then: "system calculates availability per material correctly"
+    test_type: "unit"
+    priority: "P0"
+    test_cases:
+      - "Material with 100 required, 150 available returns 150% coverage, surplus -50"
+      - "Material with 100 required, 75 available returns 75% coverage, shortage 25"
+      - "Material with 100 required, 30 available returns 30% coverage, shortage 70"
+
+  - id: "AC-02"
+    title: "Expiry-Aware Filtering"
+    given: "LPs with various expiry dates"
+    when: "availability calculated"
+    then: "expired LPs excluded from available count"
+    test_type: "integration"
+    priority: "P0"
+    test_cases:
+      - "LP with expiry_date = yesterday NOT included"
+      - "LP with expiry_date = NULL IS included"
+      - "LP with expiry_date = tomorrow IS included"
+
+  - id: "AC-03"
+    title: "Reservation Deduction"
+    given: "Product has available LPs and reservations from other WOs"
+    when: "availability calculated for this WO"
+    then: "reservations from other WOs are deducted"
+    test_type: "integration"
+    priority: "P0"
+    test_cases:
+      - "100 kg available, 30 kg reserved for other WO returns 70 kg available"
+      - "Own WO reservation NOT double-counted as unavailable"
+
+  - id: "AC-04"
+    title: "Traffic Light Indicators"
+    given: "Various coverage percentages"
+    when: "status calculated"
+    then: "correct status returned"
+    test_type: "unit"
+    priority: "P0"
+    test_cases:
+      - ">= 100% returns 'sufficient'"
+      - "50-99% returns 'low_stock'"
+      - "1-49% returns 'shortage'"
+      - "0% returns 'no_stock'"
+
+  - id: "AC-05"
+    title: "Availability Panel Display"
+    given: "WO detail page with wo_material_check = true"
+    when: "materials section loads"
+    then: "availability panel displays within 500ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "API Response Format"
+    given: "Valid GET request to availability endpoint"
+    when: "API responds successfully"
+    then: "response contains all required fields"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "Setting Toggle Behavior"
+    given: "wo_material_check = false in planning_settings"
+    when: "availability endpoint called"
+    then: "API returns enabled=false message"
+    test_type: "integration"
+    priority: "P0"
+    test_cases:
+      - "Setting false returns { enabled: false, message: 'Material check disabled' }"
+      - "Setting true returns full availability data"
+      - "Panel hidden in UI when setting false"
+
+  - id: "AC-08"
+    title: "Edge Cases - No LPs"
+    given: "Material has zero available LPs"
+    when: "availability calculated"
+    then: "available_qty = 0, coverage = 0%, status = 'no_stock'"
+    test_type: "integration"
+    priority: "P0"
+    test_cases:
+      - "No LPs for product returns 0 available, no_stock status"
+      - "Empty WO (no materials) returns empty materials array"
+
+  - id: "AC-09"
+    title: "Overall Status Calculation"
+    given: "Multiple materials with different statuses"
+    when: "overall status calculated"
+    then: "worst case status returned"
+    test_type: "unit"
+    priority: "P0"
+    test_cases:
+      - "3 sufficient, 1 low_stock, 1 shortage returns 'shortage'"
+      - "4 sufficient, 1 low_stock returns 'low_stock'"
+      - "All sufficient returns 'sufficient'"
+      - "Any no_stock returns 'no_stock'"
+
+  - id: "AC-10"
+    title: "Caching Behavior"
+    given: "Availability checked for WO"
+    when: "same WO availability requested within 30 seconds"
+    then: "cached result returned"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11"
+    title: "Performance Requirements"
+    given: "WO with various material counts"
+    when: "availability calculated"
+    then: "response within time limits"
+    test_type: "integration"
+    priority: "P1"
+    test_cases:
+      - "50 materials responds within 1 second"
+      - "200 materials responds within 2 seconds"
+
+  - id: "AC-12"
+    title: "RLS and Authorization"
+    given: "User from different org"
+    when: "availability API called for WO in another org"
+    then: "returns 404 (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-13"
+    title: "User Can Proceed with Warnings"
+    given: "WO has material shortages"
+    when: "user clicks Release button"
+    then: "warning modal shown with option to proceed"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  coverage_calculation:
+    - name: "calculateCoveragePercent returns 100% when available >= required"
+      input: { available: 150, required: 100 }
+      expected: 150
+
+    - name: "calculateCoveragePercent returns correct percentage for partial"
+      input: { available: 75, required: 100 }
+      expected: 75
+
+    - name: "calculateCoveragePercent returns 0% when no stock"
+      input: { available: 0, required: 100 }
+      expected: 0
+
+    - name: "calculateCoveragePercent returns 100% when required is 0"
+      input: { available: 50, required: 0 }
+      expected: 100
+
+    - name: "calculateCoveragePercent handles decimal quantities"
+      input: { available: 7.5, required: 10 }
+      expected: 75
+
+  status_calculation:
+    - name: "calculateAvailabilityStatus returns sufficient for >= 100%"
+      inputs: [100, 150, 200]
+      expected: "sufficient"
+
+    - name: "calculateAvailabilityStatus returns low_stock for 50-99%"
+      inputs: [50, 75, 99, 99.9]
+      expected: "low_stock"
+
+    - name: "calculateAvailabilityStatus returns shortage for 1-49%"
+      inputs: [1, 25, 49]
+      expected: "shortage"
+
+    - name: "calculateAvailabilityStatus returns no_stock for 0%"
+      input: 0
+      expected: "no_stock"
+
+  overall_status:
+    - name: "calculateOverallStatus returns sufficient when all sufficient"
+      input: ["sufficient", "sufficient", "sufficient"]
+      expected: "sufficient"
+
+    - name: "calculateOverallStatus returns low_stock when worst is low_stock"
+      input: ["sufficient", "low_stock", "sufficient"]
+      expected: "low_stock"
+
+    - name: "calculateOverallStatus returns shortage when any shortage"
+      input: ["sufficient", "low_stock", "shortage"]
+      expected: "shortage"
+
+    - name: "calculateOverallStatus returns no_stock when any no_stock"
+      input: ["sufficient", "no_stock", "shortage"]
+      expected: "no_stock"
+
+    - name: "calculateOverallStatus handles empty array"
+      input: []
+      expected: "sufficient"
+
+# Integration Test Cases
+integration_tests:
+  availability_api:
+    - name: "GET returns availability for WO with materials"
+      setup:
+        - "Create WO with 3 materials"
+        - "Create LPs for each material"
+      action: "GET /api/planning/work-orders/{wo_id}/availability"
+      assertions:
+        - "Status 200"
+        - "overall_status is defined"
+        - "materials array has 3 items"
+        - "summary totals match"
+
+    - name: "GET excludes expired LPs from available quantity"
+      setup:
+        - "Create WO with 1 material requiring 100 kg"
+        - "Create LP with 50 kg, expiry = yesterday"
+        - "Create LP with 30 kg, expiry = tomorrow"
+      action: "GET /api/planning/work-orders/{wo_id}/availability"
+      assertions:
+        - "materials[0].available_qty = 30"
+        - "materials[0].expired_excluded_qty = 50"
+
+    - name: "GET deducts reservations from other WOs"
+      setup:
+        - "Create LP with 100 kg"
+        - "Create WO-A with 30 kg reserved"
+        - "Create WO-B requiring 100 kg"
+      action: "GET /api/planning/work-orders/{wo_b_id}/availability"
+      assertions:
+        - "materials[0].available_qty = 70"
+
+    - name: "GET handles no LPs scenario"
+      setup:
+        - "Create WO with 1 material"
+        - "No LPs created"
+      action: "GET /api/planning/work-orders/{wo_id}/availability"
+      assertions:
+        - "materials[0].available_qty = 0"
+        - "materials[0].status = 'no_stock'"
+
+    - name: "GET returns disabled message when setting off"
+      setup:
+        - "Set planning_settings.wo_material_check = false"
+        - "Create WO"
+      action: "GET /api/planning/work-orders/{wo_id}/availability"
+      assertions:
+        - "Status 200"
+        - "enabled = false"
+        - "message = 'Material check disabled'"
+
+    - name: "GET returns cached result within TTL"
+      setup:
+        - "Create WO with materials and LPs"
+        - "Call availability endpoint"
+        - "Add more LPs"
+        - "Call availability endpoint again immediately"
+      assertions:
+        - "Second response has cached = true"
+        - "available_qty matches first call (cached)"
+
+    - name: "GET enforces RLS - 404 for wrong org"
+      setup:
+        - "Create WO in Org A"
+        - "Authenticate as user from Org B"
+      action: "GET /api/planning/work-orders/{org_a_wo_id}/availability"
+      assertions:
+        - "Status 404"
+
+    - name: "GET returns 404 for non-existent WO"
+      action: "GET /api/planning/work-orders/{random_uuid}/availability"
+      assertions:
+        - "Status 404"
+
+# E2E Test Cases
+e2e_tests:
+  availability_panel:
+    - name: "View availability panel on WO detail"
+      steps:
+        - "Navigate to /planning/work-orders/{id}"
+        - "Wait for page load"
+      assertions:
+        - "Availability panel is visible"
+        - "Summary card shows totals"
+        - "Material rows display"
+
+    - name: "Availability panel shows correct status colors"
+      setup:
+        - "Create WO with mixed availability materials"
+      steps:
+        - "Navigate to WO detail"
+      assertions:
+        - "Green indicator for sufficient materials"
+        - "Yellow indicator for low_stock materials"
+        - "Red indicator for shortage materials"
+
+    - name: "Availability panel hidden when setting disabled"
+      setup:
+        - "Set wo_material_check = false"
+      steps:
+        - "Navigate to WO detail"
+      assertions:
+        - "Availability panel is NOT visible"
+
+    - name: "Warning modal shown on release with shortages"
+      setup:
+        - "Create WO with material shortages"
+        - "Set WO status to 'planned'"
+      steps:
+        - "Navigate to WO detail"
+        - "Click 'Release' button"
+      assertions:
+        - "Warning modal is visible"
+        - "Modal shows shortage count"
+        - "'Proceed Anyway' button is visible"
+        - "'Go Back' button is visible"
+
+    - name: "Can proceed past warning modal"
+      setup:
+        - "Create WO with material shortages"
+      steps:
+        - "Navigate to WO detail"
+        - "Click 'Release'"
+        - "Click 'Proceed Anyway' in modal"
+      assertions:
+        - "Modal closes"
+        - "WO status changes to 'released'"
+
+    - name: "Auto-refresh updates availability"
+      setup:
+        - "Create WO with materials"
+        - "Create LPs giving 75% coverage"
+      steps:
+        - "Navigate to WO detail"
+        - "Note availability value"
+        - "In background, add more LPs"
+        - "Wait 35 seconds for refresh"
+      assertions:
+        - "Availability value updates"
+
+# Definition of Done
+definition_of_done:
+  - "API endpoint returns correct availability data"
+  - "Availability algorithm correctly sums LP quantities"
+  - "Expired LPs filtered from available count"
+  - "Reservations from other WOs deducted"
+  - "Traffic light indicators display correctly"
+  - "Coverage percentage calculated correctly"
+  - "Shortage/surplus quantities calculated correctly"
+  - "Overall status reflects worst-case material"
+  - "Availability panel displays all materials within 500ms"
+  - "Setting toggle wo_material_check respected"
+  - "Warning modal shown when proceeding with shortages"
+  - "Redis caching implemented (30 sec TTL)"
+  - "RLS enforces org isolation"
+  - "404 returned for cross-org access (not 403)"
+  - "Unit test coverage >= 90%"
+  - "Integration test coverage >= 80%"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Core calculation functions must be thoroughly tested"
+    files:
+      - "lib/services/material-availability-service.ts: 90%"
+  integration:
+    target: 80
+    reason: "API endpoint and database queries must be verified"
+  e2e:
+    target: 5
+    reason: "Critical UI flows covered"
+    tests:
+      - "View availability panel"
+      - "Status colors display"
+      - "Setting toggle hides panel"
+      - "Warning modal on release"
+      - "Proceed past warning"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Epic 05 not complete - license_plates table missing"
+    mitigation: "Story marked as DEFERRED, Phase 0 returns mock 100%"
+    severity: "high"
+    test_coverage: "Skip LP-dependent tests until Epic 05 complete"
+
+  - id: "RISK-02"
+    description: "Performance with many materials/LPs"
+    mitigation: "Indexes on license_plates, caching, virtualization for >50 materials"
+    severity: "medium"
+    test_coverage: "integration_tests.performance"
+
+  - id: "RISK-03"
+    description: "Cache staleness after inventory changes"
+    mitigation: "30 sec TTL acceptable for advisory feature, auto-refresh in UI"
+    severity: "low"
+    test_coverage: "integration_tests.caching"

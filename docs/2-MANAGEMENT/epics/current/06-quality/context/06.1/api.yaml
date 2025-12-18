@@ -1,0 +1,275 @@
+# Story 06.1 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET Status Types
+  - method: "GET"
+    path: "/api/quality/status/types"
+    description: "Returns all available quality status types with display config"
+    file: "apps/frontend/app/api/quality/status/types/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "StatusTypesResponse"
+      schema:
+        types:
+          - code: "string"
+            name: "string"
+            description: "string"
+            color: "string"
+            icon: "string"
+            allows_shipment: "boolean"
+            allows_consumption: "boolean"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+    performance:
+      target_ms: 200
+      caching: "5 min TTL (static config)"
+
+  # GET Status Transitions
+  - method: "GET"
+    path: "/api/quality/status/transitions"
+    description: "Returns valid transitions from a given status"
+    file: "apps/frontend/app/api/quality/status/transitions/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query_params:
+        current: "string (required) - Current status code"
+
+    response:
+      status: 200
+      type: "StatusTransitionsResponse"
+      schema:
+        current_status: "string"
+        valid_transitions:
+          - to_status: "string"
+            requires_inspection: "boolean"
+            requires_approval: "boolean"
+            requires_reason: "boolean"
+            description: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Invalid status code"
+        when: "Current status is not a valid quality_status_type"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+
+    performance:
+      target_ms: 200
+      caching: "5 min TTL"
+
+  # POST Validate Transition
+  - method: "POST"
+    path: "/api/quality/status/validate-transition"
+    description: "Validates if a status transition is allowed with business rules"
+    file: "apps/frontend/app/api/quality/status/validate-transition/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      body:
+        entity_type: "string (required) - 'lp' | 'batch' | 'inspection'"
+        entity_id: "string (required) - UUID"
+        from_status: "string (required) - Current status"
+        to_status: "string (required) - Target status"
+        reason: "string (optional) - Reason for transition"
+
+    response:
+      status: 200
+      type: "ValidateTransitionResponse"
+      schema:
+        is_valid: "boolean"
+        errors: "string[] | undefined"
+        warnings: "string[] | undefined"
+        required_actions:
+          inspection_required: "boolean | undefined"
+          approval_required: "boolean | undefined"
+          reason_required: "boolean | undefined"
+
+    errors:
+      - status: 400
+        code: "INVALID_REQUEST"
+        message: "Invalid request body"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "ENTITY_NOT_FOUND"
+        message: "Entity not found"
+        when: "Entity ID not found or not in user's org"
+
+    performance:
+      target_ms: 300
+
+  # POST Change Status
+  - method: "POST"
+    path: "/api/quality/status/change"
+    description: "Changes entity status and records in history"
+    file: "apps/frontend/app/api/quality/status/change/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_manager", "production_manager", "admin", "owner"]
+
+    request:
+      body:
+        entity_type: "string (required) - 'lp' | 'batch' | 'inspection'"
+        entity_id: "string (required) - UUID"
+        to_status: "string (required) - Target status"
+        reason: "string (required) - Reason for transition"
+        inspection_id: "string (optional) - UUID for transitions requiring inspection"
+
+    response:
+      status: 200
+      type: "ChangeStatusResponse"
+      schema:
+        success: "boolean"
+        new_status: "string"
+        history_id: "string"
+        warnings: "string[] | undefined"
+
+    errors:
+      - status: 400
+        code: "INVALID_TRANSITION"
+        message: "Invalid status transition: {from} -> {to}"
+      - status: 400
+        code: "REASON_REQUIRED"
+        message: "Reason is required for this status transition"
+      - status: 400
+        code: "INSPECTION_REQUIRED"
+        message: "Inspection required before this status transition"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "APPROVAL_REQUIRED"
+        message: "QA Manager approval required for this transition"
+      - status: 404
+        code: "ENTITY_NOT_FOUND"
+        message: "Entity not found"
+
+    performance:
+      target_ms: 500
+
+  # GET Status History
+  - method: "GET"
+    path: "/api/quality/status/history/:entityType/:entityId"
+    description: "Returns status change history for an entity"
+    file: "apps/frontend/app/api/quality/status/history/[entityType]/[entityId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      params:
+        entityType: "string - 'lp' | 'batch' | 'inspection'"
+        entityId: "string - UUID"
+
+    response:
+      status: 200
+      type: "StatusHistoryResponse"
+      schema:
+        entity_type: "string"
+        entity_id: "string"
+        history:
+          - id: "string"
+            from_status: "string | null"
+            to_status: "string"
+            reason: "string"
+            changed_by: "string"
+            changed_by_name: "string"
+            changed_at: "string (ISO 8601)"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "ENTITY_NOT_FOUND"
+        message: "Entity not found"
+
+    performance:
+      target_ms: 300
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/quality-status-service.ts"
+    description: "Quality status type management and transition validation"
+    exports:
+      - name: "QualityStatusService"
+        type: "class"
+        methods:
+          - name: "getStatusTypes"
+            type: "static async"
+            returns: "Promise<QualityStatusType[]>"
+            description: "Returns all 7 status types with display config"
+          - name: "getValidTransitions"
+            type: "static async"
+            params: ["currentStatus: string"]
+            returns: "Promise<StatusTransition[]>"
+            description: "Returns valid transitions from current status"
+          - name: "validateTransition"
+            type: "static async"
+            params: ["request: ValidateTransitionRequest"]
+            returns: "Promise<ValidateTransitionResponse>"
+            description: "Validates if transition is allowed with all business rules"
+          - name: "changeStatus"
+            type: "static async"
+            params: ["request: ChangeStatusRequest", "userId: string"]
+            returns: "Promise<ChangeStatusResponse>"
+            description: "Changes status and records in history"
+          - name: "getStatusHistory"
+            type: "static async"
+            params: ["entityType: string", "entityId: string"]
+            returns: "Promise<StatusHistoryEntry[]>"
+            description: "Returns chronological status history"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/quality-status.ts"
+    description: "Quality status TypeScript interfaces"
+    exports:
+      - "QualityStatusType"
+      - "QualityStatusCode"
+      - "StatusTransition"
+      - "ValidateTransitionRequest"
+      - "ValidateTransitionResponse"
+      - "ChangeStatusRequest"
+      - "ChangeStatusResponse"
+      - "StatusHistoryEntry"
+
+# Constants
+constants:
+  - path: "apps/frontend/lib/constants/quality-status.ts"
+    description: "Quality status configuration constants"
+    exports:
+      - "QUALITY_STATUS_CONFIG"
+      - "QUALITY_STATUS_CODES"
+
+# Phase 1B+ Features (return 501)
+phase_1b_features:
+  - endpoint: "POST /api/quality/status/types"
+    description: "Create custom status type"
+    response:
+      status: 501
+      body: { error: "Custom status types available in Phase 1B", feature: "custom_status_types" }
+
+  - endpoint: "PUT /api/quality/status/types/:id"
+    description: "Update status type"
+    response:
+      status: 501
+      body: { error: "Custom status types available in Phase 1B", feature: "custom_status_types" }

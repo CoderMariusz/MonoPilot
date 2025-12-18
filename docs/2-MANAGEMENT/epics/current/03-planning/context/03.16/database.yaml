@@ -1,0 +1,294 @@
+# Story 03.16 - Database Schema
+# Purpose: Views, indexes, caching strategy (no new tables - aggregation dashboard)
+# Agent: BACKEND-DEV (database focus)
+
+# Note: Dashboard story creates NO new tables
+# It aggregates data from existing PO, TO, WO tables
+new_tables: false
+
+# Tables Referenced (from dependencies)
+tables_referenced:
+  - name: "purchase_orders"
+    from_story: "03.3"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "po_number"
+      - "supplier_id"
+      - "status"
+      - "approval_status"
+      - "expected_delivery_date"
+      - "total_amount"
+      - "created_at"
+      - "created_by"
+    status_values: ["draft", "submitted", "confirmed", "receiving", "closed", "cancelled"]
+    approval_values: ["not_required", "pending", "approved", "rejected"]
+
+  - name: "transfer_orders"
+    from_story: "03.8"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "to_number"
+      - "from_warehouse_id"
+      - "to_warehouse_id"
+      - "status"
+      - "planned_ship_date"
+      - "actual_ship_date"
+      - "created_at"
+      - "created_by"
+    status_values: ["draft", "planned", "partially_shipped", "shipped", "received", "closed"]
+
+  - name: "work_orders"
+    from_story: "03.10"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "wo_number"
+      - "product_id"
+      - "production_line_id"
+      - "status"
+      - "scheduled_date"
+      - "planned_qty"
+      - "completed_at"
+      - "created_at"
+      - "created_by"
+    status_values: ["draft", "planned", "released", "in_progress", "on_hold", "completed", "closed", "cancelled"]
+
+  - name: "suppliers"
+    from_story: "03.1"
+    columns_used: ["id", "name"]
+
+  - name: "products"
+    from_story: "02.1"
+    columns_used: ["id", "name", "code"]
+
+  - name: "warehouses"
+    from_story: "01.8"
+    columns_used: ["id", "name"]
+
+  - name: "production_lines"
+    from_story: "01.9"
+    columns_used: ["id", "name"]
+
+  - name: "users"
+    from_story: "01.1"
+    columns_used: ["id", "first_name", "last_name"]
+
+# Indexes Required for Dashboard Performance
+indexes:
+  purchase_orders:
+    - name: "idx_po_org_status"
+      columns: ["org_id", "status"]
+      purpose: "KPI: Open POs count"
+    - name: "idx_po_org_approval"
+      columns: ["org_id", "approval_status"]
+      purpose: "KPI: POs pending approval count"
+    - name: "idx_po_org_created"
+      columns: ["org_id", "created_at DESC"]
+      purpose: "Activity feed: Recent POs"
+    - name: "idx_po_expected_date"
+      columns: ["expected_delivery_date"]
+      purpose: "Alert: Overdue POs"
+    - name: "idx_po_org_expected_status"
+      columns: ["org_id", "expected_delivery_date", "status"]
+      purpose: "KPI: Overdue POs count"
+
+  transfer_orders:
+    - name: "idx_to_org_status"
+      columns: ["org_id", "status"]
+      purpose: "KPI: TOs in transit count"
+    - name: "idx_to_org_created"
+      columns: ["org_id", "created_at DESC"]
+      purpose: "Activity feed: Recent TOs"
+
+  work_orders:
+    - name: "idx_wo_org_status"
+      columns: ["org_id", "status"]
+      purpose: "KPI: WOs in progress count"
+    - name: "idx_wo_org_scheduled"
+      columns: ["org_id", "scheduled_date"]
+      purpose: "KPI: WOs scheduled today count"
+    - name: "idx_wo_org_created"
+      columns: ["org_id", "created_at DESC"]
+      purpose: "Activity feed: Recent WOs"
+    - name: "idx_wo_scheduled_status"
+      columns: ["org_id", "scheduled_date", "status"]
+      purpose: "KPI: WO overdue count"
+
+# KPI Aggregation Queries
+kpi_queries:
+  po_pending_approval:
+    sql: |
+      SELECT COUNT(*) FROM purchase_orders
+      WHERE org_id = $1
+        AND approval_status = 'pending'
+    index_used: "idx_po_org_approval"
+
+  po_this_month:
+    sql: |
+      SELECT COUNT(*) FROM purchase_orders
+      WHERE org_id = $1
+        AND created_at >= date_trunc('month', CURRENT_DATE)
+    index_used: "idx_po_org_created"
+
+  to_in_transit:
+    sql: |
+      SELECT COUNT(*) FROM transfer_orders
+      WHERE org_id = $1
+        AND status IN ('partially_shipped', 'shipped')
+    index_used: "idx_to_org_status"
+
+  wo_scheduled_today:
+    sql: |
+      SELECT COUNT(*) FROM work_orders
+      WHERE org_id = $1
+        AND scheduled_date = CURRENT_DATE
+    index_used: "idx_wo_org_scheduled"
+
+  wo_overdue:
+    sql: |
+      SELECT COUNT(*) FROM work_orders
+      WHERE org_id = $1
+        AND scheduled_date < CURRENT_DATE
+        AND status NOT IN ('completed', 'closed', 'cancelled')
+    index_used: "idx_wo_scheduled_status"
+
+  open_orders:
+    sql: |
+      SELECT COUNT(*) FROM purchase_orders
+      WHERE org_id = $1
+        AND status NOT IN ('closed', 'cancelled')
+    index_used: "idx_po_org_status"
+
+# Alert Queries
+alert_queries:
+  overdue_pos:
+    sql: |
+      SELECT po.id, po.po_number, s.name as supplier_name,
+             po.expected_delivery_date,
+             CURRENT_DATE - po.expected_delivery_date as days_overdue
+      FROM purchase_orders po
+      JOIN suppliers s ON po.supplier_id = s.id
+      WHERE po.org_id = $1
+        AND po.expected_delivery_date < CURRENT_DATE
+        AND po.status NOT IN ('closed', 'cancelled')
+      ORDER BY days_overdue DESC
+      LIMIT $2
+    index_used: "idx_po_org_expected_status"
+
+  pending_approval_old:
+    sql: |
+      SELECT po.id, po.po_number, s.name as supplier_name,
+             po.created_at, po.total_amount
+      FROM purchase_orders po
+      JOIN suppliers s ON po.supplier_id = s.id
+      WHERE po.org_id = $1
+        AND po.approval_status = 'pending'
+        AND po.created_at < CURRENT_DATE - INTERVAL '2 days'
+      ORDER BY po.created_at ASC
+      LIMIT $2
+    index_used: "idx_po_org_approval"
+
+# Activity Feed Query
+activity_query:
+  sql: |
+    (
+      SELECT 'purchase_order' as entity_type, id as entity_id, po_number as entity_number,
+             'created' as action, created_by as user_id, created_at as timestamp
+      FROM purchase_orders
+      WHERE org_id = $1
+    )
+    UNION ALL
+    (
+      SELECT 'transfer_order' as entity_type, id as entity_id, to_number as entity_number,
+             'created' as action, created_by as user_id, created_at as timestamp
+      FROM transfer_orders
+      WHERE org_id = $1
+    )
+    UNION ALL
+    (
+      SELECT 'work_order' as entity_type, id as entity_id, wo_number as entity_number,
+             'created' as action, created_by as user_id, created_at as timestamp
+      FROM work_orders
+      WHERE org_id = $1
+    )
+    ORDER BY timestamp DESC
+    LIMIT $2
+  note: "For MVP, only 'created' events. Phase 2 adds audit_logs integration for status changes."
+
+# Caching Strategy (Redis)
+caching:
+  enabled: true
+  provider: "redis"
+  ttl_seconds: 120  # 2 minutes
+
+  keys:
+    kpis:
+      pattern: "planning:dashboard:kpis:{org_id}"
+      ttl: 120
+      invalidate_on: ["po.create", "po.update", "po.delete", "to.create", "to.update", "to.delete", "wo.create", "wo.update", "wo.delete"]
+
+    alerts:
+      pattern: "planning:dashboard:alerts:{org_id}"
+      ttl: 120
+      invalidate_on: ["po.create", "po.update", "po.delete"]
+
+    activity:
+      pattern: "planning:dashboard:activity:{org_id}"
+      ttl: 120
+      invalidate_on: ["po.create", "to.create", "wo.create"]
+
+  invalidation_triggers:
+    - event: "purchase_order.created"
+      keys: ["kpis", "alerts", "activity"]
+    - event: "purchase_order.updated"
+      keys: ["kpis", "alerts"]
+    - event: "purchase_order.deleted"
+      keys: ["kpis", "alerts"]
+    - event: "transfer_order.created"
+      keys: ["kpis", "activity"]
+    - event: "transfer_order.updated"
+      keys: ["kpis"]
+    - event: "transfer_order.deleted"
+      keys: ["kpis"]
+    - event: "work_order.created"
+      keys: ["kpis", "activity"]
+    - event: "work_order.updated"
+      keys: ["kpis"]
+    - event: "work_order.deleted"
+      keys: ["kpis"]
+
+# RLS Enforcement
+rls:
+  pattern: "ADR-013"
+  note: "All aggregation queries filter by org_id from session context"
+  enforcement: "All queries use parameterized org_id from getOrgContext()"
+
+# Performance Targets
+performance:
+  kpi_query_time: "<100ms"
+  alert_query_time: "<150ms"
+  activity_query_time: "<150ms"
+  total_dashboard_load: "<2000ms"
+  concurrent_users: "50+ per org"
+
+# Migration Note
+migrations:
+  required: false
+  reason: "Dashboard only reads from existing tables - no schema changes"
+  indexes_migration:
+    path: "supabase/migrations/XXX_add_dashboard_indexes.sql"
+    description: "Add composite indexes for dashboard query optimization"
+    optional: true
+    content: |
+      -- Optional: Add indexes if not already present
+      -- Check existing indexes before creating
+
+      -- Purchase Orders indexes
+      CREATE INDEX IF NOT EXISTS idx_po_org_expected_status
+        ON purchase_orders(org_id, expected_delivery_date, status);
+
+      -- Work Orders indexes
+      CREATE INDEX IF NOT EXISTS idx_wo_scheduled_status
+        ON work_orders(org_id, scheduled_date, status);

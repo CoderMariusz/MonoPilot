@@ -1,0 +1,570 @@
+# Story 05.5 - Frontend Specification
+# Purpose: Components, hooks, state management for advanced LP filtering
+# Agent: FRONTEND-DEV (React/Next.js focus)
+
+# UX References
+ux:
+  wireframes:
+    - id: "WH-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-002-license-plates-list.md"
+      sections:
+        - "Filters Bar"
+        - "Search LP Number"
+        - "Filtered Empty State"
+      components:
+        - "LPAdvancedFilters"
+        - "LPFilterChips"
+        - "LPSearchInput"
+        - "LPFilterPresets"
+
+  patterns:
+    filter_panel: "ShadCN Sheet component (slide-in from left)"
+    filter_chips: "ShadCN Badge component with X close button"
+    search_input: "ShadCN Input with Search icon and clear button"
+    multi_select: "ShadCN Command + Popover pattern"
+    date_picker: "ShadCN DatePicker component"
+    empty_state: "Centered message with clear filters action"
+
+  states:
+    - "loading"
+    - "empty"
+    - "filtered_empty"
+    - "error"
+    - "success"
+
+# Components to create
+components:
+  new:
+    - path: "apps/frontend/components/warehouse/license-plates/LPAdvancedFilters.tsx"
+      description: "Full filter panel with all filter options"
+      props:
+        - "isOpen: boolean"
+        - "onOpenChange: (open: boolean) => void"
+        - "filters: LPFilterState"
+        - "onFiltersChange: (filters: LPFilterState) => void"
+        - "onApply: () => void"
+        - "onClear: () => void"
+      state:
+        - "localFilters: LPFilterState (internal state before apply)"
+      sections:
+        - "Search input (LP number or batch)"
+        - "Product multi-select"
+        - "Warehouse dropdown"
+        - "Location multi-select"
+        - "Status badges (toggle selection)"
+        - "QA Status badges (toggle selection)"
+        - "Expiry date range picker"
+        - "Quick filter presets"
+        - "Apply/Clear buttons"
+
+    - path: "apps/frontend/components/warehouse/license-plates/LPFilterChips.tsx"
+      description: "Active filter chips display with remove buttons"
+      props:
+        - "filters: ActiveFilter[]"
+        - "onRemove: (filterKey: string) => void"
+        - "onClearAll: () => void"
+      ui:
+        - "Row of Badge components"
+        - "Each badge shows label:value and X button"
+        - "Clear All button at end (if filters.length > 0)"
+
+    - path: "apps/frontend/components/warehouse/license-plates/LPSearchInput.tsx"
+      description: "Search input with debounce and clear button"
+      props:
+        - "value: string"
+        - "onChange: (value: string) => void"
+        - "placeholder?: string"
+        - "minLength?: number (default 2)"
+      features:
+        - "Debounced onChange (300ms)"
+        - "Immediate search on Enter key"
+        - "Clear button (X) when value present"
+        - "Loading spinner during search"
+        - "Minimum length validation"
+
+    - path: "apps/frontend/components/warehouse/license-plates/LPFilterPresets.tsx"
+      description: "Preset filter buttons for common queries"
+      props:
+        - "onApplyPreset: (preset: FilterPreset) => void"
+      presets:
+        - name: "Expiring Soon"
+          filters:
+            status: "available"
+            expiry_before: "today + 30 days"
+        - name: "Available Stock"
+          filters:
+            status: "available"
+            qa_status: "passed"
+        - name: "Pending QA"
+          filters:
+            qa_status: "pending"
+        - name: "Blocked"
+          filters:
+            status: "blocked"
+
+    - path: "apps/frontend/components/warehouse/license-plates/LPFilterDateRange.tsx"
+      description: "Date range picker for expiry filtering"
+      props:
+        - "fromDate: Date | null"
+        - "toDate: Date | null"
+        - "onFromChange: (date: Date | null) => void"
+        - "onToChange: (date: Date | null) => void"
+        - "label?: string"
+      ui:
+        - "Two DatePicker components (From / To)"
+        - "Validation: from <= to"
+        - "Clear button for each"
+
+    - path: "apps/frontend/components/warehouse/license-plates/LPFilterMultiSelect.tsx"
+      description: "Multi-select dropdown for products/locations"
+      props:
+        - "options: SelectOption[]"
+        - "selected: string[]"
+        - "onChange: (selected: string[]) => void"
+        - "placeholder: string"
+        - "searchPlaceholder?: string"
+        - "emptyMessage?: string"
+      ui:
+        - "ShadCN Command + Popover"
+        - "Searchable option list"
+        - "Checkbox for each option"
+        - "Selected count badge on trigger"
+
+  enhanced:
+    - path: "apps/frontend/components/warehouse/license-plates/LPDataTable.tsx"
+      description: "Add filter chips row above table, update empty state"
+      changes:
+        - "Add LPFilterChips component above DataTable"
+        - "Update empty state for filtered results"
+        - "Pass filter state to table"
+
+    - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/page.tsx"
+      description: "Integrate advanced filters and URL state"
+      changes:
+        - "Add LPAdvancedFilters component"
+        - "Add filter state management with URL sync"
+        - "Add Filters button to open panel"
+        - "Handle filter chips remove"
+
+# TypeScript types
+types:
+  - path: "apps/frontend/lib/types/license-plate.ts"
+    additions:
+      - name: "LPFilterState"
+        description: "Filter state for LP list"
+        definition: |
+          export interface LPFilterState {
+            search?: string;
+            batch_number?: string;
+            product_id?: string;
+            product_ids?: string[];
+            warehouse_id?: string;
+            location_id?: string;
+            location_ids?: string[];
+            status?: LPStatus;
+            statuses?: LPStatus[];
+            qa_status?: QAStatus;
+            qa_statuses?: QAStatus[];
+            expiry_before?: string;
+            expiry_after?: string;
+            created_before?: string;
+            created_after?: string;
+            sort?: string;
+            order?: 'asc' | 'desc';
+          }
+
+      - name: "ActiveFilter"
+        description: "Active filter for chips display"
+        definition: |
+          export interface ActiveFilter {
+            key: string;
+            label: string;
+            value: string;
+            displayValue: string;
+          }
+
+      - name: "FilterPreset"
+        description: "Preset filter configuration"
+        definition: |
+          export interface FilterPreset {
+            name: string;
+            filters: Partial<LPFilterState>;
+          }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-lp-filters.ts"
+    description: "Hook for LP filter state management with URL sync"
+    exports:
+      - name: "useLPFilters"
+        returns: |
+          {
+            filters: LPFilterState;
+            setFilters: (filters: LPFilterState) => void;
+            updateFilter: (key: keyof LPFilterState, value: any) => void;
+            removeFilter: (key: string) => void;
+            clearAllFilters: () => void;
+            applyPreset: (preset: FilterPreset) => void;
+            activeFilters: ActiveFilter[];
+            hasActiveFilters: boolean;
+          }
+        features:
+          - "Sync filter state with URL query params"
+          - "Parse URL params on mount"
+          - "Update URL on filter change (debounced)"
+          - "Convert filters to ActiveFilter[] for chips"
+
+  - path: "apps/frontend/lib/hooks/use-debounce.ts"
+    description: "Generic debounce hook (if not exists)"
+    exports:
+      - name: "useDebounce"
+        params: ["value: T", "delay: number"]
+        returns: "T"
+
+# Service layer updates (frontend)
+services:
+  - path: "apps/frontend/lib/services/license-plate-service.ts"
+    description: "Client-side service for LP API calls"
+    additions:
+      - name: "listWithFilters"
+        description: "Call list endpoint with advanced filters"
+        params: ["filters: LPFilterState", "pagination: { page: number; limit: number }"]
+        returns: "Promise<PaginatedResult<LicensePlate>>"
+
+      - name: "getExpiringSoon"
+        description: "Preset: get expiring LPs"
+        params: ["days?: number"]
+        returns: "Promise<LicensePlate[]>"
+
+      - name: "getAvailableStock"
+        description: "Preset: get available+passed LPs"
+        params: ["productIds: string[]", "warehouseId?: string"]
+        returns: "Promise<LicensePlate[]>"
+
+# Data fetching with React Query
+data_fetching:
+  - query_key: "['license-plates', filters, page, limit]"
+    description: "LP list with filters and pagination"
+    stale_time: 30000  # 30 seconds (volatile inventory data)
+    refetch_on_window_focus: true
+
+  - query_key: "['products-dropdown']"
+    description: "Product options for multi-select"
+    stale_time: 300000  # 5 minutes
+
+  - query_key: "['warehouses-dropdown']"
+    description: "Warehouse options for dropdown"
+    stale_time: 300000  # 5 minutes
+
+  - query_key: "['locations-dropdown', warehouseId]"
+    description: "Location options (filtered by warehouse)"
+    stale_time: 300000  # 5 minutes
+
+# URL state management
+url_state:
+  description: "Filter state persisted in URL for bookmarking and sharing"
+  params:
+    search: "string"
+    batch: "string"
+    products: "comma-separated UUIDs"
+    warehouse: "UUID"
+    locations: "comma-separated UUIDs"
+    statuses: "comma-separated values"
+    qa_statuses: "comma-separated values"
+    expiry_from: "YYYY-MM-DD"
+    expiry_to: "YYYY-MM-DD"
+    sort: "string"
+    order: "asc|desc"
+    page: "number"
+
+  example_url: "/warehouse/license-plates?statuses=available,reserved&products=uuid1,uuid2&expiry_to=2025-03-31&sort=expiry_date&order=asc"
+
+  implementation: |
+    // Use Next.js useSearchParams + useRouter
+    import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+
+    function useLPFilters() {
+      const searchParams = useSearchParams();
+      const router = useRouter();
+      const pathname = usePathname();
+
+      // Parse filters from URL
+      const filters = useMemo(() => ({
+        search: searchParams.get('search') || undefined,
+        batch_number: searchParams.get('batch') || undefined,
+        product_ids: searchParams.get('products')?.split(',').filter(Boolean) || undefined,
+        warehouse_id: searchParams.get('warehouse') || undefined,
+        location_ids: searchParams.get('locations')?.split(',').filter(Boolean) || undefined,
+        statuses: searchParams.get('statuses')?.split(',').filter(Boolean) as LPStatus[] || undefined,
+        qa_statuses: searchParams.get('qa_statuses')?.split(',').filter(Boolean) as QAStatus[] || undefined,
+        expiry_before: searchParams.get('expiry_to') || undefined,
+        expiry_after: searchParams.get('expiry_from') || undefined,
+        sort: searchParams.get('sort') || 'created_at',
+        order: (searchParams.get('order') || 'desc') as 'asc' | 'desc',
+      }), [searchParams]);
+
+      // Update URL with debounce
+      const updateURL = useCallback((newFilters: LPFilterState) => {
+        const params = new URLSearchParams();
+        if (newFilters.search) params.set('search', newFilters.search);
+        if (newFilters.batch_number) params.set('batch', newFilters.batch_number);
+        if (newFilters.product_ids?.length) params.set('products', newFilters.product_ids.join(','));
+        // ... etc
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      }, [router, pathname]);
+
+      return { filters, setFilters: updateURL, ... };
+    }
+
+# Component patterns
+component_patterns:
+  filter_panel: |
+    // LPAdvancedFilters.tsx
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent side="left" className="w-[400px] sm:w-[540px]">
+        <SheetHeader>
+          <SheetTitle>Filter License Plates</SheetTitle>
+          <SheetDescription>
+            Narrow down your LP list with multiple filters
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="space-y-6 py-4 overflow-y-auto max-h-[calc(100vh-200px)]">
+          {/* Search Section */}
+          <div className="space-y-2">
+            <Label htmlFor="search">LP Number or Batch</Label>
+            <LPSearchInput
+              value={localFilters.search || ''}
+              onChange={(v) => setLocalFilter('search', v)}
+              placeholder="Search LP number or batch..."
+            />
+          </div>
+
+          {/* Product Multi-Select */}
+          <div className="space-y-2">
+            <Label>Products</Label>
+            <LPFilterMultiSelect
+              options={products}
+              selected={localFilters.product_ids || []}
+              onChange={(v) => setLocalFilter('product_ids', v)}
+              placeholder="All products"
+              searchPlaceholder="Search products..."
+            />
+          </div>
+
+          {/* Warehouse Dropdown */}
+          <div className="space-y-2">
+            <Label>Warehouse</Label>
+            <Select
+              value={localFilters.warehouse_id || 'all'}
+              onValueChange={(v) => setLocalFilter('warehouse_id', v === 'all' ? undefined : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All warehouses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All warehouses</SelectItem>
+                {warehouses.map(wh => (
+                  <SelectItem key={wh.id} value={wh.id}>{wh.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Location Multi-Select */}
+          <div className="space-y-2">
+            <Label>Locations</Label>
+            <LPFilterMultiSelect
+              options={locations}
+              selected={localFilters.location_ids || []}
+              onChange={(v) => setLocalFilter('location_ids', v)}
+              placeholder="All locations"
+            />
+          </div>
+
+          {/* Status Toggle Badges */}
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <div className="flex flex-wrap gap-2">
+              {['available', 'reserved', 'consumed', 'blocked'].map(status => (
+                <Badge
+                  key={status}
+                  variant={localFilters.statuses?.includes(status as LPStatus) ? 'default' : 'outline'}
+                  className="cursor-pointer capitalize"
+                  onClick={() => toggleArrayFilter('statuses', status)}
+                >
+                  {status}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          {/* QA Status Toggle Badges */}
+          <div className="space-y-2">
+            <Label>QA Status</Label>
+            <div className="flex flex-wrap gap-2">
+              {['pending', 'passed', 'failed', 'quarantine'].map(qa => (
+                <Badge
+                  key={qa}
+                  variant={localFilters.qa_statuses?.includes(qa as QAStatus) ? 'default' : 'outline'}
+                  className="cursor-pointer capitalize"
+                  onClick={() => toggleArrayFilter('qa_statuses', qa)}
+                >
+                  {qa}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          {/* Expiry Date Range */}
+          <div className="space-y-2">
+            <Label>Expiry Date Range</Label>
+            <LPFilterDateRange
+              fromDate={localFilters.expiry_after ? new Date(localFilters.expiry_after) : null}
+              toDate={localFilters.expiry_before ? new Date(localFilters.expiry_before) : null}
+              onFromChange={(d) => setLocalFilter('expiry_after', d?.toISOString().split('T')[0])}
+              onToChange={(d) => setLocalFilter('expiry_before', d?.toISOString().split('T')[0])}
+            />
+          </div>
+
+          {/* Presets */}
+          <div className="space-y-2">
+            <Label>Quick Filters</Label>
+            <LPFilterPresets onApplyPreset={applyPreset} />
+          </div>
+        </div>
+
+        <SheetFooter className="pt-4 border-t">
+          <Button variant="outline" onClick={handleClear}>
+            Clear All
+          </Button>
+          <Button onClick={handleApply}>
+            Apply Filters
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+
+  filter_chips: |
+    // LPFilterChips.tsx
+    export function LPFilterChips({ filters, onRemove, onClearAll }: LPFilterChipsProps) {
+      if (filters.length === 0) return null;
+
+      return (
+        <div className="flex flex-wrap gap-2 items-center py-2">
+          {filters.map(filter => (
+            <Badge key={filter.key} variant="secondary" className="gap-1 pr-1">
+              <span className="text-muted-foreground">{filter.label}:</span>
+              <span>{filter.displayValue}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => onRemove(filter.key)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={onClearAll}
+          >
+            Clear All
+          </Button>
+        </div>
+      );
+    }
+
+  search_input: |
+    // LPSearchInput.tsx
+    export function LPSearchInput({
+      value,
+      onChange,
+      placeholder = "Search LP number...",
+      minLength = 2
+    }: LPSearchInputProps) {
+      const [localValue, setLocalValue] = useState(value);
+      const [isSearching, setIsSearching] = useState(false);
+      const debouncedValue = useDebounce(localValue, 300);
+
+      useEffect(() => {
+        if (debouncedValue !== value && debouncedValue.length >= minLength) {
+          onChange(debouncedValue);
+        } else if (debouncedValue.length < minLength && value) {
+          onChange('');
+        }
+      }, [debouncedValue, value, onChange, minLength]);
+
+      const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && localValue.length >= minLength) {
+          onChange(localValue);
+        }
+      };
+
+      return (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="pl-9 pr-9"
+          />
+          {localValue && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => { setLocalValue(''); onChange(''); }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          {isSearching && (
+            <Loader2 className="absolute right-9 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />
+          )}
+        </div>
+      );
+    }
+
+# Accessibility requirements
+accessibility:
+  filter_panel:
+    - "Focus trap within panel when open"
+    - "Escape key closes panel"
+    - "aria-label on all inputs"
+    - "role='dialog' on Sheet"
+
+  filter_chips:
+    - "aria-label='Remove filter' on X buttons"
+    - "Keyboard accessible (Tab, Enter/Space to remove)"
+
+  search_input:
+    - "aria-label='Search license plates'"
+    - "aria-describedby for min length hint"
+    - "role='searchbox'"
+
+  multi_select:
+    - "aria-expanded on trigger"
+    - "aria-selected on options"
+    - "Keyboard navigation (Arrow keys, Enter, Escape)"
+
+# Responsive behavior
+responsive:
+  desktop:
+    - "Filter panel slides from left (400px width)"
+    - "All filter options visible"
+    - "Horizontal filter chips row"
+
+  tablet:
+    - "Filter panel full width on slide-in"
+    - "Compact filter presets"
+
+  mobile:
+    - "Filters in bottom sheet or full page modal"
+    - "Vertical filter chips (stacked)"
+    - "Larger touch targets (48px minimum)"

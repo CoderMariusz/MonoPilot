@@ -1,0 +1,238 @@
+# Story 05.3 - Frontend Specification
+# Purpose: Components, pages, hooks, UI patterns
+# Agent: FRONTEND-DEV
+
+# Note: This story has both backend and frontend deliverables
+is_full_stack: true
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/reservations/page.tsx"
+    description: "Reservations list page (all WOs)"
+    components:
+      - ReservationsTable
+      - ReservationFilters
+    permissions: ["warehouse:R"]
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/warehouse/reservations/components/ReservationsTable.tsx"
+    description: "Table showing all reservations with filters"
+    props:
+      - { name: "woId", type: "string | undefined", description: "Filter by WO" }
+      - { name: "lpId", type: "string | undefined", description: "Filter by LP" }
+      - { name: "status", type: "ReservationStatus | undefined", description: "Filter by status" }
+    features:
+      - "ShadCN DataTable with sorting"
+      - "Filter by WO, LP, status"
+      - "Pagination (50 per page)"
+      - "Release action button (Manager+ role)"
+    columns:
+      - { field: "lp_number", header: "LP Number", sortable: true }
+      - { field: "product_name", header: "Product", sortable: true }
+      - { field: "wo_number", header: "Work Order", sortable: true }
+      - { field: "reserved_qty", header: "Reserved Qty", align: "right" }
+      - { field: "consumed_qty", header: "Consumed Qty", align: "right" }
+      - { field: "remaining_qty", header: "Remaining", align: "right" }
+      - { field: "status", header: "Status", sortable: true }
+      - { field: "expiry_date", header: "Expiry", sortable: true }
+      - { field: "location_code", header: "Location" }
+      - { field: "actions", header: "", width: 80 }
+
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/ReservationsPanel.tsx"
+    description: "Panel showing WO reservations on WO detail page"
+    props:
+      - { name: "woId", type: "string", description: "Work Order ID" }
+    features:
+      - "Collapsible panel"
+      - "Material-grouped view"
+      - "Release button per reservation"
+      - "Total reserved vs required summary"
+    states:
+      - loading: "Skeleton rows"
+      - empty: "No reservations yet"
+      - success: "Table with reservations"
+      - error: "Error with retry button"
+
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/ReserveLPsModal.tsx"
+    description: "Modal for manually reserving LPs for WO material"
+    props:
+      - { name: "woId", type: "string" }
+      - { name: "materialId", type: "string" }
+      - { name: "productId", type: "string" }
+      - { name: "requiredQty", type: "number" }
+      - { name: "onSuccess", type: "() => void" }
+    features:
+      - "Shows FIFO/FEFO suggestions"
+      - "Multi-LP selection"
+      - "Quantity input per LP"
+      - "Running total"
+      - "Violation warnings"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/reservations/components/FIFOFEFOSuggestions.tsx"
+    description: "Component showing FIFO/FEFO suggested LPs"
+    props:
+      - { name: "productId", type: "string" }
+      - { name: "requiredQty", type: "number" }
+      - { name: "warehouseId", type: "string | undefined" }
+      - { name: "onSelect", type: "(lp: AvailableLP, qty: number) => void" }
+    features:
+      - "Auto-sorted by FIFO or FEFO"
+      - "Suggestion reason displayed"
+      - "Available qty shown"
+      - "Expiry date highlighted if FEFO"
+      - "Violation warning on non-optimal selection"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/reservations/components/ReleaseModal.tsx"
+    description: "Confirmation modal for releasing reservation"
+    props:
+      - { name: "reservation", type: "ReservationWithLP" }
+      - { name: "onConfirm", type: "() => Promise<void>" }
+      - { name: "onCancel", type: "() => void" }
+    features:
+      - "Confirmation message with LP number and qty"
+      - "Loading state during release"
+      - "Error handling"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-reservations.ts"
+    description: "React Query hook for fetching reservations"
+    exports:
+      - name: "useReservations"
+        params: ["woId?: string", "lpId?: string", "status?: string"]
+        returns: "UseQueryResult<ReservationWithLP[]>"
+      - name: "useReservation"
+        params: ["id: string"]
+        returns: "UseQueryResult<ReservationWithLP>"
+      - name: "useReleaseReservation"
+        returns: "UseMutationResult"
+      - name: "useReleaseAllReservations"
+        returns: "UseMutationResult"
+
+  - path: "apps/frontend/lib/hooks/use-available-lps.ts"
+    description: "React Query hook for FIFO/FEFO LP suggestions"
+    exports:
+      - name: "useAvailableLPs"
+        params: ["productId: string", "warehouseId?: string", "strategy?: PickingStrategy"]
+        returns: "UseQueryResult<AvailableLP[]>"
+      - name: "useReserveLPs"
+        returns: "UseMutationResult<AllocationResult>"
+
+# UX References
+ux:
+  wireframes:
+    - id: "WH-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      sections: ["Reservations section (in LP detail view)"]
+  patterns:
+    table: "ShadCN DataTable pattern"
+    modal: "ShadCN Dialog pattern"
+    panel: "Collapsible section pattern"
+  states:
+    - loading: "Skeleton rows"
+    - empty: "Empty state with icon and message"
+    - error: "Error alert with retry button"
+    - success: "Data displayed"
+
+# Status Badge Color Mapping
+status_badges:
+  reservation_status:
+    - { status: "active", color: "blue", background: "#DBEAFE", text: "#1E40AF", border: "#93C5FD", icon: "Lock" }
+    - { status: "released", color: "gray", background: "#F3F4F6", text: "#374151", border: "#D1D5DB", icon: "Unlock" }
+    - { status: "consumed", color: "green", background: "#D1FAE5", text: "#065F46", border: "#6EE7B7", icon: "Check" }
+
+# Table Columns Specification
+reservations_table:
+  columns:
+    - { field: "lp_number", header: "LP Number", width: "140px", sortable: true }
+    - { field: "product_name", header: "Product", width: "auto", sortable: true }
+    - { field: "wo_number", header: "Work Order", width: "140px", sortable: true, link: true }
+    - { field: "reserved_qty", header: "Reserved", width: "100px", align: "right" }
+    - { field: "consumed_qty", header: "Consumed", width: "100px", align: "right" }
+    - { field: "remaining_qty", header: "Remaining", width: "100px", align: "right" }
+    - { field: "status", header: "Status", width: "100px", sortable: true }
+    - { field: "expiry_date", header: "Expiry", width: "120px", sortable: true }
+    - { field: "location_code", header: "Location", width: "120px" }
+    - { field: "actions", header: "", width: "80px" }
+
+# WO Reservations Panel Specification
+wo_reservations_panel:
+  title: "Material Reservations"
+  collapsible: true
+  default_expanded: true
+  grouping: "by material"
+  summary:
+    - "Total Materials: {count}"
+    - "Fully Reserved: {fullyReservedCount}/{count}"
+    - "Shortfall: {shortfallQty} units"
+  columns:
+    - { field: "material_name", header: "Material", width: "auto" }
+    - { field: "lp_number", header: "LP", width: "140px" }
+    - { field: "reserved_qty", header: "Reserved", width: "100px", align: "right" }
+    - { field: "consumed_qty", header: "Consumed", width: "100px", align: "right" }
+    - { field: "remaining_qty", header: "Remaining", width: "100px", align: "right" }
+    - { field: "status", header: "Status", width: "100px" }
+    - { field: "actions", header: "", width: "60px" }
+  empty_state:
+    icon: "Package"
+    title: "No Reservations"
+    message: "No materials have been reserved for this work order yet."
+    action:
+      label: "Reserve Materials"
+      handler: "openReserveLPsModal"
+      permission: "production:U"
+
+# FIFO/FEFO Suggestions UI
+fifo_fefo_suggestions:
+  layout: "list"
+  item_fields:
+    - "LP Number"
+    - "Available Qty"
+    - "Batch"
+    - "Expiry Date"
+    - "Location"
+    - "Suggestion Reason"
+  suggestion_reasons:
+    fifo: "FIFO: oldest (created {date})"
+    fefo: "FEFO: expires {date}"
+  highlight:
+    suggested: "Blue background"
+    warning: "Yellow background (violation)"
+  selection:
+    type: "multi-select with qty input"
+    max_qty: "available_qty"
+    validation: "Cannot exceed available_qty"
+
+# Accessibility
+accessibility:
+  touch_targets: "48dp minimum"
+  contrast: "4.5:1 minimum (WCAG AA)"
+  keyboard_nav:
+    - "Tab through table rows"
+    - "Enter to select/expand"
+    - "Escape to close modals"
+  screen_reader:
+    - "Table announced with row count"
+    - "Status badges announced with status text"
+    - "Actions buttons labeled"
+
+# Responsive Breakpoints
+responsive:
+  desktop: ">1024px - Full table with all columns"
+  tablet: "768-1024px - Hide Location column, condensed actions"
+  mobile: "<768px - Card view instead of table"
+
+# Performance
+performance:
+  targets:
+    initial_load: "<500ms"
+    filter_response: "<200ms"
+    release_action: "<300ms"
+  caching:
+    - "org:{orgId}:reservations:wo:{woId} - 30 sec TTL"
+    - "org:{orgId}:available-lps:{productId} - 30 sec TTL"
+  optimizations:
+    - "Optimistic updates on release"
+    - "Debounce filter inputs (300ms)"
+    - "Virtual scrolling for >100 rows"

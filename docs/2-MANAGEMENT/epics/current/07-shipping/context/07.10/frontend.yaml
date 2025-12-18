@@ -1,0 +1,470 @@
+# Story 07.10 - Frontend Specification
+# Purpose: Components, hooks, types, pages
+# Agent: FRONTEND-DEV
+
+is_fullstack: true  # Both frontend and backend work
+
+# Pages to Create
+pages:
+  - path: "apps/frontend/app/(authenticated)/scanner/shipping/pick/page.tsx"
+    description: "Scanner pick main page - routing between states (list -> picking -> completion)"
+    layout: "Scanner layout (minimal chrome, dark theme, 320-480px)"
+    performance: "Initial load within 500ms, state transitions within 200ms"
+    state_management: "useState for current state, useReducer for pick progress"
+    features:
+      - "My Picks List view (list of assigned/in_progress pick lists)"
+      - "Pick Line display (location, product, quantity, LP)"
+      - "Scan input field (auto-focus, barcode entry)"
+      - "Number pad (quantity confirmation)"
+      - "Short pick modal (reason capture)"
+      - "Allergen warning banner (red, non-dismissible)"
+      - "FIFO/FEFO warning (amber banner with override options)"
+      - "Progress bar (X of Y lines)"
+      - "Pick completion celebration screen"
+      - "Settings modal (audio, vibration, display)"
+    responsive_breakpoints:
+      mobile_portrait: "320-480px (primary: stack all vertically)"
+      mobile_landscape: "480-800px (side-by-side: stats + form)"
+      tablet: "768-1024px (enhanced layout, larger fonts)"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/scanner/shipping/pick/MyPicksList.tsx"
+    description: "List of assigned/in_progress pick lists with status badges"
+    props:
+      pick_lists: "PickListSummary[]"
+      onSelectPickList: "(pickListId: string) => void"
+      isLoading: "boolean"
+    features:
+      - "Pick list # in large text (24px+)"
+      - "Priority badge (urgent=red, high=orange, normal=blue, low=gray)"
+      - "Line count (e.g., '12 lines')"
+      - "Status label (assigned/in_progress)"
+      - "Start button (for assigned)"
+      - "Continue button (for in_progress)"
+      - "Each row is 64px minimum height"
+    states:
+      loading: "Skeleton rows, spinner"
+      empty: "No active pick lists message"
+      success: "List of pick lists with action buttons"
+    accessibility:
+      - "aria-label='Pick list number, status, line count'"
+      - "Role='button' on each list row"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/PickLineCard.tsx"
+    description: "Main card showing current pick line (location, product, qty, LP)"
+    props:
+      pickLine: "PickLineDetail"
+      progress: "{ total: number, picked: number }"
+    features:
+      - "Progress bar (top): 'Line X of Y' text + visual bar"
+      - "Location Card (zone badge + location path, 32px bold text)"
+      - "Product Card (name 24px, SKU 16px gray, lot number, BBD)"
+      - "Quantity Card (32px green text, expected LP)"
+      - "Allergen warning banner (if applicable)"
+      - "FIFO/FEFO warning (if applicable)"
+    styling:
+      - "Large text for warehouse visibility"
+      - "High contrast (WCAG AA minimum)"
+      - "Green accents for pick quantity"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/LocationCard.tsx"
+    description: "Display location information (zone, path)"
+    props:
+      location: "{ zone: string, path: string }"
+    features:
+      - "Zone badge (background color by zone type)"
+      - "Location path in bold (e.g., 'A-03-12')"
+      - "Instructions: 'Go to location'"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/ProductCard.tsx"
+    description: "Display product details"
+    props:
+      product: "{ name: string, sku: string, lot: string, bbd?: string }"
+    features:
+      - "Product name (24px bold)"
+      - "SKU (16px gray)"
+      - "Lot number (16px)"
+      - "Best before date (16px, if perishable)"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/QuantityCard.tsx"
+    description: "Display quantity to pick and expected LP"
+    props:
+      quantity_to_pick: "number"
+      expected_lp: "string"
+    features:
+      - "Quantity in large green text (32px)"
+      - "Expected LP display (16px gray)"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/ScanInput.tsx"
+    description: "Barcode scan input field with auto-focus"
+    props:
+      onScan: "(barcode: string) => void"
+      placeholder: "string (default: 'Scan LP Barcode')"
+      autoFocus: "boolean (default: true)"
+      disabled: "boolean"
+    features:
+      - "Auto-focus when component mounts"
+      - "Accept hardware scanner input (text input)"
+      - "Debounce duplicate scans within 2s"
+      - "Trigger scan validation on Enter key"
+      - "Large input field (56px height minimum)"
+    behavior:
+      - "Hardware scanner should work directly (no special config needed)"
+      - "On valid scan: trigger onScan callback, clear field, maintain focus"
+      - "On empty field + Enter: show error (empty barcode)"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/NumberPad.tsx"
+    description: "Number pad for quantity input (large touch targets)"
+    props:
+      value: "string | number"
+      onChange: "(value: number) => void"
+      maxValue: "number (available quantity)"
+      disabled: "boolean"
+    features:
+      - "Input field (64px height, 32px text)"
+      - "Number buttons: 1-9, 0"
+      - "Clear button (C)"
+      - "Backspace button (<--)"
+      - "All buttons 64x64 pixels minimum"
+      - "Spacing between buttons 8px minimum"
+    behavior:
+      - "Pre-fill with quantity_to_pick default"
+      - "Allow adjustment via buttons"
+      - "Validate: quantity <= maxValue"
+      - "Clear on C button press"
+      - "Backspace removes last digit"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/ShortPickModal.tsx"
+    description: "Modal for capturing short pick reason and notes"
+    props:
+      quantity_to_pick: "number"
+      quantity_available: "number"
+      onConfirm: "(data: ShortPickData) => void"
+      onCancel: "() => void"
+    features:
+      - "Expected vs Available display"
+      - "Reason dropdown (enum values)"
+      - "Notes text input (optional, 500 char max)"
+      - "Confirm Short Pick button (amber)"
+      - "Cancel button (secondary)"
+      - "Create Backorder checkbox (default: true)"
+    form_validation:
+      - "Reason required"
+      - "quantity_available <= quantity_to_pick"
+      - "Quantity > 0"
+    accessibility:
+      - "Focus trap in modal"
+      - "Escape closes modal"
+      - "aria-labelledby='Short Pick Modal'"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/AllergenBanner.tsx"
+    description: "Red warning banner for allergen conflicts"
+    props:
+      allergens: "string[]"
+      customer_restrictions: "string[]"
+      onAcknowledge: "() => void"
+      acknowledged: "boolean"
+    features:
+      - "Red background (#DC2626)"
+      - "Warning icon (triangle with !)"
+      - "Text: 'ALLERGEN ALERT: Contains X, Y'"
+      - "Checkbox: 'I acknowledge the risk and will separate handling'"
+      - "Non-dismissible (always visible until acknowledged)"
+      - "Height: 48px minimum"
+      - "Picker must check box before confirming pick"
+    styling:
+      - "Bold text, large font for visibility"
+      - "High contrast on warehouse floor"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/FifoWarning.tsx"
+    description: "Amber warning banner for FIFO/FEFO violations"
+    props:
+      suggested_lp: "string"
+      scanned_lp: "string"
+      suggested_mfg_date: "string"
+      scanned_mfg_date: "string"
+      onUseSuggested: "() => void"
+      onContinueAnyway: "() => void"
+    features:
+      - "Amber background (#F59E0B)"
+      - "Warning text: 'Older lot available - [LP] (Lot: X)'"
+      - "'Use Suggested LP' button (primary)"
+      - "'Continue Anyway' button (secondary, requires confirmation)"
+    behavior:
+      - "Show only if picking newer lot than suggested"
+      - "Allow override with picker confirmation"
+      - "Log override decision for audit trail"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/ProgressBar.tsx"
+    description: "Visual progress indicator for pick list completion"
+    props:
+      total_lines: "number"
+      picked_lines: "number"
+      short_lines: "number"
+    features:
+      - "Text: 'Line X of Y'"
+      - "Visual progress bar (HTML progress element)"
+      - "Percentage calculation: (picked + short) / total * 100"
+      - "Auto-update as picks confirmed"
+    styling:
+      - "Green bar for progress"
+      - "Gray background for remaining"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/PickComplete.tsx"
+    description: "Celebration screen when pick list complete"
+    props:
+      pick_list: "PickListDetail"
+      summary: "{ total_lines: number, picked_lines: number, short_picks: number, total_qty: number, duration_minutes: number }"
+      onReturnToHome: "() => void"
+    features:
+      - "Animated checkmark icon (green)"
+      - "Large text: 'PICK LIST COMPLETE!'"
+      - "Summary card with stats"
+      - "Next steps text"
+      - "'Return to My Picks' button (primary)"
+      - "Optional: 'Print Pick Ticket' button"
+    animations:
+      - "Checkmark scales in and bounces"
+      - "Background flash (green) at completion"
+    audio_feedback:
+      - "Victory sweep tone (440Hz -> 880Hz, 500ms)"
+    vibration:
+      - "Celebration pattern [100, 50, 100]"
+
+  - path: "apps/frontend/components/scanner/shipping/pick/ScannerSettings.tsx"
+    description: "Settings modal (audio, vibration, display)"
+    props:
+      onClose: "() => void"
+      currentSettings: "ScannerSettings"
+      onUpdate: "(settings: ScannerSettings) => void"
+    features:
+      - "Audio Settings: volume slider (0-100%), mute toggle, test button"
+      - "Vibration Settings: enable/disable toggle"
+      - "Display Settings: high contrast toggle, large text toggle"
+      - "Scanner Settings: camera enable/disable, hardware scanner mode"
+      - "Save settings to localStorage"
+      - "Test buttons for audio/vibration feedback"
+    persistence:
+      - "Save to localStorage (key: 'scanner-settings')"
+      - "Restore on app load"
+
+  - path: "apps/frontend/components/scanner/ProgressBar.tsx"
+    description: "Generic progress bar component (reusable)"
+    props:
+      value: "number (0-100)"
+      max: "number (default: 100)"
+      label: "string (optional)"
+    features:
+      - "Visual bar with color based on value"
+      - "Optional label text"
+
+# Hooks to Create
+hooks:
+  - path: "apps/frontend/hooks/useAudioFeedback.ts"
+    description: "Web Audio API integration for scanner feedback"
+    hooks:
+      - name: "useAudioFeedback"
+        returns: "{ playTone: (tone: ToneName) => void, setVolume: (v: number) => void, isMuted: () => boolean, toggleMute: () => void }"
+        features:
+          - "Success tone (880Hz, 150ms)"
+          - "Error tone (220Hz, 300ms)"
+          - "Start tone (440Hz, 100ms)"
+          - "Line complete (880Hz, 100ms x2)"
+          - "Victory sweep (440->880Hz, 500ms)"
+          - "Short pick chord (440+554Hz, 200ms)"
+          - "Volume control (0-100%, default 70%)"
+          - "Mute toggle"
+          - "LocalStorage persistence"
+    implementation_notes: |
+      const TONES = {
+        SUCCESS: { freq: 880, dur: 150 },
+        ERROR: { freq: 220, dur: 300 },
+        START: { freq: 440, dur: 100 },
+        LINE_COMPLETE: { freq: 880, dur: 100, repeat: 2 },
+        VICTORY: { freq: [440, 880], dur: 500, type: 'sweep' },
+        SHORT_PICK: { freq: [440, 554], dur: 200, type: 'chord' }
+      }
+
+  - path: "apps/frontend/hooks/useVibration.ts"
+    description: "Vibration API integration (Navigator.vibrate)"
+    hooks:
+      - name: "useVibration"
+        returns: "{ vibrate: (pattern: PatternName) => void, setEnabled: (e: boolean) => void }"
+        features:
+          - "Success pattern: [100]"
+          - "Error pattern: [200, 100, 200]"
+          - "Complete pattern: [100, 50, 100]"
+          - "Warning pattern: [300]"
+          - "Enable/disable toggle"
+          - "LocalStorage persistence"
+    implementation_notes: |
+      const PATTERNS = {
+        SUCCESS: [100],
+        ERROR: [200, 100, 200],
+        COMPLETE: [100, 50, 100],
+        WARNING: [300]
+      }
+
+  - path: "apps/frontend/hooks/useScanInput.ts"
+    description: "Barcode input handling with debounce and validation"
+    hooks:
+      - name: "useScanInput"
+        params:
+          - "onScan: (barcode: string) => void"
+          - "debounceMs: number (default: 500)"
+        returns: "{ barcode: string, setBarcode: (s: string) => void, clearBarcode: () => void, isProcessing: boolean }"
+        features:
+          - "Debounce duplicate scans (ignore within 2s by default)"
+          - "Auto-clear field after scan"
+          - "Track processing state (for disabled button)"
+          - "Callback on valid barcode"
+    implementation_notes: |
+      - Use useCallback + useRef to track last scan timestamp
+      - Prevent rapid duplicate scans from hardware scanner
+
+  - path: "apps/frontend/hooks/usePickProgress.ts"
+    description: "Track pick list progress and manage state"
+    hooks:
+      - name: "usePickProgress"
+        params:
+          - "pickListId: string"
+          - "onComplete: () => void (callback when complete)"
+        returns: |
+          {
+            pickList: PickListDetail,
+            currentLine: PickLineDetail,
+            progress: { total: number, picked: number, short: number },
+            confirmPick: (lineId: string, qty: number, lpId: string) => Promise<void>,
+            shortPick: (lineId: string, qty: number, reason: string) => Promise<void>,
+            nextLine: () => void,
+            isLoading: boolean,
+            error: string | null
+          }
+        features:
+          - "Auto-load pick list on mount"
+          - "Track current line and progress"
+          - "Call scanner API endpoints"
+          - "Auto-advance to next line"
+          - "Detect completion"
+          - "Error handling with retry"
+
+# Types/Interfaces
+types:
+  - file: "apps/frontend/lib/types/scanner-pick.ts"
+    interfaces:
+      - name: "PickListSummary"
+        fields:
+          - "id: string"
+          - "pick_list_number: string"
+          - "status: 'assigned' | 'in_progress' | 'completed'"
+          - "priority: 'urgent' | 'high' | 'normal' | 'low'"
+          - "line_count: number"
+          - "assigned_to: string"
+
+      - name: "PickLineDetail"
+        fields:
+          - "id: string"
+          - "pick_list_id: string"
+          - "pick_sequence: number"
+          - "product: { id: string, name: string, sku: string }"
+          - "location: { id: string, code: string, zone: string, path: string }"
+          - "quantity_to_pick: number"
+          - "quantity_picked: number | null"
+          - "status: 'pending' | 'picked' | 'short'"
+          - "expected_lp: string | null"
+          - "picked_lp: string | null"
+
+      - name: "ScannerPickInput"
+        fields:
+          - "pick_line_id: string"
+          - "scanned_lp_barcode: string"
+          - "quantity_picked: number"
+          - "short_pick: boolean"
+          - "short_pick_reason?: string"
+          - "short_pick_notes?: string"
+
+      - name: "ScannerSettings"
+        fields:
+          - "audio_volume: number (0-100)"
+          - "audio_muted: boolean"
+          - "vibration_enabled: boolean"
+          - "high_contrast: boolean"
+          - "large_text: boolean"
+          - "camera_enabled: boolean"
+
+# Utils/Helpers
+utils:
+  - file: "apps/frontend/lib/utils/audio-tones.ts"
+    description: "Audio tone definitions and playback helpers"
+    exports:
+      - "playTone(toneType: ToneName, options?: AudioOptions)"
+      - "TONE_DEFINITIONS (const with all tone specs)"
+
+  - file: "apps/frontend/lib/utils/vibration-patterns.ts"
+    description: "Vibration pattern definitions"
+    exports:
+      - "vibrate(patternName: PatternName)"
+      - "VIBRATION_PATTERNS (const with all patterns)"
+
+  - file: "apps/frontend/lib/utils/scanner-pick-utils.ts"
+    description: "Helper functions for scanner pick workflow"
+    exports:
+      - "formatLPNumber(barcode: string): string"
+      - "calculateProgress(total: number, picked: number, short: number): number"
+      - "getNextPickLine(lines: PickLineDetail[]): PickLineDetail | null"
+      - "formatDuration(milliseconds: number): string (e.g., '5 mins 23 secs')"
+
+# State Management
+state_management:
+  approach: "useState for local state, useReducer for complex pick flow"
+  notes: |
+    Main page state:
+    - currentView: 'pickList' | 'picking' | 'completion' | 'settings'
+    - selectedPickListId: string | null
+    - pickList: PickListDetail
+    - currentLineIndex: number
+    - progress: { total, picked, short }
+    - isLoading: boolean
+    - error: string | null
+    - settings: ScannerSettings (persisted to localStorage)
+
+# Accessibility
+accessibility:
+  wcag_level: "AA (2.1)"
+  requirements:
+    - "All buttons 48x48px minimum (56px primary actions)"
+    - "Touch targets 8px spacing minimum"
+    - "Color contrast 4.5:1 text, 3:1 UI components"
+    - "ARIA labels on all interactive elements"
+    - "Live regions for status updates (aria-live='polite')"
+    - "Focus management (auto-focus scan input)"
+    - "Semantic HTML structure"
+    - "Keyboard navigation (Tab, Enter, Escape)"
+
+# Performance Optimization
+performance:
+  load_times:
+    - "My Picks list: <500ms"
+    - "Pick line: <200ms (cached)"
+    - "Number pad interaction: <50ms"
+  optimizations:
+    - "Lazy load product/location details"
+    - "Cache scan results (last 50 scans)"
+    - "Debounce barcode input (2s)"
+    - "Prefetch next line on current pick confirmation"
+    - "Virtual scrolling for long pick lists (if >100 items)"
+  caching:
+    - "LocalStorage for settings"
+    - "Service Worker cache for pick list data"
+
+# Notes for AI Agent
+notes:
+  - "Mobile-first: 320-480px primary, scale up for landscape/tablet"
+  - "Dark theme (slate-900 background) for warehouse visibility"
+  - "Large fonts and touch targets for gloved hands"
+  - "Hardware scanner integration (hardware sends keystrokes to input field)"
+  - "Audio/vibration feedback critical for warehouse environments"
+  - "Auto-focus on scan input keeps picker engaged"
+  - "Progress tracking motivates pickers to completion"
+  - "Settings persistence improves user experience"

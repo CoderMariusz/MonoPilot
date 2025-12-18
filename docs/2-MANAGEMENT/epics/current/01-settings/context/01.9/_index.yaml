@@ -1,0 +1,87 @@
+# Story 01.9 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.9"
+  name: "Locations CRUD (Hierarchical)"
+  slug: "locations-crud"
+  epic: "01-settings"
+  phase: "1B"
+  complexity: "L"
+  estimate_days: 1.5
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, hierarchical functions
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, tree view, capacity indicator
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table"]
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations table", "RLS pattern"]
+  blocked_by: []
+  blocks:
+    - story: "01.10"
+      name: "Machines CRUD"
+    - story: "04.x"
+      name: "Work Order Location Assignment"
+    - story: "05.x"
+      name: "Warehouse Inventory Management"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-042", "FR-SET-043", "FR-SET-044"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["locations table", "Hierarchical Data Pattern"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.9.locations-crud.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "locations table + RLS policies + computed path triggers"
+  - type: "service"
+    count: 1
+    description: "location-service.ts with tree operations"
+  - type: "api"
+    count: 6
+    description: "CRUD + tree endpoints under /api/settings/warehouses/:id/locations"
+  - type: "page"
+    count: 1
+    description: "Locations list page with hierarchical tree view"
+  - type: "component"
+    count: 5
+    description: "LocationTree, LocationModal, CapacityIndicator, Breadcrumb"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + e2e tests"
+
+# Technical notes
+technical_notes:
+  - "Hierarchical self-referencing structure: parent_id -> locations(id)"
+  - "4-level hierarchy: zone > aisle > rack > bin"
+  - "Computed full_path column for breadcrumb display"
+  - "Database triggers validate level hierarchy and compute paths"
+  - "Capacity tracking: max_pallets, current_pallets (denormalized)"
+  - "Tree view with expand/collapse state persistence"
+  - "Delete blocked if location has children or inventory"
+  - "Location types: bulk, pallet, shelf, floor, staging"

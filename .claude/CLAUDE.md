@@ -1,184 +1,201 @@
-# MonoPilot - AI Guide
+# MonoPilot
 
-## Priorytet: Efektywność Tokenów
+## Overview
+Food Manufacturing MES system for small-to-medium food manufacturers (5-100 employees). Handles product lifecycle from formulation through production to shipping, with full traceability and quality management. Multi-tenant SaaS architecture.
 
-### Zasady Podstawowe
-- **NIE czytaj plików bez potrzeby** - użyj indeksów poniżej
-- **NIE używaj Task/Explore** - najpierw Grep/Glob
-- **NIE generuj długich odpowiedzi** - zwięźle i konkretnie
-- **Pokazuj TYLKO zmiany**, nie cały plik
-- **Używaj Haiku** dla prostych zadań (docs, review, testy)
+**Positioning**: Cloud-native, easy-deploy MES - between Excel and enterprise ERP
+**Pricing Model**: Freemium + $50/user/month
 
----
+## Tech Stack
+- Frontend: Next.js 15.5, React 19, TypeScript, TailwindCSS, ShadCN UI
+- Backend: Supabase (PostgreSQL + Auth + RLS + Edge Functions)
+- Validation: Zod schemas
+- Cache: Redis
+- Testing: Vitest (unit), Playwright (e2e)
+- Monorepo: pnpm workspaces
 
-## Quick Lookup - Zanim zaczniesz szukać
-
-| Potrzebuję | Przeczytaj | NIE rób |
-|------------|------------|---------|
-| Gdzie jest plik/komponent? | `.claude/FILE-MAP.md` | Glob całego projektu |
-| Jakie są tabele/pola? | `.claude/TABLES.md` | Czytaj migracje SQL |
-| Wzorzec API/Component/Test | `.claude/PATTERNS.md` | Czytaj podobne pliki |
-| Jak sformułować prompt? | `.claude/PROMPTS.md` | Zgadywać |
-| Status projektu | `sprint-status.yaml` | Skanować docs/ |
-
----
-
-## Quick Reference
-
-### Stack
-`Next.js 15` | `React` | `TypeScript` | `Tailwind` | `shadcn/ui` | `Supabase` | `pnpm`
-
-### Struktura (zapamiętaj, nie skanuj)
+## Project Structure
 ```
 apps/frontend/
-  app/                    # Pages + API routes
-  components/             # React components
-  lib/supabase/           # client.ts, server.ts, migrations/
-docs/sprint-artifacts/    # Sprint status + stories
-.claude/                  # AI helper files
-.bmad/                    # BMAD workflows
+  app/(authenticated)/[module]/  - Module pages (45 pages)
+  app/api/[module]/              - API routes (99 endpoints)
+  lib/services/                  - Business logic (25+ services)
+  lib/validation/                - Zod schemas (18 files)
+  components/                    - UI components (70+)
+docs/
+  0-DISCOVERY/                   - Market research, competitive analysis
+  1-BASELINE/product/            - PRD modules (11 modules, 13.5K lines)
+supabase/
+  migrations/                    - Database migrations (42 files)
+  functions/                     - Edge functions
 ```
 
-### Komendy
-```bash
-pnpm dev        # Dev server
-pnpm build      # Build
-pnpm type-check # TypeScript
-pnpm test       # Playwright E2E
+## Modules (11 Total)
+
+### Core Modules (Epic 1-7)
+| Epic | Module | PRD Lines | Code Status | Path |
+|------|--------|-----------|-------------|------|
+| 1 | Settings | 703 | ~80% Done | /settings/* |
+| 2 | Technical | 772 | ~80% Done | /technical/* |
+| 3 | Planning | 2,793 | ~70% Done | /planning/* |
+| 4 | Production | 1,328 | ~60% Done | /production/* |
+| 5 | Warehouse | 1,147 | Planned | /warehouse/* |
+| 6 | Quality | 731 | Planned | /quality/* |
+| 7 | Shipping | 1,345 | Planned | /shipping/* |
+
+### Premium & New Modules (Epic 8-11)
+| Epic | Module | PRD Lines | Code Status | Path |
+|------|--------|-----------|-------------|------|
+| 8 | NPD | 1,004 | Planned | /npd/* |
+| 9 | Finance | 892 | Planned | /finance/* |
+| 10 | OEE | 914 | NEW - Planned | /oee/* |
+| 11 | Integrations | 1,647 | NEW - Planned | /integrations/* |
+
+## Key Patterns
+- **Multi-tenancy**: All tables have org_id, RLS on every query
+- **License Plate (LP)**: Atomic inventory unit, no loose qty, full genealogy
+- **BOM Snapshot**: WO captures BOM at creation, immutable
+- **GS1 Compliance**: GTIN-14 products, GS1-128 lot/expiry, SSCC-18 pallets
+- **FIFO/FEFO**: Pick suggestions by receipt date or expiry
+- **API Routes**: /api/[module]/[resource]/[id]/[action]
+- **Service Layer**: lib/services/*-service.ts
+- **Validation**: Zod schemas in lib/validation/
+
+## Story Context Format (YAML)
+
+**IMPORTANT**: Every story MUST have a `.context.yaml` file for AI agent consumption.
+
+**Location**: `docs/2-MANAGEMENT/epics/current/{epic}/context/{story-id}.context.yaml`
+
+**Lookup order** (agent reads first available):
+1. `{story-id}.context.yaml` - Primary source
+2. `{story-id}.md` - Story markdown (fallback)
+3. Epic overview - General context
+4. PRD/Architecture docs - Reference material
+
+**Required YAML structure**:
+```yaml
+story:
+  id: "XX.Y"
+  name: "Story Name"
+  epic: "XX-module-name"
+  phase: "1A|1B|2|3"
+  complexity: "S|M|L|XL"
+  estimate_days: N
+
+dependencies:
+  required:
+    - story: "XX.Y"
+      provides: ["table_name", "service_name"]
+
+files_to_read:
+  prd: "path/to/prd.md"
+  prd_sections: ["FR-XXX-NNN"]
+  architecture: "path/to/arch.md"
+  story: "path/to/story.md"
+  patterns:
+    - "path/to/example/file.ts"
+
+files_to_create:
+  database: [{path, type}]
+  api: [{path, methods}]
+  services: [{path}]
+  validation: [{path}]
+  pages: [{path}]
+  components: [{path}]
+
+database:
+  tables:
+    - name: "table_name"
+      columns: ["col1", "col2"]
+      rls: true|false
+      indexes: ["col1"]
+
+api_endpoints:
+  - method: "GET|POST|PUT|DELETE|PATCH"
+    path: "/api/..."
+    auth: true|false
+    roles: ["role1", "role2"]
+
+ux:
+  wireframes:
+    - id: "SET-XXX"
+      path: "path/to/wireframe.md"
+      components: ["Component1", "Component2"]
+  patterns:
+    table: "ShadCN DataTable pattern"
+    modal: "ShadCN Dialog pattern"
+  states: ["loading", "empty", "error", "success"]
+
+validation_rules:
+  field_name: "validation description"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "Checklist item 1"
+  - "Checklist item 2"
+
+output_artifacts:
+  - "Expected output 1"
+  - "Expected output 2"
 ```
 
----
+**UX in context**: Include UX references in same YAML file (not separate). Reference wireframe paths, don't duplicate content.
 
-## Workflow: Zanim cokolwiek zrobisz
+## Key Files
+- `.claude/PROJECT-STATE.md` - Current project state after context clear
+- `.claude/PATTERNS.md` - Code patterns and conventions
+- `.claude/TABLES.md` - Database schema reference (43 tables)
+- `docs/1-BASELINE/product/prd.md` - PRD index (11 modules)
+- `docs/0-DISCOVERY/FEATURE-GAP-ANALYSIS.md` - Competitive analysis
 
-```
-1. Użytkownik prosi o X
-       ↓
-2. Czy wiem gdzie to jest?
-   NIE → Sprawdź FILE-MAP.md
-   TAK → Idź dalej
-       ↓
-3. Czy potrzebuję schematu DB?
-   TAK → Sprawdź TABLES.md (NIE czytaj migracji)
-       ↓
-4. Czy tworzę nowy API/Component/Test?
-   TAK → Sprawdź PATTERNS.md
-       ↓
-5. Zrób zadanie, pokaż TYLKO diff
-       ↓
-6. Czy to story? → Update sprint-status.yaml
-```
+## Database
+- **43 tables** organized by module
+- **~100 RLS policies** for multi-tenancy
+- **42 migrations** in supabase/migrations/
 
----
+## Cache System (Active)
+**Status**: Fully Operational (95% token savings)
+- **5 Layers**: Claude Prompt Cache, Hot, Cold, Semantic, Global KB
+- **Global KB**: 20 agents + 51 skills available at `~/.claude-agent-pack/global/`
+- **Commands**: `cache-stats.sh`, `cache-test.sh`, `cache-clear.sh`
+- **Agents**: BACKEND-DEV, FRONTEND-DEV, ARCHITECT-AGENT, CODE-REVIEWER, etc.
+- **Skills**: 52 skills (API, Next.js, React, Supabase, Testing, TypeScript)
 
-## Po każdym COMMICIE - Aktualizuj Status
+## Current Phase
+**Phase**: UX Design Complete (Settings) | Ready for Implementation
+**Last Update**: 2025-12-11
+**Next Steps**:
+1. Implement Settings wireframes (SET-001 to SET-029)
+2. Continue UX for Technical/Production/Warehouse modules
+3. Create PR from newDoc to main
 
-### 1. Sprawdź co zrobiłeś
-```bash
-git log -1 --oneline
-```
+## Auto-Update Rules
 
-### 2. Zaktualizuj sprint-status.yaml
-Lokalizacja: `docs/sprint-artifacts/sprint-status.yaml`
+**IMPORTANT**: After EVERY session/run, you MUST:
 
-Statusy: `backlog` → `drafted` → `ready-for-dev` → `in-progress` → `review` → `done`
+1. **Update `.claude/PROJECT-STATE.md`**:
+   - Update "Last Updated" timestamp
+   - Add new commits to "Recent Commits" section
+   - Update "Current Status" if phase changed
+   - Update module status table if applicable
 
-### 3. Jeśli story ukończone
-- Update story file w `docs/sprint-artifacts/batch-XXX/stories/`
-- Zmień status na `done` + data
+2. **Declare at end of each run**:
+   ```
+   ## Session Summary
+   ### Done:
+   - [list completed tasks]
 
----
+   ### To Fix/Continue:
+   - [list pending issues or next steps]
 
-## Kiedy czytać które pliki?
+   ### Commits:
+   - [hash] - [message]
+   ```
 
-### FILE-MAP.md - Szukam lokalizacji
-- Gdzie jest komponent X?
-- Gdzie jest API dla Y?
-- Jaka jest struktura modułu Z?
-
-### TABLES.md - Potrzebuję schematu DB
-- Jakie pola ma tabela X?
-- Jaki jest typ kolumny Y?
-- Jakie są relacje między tabelami?
-
-### PATTERNS.md - Tworzę nowy element
-- Nowy API endpoint
-- Nowa migracja + RLS
-- Nowy komponent z Supabase
-- Nowy test E2E
-
-### PROMPTS.md - Nie wiem jak sformułować
-- Szablony promptów dla typowych zadań
-- Quick fix, nowy endpoint, story implementation
-
----
-
-## Optymalizacja Tokenów
-
-| Zamiast | Użyj |
-|---------|------|
-| Task/Explore agent | Grep → Read znalezione |
-| Czytaj migracje SQL | TABLES.md |
-| Czytaj podobne pliki | PATTERNS.md |
-| Czytaj cały stack | Grep błąd → Read plik |
-| Code review workflow | `git diff --stat` |
-
----
-
-## BMAD Workflows
-
-### Używaj TYLKO gdy:
-| Workflow | Kiedy |
-|----------|-------|
-| `workflow-status` | Sprawdzenie statusu projektu |
-| `dev-story` | Implementacja całego story |
-| `code-review` | Review DUŻYCH zmian (>5 plików) |
-
-### NIE używaj gdy:
-- Mała zmiana → po prostu zrób
-- Bug fix → napraw bezpośrednio
-- Docs → `/quick-docs`
-
----
-
-## Quick Commands (Haiku)
-
-- `/quick-docs` - Update dokumentacji
-- `/quick-test` - Generowanie testów
-- `/quick-review` - Szybkie code review
-
----
-
-## Komunikacja
-
-- **Polski** język
-- **Zwięźle** - bez wyjaśnień
-- **Tylko diff** - nie cały plik
-- **Pytaj** - nie zgaduj
-
-### Dobra odpowiedź:
-```
-Dodam endpoint.
-
-apps/frontend/app/api/products/route.ts:15:
-+ export async function POST(req: Request) { ... }
-
-Gotowe.
-```
-
----
-
-## Index .claude/
-
-| Plik | Kiedy czytać |
-|------|--------------|
-| `CLAUDE.md` | Zawsze załadowany |
-| `FILE-MAP.md` | Szukam gdzie jest plik |
-| `TABLES.md` | Potrzebuję DB schema |
-| `PATTERNS.md` | Tworzę nowy API/component/test |
-| `PROMPTS.md` | Szablony promptów |
-| `WORKFLOW-GUIDE.md` | Multi-model setup |
-
----
-
-**Pamiętaj: Najpierw sprawdź indeksy, potem szukaj. Każdy token kosztuje.**
+This ensures nothing is lost between sessions and context is preserved.

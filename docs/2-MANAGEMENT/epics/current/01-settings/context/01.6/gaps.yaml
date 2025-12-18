@@ -1,0 +1,329 @@
+# Story 01.6 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+
+gap_summary:
+  overall_readiness: "15%"
+  critical_blockers: 2
+  components_done: 0
+  components_partial: 1
+  components_missing: 7
+
+# =============================================================================
+# DEPENDENCY BLOCKERS (from Story 01.1)
+# =============================================================================
+dependency_blockers:
+  - blocker: "Story 01.1 (Org Context + Base RLS) must be complete"
+    status: "PARTIAL"
+    description: |
+      Story 01.1 provides:
+      - users table with role_id FK
+      - getOrgContext() helper
+      - RLS policy pattern (ADR-013)
+
+      Without 01.1, cannot proceed with role permissions.
+    impact: "Blocks all implementation"
+    action: "Wait for 01.1 to be complete"
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "roles table"
+    expected: "supabase/migrations/XXX_create_roles_table.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      CRITICAL: No roles table exists.
+      Story requires: id, code (UNIQUE), name, description,
+      permissions (JSONB), is_system, display_order, created_at
+      Essential for ADR-012 permission system.
+    refactor_action: "Create migration XXX_create_roles_table.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "Seed data for 10 system roles"
+    expected: "supabase/migrations/XXX_seed_system_roles.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      10 system roles must be seeded with lowercase snake_case codes:
+      owner, admin, production_manager, quality_manager, warehouse_manager,
+      production_operator, quality_inspector, warehouse_operator, planner, viewer
+      All with 12 module permissions (8 core + 4 premium)
+    refactor_action: "Create migration XXX_seed_system_roles.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "RLS policies for roles table"
+    expected: "Policies for SELECT (system roles public)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      RLS policies needed:
+      - roles_select_system: is_system = true (public to authenticated)
+      - roles_select_custom: org_id filter (future)
+      - roles_update_custom: prevent system role modification
+    refactor_action: "Add RLS policies in create_roles_table migration"
+    priority: "P0"
+
+  - component: "users.role_id column"
+    expected: "UUID FK to roles table"
+    found: "DEPENDS ON 01.1"
+    status: "PENDING"
+    gap_description: |
+      users.role_id FK must exist (from 01.1).
+      Current schema may use VARCHAR role enum instead.
+    refactor_action: "Verify 01.1 completion, migrate if needed"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "permission-service.ts"
+    expected: "apps/frontend/lib/services/permission-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Core permission checking service:
+      - hasPermission(user, module, action)
+      - hasRole(user, roles)
+      - requirePermission(module, action) middleware
+      - canAssignRole(currentRole, targetRole)
+    refactor_action: "Create new service"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/roles"
+    expected: "New route returning all roles"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Endpoint to fetch all roles for role selector."
+    refactor_action: "Create apps/frontend/app/api/v1/settings/roles/route.ts"
+    priority: "P0"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "usePermissions"
+    expected: "apps/frontend/lib/hooks/usePermissions.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Hook for permission checks in components:
+      - can(module, action)
+      - canAny(module)
+      - hasRole(roles)
+      - isAdmin, isSuperAdmin
+    refactor_action: "Create new hook"
+    priority: "P0-BLOCKER"
+    depends_on: "useOrgContext from 01.1"
+
+  - component: "useRoles"
+    expected: "apps/frontend/lib/hooks/useRoles.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Hook for fetching roles list (React Query)."
+    refactor_action: "Create new hook"
+    priority: "P1"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "RoleSelector"
+    expected: "apps/frontend/components/settings/users/RoleSelector.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Role dropdown for user modal:
+      - Display role names (not codes)
+      - Disable Super Admin for non-Super Admins
+      - Tooltip on disabled option
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "PermissionGuard"
+    expected: "apps/frontend/components/common/PermissionGuard.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Wrapper component for permission-based rendering:
+      - Hides children if permission denied
+      - Optional fallback component
+    refactor_action: "Create new component"
+    priority: "P1"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "Role interface"
+    expected: "apps/frontend/lib/types/role.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "TypeScript interface for Role entity."
+    refactor_action: "Create lib/types/role.ts"
+    priority: "P1"
+
+  - component: "RoleCode type"
+    expected: "String literal union of 10 role codes"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Type safety for role codes."
+    refactor_action: "Add to lib/types/role.ts"
+    priority: "P1"
+
+  - component: "PermissionAction type"
+    expected: "String literal union: 'C' | 'R' | 'U' | 'D'"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Type safety for permission actions."
+    refactor_action: "Add to lib/types/role.ts"
+    priority: "P1"
+
+# =============================================================================
+# EXISTING CODE THAT NEEDS REFACTORING
+# =============================================================================
+existing_code_to_refactor:
+  - component: "Permission checks in API routes"
+    current: "Hardcoded role checks (e.g., if (user.role === 'admin'))"
+    expected: "Use hasPermission() service"
+    status: "NEEDS_REFACTOR"
+    gap_description: |
+      Current API routes have inline permission checks like:
+      if (userData.role !== 'admin') { return 403 }
+
+      Should use:
+      if (!hasPermission(user, 'users', 'C')) { return 403 }
+    refactor_action: "Replace inline checks with permission service"
+    priority: "P1"
+
+  - component: "Role storage in users table"
+    current: "users.role VARCHAR(20) enum"
+    expected: "users.role_id UUID FK"
+    status: "DEPENDS_ON_01.1"
+    gap_description: |
+      Current schema uses TEXT enum for role.
+      Must migrate to role_id UUID FK per ADR-012.
+    refactor_action: "Migration 057_migrate_users_role_to_role_id.sql (in 01.1)"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# ARCHITECTURAL NOTES
+# =============================================================================
+architectural_notes:
+  - note: "ADR-012 JSONB vs Junction Table"
+    description: |
+      ADR-012 chose JSONB permissions over role_module_permissions junction table.
+
+      PROS:
+      - Simpler queries (single table)
+      - Atomic permission updates
+      - Easy to cache (single JSONB object)
+
+      CONS:
+      - Less normalized (duplicate permission data across roles)
+      - Query by permission harder (GIN index needed)
+
+      DECISION: JSONB is better for our use case (10 system roles, rarely changed).
+
+  - note: "Owner Role Restriction"
+    description: |
+      Only owner can assign owner role.
+      This prevents privilege escalation.
+
+      IMPLEMENTATION:
+      - Frontend: Disable owner option in dropdown
+      - Backend: canAssignRole() validation in API
+      - Both checks required (frontend for UX, backend for security)
+
+  - note: "Permission Caching"
+    description: |
+      Permissions cached in Redis (1 min TTL).
+      Trade-off: Performance vs immediate effect.
+
+      RECOMMENDATION: 1 min acceptable for permission changes.
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  prerequisite: "Story 01.1 must be complete (users.role_id FK exists)"
+
+  phase_1_database:
+    - "XXX_create_roles_table.sql"
+    - "XXX_seed_system_roles.sql"
+    - "Verify users.role_id FK exists"
+
+  phase_2_types:
+    - "lib/types/role.ts"
+
+  phase_3_services:
+    - "lib/services/permission-service.ts"
+
+  phase_4_api:
+    - "app/api/v1/settings/roles/route.ts"
+
+  phase_5_hooks:
+    - "lib/hooks/usePermissions.ts"
+    - "lib/hooks/useRoles.ts"
+
+  phase_6_components:
+    - "components/settings/users/RoleSelector.tsx"
+    - "components/common/PermissionGuard.tsx"
+
+  phase_7_refactor:
+    - "Replace inline permission checks in API routes"
+    - "Update user modal to use RoleSelector"
+
+  phase_8_tests:
+    - "Unit tests for permission service and hooks"
+    - "Integration tests for API and RLS"
+    - "E2E tests for role assignment and UI rendering"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] roles table created with 10 system roles"
+  - "[ ] RLS policies allow system role reads, block modifications"
+  - "[ ] hasPermission() service works for all module/action combos"
+  - "[ ] GET /api/v1/settings/roles returns 10 roles"
+  - "[ ] usePermissions hook provides can(), canAny(), hasRole()"
+  - "[ ] RoleSelector displays role names (not codes)"
+  - "[ ] Super Admin option disabled for non-Super Admins"
+  - "[ ] PermissionGuard hides elements without permission"
+  - "[ ] API routes use permission service (not inline checks)"
+  - "[ ] Permission cache invalidates within 1 minute"
+  - "[ ] Unit tests >= 80% coverage"
+  - "[ ] Integration tests cover all permission scenarios"
+
+# =============================================================================
+# RISKS
+# =============================================================================
+risks:
+  - id: "RISK-01"
+    description: "Story 01.1 not complete (users.role_id missing)"
+    mitigation: "Check 01.1 status before starting"
+    severity: "high"
+
+  - id: "RISK-02"
+    description: "Permission checks bypassed (frontend-only)"
+    mitigation: "Enforce permissions in both frontend (UX) and backend (security)"
+    severity: "high"
+    test_coverage: "security_tests"
+
+  - id: "RISK-03"
+    description: "Permission cache stale > 1 min"
+    mitigation: "Set Redis TTL to 60s, test cache invalidation"
+    severity: "medium"
+
+  - id: "RISK-04"
+    description: "Owner privilege escalation"
+    mitigation: "canAssignRole() validation in API, test non-owner assignment blocked"
+    severity: "high"
+    test_coverage: "security_tests.SEC-2"

@@ -1,0 +1,654 @@
+# Story 03.10 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test Files to Create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/work-order-service.test.ts"
+    type: "unit"
+    description: "Unit tests for WO service methods"
+  - path: "apps/frontend/lib/validation/__tests__/work-order.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/__tests__/integration/api/planning/work-orders.test.ts"
+    type: "integration"
+    description: "Integration tests for all WO API endpoints"
+  - path: "supabase/tests/work-orders-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for work_orders tables"
+  - path: "apps/frontend/__tests__/e2e/planning/work-orders.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for WO flows"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # AC-1: WO List Page (FR-PLAN-017)
+  - id: "AC-01"
+    name: "View work orders list"
+    given: "Planner navigates to /planning/work-orders"
+    when: "Page loads"
+    then: "WO list displays within 300ms with columns: WO Number, Product, Quantity, Status, Scheduled Date, Line, Priority, Created"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Search WOs by number or product"
+    given: "WO list with 20+ orders"
+    when: "Planner enters search 'WO-20241216'"
+    then: "Only WOs matching number or product name/code display within 200ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Filter by status"
+    given: "WO list displayed"
+    when: "Planner selects filter 'Draft'"
+    then: "Only draft WOs appear"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Filter by product"
+    given: "WO list displayed"
+    when: "Planner selects product 'FG-BREAD-001'"
+    then: "Only WOs for that product appear"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-05"
+    name: "Filter by production line"
+    given: "WO list displayed"
+    when: "Planner selects line 'Line 1'"
+    then: "Only WOs assigned to that line appear"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-06"
+    name: "Filter by date range"
+    given: "WO list displayed"
+    when: "Planner sets date range for scheduled date"
+    then: "Only WOs within date range appear"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-07"
+    name: "Pagination"
+    given: "100 WOs exist"
+    when: "Planner views WO list"
+    then: "20 WOs display per page with pagination controls"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-2: Create WO Header (FR-PLAN-017)
+  - id: "AC-08"
+    name: "Open create WO form"
+    given: "Planner clicks '+ New Work Order'"
+    when: "Form loads"
+    then: "Form displays: product dropdown, scheduled date, quantity, UoM, priority, line, machine, notes"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Product selection triggers BOM lookup"
+    given: "Planner selects product 'FG-BREAD-001'"
+    when: "Product selected with scheduled date '2024-12-20'"
+    then: "System queries active BOMs for product AND BOM auto-selected based on effective dates AND BOM preview panel shows selected BOM details"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-10"
+    name: "WO number auto-generated with daily reset"
+    given: "Planner saves a new WO on 2024-12-16 AND 5 WOs already exist for that day"
+    when: "WO is created"
+    then: "WO number generated as 'WO-20241216-0006' AND WO number is immutable after creation"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    name: "Required field validation"
+    given: "Planner leaves product empty"
+    when: "Save attempted"
+    then: "Error 'Product is required' displays inline AND form submission blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-12"
+    name: "Quantity validation"
+    given: "Planner enters quantity 0"
+    when: "Save attempted"
+    then: "Error 'Quantity must be greater than 0' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-13"
+    name: "Scheduled date validation"
+    given: "Planner enters past date (more than 1 day ago)"
+    when: "Save attempted"
+    then: "Error 'Scheduled date cannot be in the past' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-14"
+    name: "UoM defaults from product"
+    given: "Planner selects product with base UoM 'kg'"
+    when: "Product selected"
+    then: "UoM field auto-fills 'kg' AND field is editable to override"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-3: BOM Auto-Selection (FR-PLAN-018)
+  - id: "AC-15"
+    name: "Auto-select BOM based on scheduled date"
+    given: "Product 'FG-BREAD-001' has active BOM v2 (effective 2024-01-01) AND active BOM v3 (effective 2024-06-01) AND scheduled date is '2024-12-20'"
+    when: "Planner selects product"
+    then: "System selects BOM v3 (most recent effective_from <= scheduled_date) AND BOM preview shows v3 details"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-16"
+    name: "Auto-select with effective_to date"
+    given: "Product has BOM v1 (effective 2024-01-01 to 2024-05-31) AND BOM v2 (effective 2024-06-01 to null) AND scheduled date is '2024-04-15'"
+    when: "Planner selects product"
+    then: "System selects BOM v1 (scheduled_date within effective range)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-17"
+    name: "No active BOM found - warning"
+    given: "Product 'FG-NEW-001' has no active BOMs AND wo_require_bom setting is true"
+    when: "Planner selects product"
+    then: "Warning 'No active BOM found for this product on the scheduled date' displays AND BOM dropdown shows empty state AND save button disabled until BOM selected"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-18"
+    name: "Manual BOM override"
+    given: "BOM v3 is auto-selected"
+    when: "Planner clicks 'Change BOM' button"
+    then: "BOM selection modal opens AND shows all active BOMs for product AND planner can select different BOM"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-19"
+    name: "Date change triggers BOM re-selection"
+    given: "WO with BOM v2 auto-selected for date 2024-03-15"
+    when: "Planner changes scheduled date to 2024-07-20"
+    then: "System re-evaluates BOM selection AND if different BOM applies, confirmation dialog shows"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-4: BOM Validation (FR-PLAN-018)
+  - id: "AC-20"
+    name: "Product must have active BOM"
+    given: "Setting wo_require_bom = true AND product has no active BOMs"
+    when: "Planner attempts to create WO"
+    then: "Error 'Selected product has no active BOM' displays AND WO creation blocked"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-21"
+    name: "BOM must be for selected product"
+    given: "WO form with product 'FG-BREAD-001'"
+    when: "Validating BOM selection"
+    then: "System verifies bom.product_id matches wo.product_id AND mismatched BOM selection blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-22"
+    name: "Optional BOM mode"
+    given: "Setting wo_require_bom = false AND product has no active BOMs"
+    when: "Planner creates WO"
+    then: "WO created successfully with bom_id = null AND warning displays"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-5: WO Status Lifecycle (FR-PLAN-022)
+  - id: "AC-23"
+    name: "Plan WO (draft -> planned)"
+    given: "WO is in 'draft' status AND WO has valid BOM selected"
+    when: "Planner clicks 'Plan'"
+    then: "Status changes to 'planned' AND status history records transition AND planned_at timestamp recorded"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-24"
+    name: "Release WO (planned -> released)"
+    given: "WO is in 'planned' status"
+    when: "Planner clicks 'Release'"
+    then: "Status changes to 'released' AND status history records transition"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-25"
+    name: "Released WO restrictions"
+    given: "WO is 'released'"
+    when: "Planner views available actions"
+    then: "Cannot change: product_id, bom_id, quantity AND can only update: scheduled date/time, line, machine, priority, notes"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-26"
+    name: "Cancel WO"
+    given: "WO in any pre-production status (draft, planned, released) AND WO has no production activity"
+    when: "Planner clicks 'Cancel'"
+    then: "Confirmation dialog displays AND upon confirm, status changes to 'cancelled'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-27"
+    name: "Status history tracking"
+    given: "WO transitions through statuses"
+    when: "Viewing WO detail"
+    then: "Status history timeline shows all transitions with: from_status, to_status, changed_by, changed_at, notes"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-6: Edit WO (FR-PLAN-017)
+  - id: "AC-28"
+    name: "Edit header fields in draft"
+    given: "WO is 'draft'"
+    when: "Planner changes quantity"
+    then: "Change saved successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-29"
+    name: "WO number immutable"
+    given: "WO exists with number WO-20241216-0001"
+    when: "Planner views edit form"
+    then: "WO number field is disabled/read-only"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-30"
+    name: "Product change resets BOM"
+    given: "WO has product 'FG-BREAD-001' with BOM v3"
+    when: "Planner changes product to 'FG-CAKE-001'"
+    then: "BOM cleared and re-selected for new product AND confirmation dialog warns 'Changing product will reset BOM selection'"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-7: Delete WO (FR-PLAN-017)
+  - id: "AC-31"
+    name: "Delete draft WO"
+    given: "WO is 'draft'"
+    when: "Planner clicks 'Delete'"
+    then: "Confirmation 'Delete this draft WO?' displays AND upon confirm, WO permanently deleted"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-32"
+    name: "Cannot delete non-draft WO"
+    given: "WO status is 'planned' or later"
+    when: "Planner views available actions"
+    then: "Delete action is hidden (only cancel available)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-33"
+    name: "Cannot delete WO with materials"
+    given: "WO has wo_materials records"
+    when: "Planner attempts to delete"
+    then: "Error 'Cannot delete WO with materials or operations' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-9: Permission Enforcement
+  - id: "AC-34"
+    name: "Planner full access"
+    given: "User has PLANNER role"
+    when: "Accessing /planning/work-orders"
+    then: "All CRUD actions available"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-35"
+    name: "Operator view only"
+    given: "User has OPERATOR role"
+    when: "Accessing /planning/work-orders"
+    then: "Can view list and detail BUT create/edit/delete buttons hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-10: Multi-tenancy
+  - id: "AC-36"
+    name: "Org isolation on list"
+    given: "User A from Org A"
+    when: "Requesting /api/planning/work-orders"
+    then: "Only Org A WOs returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-37"
+    name: "Cross-tenant access returns 404"
+    given: "User A from Org A"
+    when: "Requesting WO ID from Org B"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-38"
+    name: "BOM selection respects org"
+    given: "User A from Org A selects product"
+    when: "BOM auto-selection runs"
+    then: "Only BOMs from Org A considered"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  work_order_service:
+    - name: "generateNextNumber() generates daily sequence"
+      description: "Verify WO-YYYYMMDD-NNNN format"
+      expected: "Returns WO-20241216-0001 format"
+
+    - name: "generateNextNumber() resets on new day"
+      description: "Sequence resets to 0001 on date change"
+      expected: "New day starts at 0001"
+
+    - name: "create() validates required fields"
+      description: "Product, quantity, date required"
+      expected: "Throws validation error for missing fields"
+
+    - name: "create() auto-selects BOM"
+      description: "BOM selected based on scheduled date"
+      expected: "Most recent effective BOM selected"
+
+    - name: "create() validates product has active BOM"
+      description: "Error when no active BOM (if required)"
+      expected: "Throws NO_ACTIVE_BOM error"
+
+    - name: "create() allows null BOM"
+      description: "When wo_require_bom = false"
+      expected: "WO created with bom_id = null"
+
+    - name: "create() sets default priority"
+      description: "Priority defaults to 'normal'"
+      expected: "priority = 'normal'"
+
+    - name: "update() validates status restrictions"
+      description: "Cannot change product/bom after release"
+      expected: "Throws FIELD_LOCKED error"
+
+    - name: "delete() only allows draft"
+      description: "Non-draft returns error"
+      expected: "Throws INVALID_STATUS error"
+
+    - name: "plan() validates BOM required"
+      description: "Cannot plan without BOM (if required)"
+      expected: "Throws NO_BOM error"
+
+    - name: "release() validates status"
+      description: "Must be in 'planned' status"
+      expected: "Throws INVALID_TRANSITION error"
+
+    - name: "getActiveBomForDate() selects correctly"
+      description: "Most recent effective_from <= date"
+      expected: "Returns correct BOM"
+
+    - name: "getActiveBomForDate() respects effective_to"
+      description: "Excludes expired BOMs"
+      expected: "Expired BOMs not returned"
+
+    - name: "validateStatusTransition() enforces rules"
+      description: "Valid transitions only"
+      expected: "Returns false for invalid transitions"
+
+  validation_schemas:
+    - name: "createWOSchema validates product_id"
+      expected: "UUID format required"
+
+    - name: "createWOSchema validates quantity > 0"
+      expected: "Positive number required"
+
+    - name: "createWOSchema validates scheduled date not past"
+      expected: "Date >= yesterday"
+
+    - name: "createWOSchema validates end_date >= start_date"
+      expected: "Refinement error if invalid"
+
+    - name: "createWOSchema validates time format"
+      expected: "HH:mm or HH:mm:ss format"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /work-orders returns paginated list"
+      setup: "Create 25 WOs"
+      expected: "Returns 20 WOs with pagination meta"
+
+    - name: "GET /work-orders?status=draft filters"
+      setup: "Create mix of draft/planned WOs"
+      expected: "Returns only draft WOs"
+
+    - name: "GET /work-orders?product_id=X filters"
+      setup: "Create WOs for multiple products"
+      expected: "Returns only matching product WOs"
+
+    - name: "GET /work-orders?date_from=X&date_to=Y filters"
+      setup: "Create WOs with various dates"
+      expected: "Returns only WOs in date range"
+
+    - name: "POST /work-orders creates with auto-BOM"
+      setup: "Product with active BOM"
+      expected: "WO created with auto-selected BOM"
+
+    - name: "POST /work-orders creates with manual BOM"
+      setup: "Provide bom_id in request"
+      expected: "WO created with specified BOM"
+
+    - name: "POST /work-orders validates required"
+      setup: "Missing product_id"
+      expected: "400 VALIDATION_ERROR"
+
+    - name: "POST /work-orders validates BOM exists"
+      setup: "Invalid bom_id"
+      expected: "400 NOT_FOUND"
+
+    - name: "PUT /work-orders/:id updates draft"
+      setup: "Draft WO"
+      expected: "All fields updatable"
+
+    - name: "PUT /work-orders/:id restricts released"
+      setup: "Released WO"
+      expected: "Product/BOM locked, returns 400"
+
+    - name: "DELETE /work-orders/:id draft only"
+      setup: "Non-draft WO"
+      expected: "400 INVALID_STATUS"
+
+    - name: "POST /work-orders/:id/plan validates"
+      setup: "Draft WO without BOM (if required)"
+      expected: "400 NO_BOM"
+
+    - name: "POST /work-orders/:id/release validates"
+      setup: "Draft WO (not planned)"
+      expected: "400 INVALID_TRANSITION"
+
+    - name: "POST /work-orders/:id/cancel validates"
+      setup: "WO with production activity"
+      expected: "400 HAS_PRODUCTION"
+
+    - name: "GET /work-orders/bom-for-date returns BOM"
+      setup: "Product with active BOM"
+      expected: "Correct BOM selected for date"
+
+  rls_tests:
+    - name: "User can only read own org WOs"
+      setup: "Create WOs in Org A and Org B"
+      action: "User A queries work_orders"
+      expected: "Only Org A WOs returned"
+
+    - name: "Cross-org WO access blocked"
+      setup: "WO in Org B"
+      action: "User A attempts to read Org B WO"
+      expected: "RLS blocks, returns empty/404"
+
+    - name: "Non-planner cannot create WO"
+      setup: "User with viewer role"
+      action: "Attempt to insert WO"
+      expected: "RLS blocks insert"
+
+    - name: "Delete policy enforces draft status"
+      setup: "Released WO"
+      action: "Attempt to delete"
+      expected: "RLS blocks delete"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create WO flow"
+    steps:
+      - "Navigate to /planning/work-orders"
+      - "Click '+ New Work Order'"
+      - "Select product"
+      - "Verify BOM auto-selects"
+      - "Enter quantity"
+      - "Enter scheduled date"
+      - "Save"
+    expected: "WO created, redirected to detail page"
+
+  - name: "Create WO with BOM override"
+    steps:
+      - "Open create form"
+      - "Select product"
+      - "Click 'Change BOM'"
+      - "Select different BOM"
+      - "Save"
+    expected: "WO created with manually selected BOM"
+
+  - name: "Edit WO flow"
+    steps:
+      - "Navigate to WO detail"
+      - "Click 'Edit'"
+      - "Modify fields"
+      - "Save"
+    expected: "Changes saved"
+
+  - name: "Plan WO flow"
+    steps:
+      - "View draft WO"
+      - "Click 'Plan'"
+      - "Confirm"
+    expected: "Status changes to 'planned'"
+
+  - name: "Release WO flow"
+    steps:
+      - "View planned WO"
+      - "Click 'Release'"
+      - "Confirm"
+    expected: "Status changes to 'released'"
+
+  - name: "Cancel WO flow"
+    steps:
+      - "View draft/planned WO"
+      - "Click 'Cancel'"
+      - "Enter reason (optional)"
+      - "Confirm"
+    expected: "Status changes to 'cancelled'"
+
+  - name: "Delete draft WO"
+    steps:
+      - "View draft WO"
+      - "Click 'Delete'"
+      - "Confirm"
+    expected: "WO deleted, redirected to list"
+
+  - name: "Filter and search"
+    steps:
+      - "Apply status filter"
+      - "Enter search term"
+      - "Clear filters"
+    expected: "Results update correctly"
+
+  - name: "Status history timeline"
+    steps:
+      - "Create WO"
+      - "Plan WO"
+      - "View History tab"
+    expected: "Timeline shows all transitions"
+
+  - name: "Validation errors display"
+    steps:
+      - "Open create form"
+      - "Submit without required fields"
+    expected: "Inline errors display"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates all 3 tables (work_orders, wo_status_history, wo_daily_sequence)"
+  - "All constraints and indexes created"
+  - "WO number generation function working (daily reset sequence)"
+  - "BOM auto-selection function working"
+  - "Status history trigger working"
+  - "RLS policies enforce org isolation and role permissions"
+  - "All 11 API endpoints implemented"
+  - "Zod schemas validate all inputs"
+  - "work-order-service.ts implements all methods"
+  - "BOM auto-selection logic tested thoroughly"
+  - "WO list page with DataTable (PLAN-013)"
+  - "WO detail/form page with BOM preview (PLAN-014, PLAN-015)"
+  - "Product selection triggers BOM lookup"
+  - "BOM preview panel displays correctly"
+  - "Manual BOM override modal working"
+  - "Status badges with correct colors"
+  - "Priority badges with correct colors"
+  - "Status transitions enforced with validation"
+  - "Plan/Release/Cancel actions with proper checks"
+  - "Permission matrix implemented"
+  - "Multi-tenancy: cross-org returns 404"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all endpoints"
+  - "E2E tests for critical flows"
+  - "BOM selection edge cases tested"
+  - "Loading, empty, error states implemented"
+  - "Toast notifications on success/error"
+  - "Accessibility: keyboard nav, ARIA labels"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core business logic requires good coverage"
+    files:
+      - "lib/services/work-order-service.ts: 80%"
+      - "lib/validation/work-order.ts: 90%"
+  integration:
+    target: 70
+    reason: "API endpoints and RLS must be tested"
+  e2e:
+    target: 10
+    reason: "Critical user flows"
+    scenarios:
+      - "Create WO with BOM auto-selection"
+      - "Plan and Release WO"
+      - "Cancel and Delete WO"
+      - "Filter and search"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "BOM auto-selection edge cases (multiple BOMs, same effective_from)"
+    mitigation: "Use created_at as tiebreaker, add unit tests for edge cases"
+    severity: "medium"
+    test_coverage: "unit_tests.work_order_service.getActiveBomForDate"
+
+  - id: "RISK-02"
+    description: "WO number race condition on concurrent creates"
+    mitigation: "Use database function with ON CONFLICT DO UPDATE"
+    severity: "high"
+    test_coverage: "integration_tests.api_endpoints.POST creates"
+
+  - id: "RISK-03"
+    description: "RLS policy misconfiguration could leak WO data"
+    mitigation: "Comprehensive RLS tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_tests"
+
+  - id: "RISK-04"
+    description: "Status transition validation bypass"
+    mitigation: "Validate in service layer AND RLS policy"
+    severity: "medium"
+    test_coverage: "unit_tests.validateStatusTransition"

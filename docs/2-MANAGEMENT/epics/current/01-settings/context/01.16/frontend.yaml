@@ -1,0 +1,179 @@
+# Story 01.16 - Frontend Specification
+# Purpose: Invitation UI, accept page
+# Agent: FRONTEND-DEV
+
+pages:
+  - path: "app/(authenticated)/settings/users/page.tsx"
+    description: "Users page with 'Pending Invitations' tab"
+    tabs:
+      - "Active Users"
+      - "Pending Invitations"  # New tab
+
+  - path: "app/(public)/invite/[token]/page.tsx"
+    description: "Accept invitation page (public, no auth)"
+    sections:
+      - "Organization name and role display"
+      - "Email field (readonly, pre-filled)"
+      - "Password setup form"
+      - "Submit button"
+
+components:
+  base_path: "components/settings/users"
+
+  invite_components:
+    - name: "InviteUserModal.tsx"
+      description: "Email + role selection modal"
+      props:
+        - "onClose: () => void"
+        - "onSubmit: (data: InviteUserRequest) => void"
+      fields:
+        - "email: email input with validation"
+        - "role_id: role dropdown (from 01.6)"
+      features:
+        - "Real-time email validation"
+        - "Super Admin role disabled for non-Super Admin"
+        - "Loading state during send"
+        - "Duplicate email check"
+
+    - name: "PendingInvitationsTable.tsx"
+      description: "List of pending invitations"
+      props:
+        - "invitations: Invitation[]"
+        - "onResend: (id: string) => void"
+        - "onCancel: (id: string) => void"
+      columns:
+        - "Email"
+        - "Role"
+        - "Invited By"
+        - "Sent Date"
+        - "Expires"
+        - "Actions"
+      actions:
+        - "Resend"
+        - "Cancel"
+
+    - name: "InvitationRow.tsx"
+      description: "Single invitation row"
+      props:
+        - "invitation: Invitation"
+        - "onResend: () => void"
+        - "onCancel: () => void"
+
+    - name: "InvitationStatusBadge.tsx"
+      description: "Status indicator"
+      props:
+        - "status: 'pending' | 'expired' | 'accepted' | 'cancelled'"
+      variants:
+        - { status: "pending", color: "bg-blue-100 text-blue-800", label: "Pending" }
+        - { status: "expired", color: "bg-red-100 text-red-800", label: "Expired" }
+        - { status: "accepted", color: "bg-green-100 text-green-800", label: "Accepted" }
+        - { status: "cancelled", color: "bg-gray-100 text-gray-800", label: "Cancelled" }
+
+    - name: "ResendConfirmDialog.tsx"
+      description: "Resend confirmation"
+      props:
+        - "invitation: Invitation"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+
+    - name: "CancelInvitationDialog.tsx"
+      description: "Cancel confirmation"
+      props:
+        - "invitation: Invitation"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+
+  accept_components:
+    - name: "AcceptInvitationForm.tsx"
+      description: "Password setup form"
+      props:
+        - "token: string"
+        - "invitationDetails: GetInvitationResponse"
+        - "onSuccess: () => void"
+      fields:
+        - "email: text (readonly, pre-filled)"
+        - "password: password with requirements"
+        - "confirm_password: password"
+      features:
+        - "Real-time password validation"
+        - "Requirements checklist"
+        - "Strength indicator"
+
+    - name: "InvitationExpiredPage.tsx"
+      description: "Expired/invalid invitation page"
+      props:
+        - "error: string"
+      display: |
+        This invitation has expired
+
+        [Request New Invitation]
+
+        Contact your administrator for a new invitation.
+
+# Hooks
+hooks:
+  - path: "lib/hooks/use-invitations.ts"
+    exports:
+      - "useInvitations(): UseQueryResult<Invitation[]>"
+      - "useInviteUser(): UseMutationResult"
+      - "useResendInvitation(): UseMutationResult"
+      - "useCancelInvitation(): UseMutationResult"
+
+  - path: "lib/hooks/use-accept-invitation.ts"
+    exports:
+      - "useInvitationDetails(token): UseQueryResult<GetInvitationResponse>"
+      - "useAcceptInvitation(): UseMutationResult"
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SET-010"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-010-user-invitations.md"
+      description: "User invitations management with pending/accepted/expired states"
+      components:
+        - "InvitationsDataTable"
+        - "InvitationRow"
+        - "InvitationStatusBadge"
+        - "SendInvitationButton"
+        - "ResendInvitationButton"
+        - "RevokeInvitationButton"
+    - id: "SET-025"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-025-audit-logs.md"
+      description: "Audit logs viewer with filtering and export"
+      components:
+        - "AuditLogsDataTable"
+        - "AuditLogRow"
+        - "AuditLogFilters"
+        - "AuditLogDetailModal"
+        - "ExportButton"
+
+  empty_state:
+    title: "No pending invitations"
+    description: "Invite team members to join your organization."
+    action: "Invite User"
+
+  states:
+    loading: "Skeleton table rows"
+    empty: "No audit logs / No pending invitations message"
+    error: "Error loading data with retry button"
+    success: "Table with logs/invitations visible"
+
+  patterns:
+    table: "ShadCN DataTable with pagination and filtering"
+    filter: "Date range picker, action type filter, user filter"
+    export: "CSV/JSON export functionality"
+    detail: "ShadCN Dialog for log detail view"
+
+  toasts:
+    - event: "invite_success"
+      message: "Invitation sent to {{email}}"
+      type: "success"
+    - event: "resend_success"
+      message: "Invitation resent to {{email}}"
+      type: "success"
+    - event: "cancel_success"
+      message: "Invitation cancelled"
+      type: "success"
+    - event: "accept_success"
+      message: "Welcome to {{orgName}}!"
+      type: "success"

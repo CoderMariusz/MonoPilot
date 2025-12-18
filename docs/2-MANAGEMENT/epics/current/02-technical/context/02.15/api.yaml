@@ -1,0 +1,574 @@
+# Story 02.15 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/technical/costing/products/:id/history"
+    description: "Returns cost history with trends, breakdown, and cost drivers"
+    file: "apps/frontend/app/api/technical/costing/products/[id]/history/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Product ID"
+      query:
+        from: "string (ISO date) - Start date filter"
+        to: "string (ISO date) - End date filter"
+        type: "string - Cost type filter: 'standard' | 'actual' | 'planned' | 'all'"
+        page: "number - Page number for pagination (default: 1)"
+        limit: "number - Records per page (default: 10, max: 100)"
+
+    response:
+      status: 200
+      type: "CostHistoryResponse"
+      schema:
+        product:
+          id: "string (UUID)"
+          code: "string"
+          name: "string"
+        summary:
+          current_cost: "number"
+          current_cost_per_unit: "number"
+          previous_cost: "number | null"
+          change_amount: "number"
+          change_percentage: "number"
+          trend_30d: "number"
+          trend_90d: "number"
+          trend_ytd: "number"
+        history:
+          - id: "string (UUID)"
+            cost_type: "string"
+            material_cost: "number"
+            labor_cost: "number"
+            overhead_cost: "number"
+            total_cost: "number"
+            cost_per_unit: "number"
+            effective_from: "string (ISO date)"
+            effective_to: "string | null"
+            created_at: "string (ISO datetime)"
+            created_by: "string"
+            bom_version: "number | null"
+        pagination:
+          total: "number"
+          page: "number"
+          limit: "number"
+          total_pages: "number"
+        component_breakdown:
+          current:
+            material: "number"
+            labor: "number"
+            overhead: "number"
+            total: "number"
+          historical:
+            material: "number"
+            labor: "number"
+            overhead: "number"
+            total: "number"
+          changes:
+            material: { amount: "number", percent: "number" }
+            labor: { amount: "number", percent: "number" }
+            overhead: { amount: "number", percent: "number" }
+            total: { amount: "number", percent: "number" }
+        cost_drivers:
+          - ingredient_id: "string"
+            ingredient_name: "string"
+            ingredient_code: "string"
+            current_cost: "number"
+            historical_cost: "number"
+            change_amount: "number"
+            change_percent: "number"
+            impact_percent: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Access denied"
+        when: "User lacks 'technical' read permission"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product ID does not exist or belongs to different org"
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "Invalid date range"
+        when: "from > to or range exceeds 2 years"
+
+  - method: "GET"
+    path: "/api/technical/costing/variance/report"
+    description: "Returns variance analysis comparing standard vs actual costs"
+    file: "apps/frontend/app/api/technical/costing/variance/report/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query:
+        productId: "string (UUID) - Required product ID"
+        period: "number - Analysis period in days: 7 | 30 | 90 | 365 (default: 30)"
+
+    response:
+      status: 200
+      type: "VarianceReportResponse"
+      schema:
+        product_id: "string (UUID)"
+        period_days: "number"
+        work_orders_analyzed: "number"
+        components:
+          material:
+            standard: "number"
+            actual: "number"
+            variance: "number"
+            variance_percent: "number"
+          labor:
+            standard: "number"
+            actual: "number"
+            variance: "number"
+            variance_percent: "number"
+          overhead:
+            standard: "number"
+            actual: "number"
+            variance: "number"
+            variance_percent: "number"
+          total:
+            standard: "number"
+            actual: "number"
+            variance: "number"
+            variance_percent: "number"
+        significant_variances:
+          - component: "string"
+            variance_percent: "number"
+            threshold: "number"
+            direction: "string ('over' | 'under')"
+        work_order_details:
+          - work_order_id: "string"
+            work_order_code: "string"
+            standard_cost: "number"
+            actual_cost: "number"
+            variance: "number"
+            variance_percent: "number"
+            completed_at: "string (ISO datetime)"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product ID does not exist"
+      - status: 200
+        code: "NO_VARIANCE_DATA"
+        note: "Returns empty response with work_orders_analyzed: 0"
+        when: "No production data exists for this product"
+
+  - method: "POST"
+    path: "/api/technical/costing/products/:id/history/export"
+    description: "Export cost history in specified format"
+    file: "apps/frontend/app/api/technical/costing/products/[id]/history/export/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "production_manager", "planner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id: "UUID - Product ID"
+      body:
+        format: "string - Export format: 'csv' | 'pdf' | 'png' | 'xlsx'"
+        date_range:
+          from: "string (ISO date)"
+          to: "string (ISO date)"
+        data_inclusions:
+          history_table: "boolean"
+          component_breakdown: "boolean"
+          cost_drivers: "boolean"
+          variance_analysis: "boolean"
+          chart_data_points: "boolean"
+        options:
+          delimiter: "string - CSV delimiter: ',' | ';' | '\\t' (optional)"
+          encoding: "string - 'utf-8' | 'ascii' (optional)"
+          filename: "string - Custom filename (optional)"
+
+    response:
+      status: 200
+      type: "ExportCostHistoryResponse"
+      schema:
+        download_url: "string - Pre-signed URL for download"
+        filename: "string"
+        file_size_bytes: "number"
+        record_count: "number"
+        expires_at: "string (ISO datetime)"
+
+    errors:
+      - status: 400
+        code: "INVALID_FORMAT"
+        message: "Invalid export format"
+        when: "Format not one of: csv, pdf, png, xlsx"
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "Invalid date range"
+        when: "from > to"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/cost-history-service.ts"
+    description: "Cost history retrieval and trend calculation"
+    exports:
+      - name: "getCostHistory"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "options: CostHistoryOptions"
+        returns: "Promise<CostHistoryResponse>"
+        description: "Fetches cost history with trends and breakdown"
+      - name: "calculateTrends"
+        type: "function"
+        params:
+          - "costHistory: ProductCost[]"
+        returns: "TrendSummary"
+        description: "Calculates 30d, 90d, YTD trends from cost history"
+      - name: "getComponentBreakdown"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "comparisonPeriod: '1mo' | '3mo' | '6mo' | '1yr'"
+        returns: "Promise<ComponentBreakdown>"
+        description: "Gets current vs historical component breakdown"
+      - name: "getCostDrivers"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "limit: number"
+        returns: "Promise<CostDriver[]>"
+        description: "Gets top N cost drivers by impact"
+
+  - path: "apps/frontend/lib/services/variance-analysis-service.ts"
+    description: "Standard vs actual variance analysis"
+    exports:
+      - name: "getVarianceReport"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "periodDays: number"
+        returns: "Promise<VarianceReportResponse>"
+        description: "Gets variance analysis for product"
+      - name: "calculateVariance"
+        type: "function"
+        params:
+          - "standardCosts: ProductCost"
+          - "actualCosts: WorkOrderCost[]"
+        returns: "VarianceReport"
+        description: "Calculates variance between standard and actual"
+      - name: "identifySignificantVariances"
+        type: "function"
+        params:
+          - "components: VarianceComponents"
+          - "threshold: number"
+        returns: "SignificantVariance[]"
+        description: "Identifies variances exceeding threshold"
+
+  - path: "apps/frontend/lib/services/cost-export-service.ts"
+    description: "Export functionality for cost history"
+    exports:
+      - name: "exportCostHistory"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "options: ExportOptions"
+        returns: "Promise<ExportResult>"
+        description: "Exports cost history in specified format"
+      - name: "generateCSV"
+        type: "function"
+        params:
+          - "data: CostHistoryData"
+          - "options: CSVOptions"
+        returns: "string"
+        description: "Generates CSV content"
+      - name: "generatePDF"
+        type: "async function"
+        params:
+          - "data: CostHistoryData"
+          - "chartImage: string"
+        returns: "Promise<Blob>"
+        description: "Generates PDF report with charts"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/cost-history.ts"
+    description: "Cost history TypeScript interfaces"
+    exports:
+      - "CostHistoryResponse"
+      - "CostHistorySummary"
+      - "CostHistoryItem"
+      - "ComponentBreakdown"
+      - "ComponentChanges"
+      - "CostDriver"
+      - "TrendSummary"
+
+  - path: "apps/frontend/lib/types/variance.ts"
+    description: "Variance analysis TypeScript interfaces"
+    exports:
+      - "VarianceReportResponse"
+      - "VarianceComponent"
+      - "SignificantVariance"
+      - "WorkOrderVariance"
+
+  - path: "apps/frontend/lib/types/cost-export.ts"
+    description: "Export TypeScript interfaces"
+    exports:
+      - "ExportCostHistoryRequest"
+      - "ExportCostHistoryResponse"
+      - "ExportFormat"
+      - "ExportOptions"
+
+# Implementation patterns
+patterns:
+  trend_calculation: |
+    // apps/frontend/lib/services/cost-history-service.ts
+    export const calculateTrends = (costHistory: ProductCost[]): TrendSummary => {
+      const now = new Date();
+
+      const calculatePeriodTrend = (days: number): number => {
+        const cutoff = new Date(now);
+        cutoff.setDate(cutoff.getDate() - days);
+
+        const periodCosts = costHistory
+          .filter(c => new Date(c.created_at) >= cutoff)
+          .sort((a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+
+        if (periodCosts.length < 2) return 0;
+
+        const oldest = periodCosts[0].total_cost;
+        const newest = periodCosts[periodCosts.length - 1].total_cost;
+
+        return ((newest - oldest) / oldest) * 100;
+      };
+
+      const calculateYtdTrend = (): number => {
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        const ytdCosts = costHistory
+          .filter(c => new Date(c.created_at) >= startOfYear)
+          .sort((a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+
+        if (ytdCosts.length < 2) return 0;
+
+        const first = ytdCosts[0].total_cost;
+        const last = ytdCosts[ytdCosts.length - 1].total_cost;
+
+        return ((last - first) / first) * 100;
+      };
+
+      return {
+        trend_30d: calculatePeriodTrend(30),
+        trend_90d: calculatePeriodTrend(90),
+        trend_ytd: calculateYtdTrend(),
+      };
+    };
+
+  variance_calculation: |
+    // apps/frontend/lib/services/variance-analysis-service.ts
+    export const calculateVariance = (
+      standardCosts: ProductCost,
+      actualCosts: WorkOrderCost[]
+    ): VarianceReport => {
+      if (actualCosts.length === 0) {
+        return {
+          components: null,
+          significant_variances: [],
+          work_orders_analyzed: 0,
+        };
+      }
+
+      // Aggregate actual costs from work orders
+      const totalActual = actualCosts.reduce(
+        (acc, wo) => ({
+          material: acc.material + wo.material_cost,
+          labor: acc.labor + wo.labor_cost,
+          overhead: acc.overhead + wo.overhead_cost,
+        }),
+        { material: 0, labor: 0, overhead: 0 }
+      );
+
+      // Average per work order
+      const count = actualCosts.length;
+      const avgActual = {
+        material: totalActual.material / count,
+        labor: totalActual.labor / count,
+        overhead: totalActual.overhead / count,
+        total: (totalActual.material + totalActual.labor + totalActual.overhead) / count,
+      };
+
+      // Calculate variance for each component
+      const calcVariance = (standard: number, actual: number): VarianceComponent => ({
+        standard,
+        actual,
+        variance: actual - standard,
+        variance_percent: ((actual - standard) / standard) * 100,
+      });
+
+      const components = {
+        material: calcVariance(standardCosts.material_cost, avgActual.material),
+        labor: calcVariance(standardCosts.labor_cost, avgActual.labor),
+        overhead: calcVariance(standardCosts.overhead_cost, avgActual.overhead),
+        total: calcVariance(standardCosts.total_cost, avgActual.total),
+      };
+
+      // Identify significant variances (>5% threshold)
+      const threshold = 5;
+      const significant_variances = Object.entries(components)
+        .filter(([_, v]) => Math.abs(v.variance_percent) > threshold)
+        .map(([component, v]) => ({
+          component,
+          variance_percent: v.variance_percent,
+          threshold,
+          direction: (v.variance_percent > 0 ? 'over' : 'under') as const,
+        }));
+
+      return {
+        components,
+        significant_variances,
+        work_orders_analyzed: count,
+      };
+    };
+
+  api_route: |
+    // apps/frontend/app/api/technical/costing/products/[id]/history/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { calculateTrends } from '@/lib/services/cost-history-service';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { searchParams } = new URL(request.url);
+
+      // Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Get org context
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      const productId = params.id;
+      const from = searchParams.get('from');
+      const to = searchParams.get('to');
+      const type = searchParams.get('type') || 'all';
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 100);
+      const offset = (page - 1) * limit;
+
+      // Build query
+      let query = supabase
+        .from('product_costs')
+        .select('*', { count: 'exact' })
+        .eq('org_id', userData.org_id)
+        .eq('product_id', productId)
+        .order('effective_from', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (from) query = query.gte('effective_from', from);
+      if (to) query = query.lte('effective_from', to);
+      if (type !== 'all') query = query.eq('cost_type', type);
+
+      const { data: history, error, count } = await query;
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Get product info
+      const { data: product } = await supabase
+        .from('products')
+        .select('id, code, name')
+        .eq('id', productId)
+        .single();
+
+      if (!product) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+
+      // Calculate trends
+      const trends = calculateTrends(history || []);
+
+      // Build response
+      const response = {
+        product,
+        summary: {
+          current_cost: history?.[0]?.total_cost || 0,
+          current_cost_per_unit: history?.[0]?.cost_per_unit || 0,
+          previous_cost: history?.[1]?.total_cost || null,
+          change_amount: history?.[0] && history?.[1]
+            ? history[0].total_cost - history[1].total_cost
+            : 0,
+          change_percentage: history?.[0] && history?.[1]
+            ? ((history[0].total_cost - history[1].total_cost) / history[1].total_cost) * 100
+            : 0,
+          ...trends,
+        },
+        history: history || [],
+        pagination: {
+          total: count || 0,
+          page,
+          limit,
+          total_pages: Math.ceil((count || 0) / limit),
+        },
+        // component_breakdown and cost_drivers would be calculated separately
+      };
+
+      return NextResponse.json(response);
+    }
+
+# Caching Strategy
+caching:
+  redis_keys:
+    - key: "org:{orgId}:product:{productId}:cost-history"
+      ttl: "5 minutes"
+      purpose: "Cache cost history query results"
+    - key: "org:{orgId}:product:{productId}:cost-trends"
+      ttl: "5 minutes"
+      purpose: "Cache trend calculations"
+    - key: "org:{orgId}:product:{productId}:variance-report"
+      ttl: "5 minutes"
+      purpose: "Cache variance analysis results"
+
+# Performance Targets
+performance:
+  - endpoint: "GET /history"
+    target_ms: 1000
+    max_records: 100
+    notes: "Use index on (org_id, product_id, effective_from)"
+  - endpoint: "GET /variance/report"
+    target_ms: 2000
+    notes: "May require aggregation of work order data"
+  - endpoint: "POST /export"
+    csv_target_ms: 2000
+    pdf_target_ms: 5000
+    notes: "Use streaming for large datasets"

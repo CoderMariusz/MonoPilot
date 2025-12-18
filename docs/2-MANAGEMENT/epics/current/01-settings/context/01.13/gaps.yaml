@@ -1,0 +1,309 @@
+# Story 01.13 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built
+
+gap_summary:
+  overall_readiness: "0%"
+  critical_blockers: 1
+  components_done: 0
+  components_partial: 0
+  components_missing: 15
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "tax_codes table"
+    expected: "supabase/migrations/061_create_tax_codes_table.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      CRITICAL: No tax_codes table exists in database.
+      Story requires: id, org_id, code, name, rate (DECIMAL 5,2), country_code (CHAR 2),
+      valid_from (DATE), valid_to (DATE), is_default, is_deleted, audit fields.
+      With constraints: UNIQUE(org_id, code, country_code), CHECK rate 0-100,
+      CHECK valid_to > valid_from.
+    refactor_action: "Create migration 061_create_tax_codes_table.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "RLS policies for tax_codes"
+    expected: "ADR-013 pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No RLS policies for tax_codes table.
+      Required policies: SELECT (all users), INSERT/UPDATE/DELETE (admin only).
+    refactor_action: "Add RLS policies in migration 061"
+    priority: "P0-BLOCKER"
+
+  - component: "Single default trigger"
+    expected: "ensure_single_default_tax_code() trigger function"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No trigger to ensure only one default tax code per org.
+      Trigger must atomically unset previous default when new one is set.
+    refactor_action: "Add trigger function + trigger in migration 061"
+    priority: "P0"
+
+  - component: "Seed data for Polish tax codes"
+    expected: "supabase/migrations/062_seed_polish_tax_codes.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No seed migration for common Polish VAT rates:
+      VAT23 (23%), VAT8 (8%), VAT5 (5%), VAT0 (0%), ZW (Exempt 0%).
+    refactor_action: "Create migration 062_seed_polish_tax_codes.sql"
+    priority: "P1"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "tax-code-service.ts"
+    expected: "apps/frontend/lib/services/tax-code-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No tax code service layer.
+      Required methods: list(), getById(), getDefault(), create(), update(),
+      delete(), setDefault(), validateCode(), hasReferences(), canDelete().
+    refactor_action: "Create lib/services/tax-code-service.ts"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "TaxCode interface"
+    expected: "apps/frontend/lib/types/tax-code.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No TypeScript interface for TaxCode entity."
+    refactor_action: "Create lib/types/tax-code.ts"
+    priority: "P0"
+
+  - component: "TaxCodeStatus type"
+    expected: "'active' | 'expired' | 'scheduled'"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No type for tax code status."
+    refactor_action: "Add to lib/types/tax-code.ts"
+    priority: "P1"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "Tax Codes API Routes"
+    expected: "8 endpoints for tax code CRUD"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No API routes for tax codes.
+      Required endpoints:
+      - GET /api/v1/settings/tax-codes (list with filters)
+      - POST /api/v1/settings/tax-codes (create)
+      - GET /api/v1/settings/tax-codes/:id (get by ID)
+      - PUT /api/v1/settings/tax-codes/:id (update)
+      - DELETE /api/v1/settings/tax-codes/:id (soft delete)
+      - PATCH /api/v1/settings/tax-codes/:id/set-default (set default)
+      - GET /api/v1/settings/tax-codes/validate-code (uniqueness check)
+      - GET /api/v1/settings/tax-codes/default (get default)
+    refactor_action: "Create app/api/v1/settings/tax-codes/ route files"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "Tax code Zod schemas"
+    expected: "lib/validation/tax-code.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No Zod validation schemas for tax codes.
+      Required schemas:
+      - taxCodeSchema (base)
+      - createTaxCodeSchema (with date range refinement)
+      - updateTaxCodeSchema (partial, immutable code/country)
+      - setDefaultSchema
+    refactor_action: "Create lib/validation/tax-code.ts"
+    priority: "P0"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "Tax Codes Page"
+    expected: "app/(authenticated)/settings/tax-codes/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No tax codes page exists."
+    refactor_action: "Create tax codes page"
+    priority: "P0"
+
+  - component: "TaxCodesDataTable"
+    expected: "components/settings/tax-codes/TaxCodesDataTable.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No DataTable component for tax codes."
+    refactor_action: "Create DataTable following ShadCN pattern"
+    priority: "P0"
+
+  - component: "TaxCodeModal"
+    expected: "components/settings/tax-codes/TaxCodeModal.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No create/edit modal for tax codes."
+    refactor_action: "Create modal with form fields"
+    priority: "P0"
+
+  - component: "Badge components"
+    expected: "TaxCodeRateBadge, TaxCodeStatusBadge, TaxCodeCountryBadge"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No badge components for rate, status, country display."
+    refactor_action: "Create 3 badge components"
+    priority: "P1"
+
+  - component: "TaxCodeFilters"
+    expected: "components/settings/tax-codes/TaxCodeFilters.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No filter bar for search, country, status."
+    refactor_action: "Create filter component"
+    priority: "P1"
+
+  - component: "TaxCodeActionsMenu"
+    expected: "components/settings/tax-codes/TaxCodeActionsMenu.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No actions dropdown menu."
+    refactor_action: "Create actions menu component"
+    priority: "P1"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "useTaxCodes"
+    expected: "apps/frontend/lib/hooks/use-tax-codes.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No React Query hooks for tax codes."
+    refactor_action: "Create hooks file with 7 hooks"
+    priority: "P0"
+
+# =============================================================================
+# TEST GAPS
+# =============================================================================
+test_gaps:
+  - component: "Unit tests"
+    expected: "__tests__/unit/services/tax-code-service.test.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No unit tests for tax code service."
+    refactor_action: "Create unit test file"
+    priority: "P1"
+
+  - component: "Integration tests"
+    expected: "__tests__/integration/api/settings/tax-codes.test.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No integration tests for API endpoints."
+    refactor_action: "Create integration test file"
+    priority: "P1"
+
+  - component: "E2E tests"
+    expected: "__tests__/e2e/settings/tax-codes.spec.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No E2E tests for tax code flows."
+    refactor_action: "Create E2E test file"
+    priority: "P1"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "No tax_codes table"
+    description: "Core table missing from database schema"
+    migration: "061_create_tax_codes_table.sql"
+    risk: "HIGH - blocks all functionality"
+
+  - blocker: "No tax-code-service"
+    description: "Service layer missing for business logic"
+    file: "lib/services/tax-code-service.ts"
+    risk: "HIGH - blocks API development"
+
+  - blocker: "No API routes"
+    description: "All 8 API endpoints missing"
+    files: "app/api/v1/settings/tax-codes/**/*.ts"
+    risk: "HIGH - blocks frontend development"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_1_database:
+    - "061_create_tax_codes_table.sql"
+    - "062_seed_polish_tax_codes.sql"
+
+  phase_2_types:
+    - "lib/types/tax-code.ts"
+    - "lib/validation/tax-code.ts"
+
+  phase_3_services:
+    - "lib/services/tax-code-service.ts"
+
+  phase_4_api:
+    - "app/api/v1/settings/tax-codes/route.ts (GET, POST)"
+    - "app/api/v1/settings/tax-codes/[id]/route.ts (GET, PUT, DELETE)"
+    - "app/api/v1/settings/tax-codes/[id]/set-default/route.ts (PATCH)"
+    - "app/api/v1/settings/tax-codes/validate-code/route.ts (GET)"
+    - "app/api/v1/settings/tax-codes/default/route.ts (GET)"
+
+  phase_5_hooks:
+    - "lib/hooks/use-tax-codes.ts"
+
+  phase_6_components:
+    - "components/settings/tax-codes/TaxCodesDataTable.tsx"
+    - "components/settings/tax-codes/TaxCodeModal.tsx"
+    - "components/settings/tax-codes/TaxCodeRateBadge.tsx"
+    - "components/settings/tax-codes/TaxCodeStatusBadge.tsx"
+    - "components/settings/tax-codes/TaxCodeCountryBadge.tsx"
+    - "components/settings/tax-codes/TaxCodeFilters.tsx"
+    - "components/settings/tax-codes/TaxCodeActionsMenu.tsx"
+    - "components/settings/tax-codes/SetDefaultConfirmDialog.tsx"
+    - "components/settings/tax-codes/DeleteConfirmDialog.tsx"
+
+  phase_7_pages:
+    - "app/(authenticated)/settings/tax-codes/page.tsx"
+
+  phase_8_tests:
+    - "__tests__/unit/services/tax-code-service.test.ts"
+    - "__tests__/integration/api/settings/tax-codes.test.ts"
+    - "__tests__/e2e/settings/tax-codes.spec.ts"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] tax_codes table created with all constraints"
+  - "[ ] RLS policies enforce org isolation and admin-only writes"
+  - "[ ] Single default trigger works atomically"
+  - "[ ] Polish tax codes seeded for all orgs"
+  - "[ ] All 8 API endpoints functional"
+  - "[ ] Zod schemas validate all inputs"
+  - "[ ] Tax code service implements all methods"
+  - "[ ] DataTable displays with sorting, filtering, pagination"
+  - "[ ] Create/Edit modal works with validation"
+  - "[ ] Set default action works atomically"
+  - "[ ] Delete blocked for referenced tax codes"
+  - "[ ] Code immutability enforced when referenced"
+  - "[ ] Cross-tenant access returns 404"
+  - "[ ] Permission enforcement works (admin vs viewer)"
+  - "[ ] Unit tests >= 80% coverage"
+  - "[ ] Integration tests for all endpoints"
+  - "[ ] E2E tests for critical flows"

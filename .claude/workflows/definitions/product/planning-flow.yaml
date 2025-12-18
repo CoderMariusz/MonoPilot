@@ -1,0 +1,999 @@
+# Planning Flow Workflow
+# Connects discovery outputs to epic breakdown
+# Handles portfolio planning, epic scoping, and roadmap adjustments
+#
+# Documentation: @.claude/workflows/documentation/PLANNING-FLOW.md
+# Inputs from: @.claude/workflows/documentation/DISCOVERY-FLOW.md
+# Outputs to: @.claude/workflows/documentation/EPIC-WORKFLOW.md
+
+name: planning-flow
+description: Strategic planning workflow - from discovery to sprint-ready epics
+trigger: "planning | roadmap | prioritization | epic_planning"
+
+# Expected duration: 1-3 sessions depending on scope
+# Parallelization: Research agents can run in parallel
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE FLOW DIAGRAM
+# ═══════════════════════════════════════════════════════════════════
+#
+#   1. CONTEXT GATHERING (ORCHESTRATOR)
+#            |
+#            v
+#   2. PRD/OUTCOMES (PM-AGENT)
+#            |
+#            v
+#   3. PRD VALIDATION (PRODUCT-OWNER)
+#            |
+#            v
+#   4. ARCHITECTURE - technical design only (ARCHITECT-AGENT)
+#      - system-overview.md
+#      - ADRs
+#      - NO epic breakdown here!
+#            |
+#            v
+#   5. UX DESIGN (UX-DESIGNER) - after architecture for technical context
+#      - wireframes
+#      - user flows
+#      - component specs
+#            |
+#            v
+#   6. EPIC BREAKDOWN (ARCHITECT-AGENT) - separate from architecture
+#      - epic identification
+#      - dependency mapping
+#      - risk assessment
+#            |
+#            v
+#   7. PRIORITIZATION/ROADMAP (PRODUCT-OWNER)
+#            |
+#            v
+#   8. STORY BREAKDOWN (SPRINT INTAKE)
+#            |
+#            v
+#   9. CONFIRMATION
+#
+# ═══════════════════════════════════════════════════════════════════
+
+modes:
+  - id: portfolio
+    description: "Full portfolio planning - new project or major pivot"
+    triggers:
+      - "new_project"
+      - "major_pivot"
+      - "annual_planning"
+    phases: [context, outcomes, prd_validation, architecture, ux_design, epic_breakdown, prioritization, sprint_intake, confirmation]
+
+  - id: epic_scoped
+    description: "Single epic deep-dive - feature expansion"
+    triggers:
+      - "new_feature"
+      - "epic_expansion"
+    phases: [context, ux_design, epic_breakdown, prioritization, confirmation]
+    skip_phases: [outcomes, prd_validation, architecture]
+
+  - id: adjustment
+    description: "Quick priority adjustment - mid-sprint changes"
+    triggers:
+      - "priority_change"
+      - "scope_adjustment"
+      - "resource_change"
+    phases: [context, prioritization, confirmation]
+    skip_phases: [outcomes, prd_validation, architecture, ux_design, epic_breakdown]
+
+# Input sources - flexible, user can add more
+inputs:
+  required:
+    - type: discovery_output
+      source: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      description: "Output from DISCOVERY-FLOW"
+
+  optional:
+    - type: existing_prd
+      source: "docs/1-BASELINE/product/prd.md"
+      description: "Existing PRD if available"
+
+    - type: market_research
+      source: "docs/0-DISCOVERY/research/*.md"
+      description: "Research agent outputs"
+
+    - type: user_provided
+      source: "{user_input}"
+      description: "Additional context from user"
+
+    - type: external_docs
+      source: "{external_refs}"
+      description: "External documentation or specs"
+
+# Main workflow phases
+phases:
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 1: CONTEXT
+  # ═══════════════════════════════════════════════════════════════════
+  - id: context
+    name: "Context Gathering"
+    description: "Collect and validate all inputs for planning"
+    agent: ORCHESTRATOR
+    type: coordination
+
+    activities:
+      - "Validate discovery outputs are complete"
+      - "Identify gaps in information"
+      - "Trigger research agents if needed"
+      - "Consolidate all inputs"
+
+    parallel_research:
+      enabled: true
+      agents:
+        - RESEARCH-AGENT
+      triggers:
+        - "technology_unknown"
+        - "market_gap"
+        - "competitor_analysis_needed"
+
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+        - "@docs/0-DISCOVERY/research/*.md"
+
+    output:
+      deliverable: "docs/0-DISCOVERY/planning-context.md"
+
+    checkpoint:
+      - "All required inputs available"
+      - "Clarity score >= 60%"
+      - "No critical unknowns blocking"
+
+    gate:
+      id: CONTEXT_GATHERED
+      type: quality_gate
+      enforcer: ORCHESTRATOR
+      criteria:
+        - "All required inputs available"
+        - "Clarity score >= 60%"
+        - "No critical unknowns blocking"
+      on_pass: outcomes
+      on_fail:
+        action: return_to_phase
+        target: discovery_flow
+        message: "Need more information - returning to DISCOVERY-FLOW"
+      block_message: |
+        [STOP] Cannot proceed to OUTCOMES:
+        - Required inputs: {status}
+        - Clarity score: {score}%
+        - Critical unknowns: {count}
+
+    on_blocked:
+      action: trigger_discovery_agent
+      params:
+        type: gap_filling
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 2: OUTCOMES / PRD
+  # ═══════════════════════════════════════════════════════════════════
+  - id: outcomes
+    name: "Outcomes & PRD"
+    description: "Define measurable outcomes and create/update PRD"
+    agent: PM-AGENT
+    type: prd_creation
+
+    activities:
+      - "Define SMART success metrics"
+      - "Create/update PRD"
+      - "Apply MoSCoW prioritization to requirements"
+      - "Define explicit scope boundaries"
+
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/planning-context.md"
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      templates:
+        - "@.claude/templates/prd-template.md"
+
+    output:
+      deliverables:
+        - "docs/1-BASELINE/product/prd.md"
+        - "docs/1-BASELINE/product/success-metrics.md"
+
+    checkpoint:
+      - "All requirements have MoSCoW priority"
+      - "Success metrics are SMART"
+      - "Scope explicitly defined (IN/OUT/FUTURE)"
+      - "At least 3 MUST requirements defined"
+
+    gate:
+      id: PRD_COMPLETE
+      type: quality_gate
+      enforcer: PM-AGENT
+      criteria:
+        - "All requirements have MoSCoW priority"
+        - "Success metrics are SMART"
+        - "Scope explicitly defined (IN/OUT/FUTURE)"
+        - "At least 3 MUST requirements defined"
+      on_pass: prd_validation
+      on_fail:
+        action: iterate
+        target: outcomes
+        max_iterations: 2
+        message: "PRD incomplete - needs revision"
+      block_message: |
+        [STOP] Cannot proceed to PRD VALIDATION:
+        - MoSCoW priorities: {status}
+        - SMART metrics: {status}
+        - Scope definition: {status}
+        - MUST requirements: {count}/3
+
+    quality_criteria:
+      - name: requirement_completeness
+        check: "Each FR has: description, priority, AC, traces"
+      - name: nfr_coverage
+        check: "Performance, Security, Scalability addressed"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 3: PRD VALIDATION
+  # ═══════════════════════════════════════════════════════════════════
+  - id: prd_validation
+    name: "PRD Validation"
+    description: "Product Owner validates PRD before architecture"
+    agent: PRODUCT-OWNER
+    type: approval
+
+    activities:
+      - "Review PRD completeness"
+      - "Validate business alignment"
+      - "Approve scope boundaries"
+      - "Sign off on success metrics"
+
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/1-BASELINE/product/success-metrics.md"
+
+    checkpoint:
+      - "PRD business-aligned"
+      - "Scope approved"
+      - "Metrics realistic"
+
+    gate:
+      id: PRD_VALIDATED
+      type: approval_gate
+      enforcer: PRODUCT-OWNER
+      criteria:
+        - "PRD reviewed and approved"
+        - "Business alignment confirmed"
+        - "Scope boundaries accepted"
+      on_pass: architecture
+      on_fail:
+        action: return_to_phase
+        target: outcomes
+        message: "PRD needs revision based on PO feedback"
+      block_message: |
+        [STOP] Cannot proceed to ARCHITECTURE:
+        - PRD approval: {status}
+        - Business alignment: {status}
+        - Scope acceptance: {status}
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 4: ARCHITECTURE (Technical Design Only)
+  # ═══════════════════════════════════════════════════════════════════
+  - id: architecture
+    name: "Architecture & Technical Design"
+    description: "Create technical architecture - NO epic breakdown here"
+    agent: ARCHITECT-AGENT
+    type: technical_design
+
+    activities:
+      - "Create system overview"
+      - "Define technical components"
+      - "Document architectural decisions (ADRs)"
+      - "Identify technical constraints"
+      - "Define integration points"
+      - "Establish technical standards"
+
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/0-DISCOVERY/planning-context.md"
+      templates:
+        - "@.claude/templates/system-overview-template.md"
+        - "@.claude/templates/adr-template.md"
+
+    output:
+      deliverables:
+        - "docs/1-BASELINE/architecture/system-overview.md"
+        - "docs/1-BASELINE/architecture/decisions/ADR-*.md"
+        - "docs/1-BASELINE/architecture/technical-constraints.md"
+
+    checkpoint:
+      - "System overview complete"
+      - "Major architectural decisions documented"
+      - "Technical constraints identified"
+      - "Integration points defined"
+
+    gate:
+      id: ARCHITECTURE_COMPLETE
+      type: quality_gate
+      enforcer: ARCHITECT-AGENT
+      criteria:
+        - "System overview complete"
+        - "Major architectural decisions documented as ADRs"
+        - "Technical constraints identified"
+        - "Integration points defined"
+        - "Technical standards established"
+      on_pass: ux_design
+      on_fail:
+        action: iterate
+        target: architecture
+        max_iterations: 2
+        message: "Architecture incomplete - needs revision"
+      block_message: |
+        [STOP] Cannot proceed to UX DESIGN:
+        - System overview: {status}
+        - ADRs documented: {count}
+        - Technical constraints: {status}
+        - Integration points: {status}
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 5: UX DESIGN
+  # ═══════════════════════════════════════════════════════════════════
+  - id: ux_design
+    name: "UX Design"
+    description: "Create user experience design with technical context from architecture"
+    agent: UX-DESIGNER
+    type: ux_design
+
+    activities:
+      - "Review system overview for technical context"
+      - "Create user flow diagrams"
+      - "Design wireframes for key screens"
+      - "Define component specifications"
+      - "Document interaction patterns"
+      - "Create design system foundations"
+      - "Validate UX against technical constraints"
+
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/1-BASELINE/architecture/system-overview.md"
+        - "@docs/1-BASELINE/architecture/technical-constraints.md"
+      templates:
+        - "@.claude/templates/ux-wireframe-template.md"
+        - "@.claude/templates/user-flow-template.md"
+
+    output:
+      deliverables:
+        - "docs/1-BASELINE/ux/user-flows.md"
+        - "docs/1-BASELINE/ux/wireframes.md"
+        - "docs/1-BASELINE/ux/component-specs.md"
+        - "docs/1-BASELINE/ux/interaction-patterns.md"
+        - "docs/1-BASELINE/ux/design-system.md"
+
+    checkpoint:
+      - "User flows cover all PRD requirements"
+      - "Wireframes for key screens complete"
+      - "Component specifications defined"
+      - "UX validated against technical constraints"
+      - "Design system foundations established"
+
+    gate:
+      id: UX_APPROVED
+      type: approval_gate
+      enforcer: PRODUCT-OWNER
+      criteria:
+        - "User flows cover all PRD requirements"
+        - "Wireframes for key screens complete"
+        - "Component specifications defined"
+        - "UX validated against technical constraints"
+        - "Design system foundations established"
+        - "UX approved by Product Owner"
+      on_pass: epic_breakdown
+      on_fail:
+        action: iterate
+        target: ux_design
+        max_iterations: 2
+        message: "UX design needs revision"
+      block_message: |
+        [STOP] Cannot proceed to EPIC BREAKDOWN:
+        - User flows: {status}
+        - Wireframes: {status}
+        - Component specs: {status}
+        - Technical validation: {status}
+        - PO approval: {status}
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 6: EPIC BREAKDOWN
+  # ═══════════════════════════════════════════════════════════════════
+  - id: epic_breakdown
+    name: "Epic Breakdown"
+    description: "Identify epics, map dependencies, assess risks - SEPARATE from architecture"
+    agent: ARCHITECT-AGENT
+    type: epic_breakdown
+
+    sub_phases:
+
+      - id: epic_identification
+        agent: ARCHITECT-AGENT
+        type: epic_breakdown
+        description: "Identify and structure epics from PRD"
+
+        activities:
+          - "Map PRD requirements to epics"
+          - "Incorporate UX deliverables into epic scope"
+          - "Ensure each epic has clear boundaries"
+          - "Validate INVEST compliance at epic level"
+
+        input:
+          context_refs:
+            - "@docs/1-BASELINE/product/prd.md"
+            - "@docs/1-BASELINE/architecture/system-overview.md"
+            - "@docs/1-BASELINE/ux/user-flows.md"
+            - "@docs/1-BASELINE/ux/wireframes.md"
+          templates:
+            - "@.claude/templates/epic-template.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/epics/epic-catalog.md"
+
+        checkpoint:
+          - "Each PRD requirement mapped to epic"
+          - "UX deliverables incorporated"
+          - "Epic boundaries are clear"
+          - "No orphan requirements"
+
+      - id: dependency_mapping
+        agent: ARCHITECT-AGENT
+        type: dependency_analysis
+        description: "Map dependencies between epics"
+
+        activities:
+          - "Identify technical dependencies"
+          - "Identify business dependencies"
+          - "Identify UX dependencies"
+          - "Create dependency graph"
+          - "Identify critical path"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "@docs/1-BASELINE/architecture/system-overview.md"
+          templates:
+            - "@.claude/templates/epic-dependency-graph.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/epics/dependency-graph.md"
+
+        checkpoint:
+          - "All dependencies explicit"
+          - "No circular dependencies"
+          - "Critical path identified"
+
+      - id: risk_assessment
+        agent: ARCHITECT-AGENT
+        type: risk_analysis
+        description: "Assess risks per epic"
+
+        activities:
+          - "Identify technical risks"
+          - "Identify business risks"
+          - "Identify UX/usability risks"
+          - "Propose mitigations"
+          - "Flag unknowns requiring research"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "@docs/2-MANAGEMENT/epics/dependency-graph.md"
+          templates:
+            - "@.claude/templates/risk-registry.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/risks/risk-registry.md"
+
+        checkpoint:
+          - "Each epic has risk assessment"
+          - "High risks have mitigation plans"
+          - "Research spikes identified for unknowns"
+
+    gate:
+      id: EPICS_COMPLETE
+      type: quality_gate
+      enforcer: ARCHITECT-AGENT
+      criteria:
+        - "Each PRD requirement mapped to epic"
+        - "UX deliverables incorporated into epics"
+        - "Epic boundaries are clear"
+        - "All dependencies explicit"
+        - "No circular dependencies"
+        - "Critical path identified"
+        - "Each epic has risk assessment"
+        - "High risks have mitigation plans"
+      on_pass: prioritization
+      on_fail:
+        action: trigger_research
+        target: epic_breakdown.risk_assessment
+        agent: RESEARCH-AGENT
+        message: "Epic breakdown incomplete - research needed for unknowns"
+      block_message: |
+        [STOP] Cannot proceed to PRIORITIZATION:
+        - PRD mapping: {status}
+        - UX incorporation: {status}
+        - Epic boundaries: {status}
+        - Dependencies: {status}
+        - Circular deps: {count}
+        - Critical path: {status}
+        - Risk assessment: {status}
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 7: PRIORITIZATION
+  # ═══════════════════════════════════════════════════════════════════
+  - id: prioritization
+    name: "Prioritization & Roadmap"
+    description: "Prioritize epics and create roadmap"
+
+    sub_phases:
+
+      - id: value_scoring
+        agent: PRODUCT-OWNER
+        type: prioritization
+        description: "Score epics by business value"
+
+        activities:
+          - "Apply value scoring framework"
+          - "Consider dependencies in scoring"
+          - "Balance quick wins vs strategic"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "@docs/2-MANAGEMENT/epics/dependency-graph.md"
+            - "@docs/2-MANAGEMENT/risks/risk-registry.md"
+
+        scoring_criteria:
+          - business_value: "1-5 scale"
+          - user_impact: "1-5 scale"
+          - technical_risk: "1-5 scale (inverse)"
+          - dependency_weight: "0-3 scale"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/epics/prioritized-backlog.md"
+
+      - id: roadmap_creation
+        agent: PRODUCT-OWNER
+        type: roadmap
+        description: "Create NOW/NEXT/LATER roadmap"
+
+        activities:
+          - "Bucket epics into NOW/NEXT/LATER"
+          - "Respect dependency constraints"
+          - "Balance capacity with ambition"
+          - "Define milestone markers"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/prioritized-backlog.md"
+            - "@docs/2-MANAGEMENT/epics/dependency-graph.md"
+          templates:
+            - "@.claude/templates/roadmap.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/roadmap.md"
+
+        checkpoint:
+          - "NOW bucket has max 2-3 epics"
+          - "Dependencies respected in sequencing"
+          - "Clear milestone definitions"
+
+    gate:
+      id: ROADMAP_COMPLETE
+      type: quality_gate
+      enforcer: PRODUCT-OWNER
+      criteria:
+        - "NOW bucket has max 2-3 epics"
+        - "Dependencies respected in sequencing"
+        - "Clear milestone definitions"
+        - "Roadmap complete"
+      on_pass: sprint_intake
+      on_fail:
+        action: rebalance
+        target: prioritization.roadmap_creation
+        triggers:
+          - "NOW bucket > 3 epics"
+          - "dependency_violation"
+        message: "Prioritization needs rebalancing"
+      block_message: |
+        [STOP] Cannot proceed to SPRINT INTAKE:
+        - NOW bucket epics: {count}/3
+        - Dependency violations: {count}
+        - Milestones defined: {status}
+        - Roadmap status: {status}
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 8: SPRINT INTAKE
+  # ═══════════════════════════════════════════════════════════════════
+  - id: sprint_intake
+    name: "Sprint Intake Preparation"
+    description: "Prepare first epic(s) for sprint planning"
+
+    sub_phases:
+
+      - id: story_breakdown
+        agent: ARCHITECT-AGENT
+        type: story_creation
+        description: "Break NOW epics into INVEST stories"
+
+        activities:
+          - "Break epic into stories"
+          - "Apply INVEST criteria"
+          - "Define acceptance criteria"
+          - "Estimate complexity (S/M/L)"
+          - "Include UX requirements in stories"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/roadmap.md"
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "@docs/1-BASELINE/ux/wireframes.md"
+            - "@docs/1-BASELINE/ux/component-specs.md"
+          templates:
+            - "@.claude/templates/story-template.md"
+
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+
+        checkpoint:
+          - "All stories pass INVEST"
+          - "AC in Given/When/Then format"
+          - "Complexity estimated"
+          - "UX requirements incorporated"
+
+      - id: invest_validation
+        agent: PRODUCT-OWNER
+        type: story_review
+        description: "Validate stories against INVEST and PRD"
+
+        activities:
+          - "Review INVEST compliance"
+          - "Verify PRD traceability"
+          - "Check scope alignment"
+          - "Validate testability of AC"
+          - "Verify UX requirements included"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+            - "@docs/1-BASELINE/product/prd.md"
+            - "@docs/1-BASELINE/ux/user-flows.md"
+          templates:
+            - "@.claude/templates/story-checklist-template.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/reviews/invest-review-epic-{N}.md"
+
+        gate:
+          id: STORIES_VALIDATED
+          type: approval_gate
+          enforcer: PRODUCT-OWNER
+          criteria:
+            - "All stories pass INVEST"
+            - "AC in Given/When/Then format"
+            - "PRD traceability verified"
+            - "Scope alignment confirmed"
+            - "AC testability validated"
+            - "UX requirements incorporated"
+          on_pass: confirmation
+          on_fail:
+            action: return_to_phase
+            target: sprint_intake.story_breakdown
+            max_iterations: 2
+            message: "Stories need revision based on PO review"
+          block_message: |
+            [STOP] Cannot proceed to CONFIRMATION:
+            - INVEST compliance: {status}
+            - AC format: {status}
+            - PRD traceability: {status}
+            - Scope alignment: {status}
+            - AC testability: {status}
+            - UX requirements: {status}
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 9: CONFIRMATION
+  # ═══════════════════════════════════════════════════════════════════
+  - id: confirmation
+    name: "Planning Confirmation"
+    description: "Final review and handoff"
+    agent: ORCHESTRATOR
+    type: confirmation
+
+    activities:
+      - "Verify all artifacts created"
+      - "Confirm stakeholder alignment"
+      - "Prepare handoff to EPIC-WORKFLOW"
+
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/roadmap.md"
+        - "@docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+        - "@docs/2-MANAGEMENT/reviews/invest-review-epic-{N}.md"
+
+    output:
+      deliverable: "docs/2-MANAGEMENT/planning-summary.md"
+
+    summary_includes:
+      - "Roadmap overview"
+      - "First sprint candidates"
+      - "Key risks and mitigations"
+      - "Open questions for user"
+
+    checkpoint:
+      - "All planning artifacts complete"
+      - "Stories ready for sprint planning"
+      - "No blocking issues"
+
+    next_workflow:
+      workflow: "definitions/product/new-project.yaml"
+      start_at: "scope_validation"
+      # OR direct to EPIC-WORKFLOW
+      alternative:
+        workflow: "documentation/EPIC-WORKFLOW.md"
+        start_at: "Phase 2: Story Breakdown"
+
+# ═══════════════════════════════════════════════════════════════════
+# QUALITY GATES SUMMARY
+# ═══════════════════════════════════════════════════════════════════
+quality_gates:
+  # Context phase gate
+  CONTEXT_GATHERED:
+    phase: context
+    enforcer: ORCHESTRATOR
+    type: quality_gate
+    blocker: "Cannot proceed to outcomes definition"
+    criteria:
+      - "All required inputs available"
+      - "Clarity score >= 60%"
+      - "No critical unknowns blocking"
+
+  # Outcomes/PRD phase gate
+  PRD_COMPLETE:
+    phase: outcomes
+    enforcer: PM-AGENT
+    type: quality_gate
+    blocker: "Cannot proceed to PRD validation"
+    criteria:
+      - "All requirements have MoSCoW priority"
+      - "Success metrics are SMART"
+      - "Scope explicitly defined"
+      - "At least 3 MUST requirements"
+
+  # PRD validation gate
+  PRD_VALIDATED:
+    phase: prd_validation
+    enforcer: PRODUCT-OWNER
+    type: approval_gate
+    blocker: "Cannot proceed to architecture"
+    criteria:
+      - "PRD reviewed and approved"
+      - "Business alignment confirmed"
+      - "Scope boundaries accepted"
+
+  # Architecture phase gate
+  ARCHITECTURE_COMPLETE:
+    phase: architecture
+    enforcer: ARCHITECT-AGENT
+    type: quality_gate
+    blocker: "Cannot proceed to UX design"
+    criteria:
+      - "System overview complete"
+      - "Major architectural decisions documented as ADRs"
+      - "Technical constraints identified"
+      - "Integration points defined"
+      - "Technical standards established"
+
+  # UX Design phase gate
+  UX_APPROVED:
+    phase: ux_design
+    enforcer: PRODUCT-OWNER
+    type: approval_gate
+    blocker: "Cannot proceed to epic breakdown"
+    criteria:
+      - "User flows cover all PRD requirements"
+      - "Wireframes for key screens complete"
+      - "Component specifications defined"
+      - "UX validated against technical constraints"
+      - "Design system foundations established"
+      - "UX approved by Product Owner"
+
+  # Epic breakdown phase gate
+  EPICS_COMPLETE:
+    phase: epic_breakdown
+    enforcer: ARCHITECT-AGENT
+    type: quality_gate
+    blocker: "Cannot proceed to prioritization"
+    criteria:
+      - "Each PRD requirement mapped to epic"
+      - "UX deliverables incorporated into epics"
+      - "Epic boundaries are clear"
+      - "All dependencies explicit"
+      - "No circular dependencies"
+      - "Critical path identified"
+      - "Each epic has risk assessment"
+      - "High risks have mitigation plans"
+
+  # Prioritization phase gate
+  ROADMAP_COMPLETE:
+    phase: prioritization
+    enforcer: PRODUCT-OWNER
+    type: quality_gate
+    blocker: "Cannot proceed to sprint intake"
+    criteria:
+      - "NOW bucket has max 2-3 epics"
+      - "Dependencies respected in sequencing"
+      - "Clear milestone definitions"
+      - "Roadmap complete"
+
+  # Sprint intake phase gate
+  STORIES_VALIDATED:
+    phase: sprint_intake.invest_validation
+    enforcer: PRODUCT-OWNER
+    type: approval_gate
+    blocker: "Cannot proceed to confirmation"
+    criteria:
+      - "All stories pass INVEST"
+      - "AC in Given/When/Then format"
+      - "PRD traceability verified"
+      - "Scope alignment confirmed"
+      - "AC testability validated"
+      - "UX requirements incorporated"
+
+# ═══════════════════════════════════════════════════════════════════
+# ERROR HANDLING
+# ═══════════════════════════════════════════════════════════════════
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalation:
+    context_phase: DISCOVERY-AGENT
+    outcomes_phase: PM-AGENT
+    architecture_phase: ARCHITECT-AGENT
+    ux_design_phase: UX-DESIGNER
+    epic_breakdown_phase: ARCHITECT-AGENT
+    prioritization_phase: PRODUCT-OWNER
+    sprint_intake_phase: ARCHITECT-AGENT
+    default: ORCHESTRATOR
+
+error_recovery:
+  clarity_too_low:
+    actions:
+      - "Request more context from user"
+      - "Trigger discovery-agent for gap filling"
+      - "Return to DISCOVERY-FLOW if critical gaps"
+    if_still_blocked:
+      - "Escalate to user"
+      - "Document blocking issues"
+      - "Pause workflow"
+
+  circular_dependency:
+    actions:
+      - "Identify circular dependency chain"
+      - "Propose dependency resolution options"
+      - "Escalate to architect-agent"
+    if_still_blocked:
+      - "Escalate to user for decision"
+      - "Document architecture constraint"
+
+  scope_creep_detected:
+    actions:
+      - "Identify new scope items"
+      - "Categorize as IN/OUT/FUTURE"
+      - "Pause for user confirmation"
+    if_still_blocked:
+      - "Log scope change request"
+      - "Return to outcomes phase if significant"
+
+  prd_validation_failed:
+    actions:
+      - "Document PO feedback"
+      - "Return to outcomes phase"
+      - "Iterate with PM-AGENT"
+    max_iterations: 2
+    if_still_blocked:
+      - "Escalate to user"
+      - "Request stakeholder alignment session"
+
+  architecture_incomplete:
+    actions:
+      - "Identify missing architectural elements"
+      - "Document technical questions"
+      - "Return to architecture phase"
+    max_iterations: 2
+    if_still_blocked:
+      - "Escalate to user"
+      - "Request technical SME input"
+
+  ux_rejected:
+    actions:
+      - "Document PO feedback on UX"
+      - "Return to ux_design phase"
+      - "Iterate with UX-DESIGNER"
+    max_iterations: 2
+    if_still_blocked:
+      - "Escalate to user"
+      - "Request UX stakeholder review"
+
+  stories_rejected:
+    actions:
+      - "Document rejection reasons"
+      - "Return to story_breakdown"
+      - "Re-apply INVEST criteria"
+    max_iterations: 2
+    if_still_blocked:
+      - "Escalate to architect-agent"
+      - "Consider epic restructuring"
+
+# ═══════════════════════════════════════════════════════════════════
+# ARTIFACTS
+# ═══════════════════════════════════════════════════════════════════
+artifacts:
+  planning_context:
+    path: "docs/0-DISCOVERY/planning-context.md"
+    created_by: context
+
+  prd:
+    path: "docs/1-BASELINE/product/prd.md"
+    created_by: outcomes
+
+  system_overview:
+    path: "docs/1-BASELINE/architecture/system-overview.md"
+    created_by: architecture
+
+  adrs:
+    path: "docs/1-BASELINE/architecture/decisions/ADR-*.md"
+    created_by: architecture
+
+  technical_constraints:
+    path: "docs/1-BASELINE/architecture/technical-constraints.md"
+    created_by: architecture
+
+  user_flows:
+    path: "docs/1-BASELINE/ux/user-flows.md"
+    created_by: ux_design
+
+  wireframes:
+    path: "docs/1-BASELINE/ux/wireframes.md"
+    created_by: ux_design
+
+  component_specs:
+    path: "docs/1-BASELINE/ux/component-specs.md"
+    created_by: ux_design
+
+  interaction_patterns:
+    path: "docs/1-BASELINE/ux/interaction-patterns.md"
+    created_by: ux_design
+
+  design_system:
+    path: "docs/1-BASELINE/ux/design-system.md"
+    created_by: ux_design
+
+  epic_catalog:
+    path: "docs/2-MANAGEMENT/epics/epic-catalog.md"
+    created_by: epic_breakdown.epic_identification
+
+  dependency_graph:
+    path: "docs/2-MANAGEMENT/epics/dependency-graph.md"
+    created_by: epic_breakdown.dependency_mapping
+
+  risk_registry:
+    path: "docs/2-MANAGEMENT/risks/risk-registry.md"
+    created_by: epic_breakdown.risk_assessment
+
+  roadmap:
+    path: "docs/2-MANAGEMENT/roadmap.md"
+    created_by: prioritization.roadmap_creation
+
+  stories:
+    path: "docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+    created_by: sprint_intake.story_breakdown
+
+  planning_summary:
+    path: "docs/2-MANAGEMENT/planning-summary.md"
+    created_by: confirmation

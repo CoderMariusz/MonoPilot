@@ -1,0 +1,69 @@
+# Story 01.16 - Database Schema
+# Purpose: user_invitations table with expiry and status tracking
+# Agent: BACKEND-DEV
+
+migrations:
+  - path: "supabase/migrations/067_create_user_invitations_table.sql"
+    type: "migration"
+    description: "User invitations table with token, expiry, status"
+
+tables:
+  - name: "user_invitations"
+    description: "Pending user invitations with secure tokens"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "email", type: "VARCHAR(255)", constraints: "NOT NULL" }
+      - { name: "role_id", type: "UUID", constraints: "NOT NULL REFERENCES roles(id)" }
+      - { name: "token", type: "VARCHAR(64)", constraints: "UNIQUE NOT NULL" }
+      - { name: "expires_at", type: "TIMESTAMPTZ", constraints: "NOT NULL" }
+      - { name: "invited_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "status", type: "VARCHAR(20)", constraints: "NOT NULL DEFAULT 'pending'" }
+      - { name: "accepted_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "cancelled_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_user_invitations_token ON user_invitations(token) WHERE status = 'pending'"
+      - "idx_user_invitations_org_status ON user_invitations(org_id, status)"
+    constraints:
+      - "UNIQUE(org_id, email, status)"
+      - "CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled'))"
+    notes:
+      - "status: 'pending', 'accepted', 'expired', 'cancelled'"
+      - "Only one pending invitation per email per org"
+
+# RLS Policies
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "user_invitations"
+      name: "invitations_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "user_invitations"
+      name: "invitations_admin_write"
+      operation: "ALL"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('SUPER_ADMIN', 'ADMIN')
+        )
+
+# Token Generation (implementation note)
+token_generation:
+  method: "crypto.randomBytes(32).toString('hex')"
+  length: "64 characters (32 bytes hex-encoded)"
+  security: "Cryptographically secure"
+
+# Expiry Calculation
+expiry:
+  default_days: 7
+  calculation: "NOW() + INTERVAL '7 days'"
+  cron_job: "Daily task to mark expired invitations"

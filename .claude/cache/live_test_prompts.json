@@ -1,0 +1,167 @@
+{
+  "version": "1.0.0",
+  "description": "Live test prompts for cache validation in real usage",
+  "testCategories": {
+    "authentication": {
+      "basePrompt": "How do I implement JWT authentication in my Node.js backend?",
+      "similarPrompts": [
+        "Add JWT auth to Express API",
+        "Implement token-based authentication in Node",
+        "Setup JWT for user login in Node.js app",
+        "What's the best way to handle JWT auth in Express?"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["authentication", "jwt", "nodejs", "security"]
+    },
+    "database": {
+      "basePrompt": "How to optimize PostgreSQL queries for better performance?",
+      "similarPrompts": [
+        "Improve Postgres database speed",
+        "PostgreSQL query optimization techniques",
+        "Speed up slow SQL queries in PostgreSQL",
+        "Best practices for PostgreSQL performance"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["postgresql", "optimization", "database", "performance"]
+    },
+    "react": {
+      "basePrompt": "What are React hooks and how do I use them effectively?",
+      "similarPrompts": [
+        "Explain React hooks with examples",
+        "How to use useState and useEffect",
+        "React hooks best practices",
+        "Guide to React hooks for beginners"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["react", "hooks", "frontend", "javascript"]
+    },
+    "supabase": {
+      "basePrompt": "How do I setup Row Level Security (RLS) policies in Supabase?",
+      "similarPrompts": [
+        "Implement RLS in Supabase database",
+        "Supabase security policies configuration",
+        "Setup auth-based RLS in Supabase",
+        "Best practices for Supabase RLS"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["supabase", "rls", "security", "database"]
+    },
+    "nextjs": {
+      "basePrompt": "How to use Next.js App Router and Server Components?",
+      "similarPrompts": [
+        "Next.js 13 App Router tutorial",
+        "Server Components vs Client Components in Next.js",
+        "Migrate from Pages to App Router in Next.js",
+        "Best practices for Next.js App Router"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["nextjs", "app-router", "server-components", "react"]
+    },
+    "typescript": {
+      "basePrompt": "How do TypeScript generics work and when should I use them?",
+      "similarPrompts": [
+        "TypeScript generics explained with examples",
+        "When to use generic types in TypeScript",
+        "Advanced TypeScript generics patterns",
+        "Generic constraints in TypeScript"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["typescript", "generics", "types", "advanced"]
+    },
+    "api": {
+      "basePrompt": "How to implement REST API pagination properly?",
+      "similarPrompts": [
+        "Add pagination to Express API",
+        "REST API pagination best practices",
+        "Cursor-based vs offset pagination",
+        "Implement limit/offset pagination in API"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["api", "rest", "pagination", "backend"]
+    },
+    "deployment": {
+      "basePrompt": "How do I deploy a Next.js application to production?",
+      "similarPrompts": [
+        "Deploy Next.js to Vercel",
+        "Production deployment guide for Next.js",
+        "Next.js deployment best practices",
+        "Setup CI/CD for Next.js app"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["nextjs", "deployment", "production", "devops"]
+    },
+    "testing": {
+      "basePrompt": "How to write unit tests for React components?",
+      "similarPrompts": [
+        "React testing library examples",
+        "Test React hooks with Vitest",
+        "Best practices for React component testing",
+        "Mock API calls in React tests"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["testing", "react", "vitest", "unit-tests"]
+    },
+    "git": {
+      "basePrompt": "What is the best Git branching strategy for teams?",
+      "similarPrompts": [
+        "Git flow vs trunk-based development",
+        "Team collaboration with Git branches",
+        "Feature branch workflow in Git",
+        "Git branching best practices"
+      ],
+      "expectedCacheLayer": "semantic",
+      "tags": ["git", "workflow", "team", "best-practices"]
+    }
+  },
+  "exactMatchTests": {
+    "description": "Tests for exact match cache (Hot + Cold)",
+    "prompts": [
+      "What is the capital of France?",
+      "How many planets are in our solar system?",
+      "What is 2 + 2?",
+      "Who wrote Romeo and Juliet?",
+      "What is the speed of light?"
+    ]
+  },
+  "stressTest": {
+    "description": "Stress test with many variations",
+    "basePrompt": "How to handle errors in JavaScript?",
+    "variations": [
+      "JavaScript error handling best practices",
+      "Try-catch in JavaScript",
+      "Error handling patterns in JS",
+      "How to catch and handle errors in JavaScript",
+      "JavaScript exception handling guide",
+      "Best way to manage errors in JavaScript code",
+      "Error handling in async JavaScript",
+      "Promise error handling in JavaScript",
+      "Global error handler in JavaScript"
+    ]
+  },
+  "crossProjectTests": {
+    "description": "Tests for global knowledge base sharing",
+    "projectSpecific": [
+      {
+        "project": "MonoPilot",
+        "prompt": "How to implement License Plate tracking in MES system?",
+        "tags": ["mes", "inventory", "tracking", "monopilot"]
+      },
+      {
+        "project": "MonoPilot",
+        "prompt": "What is FIFO/FEFO picking strategy?",
+        "tags": ["warehouse", "picking", "fifo", "fefo"]
+      },
+      {
+        "project": "General",
+        "prompt": "How to implement multi-tenancy in Supabase?",
+        "tags": ["supabase", "multi-tenancy", "rls", "saas"]
+      }
+    ]
+  },
+  "metadata": {
+    "totalCategories": 10,
+    "totalPrompts": 50,
+    "createdAt": "2025-12-11",
+    "purpose": "Live cache testing and validation"
+  }
+}

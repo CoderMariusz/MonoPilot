@@ -1,0 +1,411 @@
+# Story 05.8 - API Specification
+# Purpose: Endpoints, request/response schemas, services, validation
+# Agent: BACKEND-DEV (API focus)
+
+# API Endpoints
+endpoints:
+  # ASN CRUD
+  - method: "GET"
+    path: "/api/warehouse/asns"
+    description: "List ASNs with filters, sort, pagination"
+    file: "apps/frontend/app/api/warehouse/asns/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "warehouse_operator", "production_manager"]
+    feature_flag: "enable_asn"
+    query_params:
+      - { name: "search", type: "string", description: "Search by ASN number, PO number, or supplier name" }
+      - { name: "status", type: "string", description: "Filter by status (pending, partial, received, cancelled)" }
+      - { name: "supplier_id", type: "uuid", description: "Filter by supplier" }
+      - { name: "po_id", type: "uuid", description: "Filter by PO" }
+      - { name: "date_from", type: "date", description: "Expected date from" }
+      - { name: "date_to", type: "date", description: "Expected date to" }
+      - { name: "sort", type: "string", description: "Sort field (asn_number, expected_date, created_at)" }
+      - { name: "order", type: "string", description: "Sort order (asc, desc)" }
+      - { name: "page", type: "number", description: "Page number (default 1)" }
+      - { name: "limit", type: "number", description: "Items per page (default 20, max 100)" }
+    response:
+      status: 200
+      type: "PaginatedResult<ASNListItem>"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FEATURE_DISABLED", message: "ASN feature is disabled" }
+
+  - method: "POST"
+    path: "/api/warehouse/asns"
+    description: "Create ASN with header and items"
+    file: "apps/frontend/app/api/warehouse/asns/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "production_manager"]
+    feature_flag: "enable_asn"
+    request_body: "CreateASNInput"
+    response:
+      status: 201
+      type: "ASNWithDetails"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 400, code: "PO_FULLY_RECEIVED", message: "Cannot create ASN for fully received PO" }
+      - { status: 403, code: "FEATURE_DISABLED", message: "ASN feature is disabled" }
+
+  - method: "GET"
+    path: "/api/warehouse/asns/:id"
+    description: "Get ASN detail with items"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "warehouse_operator", "production_manager"]
+    feature_flag: "enable_asn"
+    response:
+      status: 200
+      type: "ASNWithDetails"
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "ASN not found" }
+      - { status: 403, code: "FEATURE_DISABLED", message: "ASN feature is disabled" }
+
+  - method: "PUT"
+    path: "/api/warehouse/asns/:id"
+    description: "Update ASN header (only if status=pending)"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "production_manager"]
+    feature_flag: "enable_asn"
+    request_body: "UpdateASNInput"
+    response:
+      status: 200
+      type: "ASN"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 400, code: "CANNOT_MODIFY", message: "Cannot modify ASN in {status} status" }
+      - { status: 404, code: "NOT_FOUND", message: "ASN not found" }
+
+  - method: "DELETE"
+    path: "/api/warehouse/asns/:id"
+    description: "Delete ASN (only if status=pending and no receipts)"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager"]
+    feature_flag: "enable_asn"
+    response:
+      status: 204
+    errors:
+      - { status: 400, code: "CANNOT_DELETE", message: "Cannot delete ASN with received items" }
+      - { status: 404, code: "NOT_FOUND", message: "ASN not found" }
+
+  - method: "POST"
+    path: "/api/warehouse/asns/:id/cancel"
+    description: "Cancel ASN (only if status=pending)"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/cancel/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager"]
+    feature_flag: "enable_asn"
+    response:
+      status: 200
+      type: "ASN"
+    errors:
+      - { status: 400, code: "CANNOT_CANCEL", message: "Cannot cancel ASN with received items" }
+      - { status: 404, code: "NOT_FOUND", message: "ASN not found" }
+
+  # ASN Items CRUD
+  - method: "POST"
+    path: "/api/warehouse/asns/:id/items"
+    description: "Add item to ASN"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/items/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "production_manager"]
+    feature_flag: "enable_asn"
+    request_body: "CreateASNItemInput"
+    response:
+      status: 201
+      type: "ASNItem"
+    errors:
+      - { status: 400, code: "DUPLICATE_PRODUCT", message: "Product already exists in ASN items" }
+      - { status: 400, code: "CANNOT_MODIFY", message: "Cannot modify ASN in {status} status" }
+      - { status: 404, code: "NOT_FOUND", message: "ASN not found" }
+
+  - method: "PUT"
+    path: "/api/warehouse/asns/:id/items/:itemId"
+    description: "Update ASN item"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/items/[itemId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "production_manager"]
+    feature_flag: "enable_asn"
+    request_body: "UpdateASNItemInput"
+    response:
+      status: 200
+      type: "ASNItem"
+    errors:
+      - { status: 400, code: "CANNOT_MODIFY", message: "Cannot modify ASN in {status} status" }
+      - { status: 404, code: "NOT_FOUND", message: "ASN item not found" }
+
+  - method: "DELETE"
+    path: "/api/warehouse/asns/:id/items/:itemId"
+    description: "Delete ASN item (only if status=pending)"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/items/[itemId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager"]
+    feature_flag: "enable_asn"
+    response:
+      status: 204
+    errors:
+      - { status: 400, code: "CANNOT_MODIFY", message: "Cannot modify ASN in {status} status" }
+      - { status: 404, code: "NOT_FOUND", message: "ASN item not found" }
+
+  # ASN Workflows
+  - method: "POST"
+    path: "/api/warehouse/asns/:id/receive"
+    description: "Initiate receiving from ASN (create GRN pre-filled with ASN data)"
+    file: "apps/frontend/app/api/warehouse/asns/[id]/receive/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+    feature_flag: "enable_asn"
+    response:
+      status: 201
+      type: "{ grn_id: string }"
+    errors:
+      - { status: 400, code: "ALREADY_RECEIVED", message: "ASN already fully received" }
+      - { status: 404, code: "NOT_FOUND", message: "ASN not found" }
+
+  - method: "GET"
+    path: "/api/warehouse/asns/expected-today"
+    description: "Get ASNs expected today (for dashboard widget)"
+    file: "apps/frontend/app/api/warehouse/asns/expected-today/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "warehouse_operator", "production_manager"]
+    feature_flag: "enable_asn"
+    response:
+      status: 200
+      type: "ASN[]"
+
+  - method: "POST"
+    path: "/api/warehouse/asns/from-po/:poId"
+    description: "Create ASN from PO (auto-populate items from PO lines)"
+    file: "apps/frontend/app/api/warehouse/asns/from-po/[poId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "warehouse_manager", "production_manager"]
+    feature_flag: "enable_asn"
+    request_body: "CreateASNFromPOInput"
+    response:
+      status: 201
+      type: "ASNWithDetails"
+    errors:
+      - { status: 400, code: "PO_FULLY_RECEIVED", message: "Cannot create ASN for fully received PO" }
+      - { status: 400, code: "PO_NOT_APPROVED", message: "Cannot create ASN for PO not in confirmed/receiving status" }
+      - { status: 404, code: "NOT_FOUND", message: "PO not found" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/asn-service.ts"
+    description: "ASN CRUD, status transitions, workflows"
+    exports:
+      # Types
+      - name: "ASN"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "asn_number: string"
+          - "po_id: string"
+          - "supplier_id: string"
+          - "expected_date: string"
+          - "actual_date?: string"
+          - "carrier?: string"
+          - "tracking_number?: string"
+          - "status: ASNStatus"
+          - "notes?: string"
+          - "created_at: string"
+          - "created_by: string"
+          - "updated_at: string"
+
+      - name: "ASNItem"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "asn_id: string"
+          - "product_id: string"
+          - "po_line_id?: string"
+          - "expected_qty: number"
+          - "received_qty: number"
+          - "uom: string"
+          - "supplier_lp_number?: string"
+          - "supplier_batch_number?: string"
+          - "gtin?: string"
+          - "expiry_date?: string"
+          - "notes?: string"
+
+      - name: "ASNWithDetails"
+        type: "interface"
+        extends: "ASN"
+        additional_fields:
+          - "items: ASNItem[]"
+          - "supplier_name: string"
+          - "po_number: string"
+
+      - name: "ASNStatus"
+        type: "type"
+        value: "'pending' | 'partial' | 'received' | 'cancelled'"
+
+      # CRUD Functions
+      - name: "listASNs"
+        type: "async function"
+        params: ["filters: ASNFilters"]
+        returns: "Promise<PaginatedResult<ASNListItem>>"
+        description: "List ASNs with filters, sort, pagination"
+
+      - name: "getASNById"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<ASNWithDetails | null>"
+        description: "Get ASN detail with items"
+
+      - name: "createASN"
+        type: "async function"
+        params: ["data: CreateASNInput"]
+        returns: "Promise<ASN>"
+        description: "Create ASN with header and items"
+
+      - name: "updateASN"
+        type: "async function"
+        params: ["id: string", "data: UpdateASNInput"]
+        returns: "Promise<ASN>"
+        description: "Update ASN header"
+
+      - name: "deleteASN"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<void>"
+        description: "Delete ASN (soft delete via cancel if has items)"
+
+      - name: "cancelASN"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<ASN>"
+        description: "Cancel ASN (status -> cancelled)"
+
+      # ASN Items Functions
+      - name: "addASNItem"
+        type: "async function"
+        params: ["asnId: string", "item: CreateASNItemInput"]
+        returns: "Promise<ASNItem>"
+        description: "Add item to ASN"
+
+      - name: "updateASNItem"
+        type: "async function"
+        params: ["asnId: string", "itemId: string", "data: UpdateASNItemInput"]
+        returns: "Promise<ASNItem>"
+        description: "Update ASN item"
+
+      - name: "deleteASNItem"
+        type: "async function"
+        params: ["asnId: string", "itemId: string"]
+        returns: "Promise<void>"
+        description: "Delete ASN item"
+
+      # Workflow Functions
+      - name: "createASNFromPO"
+        type: "async function"
+        params: ["poId: string", "data: CreateASNFromPOInput"]
+        returns: "Promise<ASNWithDetails>"
+        description: "Create ASN from PO (auto-populate items from unreceived PO lines)"
+
+      - name: "initiateReceivingFromASN"
+        type: "async function"
+        params: ["asnId: string"]
+        returns: "Promise<{ grn_id: string }>"
+        description: "Create GRN pre-filled with ASN data"
+
+      - name: "getExpectedTodayASNs"
+        type: "async function"
+        params: []
+        returns: "Promise<ASN[]>"
+        description: "Get ASNs expected today for dashboard widget"
+
+      - name: "updateASNStatus"
+        type: "async function"
+        params: ["asnId: string"]
+        returns: "Promise<void>"
+        description: "Auto-update ASN status based on received quantities"
+
+      # Utility Functions
+      - name: "generateASNNumber"
+        type: "async function"
+        params: ["orgId: string"]
+        returns: "Promise<string>"
+        description: "Generate next ASN number (ASN-YYYY-NNNNN)"
+
+      - name: "canDeleteASN"
+        type: "async function"
+        params: ["asnId: string"]
+        returns: "Promise<boolean>"
+        description: "Check if ASN can be deleted"
+
+      - name: "canEditASN"
+        type: "async function"
+        params: ["asnId: string"]
+        returns: "Promise<boolean>"
+        description: "Check if ASN can be edited"
+
+      - name: "getTrackingUrl"
+        type: "function"
+        params: ["carrier: string", "trackingNumber: string"]
+        returns: "string | null"
+        description: "Generate tracking URL for known carriers"
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/warehouse-schemas.ts"
+  schemas:
+    - name: "asnSchema"
+      description: "ASN header validation"
+      fields:
+        - { name: "po_id", validation: "z.string().uuid('Invalid purchase order ID')" }
+        - { name: "expected_date", validation: "z.string().date().refine(date => new Date(date) >= new Date(new Date().setHours(0,0,0,0)), 'Expected delivery date must be today or in the future')" }
+        - { name: "carrier", validation: "z.string().optional()" }
+        - { name: "tracking_number", validation: "z.string().optional()" }
+        - { name: "notes", validation: "z.string().optional()" }
+
+    - name: "asnItemSchema"
+      description: "ASN item validation"
+      fields:
+        - { name: "product_id", validation: "z.string().uuid('Invalid product ID')" }
+        - { name: "expected_qty", validation: "z.number().positive('Expected quantity must be greater than 0')" }
+        - { name: "uom", validation: "z.string().min(1, 'Unit of measure is required')" }
+        - { name: "supplier_lp_number", validation: "z.string().optional()" }
+        - { name: "supplier_batch_number", validation: "z.string().optional()" }
+        - { name: "gtin", validation: "z.string().regex(/^\\d{14}$/, 'GTIN must be 14 digits').optional()" }
+        - { name: "expiry_date", validation: "z.string().date().optional()" }
+        - { name: "notes", validation: "z.string().optional()" }
+
+    - name: "createASNSchema"
+      description: "Create ASN with header + items"
+      extends: "asnSchema"
+      additional:
+        - { name: "items", validation: "z.array(asnItemSchema).min(1, 'At least one item is required')" }
+
+    - name: "updateASNSchema"
+      description: "Update ASN header (partial)"
+      base: "asnSchema.partial()"
+
+    - name: "createASNFromPOSchema"
+      description: "Create ASN from PO with optional overrides"
+      fields:
+        - { name: "po_id", validation: "z.string().uuid('Invalid purchase order ID')" }
+        - { name: "expected_date", validation: "z.string().date()" }
+        - { name: "carrier", validation: "z.string().optional()" }
+        - { name: "tracking_number", validation: "z.string().optional()" }
+        - { name: "notes", validation: "z.string().optional()" }
+        - { name: "item_overrides", validation: "z.array(z.object({ po_line_id: z.string().uuid(), expected_qty: z.number().positive().optional(), supplier_batch_number: z.string().optional(), gtin: z.string().optional(), expiry_date: z.string().date().optional() })).optional()" }
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/warehouse.ts"
+    description: "Warehouse module TypeScript interfaces"
+    exports:
+      - "ASN"
+      - "ASNItem"
+      - "ASNWithDetails"
+      - "ASNListItem"
+      - "ASNStatus"
+      - "ASNFilters"
+      - "CreateASNInput"
+      - "UpdateASNInput"
+      - "CreateASNItemInput"
+      - "UpdateASNItemInput"
+      - "CreateASNFromPOInput"

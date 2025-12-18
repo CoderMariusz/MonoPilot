@@ -1,0 +1,28 @@
+{
+  "name": "@claude/cache-system",
+  "version": "1.0.0",
+  "description": "2-layer caching system for Agent Methodology Pack - optimizes token usage",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --test",
+    "stats": "node dist/cli.js stats"
+  },
+  "keywords": [
+    "cache",
+    "lru",
+    "tokens",
+    "optimization",
+    "claude"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

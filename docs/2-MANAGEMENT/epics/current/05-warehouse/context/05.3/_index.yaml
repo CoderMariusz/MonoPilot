@@ -1,0 +1,108 @@
+# Story 05.3 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.3"
+  name: "LP Reservations + FIFO/FEFO"
+  slug: "lp-reservations-fifo-fefo"
+  epic: "05-warehouse"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 4
+  type: "backend + frontend"
+  model: "opus"
+  state: "ready"
+  priority: "P0"  # Critical - unblocks Epic 04
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, services, validation
+  - frontend.yaml    # Components, types, UI
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings.enable_fifo", "warehouse_settings.enable_fefo"]
+    - story: "05.1"
+      name: "LP Table + Basic Service"
+      provides: ["license_plates table", "lp-service.ts"]
+    - story: "03.10"
+      epic: "03-planning"
+      name: "Work Orders Table"
+      provides: ["work_orders table"]
+  blocked_by: []
+  blocks:
+    - story: "04.8"
+      epic: "04-production"
+      name: "Material Reservations"
+      reason: "Needs lp_reservations table and FIFO/FEFO service methods"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-019", "WH-FR-020", "WH-FR-027"]
+  production_prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-016"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["Database Schema", "lp_reservations"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.3.lp-reservations-fifo-fefo.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      sections: ["Reservations Panel"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for lp_reservations"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "lp_reservations table with RLS and indexes"
+  - type: "service"
+    count: 2
+    description: "lp-reservation-service.ts, fifo-fefo-service.ts"
+  - type: "api"
+    count: 8
+    description: "Reservation and picking endpoints"
+  - type: "validation"
+    count: 1
+    description: "reservation-schemas.ts"
+  - type: "components"
+    count: 4
+    description: "ReservationsTable, ReservationsPanel, FIFOFEFOSuggestions, ReleaseModal"
+  - type: "test"
+    count: 3
+    description: "Unit tests, integration tests, FIFO/FEFO algorithm tests"
+
+# Critical blocker notice
+critical_notice: |
+  THIS STORY IS A HARD BLOCKER FOR EPIC 04 PRODUCTION PHASE 1
+
+  Epic 04.8 (Material Reservations) cannot proceed without:
+  1. lp_reservations table with full schema
+  2. FIFO algorithm for finding available LPs
+  3. FEFO algorithm for expiry-based selection
+  4. Multi-LP allocation when single LP insufficient
+  5. Reservation service methods for Epic 04.8 to consume
+
+# Technical notes
+technical_notes:
+  - "Root story for reservation system - Epic 04.8 depends on this"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "FIFO: ORDER BY created_at ASC"
+  - "FEFO: ORDER BY expiry_date ASC, created_at ASC (NULLs last)"
+  - "Both FIFO+FEFO enabled: FEFO takes precedence"
+  - "Expired LPs excluded from suggestions"
+  - "Only qa_status='passed' LPs can be reserved"
+  - "Multi-LP allocation for partial fulfillment"
+  - "Violation warning only, not blocking (audit logged)"

@@ -1,0 +1,539 @@
+# Story 02.4 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ============================================
+  # LIST BOMs
+  # ============================================
+  - method: "GET"
+    path: "/api/v1/technical/boms"
+    description: "List BOMs with pagination, search, and filters"
+    file: "apps/frontend/app/api/v1/technical/boms/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - { name: "page", type: "number", default: 1, description: "Page number" }
+        - { name: "limit", type: "number", default: 50, description: "Items per page (max 100)" }
+        - { name: "search", type: "string", optional: true, description: "Search by product code or name" }
+        - { name: "status", type: "string", optional: true, description: "Filter by status: draft|active|phased_out|inactive" }
+        - { name: "product_type", type: "string", optional: true, description: "Filter by product type code" }
+        - { name: "effective_date", type: "string", optional: true, description: "Date filter: current|future|expired" }
+        - { name: "product_id", type: "uuid", optional: true, description: "Filter by specific product" }
+        - { name: "sortBy", type: "string", default: "effective_from", description: "Sort field" }
+        - { name: "sortOrder", type: "string", default: "desc", description: "Sort order: asc|desc" }
+
+    response:
+      status: 200
+      type: "BOMsListResponse"
+      schema:
+        boms: "BOMWithProduct[]"
+        total: "number"
+        page: "number"
+        limit: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+  # ============================================
+  # GET BOM BY ID
+  # ============================================
+  - method: "GET"
+    path: "/api/v1/technical/boms/:id"
+    description: "Get single BOM with product details"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        - { name: "id", type: "uuid", description: "BOM ID" }
+
+    response:
+      status: 200
+      type: "BOMWithProduct"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+        when: "BOM does not exist or belongs to different org (RLS)"
+
+  # ============================================
+  # CREATE BOM
+  # ============================================
+  - method: "POST"
+    path: "/api/v1/technical/boms"
+    description: "Create new BOM with auto-versioning"
+    file: "apps/frontend/app/api/v1/technical/boms/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        type: "CreateBOMRequest"
+        schema:
+          product_id: "string (uuid, required)"
+          effective_from: "string (ISO date, required)"
+          effective_to: "string | null (ISO date, optional)"
+          status: "string (draft|active, default: draft)"
+          output_qty: "number (required, > 0)"
+          output_uom: "string (required)"
+          notes: "string | null (optional, max 2000 chars)"
+
+    response:
+      status: 201
+      type: "BOMWithProduct"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        details: "Zod validation errors"
+      - status: 400
+        code: "DATE_OVERLAP"
+        message: "Date range overlaps with existing BOM v{version} ({from} to {to})"
+        when: "Effective dates overlap with another BOM for same product"
+      - status: 400
+        code: "MULTIPLE_ONGOING"
+        message: "Only one BOM can have no end date per product"
+        when: "Trying to create BOM with effective_to=NULL when one already exists"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User role cannot create BOMs"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "product_id does not exist"
+
+  # ============================================
+  # UPDATE BOM
+  # ============================================
+  - method: "PUT"
+    path: "/api/v1/technical/boms/:id"
+    description: "Update existing BOM header (product is immutable)"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        - { name: "id", type: "uuid", description: "BOM ID" }
+      body:
+        type: "UpdateBOMRequest"
+        schema:
+          effective_from: "string (ISO date, optional)"
+          effective_to: "string | null (ISO date, optional)"
+          status: "string (draft|active|phased_out|inactive, optional)"
+          output_qty: "number (optional, > 0)"
+          output_uom: "string (optional)"
+          notes: "string | null (optional)"
+
+    response:
+      status: 200
+      type: "BOMWithProduct"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+      - status: 400
+        code: "DATE_OVERLAP"
+        message: "Date range overlaps with existing BOM"
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "Effective To must be after Effective From"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+
+  # ============================================
+  # DELETE BOM
+  # ============================================
+  - method: "DELETE"
+    path: "/api/v1/technical/boms/:id"
+    description: "Delete BOM (blocked if used in Work Orders)"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        - { name: "id", type: "uuid", description: "BOM ID" }
+
+    response:
+      status: 200
+      type: "DeleteResponse"
+      schema:
+        success: true
+        message: "BOM deleted successfully"
+
+    errors:
+      - status: 400
+        code: "BOM_IN_USE"
+        message: "Cannot delete BOM used in Work Orders: {wo_numbers}"
+        when: "BOM is referenced by active Work Orders"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only administrators can delete BOMs"
+        when: "User role is not ADMIN or SUPER_ADMIN"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+
+  # ============================================
+  # GET BOM TIMELINE (FR-2.23)
+  # ============================================
+  - method: "GET"
+    path: "/api/v1/technical/boms/timeline/:productId"
+    description: "Get all BOM versions for a product (timeline visualization)"
+    file: "apps/frontend/app/api/v1/technical/boms/timeline/[productId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        - { name: "productId", type: "uuid", description: "Product ID" }
+
+    response:
+      status: 200
+      type: "BOMTimelineResponse"
+      schema:
+        product:
+          id: "string (uuid)"
+          code: "string"
+          name: "string"
+        versions: "BOMTimelineVersion[]"
+        current_date: "string (ISO date)"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+
+# ============================================
+# TYPE DEFINITIONS
+# ============================================
+types:
+  - name: "BOMWithProduct"
+    description: "BOM with joined product details"
+    schema:
+      id: "string (uuid)"
+      org_id: "string (uuid)"
+      product_id: "string (uuid)"
+      product:
+        id: "string"
+        code: "string"
+        name: "string"
+        type: "string"
+        uom: "string"
+      version: "number"
+      status: "'draft' | 'active' | 'phased_out' | 'inactive'"
+      effective_from: "string (ISO date)"
+      effective_to: "string | null"
+      output_qty: "number"
+      output_uom: "string"
+      routing_id: "string | null"
+      units_per_box: "number | null"
+      boxes_per_pallet: "number | null"
+      notes: "string | null"
+      created_at: "string (ISO datetime)"
+      updated_at: "string (ISO datetime)"
+      created_by: "string | null"
+      updated_by: "string | null"
+
+  - name: "BOMTimelineVersion"
+    description: "BOM version for timeline visualization"
+    schema:
+      id: "string (uuid)"
+      version: "number"
+      status: "'draft' | 'active' | 'phased_out' | 'inactive'"
+      effective_from: "string (ISO date)"
+      effective_to: "string | null"
+      output_qty: "number"
+      output_uom: "string"
+      notes: "string | null"
+      is_currently_active: "boolean"
+      has_overlap: "boolean"
+
+  - name: "CreateBOMRequest"
+    description: "Request body for creating a new BOM"
+    schema:
+      product_id: "string (uuid, required)"
+      effective_from: "string (ISO date, required)"
+      effective_to: "string | null (optional)"
+      status: "'draft' | 'active' (default: draft)"
+      output_qty: "number (required, > 0)"
+      output_uom: "string (required)"
+      notes: "string | null (optional)"
+
+  - name: "UpdateBOMRequest"
+    description: "Request body for updating a BOM"
+    schema:
+      effective_from: "string (ISO date, optional)"
+      effective_to: "string | null (optional)"
+      status: "'draft' | 'active' | 'phased_out' | 'inactive' (optional)"
+      output_qty: "number (optional, > 0)"
+      output_uom: "string (optional)"
+      notes: "string | null (optional)"
+
+# ============================================
+# SERVICES
+# ============================================
+services:
+  - path: "apps/frontend/lib/services/bom-service.ts"
+    description: "BOM CRUD and utility functions"
+    exports:
+      - name: "listBOMs"
+        type: "async function"
+        params:
+          - "filters: BOMFilters"
+        returns: "Promise<BOMsListResponse>"
+        description: "List BOMs with pagination and filters"
+
+      - name: "getBOM"
+        type: "async function"
+        params:
+          - "id: string"
+        returns: "Promise<BOMWithProduct>"
+        description: "Get single BOM by ID with product details"
+
+      - name: "createBOM"
+        type: "async function"
+        params:
+          - "data: CreateBOMRequest"
+        returns: "Promise<BOMWithProduct>"
+        description: "Create new BOM with auto-versioning"
+
+      - name: "updateBOM"
+        type: "async function"
+        params:
+          - "id: string"
+          - "data: UpdateBOMRequest"
+        returns: "Promise<BOMWithProduct>"
+        description: "Update BOM header fields"
+
+      - name: "deleteBOM"
+        type: "async function"
+        params:
+          - "id: string"
+        returns: "Promise<void>"
+        description: "Delete BOM (throws if in use)"
+
+      - name: "getNextVersion"
+        type: "async function"
+        params:
+          - "productId: string"
+        returns: "Promise<number>"
+        description: "Get next available version for product"
+
+      - name: "checkDateOverlap"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "effectiveFrom: string"
+          - "effectiveTo: string | null"
+          - "excludeId?: string"
+        returns: "Promise<{ overlaps: boolean; conflictingBom?: BOM }>"
+        description: "Check if date range overlaps with existing BOMs"
+
+      - name: "getBOMTimeline"
+        type: "async function"
+        params:
+          - "productId: string"
+        returns: "Promise<BOMTimelineResponse>"
+        description: "Get all BOM versions for timeline visualization"
+
+# ============================================
+# VALIDATION SCHEMAS (Zod)
+# ============================================
+validation:
+  path: "apps/frontend/lib/validation/bom-schema.ts"
+  schemas:
+    - name: "createBOMSchema"
+      type: "z.object"
+      fields:
+        product_id: "z.string().uuid('Invalid product')"
+        effective_from: "z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid date')"
+        effective_to: "z.string().refine((val) => !val || !isNaN(Date.parse(val)), 'Invalid date').nullable().optional()"
+        status: "z.enum(['draft', 'active']).default('draft')"
+        output_qty: "z.number().positive('Output quantity must be greater than 0').max(999999999, 'Output quantity too large')"
+        output_uom: "z.string().min(1, 'Unit of measure is required').max(20)"
+        notes: "z.string().max(2000).optional().nullable()"
+      refinements:
+        - check: "effective_to > effective_from (if both set)"
+          message: "Effective To must be after Effective From"
+          path: ["effective_to"]
+
+    - name: "updateBOMSchema"
+      type: "z.object"
+      fields:
+        effective_from: "z.string().refine(...).optional()"
+        effective_to: "z.string().refine(...).nullable().optional()"
+        status: "z.enum(['draft', 'active', 'phased_out', 'inactive']).optional()"
+        output_qty: "z.number().positive().max(999999999).optional()"
+        output_uom: "z.string().min(1).max(20).optional()"
+        notes: "z.string().max(2000).nullable().optional()"
+
+# ============================================
+# IMPLEMENTATION PATTERNS
+# ============================================
+patterns:
+  api_route_list: |
+    // apps/frontend/app/api/v1/technical/boms/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { createBOMSchema } from '@/lib/validation/bom-schema';
+
+    export async function GET(request: NextRequest) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const searchParams = request.nextUrl.searchParams;
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
+      const search = searchParams.get('search');
+      const status = searchParams.get('status');
+
+      // Build query with RLS applied automatically
+      let query = supabase
+        .from('boms')
+        .select(`
+          *,
+          product:products(id, code, name, uom, product_type:product_types(code))
+        `, { count: 'exact' });
+
+      if (search) {
+        query = query.or(`product.code.ilike.%${search}%,product.name.ilike.%${search}%`);
+      }
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const { data, error, count } = await query
+        .order('effective_from', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        boms: data,
+        total: count || 0,
+        page,
+        limit
+      });
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/bom-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import type { BOMWithProduct, CreateBOMRequest } from '@/lib/types/bom';
+
+    const supabase = createClientComponentClient();
+
+    export async function getNextVersion(productId: string): Promise<number> {
+      const { data, error } = await supabase
+        .from('boms')
+        .select('version')
+        .eq('product_id', productId)
+        .order('version', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      return (data?.[0]?.version || 0) + 1;
+    }
+
+    export async function checkDateOverlap(
+      productId: string,
+      effectiveFrom: string,
+      effectiveTo: string | null,
+      excludeId?: string
+    ): Promise<{ overlaps: boolean; conflictingBom?: any }> {
+      // Server-side check before insert/update
+      const { data, error } = await supabase.rpc('check_bom_date_overlap', {
+        p_product_id: productId,
+        p_effective_from: effectiveFrom,
+        p_effective_to: effectiveTo,
+        p_exclude_id: excludeId
+      });
+
+      if (error) throw error;
+      return { overlaps: !!data, conflictingBom: data };
+    }
+
+# ============================================
+# ERROR CODES
+# ============================================
+error_codes:
+  - code: "BOM_NOT_FOUND"
+    http_status: 404
+    message: "BOM not found"
+    resolution: "Check BOM ID is correct and belongs to your organization"
+
+  - code: "DATE_OVERLAP"
+    http_status: 400
+    message: "Date range overlaps with existing BOM"
+    resolution: "Adjust effective_from or effective_to to avoid overlap with existing BOM versions"
+
+  - code: "MULTIPLE_ONGOING"
+    http_status: 400
+    message: "Only one BOM can have no end date per product"
+    resolution: "Set an end date on the existing ongoing BOM before creating new one without end date"
+
+  - code: "BOM_IN_USE"
+    http_status: 400
+    message: "Cannot delete BOM used in Work Orders"
+    resolution: "Mark BOM as inactive instead of deleting, or wait until Work Orders are completed"
+
+  - code: "INVALID_DATE_RANGE"
+    http_status: 400
+    message: "Effective To must be after Effective From"
+    resolution: "Ensure effective_to date is later than effective_from date"
+
+  - code: "PRODUCT_NOT_FOUND"
+    http_status: 404
+    message: "Product not found"
+    resolution: "Check product_id is correct and product exists in your organization"

@@ -1,0 +1,493 @@
+# Story 02.6 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/bom-clone-service.test.ts"
+    type: "unit"
+    description: "Unit tests for BOM clone service"
+  - path: "apps/frontend/lib/services/__tests__/bom-alternatives-service.test.ts"
+    type: "unit"
+    description: "Unit tests for BOM alternatives service"
+  - path: "apps/frontend/app/api/v1/technical/boms/[id]/clone/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for BOM clone API"
+  - path: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/alternatives/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for alternatives API"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # === CLONE ===
+  - id: "AC-01"
+    name: "Clone to Same Product - Version Increment"
+    given: "User clicks Clone on BOM v1 for FG-001"
+    when: "Clone modal opens with Same Product selected"
+    then: "Version field shows v2 (auto-increment)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Clone Preserves Items"
+    given: "BOM v1 has 5 items"
+    when: "Clone completed"
+    then: "New BOM v2 created with all 5 items copied"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Clone Preserves Routing"
+    given: "BOM v1 has routing_id assigned to RTG-BREAD-01"
+    when: "Clone completed"
+    then: "New BOM v2 has same routing_id"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Clone Sets Draft Status"
+    given: "Clone to same product from active BOM"
+    when: "New BOM created"
+    then: "Status defaults to draft regardless of source status"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    name: "Clone Effective Date Default"
+    given: "BOM v1 effective_from is 2024-01-01"
+    when: "Clone completed"
+    then: "New BOM effective_from defaults to today's date"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-06"
+    name: "Clone to Different Product"
+    given: "User clones BOM for FG-001 to FG-002 (has no existing BOMs)"
+    when: "Clone completed"
+    then: "New BOM version is v1"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    name: "Clone to Different Product with Existing BOMs"
+    given: "User clones to FG-002 which has BOM v1, v2"
+    when: "Clone completed"
+    then: "New BOM version is v3"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    name: "Clone Validation - No Target"
+    given: "User attempts clone without selecting target (for different product mode)"
+    when: "Clone clicked"
+    then: "Error: Select target product displays"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Clone Validation - Date Overlap"
+    given: "User attempts clone and target product has overlapping date range"
+    when: "Clone clicked"
+    then: "Error: Effective date overlaps with existing BOM for target product"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    name: "Clone Success Flow"
+    given: "Successful clone"
+    when: "Operation completes"
+    then: "Success toast displays and user redirected to new BOM detail page"
+    test_type: "e2e"
+    priority: "P1"
+
+  # === ALTERNATIVES ===
+  - id: "AC-11"
+    name: "Create Alternative - Success"
+    given: "Valid alternative data entered (same type, different product)"
+    when: "Add Alternative clicked"
+    then: "Alternative saved and appears in item sub-row"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    name: "Preference Order Auto-increment"
+    given: "Item has 3 alternatives with orders 2, 3, 4"
+    when: "Adding new alternative"
+    then: "Preference_order defaults to max(existing) + 1 = 5"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-13"
+    name: "Preference Order Validation"
+    given: "Preference_order 1 entered for alternative"
+    when: "Save attempted"
+    then: "Error: Preference must be 2 or higher (1 is reserved for primary)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-14"
+    name: "Same Type Validation"
+    given: "Primary item is type RM (Raw Material)"
+    when: "Adding alternative of type ING (Ingredient)"
+    then: "Error: Alternative must be same product type as primary (Raw Material)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    name: "UoM Mismatch Warning"
+    given: "Primary item has base_uom kg"
+    when: "Adding alternative with base_uom L"
+    then: "Warning: UoM class mismatch. Manual conversion may be required. (warning, not error)"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-16"
+    name: "Same as Primary Validation"
+    given: "Primary item is RM-001"
+    when: "Adding RM-001 as its own alternative"
+    then: "Error: Alternative cannot be same as primary component"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-17"
+    name: "Duplicate Alternative Validation"
+    given: "Item already has RM-005 as alternative"
+    when: "Adding RM-005 again"
+    then: "Error: Alternative already exists for this item"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-18"
+    name: "Circular Reference Prevention"
+    given: "BOM is for product FG-001"
+    when: "User attempts to add FG-001 as a BOM item alternative"
+    then: "Error: Cannot add BOM product as alternative"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-19"
+    name: "Alternatives Display"
+    given: "BOM item has 2 alternatives"
+    when: "Items table renders"
+    then: |
+      Sub-row shows:
+      - ALT: RM-005 Whole Wheat (48 kg) - Priority 2
+      - ALT: RM-006 Rye Flour (52 kg) - Priority 3
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-20"
+    name: "Permission Enforcement - Clone"
+    given: "User with read-only permission"
+    when: "BOM detail page loaded"
+    then: "Clone button hidden"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-21"
+    name: "Permission Enforcement - Alternatives"
+    given: "User with read-only permission"
+    when: "Items table loaded"
+    then: "+ Add Alternative links hidden"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  bom_clone_service:
+    - name: "cloneBOM returns new BOM with correct version for same product"
+      setup: "Mock source BOM v2, target same product"
+      expected: "Returns BOM with version 3"
+
+    - name: "cloneBOM returns v1 for product with no existing BOMs"
+      setup: "Mock source BOM, target product has no BOMs"
+      expected: "Returns BOM with version 1"
+
+    - name: "getNextVersion returns max+1"
+      setup: "Mock product with BOMs v1, v2, v5"
+      expected: "Returns 6"
+
+    - name: "getNextVersion returns 1 for no existing BOMs"
+      setup: "Mock product with no BOMs"
+      expected: "Returns 1"
+
+    - name: "validateCloneTarget returns error for date overlap"
+      setup: "Mock existing BOM with overlapping dates"
+      expected: "Returns { valid: false, error: 'Date overlap...' }"
+
+    - name: "validateCloneTarget returns valid for no overlap"
+      setup: "Mock existing BOM with non-overlapping dates"
+      expected: "Returns { valid: true }"
+
+  bom_alternatives_service:
+    - name: "getAlternatives returns sorted by preference_order"
+      setup: "Mock 3 alternatives with orders 4, 2, 3"
+      expected: "Returns alternatives in order 2, 3, 4"
+
+    - name: "createAlternative returns created alternative"
+      setup: "Mock valid alternative data"
+      expected: "Returns alternative with id"
+
+    - name: "getNextPreferenceOrder returns max+1 with min 2"
+      setup: "Mock item with alternatives at orders 2, 3"
+      expected: "Returns 4"
+
+    - name: "getNextPreferenceOrder returns 2 for no alternatives"
+      setup: "Mock item with no alternatives"
+      expected: "Returns 2"
+
+    - name: "validateAlternativeRules returns error for same as primary"
+      setup: "Primary product_id matches alternative_product_id"
+      expected: "Returns { valid: false, error: 'Cannot be same...' }"
+
+    - name: "validateAlternativeRules returns error for duplicate"
+      setup: "Alternative already exists in list"
+      expected: "Returns { valid: false, error: 'Already exists...' }"
+
+    - name: "validateAlternativeRules returns warning for UoM mismatch"
+      setup: "Primary UoM kg, alternative UoM L"
+      expected: "Returns { valid: true, warning: 'UoM mismatch...' }"
+
+  validation_schemas:
+    - name: "cloneBOMSchema rejects past effective_from"
+      setup: "effective_from = yesterday"
+      expected: "Validation fails with 'cannot be in the past'"
+
+    - name: "cloneBOMSchema rejects effective_to before effective_from"
+      setup: "effective_from = 2024-06-01, effective_to = 2024-01-01"
+      expected: "Validation fails with 'must be after'"
+
+    - name: "createAlternativeSchema rejects preference_order < 2"
+      setup: "preference_order = 1"
+      expected: "Validation fails with 'must be 2 or higher'"
+
+    - name: "createAlternativeSchema rejects quantity <= 0"
+      setup: "quantity = 0"
+      expected: "Validation fails with 'must be greater than 0'"
+
+    - name: "createAlternativeSchema rejects > 6 decimal places"
+      setup: "quantity = 1.1234567"
+      expected: "Validation fails with 'Maximum 6 decimal places'"
+
+# Integration Test Cases
+integration_tests:
+  clone_api:
+    - name: "POST /clone creates new BOM with items"
+      setup: |
+        - Create source BOM with 3 items
+        - No existing BOMs for target product
+      action: "POST /api/v1/technical/boms/{id}/clone"
+      expected: |
+        - 201 Created
+        - New BOM version 1
+        - 3 items copied
+        - Status = draft
+
+    - name: "POST /clone increments version for same product"
+      setup: |
+        - Create source BOM v2 for product
+      action: "POST /api/v1/technical/boms/{id}/clone with same product"
+      expected: |
+        - 201 Created
+        - New BOM version 3
+
+    - name: "POST /clone preserves routing_id"
+      setup: |
+        - Create source BOM with routing RTG-001
+      action: "POST /api/v1/technical/boms/{id}/clone"
+      expected: |
+        - New BOM has routing_id = RTG-001
+
+    - name: "POST /clone returns 400 for date overlap"
+      setup: |
+        - Create target product with BOM effective 2024-01-01 to 2024-12-31
+      action: "POST /api/v1/technical/boms/{id}/clone with effective_from = 2024-06-01"
+      expected: |
+        - 400 Bad Request
+        - Error: DATE_OVERLAP
+
+    - name: "POST /clone returns 404 for invalid source BOM"
+      setup: "No setup"
+      action: "POST /api/v1/technical/boms/invalid-uuid/clone"
+      expected: |
+        - 404 Not Found
+        - Error: BOM_NOT_FOUND
+
+    - name: "POST /clone respects RLS - cross-tenant blocked"
+      setup: |
+        - Create BOM in Org A
+        - Authenticate as user in Org B
+      action: "POST /api/v1/technical/boms/{id}/clone"
+      expected: |
+        - 404 Not Found (not 403, per ADR-013)
+
+  alternatives_api:
+    - name: "GET alternatives returns sorted list"
+      setup: |
+        - Create BOM item
+        - Add 3 alternatives with orders 4, 2, 3
+      action: "GET /api/v1/technical/boms/{id}/items/{itemId}/alternatives"
+      expected: |
+        - 200 OK
+        - Alternatives in order: 2, 3, 4
+
+    - name: "POST alternatives creates with auto-increment preference"
+      setup: |
+        - Create BOM item
+        - Add alternative with preference 2
+      action: "POST new alternative without preference_order"
+      expected: |
+        - 201 Created
+        - preference_order = 3
+
+    - name: "POST alternatives validates same type"
+      setup: |
+        - Create BOM item with RM product
+        - Prepare alternative ING product
+      action: "POST /alternatives with ING product"
+      expected: |
+        - 400 Bad Request
+        - Error: TYPE_MISMATCH
+
+    - name: "POST alternatives validates not duplicate"
+      setup: |
+        - Create BOM item
+        - Add alternative RM-005
+      action: "POST /alternatives with same RM-005"
+      expected: |
+        - 400 Bad Request
+        - Error: DUPLICATE_ALTERNATIVE
+
+    - name: "POST alternatives validates not same as primary"
+      setup: |
+        - Create BOM item with product RM-001
+      action: "POST /alternatives with RM-001"
+      expected: |
+        - 400 Bad Request
+        - Error: SAME_AS_PRIMARY
+
+    - name: "DELETE alternatives removes alternative"
+      setup: |
+        - Create BOM item with 2 alternatives
+      action: "DELETE /alternatives/{altId}"
+      expected: |
+        - 200 OK
+        - Alternative removed
+        - Other alternative remains
+
+    - name: "Alternatives respects RLS - cross-tenant blocked"
+      setup: |
+        - Create BOM item in Org A
+        - Authenticate as user in Org B
+      action: "GET /alternatives"
+      expected: |
+        - 404 Not Found
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Clone BOM to same product flow"
+    steps:
+      - "Navigate to /technical/boms"
+      - "Click Clone on BOM v1"
+      - "Modal shows 'Same Product' selected"
+      - "Version preview shows v2"
+      - "Click Clone"
+      - "Toast shows 'BOM cloned successfully'"
+      - "Redirected to new BOM detail page"
+      - "New BOM shows v2 with all items"
+
+  - name: "Clone BOM to different product flow"
+    steps:
+      - "Navigate to /technical/boms"
+      - "Click Clone on BOM"
+      - "Select 'Different Product'"
+      - "Search and select new product"
+      - "Version preview shows v1"
+      - "Click Clone"
+      - "Toast shows success"
+      - "New BOM created for selected product"
+
+  - name: "Add alternative to BOM item flow"
+    steps:
+      - "Navigate to /technical/boms/{id}/items"
+      - "Click '+ Add Alternative' on item row"
+      - "Modal shows primary item info"
+      - "Search and select alternative product"
+      - "Enter quantity"
+      - "Click 'Add Alternative'"
+      - "Modal closes"
+      - "Sub-row appears below item"
+      - "Shows 'ALT: {code} {name} ({qty} {uom}) - Priority 2'"
+
+  - name: "Edit and delete alternative flow"
+    steps:
+      - "Navigate to BOM items with alternatives"
+      - "Click Edit on alternative row"
+      - "Modal pre-filled with data"
+      - "Change quantity"
+      - "Save"
+      - "Updated quantity displays"
+      - "Click Delete on alternative"
+      - "Confirmation dialog appears"
+      - "Confirm delete"
+      - "Alternative removed from sub-row"
+
+# Definition of Done
+definition_of_done:
+  - "Clone BOM to same product creates new version with items copied"
+  - "Clone BOM to different product creates v1 for new product"
+  - "Clone copies: items, routing_id, notes"
+  - "Clone modal shows version preview (next available)"
+  - "Clone validates target date overlap before creating"
+  - "Circular reference prevented (BOM product cannot be its own component)"
+  - "Alternative preference_order enforced >= 2"
+  - "Alternative same-type validation enforced"
+  - "Duplicate alternative prevented per item"
+  - "UoM class mismatch shows warning (not error)"
+  - "Alternatives display in sub-row with preference order"
+  - "Clone button visible in list row actions and detail header"
+  - "Permission checks hide clone/alternative actions for read-only users"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover services (>80% coverage)"
+  - "Success/error toasts display for all operations"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core business logic for clone and alternatives"
+  integration:
+    target: 90
+    reason: "Critical API endpoints with multiple validation rules"
+  files:
+    - "lib/services/bom-clone-service.ts: 80%"
+    - "lib/services/bom-alternatives-service.ts: 80%"
+    - "lib/validation/bom-clone.ts: 100%"
+    - "lib/validation/bom-alternative.ts: 100%"
+    - "API routes: 90%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Clone transaction failure could leave partial data"
+    mitigation: "Use database transaction for BOM header + items creation"
+    severity: "medium"
+    test_coverage: "integration_tests.clone_api"
+
+  - id: "RISK-02"
+    description: "Date overlap detection could fail with concurrent clones"
+    mitigation: "Database trigger + API validation both enforce overlap prevention"
+    severity: "low"
+    test_coverage: "integration_tests.clone_api - date overlap test"
+
+  - id: "RISK-03"
+    description: "Type mismatch validation requires product lookup"
+    mitigation: "Server-side validation with product type check"
+    severity: "low"
+    test_coverage: "integration_tests.alternatives_api - type validation"
+
+  - id: "RISK-04"
+    description: "RLS policy could leak alternative existence across tenants"
+    mitigation: "bom_alternatives has org_id FK and RLS policy; return 404 not 403"
+    severity: "high"
+    test_coverage: "integration_tests.alternatives_api - RLS test"

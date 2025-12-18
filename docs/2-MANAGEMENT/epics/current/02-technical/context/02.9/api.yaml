@@ -1,0 +1,491 @@
+# Story 02.9 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# Endpoints
+endpoints:
+  - method: "GET"
+    path: "/api/v1/technical/boms/:id/cost"
+    description: "Get calculated cost breakdown for a BOM"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/cost/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with technical.R permission
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - BOM ID"
+
+    response:
+      status: 200
+      type: "BOMCostResponse"
+      schema:
+        bom_id: "UUID"
+        product_id: "UUID"
+        cost_type: "string - 'standard'"
+        batch_size: "number"
+        batch_uom: "string"
+        material_cost: "number"
+        labor_cost: "number"
+        overhead_cost: "number"
+        total_cost: "number"
+        cost_per_unit: "number"
+        currency: "string"
+        calculated_at: "ISO datetime string"
+        calculated_by: "string"
+        is_stale: "boolean"
+        breakdown:
+          materials: "MaterialCostBreakdown[]"
+          operations: "OperationCostBreakdown[]"
+          routing: "RoutingCostBreakdown"
+          overhead: "OverheadBreakdown"
+        margin_analysis:
+          std_price: "number | null"
+          target_margin_percent: "number"
+          actual_margin_percent: "number | null"
+          below_target: "boolean"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks technical.R permission"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+        when: "BOM ID does not exist or user not in same org"
+      - status: 422
+        code: "MISSING_INGREDIENT_COSTS"
+        message: "Missing cost data for: {ingredient_codes}"
+        when: "One or more ingredients have NULL cost_per_unit"
+      - status: 422
+        code: "NO_ROUTING_ASSIGNED"
+        message: "Assign routing to BOM to calculate labor costs"
+        when: "BOM has no routing_id"
+
+  - method: "POST"
+    path: "/api/v1/technical/boms/:id/recalculate-cost"
+    description: "Force recalculation of BOM cost and create new product_costs record"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/recalculate-cost/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER", "PLANNER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - BOM ID"
+      body: null  # No request body - uses current BOM/routing/ingredient data
+
+    response:
+      status: 200
+      type: "RecalculateCostResponse"
+      schema:
+        success: "boolean"
+        cost: "BOMCostResponse"
+        calculated_at: "ISO datetime string"
+        warnings: "string[] - optional"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks technical.U permission"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+        when: "BOM ID does not exist or user not in same org"
+      - status: 422
+        code: "MISSING_INGREDIENT_COSTS"
+        message: "Missing cost data for: {ingredient_codes}"
+        when: "Cannot calculate - ingredients have NULL cost_per_unit"
+      - status: 500
+        code: "CALCULATION_ERROR"
+        message: "Cost calculation failed"
+        when: "Database error or calculation exception"
+
+  - method: "GET"
+    path: "/api/v1/technical/routings/:id/cost"
+    description: "Get routing-only cost (labor + routing costs, no materials)"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/cost/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with technical.R permission
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Routing ID"
+      query:
+        batch_size: "number - optional, default 1"
+
+    response:
+      status: 200
+      type: "RoutingCostResponse"
+      schema:
+        routing_id: "UUID"
+        routing_code: "string"
+        total_operation_cost: "number"
+        total_routing_cost: "number"
+        total_cost: "number"
+        currency: "string"
+        breakdown:
+          operations: "OperationCostBreakdown[]"
+          routing: "RoutingCostBreakdown"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks technical.R permission"
+      - status: 404
+        code: "ROUTING_NOT_FOUND"
+        message: "Routing not found"
+        when: "Routing ID does not exist or user not in same org"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/costing-service.ts"
+    description: "EXISTING - BOM cost calculation service (integrate, not create)"
+    status: "implemented"
+    exports:
+      - name: "calculateTotalBOMCost"
+        type: "async function"
+        params:
+          - "bomId: string"
+          - "quantity?: number (default 1)"
+        returns: "Promise<CostCalculationResult>"
+        description: "Calculates complete BOM cost with breakdown"
+
+      - name: "calculateUnitCost"
+        type: "async function"
+        params:
+          - "bomId: string"
+        returns: "Promise<{ success: true; unitCost: number; currency: string } | { success: false; error: CostCalculationError }>"
+        description: "Calculates cost per output unit"
+
+      - name: "compareBOMCosts"
+        type: "async function"
+        params:
+          - "bomId1: string"
+          - "bomId2: string"
+          - "quantity?: number (default 1)"
+        returns: "Promise<{ bom1: BOMCostBreakdown | null; bom2: BOMCostBreakdown | null; difference: CostDifference | null }>"
+        description: "Compares costs between two BOMs"
+
+      - name: "BOMCostBreakdown"
+        type: "interface"
+        fields:
+          - "materialCost: number"
+          - "laborCost: number"
+          - "setupCost: number"
+          - "workingCost: number"
+          - "overheadCost: number"
+          - "totalCost: number"
+          - "currency: string"
+          - "calculatedAt: Date"
+          - "breakdown: { materials: MaterialCostLine[]; operations: OperationCostLine[] }"
+
+      - name: "MaterialCostLine"
+        type: "interface"
+        fields:
+          - "productId: string"
+          - "productCode: string"
+          - "productName: string"
+          - "quantity: number"
+          - "scrapPercent?: number"
+          - "effectiveQuantity?: number"
+          - "unitCost: number"
+          - "lineCost: number"
+          - "uom: string"
+
+      - name: "OperationCostLine"
+        type: "interface"
+        fields:
+          - "operationId: string"
+          - "operationName: string"
+          - "sequence: number"
+          - "duration: number"
+          - "setupTime: number"
+          - "cleanupTime: number"
+          - "laborRate: number"
+          - "laborCost: number"
+
+      - name: "CostCalculationError"
+        type: "interface"
+        fields:
+          - "code: 'BOM_NOT_FOUND' | 'NO_ROUTING' | 'DATABASE_ERROR'"
+          - "message: string"
+
+# Types (to create)
+types:
+  - path: "apps/frontend/lib/types/costing.ts"
+    description: "Cost calculation TypeScript interfaces"
+    content: |
+      // Response types for API
+      export interface BOMCostResponse {
+        bom_id: string;
+        product_id: string;
+        cost_type: 'standard';
+        batch_size: number;
+        batch_uom: string;
+        material_cost: number;
+        labor_cost: number;
+        overhead_cost: number;
+        total_cost: number;
+        cost_per_unit: number;
+        currency: string;
+        calculated_at: string;
+        calculated_by: string;
+        is_stale: boolean;
+        breakdown: {
+          materials: MaterialCostBreakdown[];
+          operations: OperationCostBreakdown[];
+          routing: RoutingCostBreakdown;
+          overhead: OverheadBreakdown;
+        };
+        margin_analysis?: {
+          std_price: number;
+          target_margin_percent: number;
+          actual_margin_percent: number;
+          below_target: boolean;
+        };
+      }
+
+      export interface MaterialCostBreakdown {
+        ingredient_id: string;
+        ingredient_code: string;
+        ingredient_name: string;
+        quantity: number;
+        uom: string;
+        unit_cost: number;
+        scrap_percent: number;
+        scrap_cost: number;
+        total_cost: number;
+        percentage: number;
+      }
+
+      export interface OperationCostBreakdown {
+        operation_seq: number;
+        operation_name: string;
+        machine_name: string | null;
+        setup_time_min: number;
+        duration_min: number;
+        cleanup_time_min: number;
+        labor_rate: number;
+        setup_cost: number;
+        run_cost: number;
+        cleanup_cost: number;
+        total_cost: number;
+        percentage: number;
+      }
+
+      export interface RoutingCostBreakdown {
+        routing_id: string;
+        routing_code: string;
+        setup_cost: number;
+        working_cost_per_unit: number;
+        total_working_cost: number;
+        total_routing_cost: number;
+      }
+
+      export interface OverheadBreakdown {
+        allocation_method: 'labor_hours' | 'percentage';
+        overhead_percent: number;
+        subtotal_before_overhead: number;
+        overhead_cost: number;
+      }
+
+      export interface RoutingCostResponse {
+        routing_id: string;
+        routing_code: string;
+        total_operation_cost: number;
+        total_routing_cost: number;
+        total_cost: number;
+        currency: string;
+        breakdown: {
+          operations: OperationCostBreakdown[];
+          routing: RoutingCostBreakdown;
+        };
+      }
+
+      export interface RecalculateCostResponse {
+        success: boolean;
+        cost: BOMCostResponse;
+        calculated_at: string;
+        warnings?: string[];
+      }
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/costing-schema.ts"
+    description: "Zod schemas for cost request/response validation"
+    schemas:
+      - name: "bomCostRequestSchema"
+        content: |
+          export const bomCostRequestSchema = z.object({
+            bom_id: z.string().uuid("Invalid BOM ID"),
+          });
+
+      - name: "recalculateCostResponseSchema"
+        content: |
+          export const recalculateCostResponseSchema = z.object({
+            success: z.boolean(),
+            cost: z.object({
+              bom_id: z.string().uuid(),
+              product_id: z.string().uuid(),
+              material_cost: z.number().min(0),
+              labor_cost: z.number().min(0),
+              overhead_cost: z.number().min(0),
+              total_cost: z.number().min(0),
+              cost_per_unit: z.number().min(0),
+              currency: z.string(),
+              calculated_at: z.string().datetime(),
+            }),
+            calculated_at: z.string().datetime(),
+            warnings: z.array(z.string()).optional(),
+          });
+
+      - name: "routingCostQuerySchema"
+        content: |
+          export const routingCostQuerySchema = z.object({
+            batch_size: z.coerce.number().positive().default(1),
+          });
+
+# Implementation patterns
+patterns:
+  api_route_get_cost: |
+    // apps/frontend/app/api/v1/technical/boms/[id]/cost/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { calculateTotalBOMCost } from '@/lib/services/costing-service';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Permission check
+      // ... check technical.R permission
+
+      // Call existing costing service
+      const result = await calculateTotalBOMCost(params.id);
+
+      if (!result.success) {
+        if (result.error.code === 'BOM_NOT_FOUND') {
+          return NextResponse.json({ error: result.error.message }, { status: 404 });
+        }
+        return NextResponse.json({ error: result.error.message }, { status: 422 });
+      }
+
+      // Transform service response to API response format
+      return NextResponse.json({
+        bom_id: params.id,
+        material_cost: result.data.materialCost,
+        labor_cost: result.data.laborCost,
+        setup_cost: result.data.setupCost,
+        working_cost: result.data.workingCost,
+        overhead_cost: result.data.overheadCost,
+        total_cost: result.data.totalCost,
+        currency: result.data.currency,
+        calculated_at: result.data.calculatedAt.toISOString(),
+        breakdown: result.data.breakdown,
+      });
+    }
+
+  api_route_recalculate: |
+    // apps/frontend/app/api/v1/technical/boms/[id]/recalculate-cost/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { calculateTotalBOMCost } from '@/lib/services/costing-service';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Permission check - require technical.U
+      // ... check technical.U permission
+
+      // Get BOM to extract batch size
+      const { data: bom, error: bomError } = await supabase
+        .from('boms')
+        .select('output_qty')
+        .eq('id', params.id)
+        .single();
+
+      if (bomError || !bom) {
+        return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+      }
+
+      // Calculate cost
+      const result = await calculateTotalBOMCost(params.id, bom.output_qty);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error.message },
+          { status: 422 }
+        );
+      }
+
+      // Store in product_costs table
+      const { error: insertError } = await supabase
+        .from('product_costs')
+        .insert({
+          product_id: bom.product_id,
+          cost_type: 'standard',
+          material_cost: result.data.materialCost,
+          labor_cost: result.data.laborCost,
+          overhead_cost: result.data.overheadCost,
+          total_cost: result.data.totalCost,
+          effective_from: new Date().toISOString().split('T')[0],
+          calculation_method: 'bom_routing',
+          created_by: user.id,
+        });
+
+      if (insertError) {
+        console.error('Failed to store cost:', insertError);
+        // Continue anyway - return calculated cost
+      }
+
+      return NextResponse.json({
+        success: true,
+        cost: {
+          material_cost: result.data.materialCost,
+          labor_cost: result.data.laborCost,
+          overhead_cost: result.data.overheadCost,
+          total_cost: result.data.totalCost,
+          currency: result.data.currency,
+        },
+        calculated_at: new Date().toISOString(),
+      });
+    }

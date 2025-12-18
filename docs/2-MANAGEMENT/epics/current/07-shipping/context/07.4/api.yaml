@@ -1,0 +1,375 @@
+# Story 07.4 - API Specification
+# Purpose: Sales order line pricing endpoints
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # Create SO Line with auto-price
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/lines"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/lines/route.ts"
+    description: "Add line to SO with auto-populated unit_price from product master"
+    auth: true
+    roles: ["sales", "manager", "admin"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        product_id:
+          type: "string (UUID)"
+          required: true
+          description: "Product to add"
+        quantity_ordered:
+          type: "number"
+          required: true
+          validation: "> 0"
+        unit_price:
+          type: "number"
+          required: false
+          description: "Manual override (optional, else auto-populated from product.std_price)"
+        discount:
+          type: "object"
+          required: false
+          schema:
+            type: "enum: percent|fixed"
+            value: "number >= 0"
+          description: "Optional discount"
+        requested_lot:
+          type: "string"
+          required: false
+        notes:
+          type: "string"
+          required: false
+
+    response:
+      status: 201
+      schema:
+        success: true
+        line:
+          id: "uuid"
+          sales_order_id: "uuid"
+          line_number: "integer"
+          product_id: "uuid"
+          quantity_ordered: "number"
+          unit_price: "number"
+          line_total: "number (calculated)"
+          discount: "object|null"
+        so_total: "number (updated SO total_amount)"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+      - status: 400
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found or no standard price"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Cannot modify non-draft SO"
+
+    on_success:
+      - "Create sales_order_lines record"
+      - "Auto-populate unit_price from products.std_price (warn if NULL)"
+      - "Calculate line_total = quantity * unit_price - discount"
+      - "Recalculate SO total_amount"
+      - "Return line and updated SO total"
+
+    pattern: |
+      import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+      import { cookies } from 'next/headers';
+      import { NextResponse } from 'next/server';
+      import { z } from 'zod';
+      import { PricingService } from '@/lib/services/pricing-service';
+      import { getOrgContext } from '@/lib/services/org-context-service';
+
+      const addLineSchema = z.object({
+        product_id: z.string().uuid(),
+        quantity_ordered: z.number().positive('Quantity must be greater than zero'),
+        unit_price: z.number().positive().optional(),
+        discount: z.object({
+          type: z.enum(['percent', 'fixed']),
+          value: z.number().min(0),
+        }).optional(),
+        requested_lot: z.string().optional(),
+        notes: z.string().optional(),
+      });
+
+      export async function POST(request: Request, { params }: { params: { id: string } }) {
+        const supabase = createRouteHandlerClient({ cookies });
+        const context = await getOrgContext();
+
+        if (!context) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const body = await request.json();
+        const result = addLineSchema.safeParse(body);
+
+        if (!result.success) {
+          return NextResponse.json({
+            error: 'Validation error',
+            details: result.error.errors,
+          }, { status: 400 });
+        }
+
+        // Check SO exists and is draft
+        const { data: so, error: soError } = await supabase
+          .from('sales_orders')
+          .select('status, total_amount')
+          .eq('id', params.id)
+          .eq('org_id', context.org_id)
+          .single();
+
+        if (soError || !so || so.status !== 'draft') {
+          return NextResponse.json(
+            { error: 'Cannot modify non-draft sales order' },
+            { status: 403 }
+          );
+        }
+
+        const { product_id, quantity_ordered, unit_price: manualPrice, discount, requested_lot, notes } = result.data;
+
+        // Auto-populate price from product
+        let unitPrice = manualPrice;
+        if (!unitPrice) {
+          const price = await PricingService.getProductPrice(product_id);
+          if (!price) {
+            return NextResponse.json(
+              { error: 'Product not found or has no standard price' },
+              { status: 400 }
+            );
+          }
+          unitPrice = price;
+        }
+
+        // Calculate line total
+        const lineTotal = PricingService.calculateLineTotal(quantity_ordered, unitPrice, discount);
+
+        // Create line
+        const { data: line, error: lineError } = await supabase
+          .from('sales_order_lines')
+          .insert({
+            sales_order_id: params.id,
+            org_id: context.org_id,
+            product_id,
+            quantity_ordered,
+            unit_price: unitPrice,
+            line_total: lineTotal,
+            discount: discount || null,
+            requested_lot: requested_lot || null,
+            notes: notes || null,
+          })
+          .select()
+          .single();
+
+        if (lineError) {
+          return NextResponse.json({ error: 'Failed to create line' }, { status: 500 });
+        }
+
+        // Recalculate SO total
+        const soTotal = await PricingService.calculateOrderTotal(params.id);
+        await PricingService.updateOrderTotal(params.id);
+
+        return NextResponse.json({
+          success: true,
+          line,
+          so_total: soTotal,
+        }, { status: 201 });
+      }
+
+  # Update SO Line with pricing
+  - method: "PUT"
+    path: "/api/shipping/sales-orders/:id/lines/:lineId"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/lines/[lineId]/route.ts"
+    description: "Update SO line with recalculation of line_total and SO total_amount"
+    auth: true
+    roles: ["sales", "manager", "admin"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        quantity_ordered:
+          type: "number"
+          required: false
+          validation: "> 0"
+        unit_price:
+          type: "number"
+          required: false
+          validation: "> 0"
+        discount:
+          type: "object|null"
+          required: false
+          schema:
+            type: "enum: percent|fixed"
+            value: "number >= 0"
+        requested_lot:
+          type: "string"
+          required: false
+        notes:
+          type: "string"
+          required: false
+
+    response:
+      status: 200
+      schema:
+        success: true
+        line:
+          id: "uuid"
+          quantity_ordered: "number"
+          unit_price: "number"
+          line_total: "number (recalculated)"
+          discount: "object|null"
+        so_total: "number (updated SO total_amount)"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Cannot modify non-draft SO"
+      - status: 404
+        code: "NOT_FOUND"
+
+    on_success:
+      - "Update line with provided values"
+      - "Recalculate line_total = quantity * unit_price - discount"
+      - "Recalculate SO total_amount = SUM(all line_total)"
+      - "Return updated line and SO total"
+
+    pattern: |
+      // Similar to POST, but UPDATE instead of INSERT
+      // - Validate SO is draft
+      // - Recalculate line_total from all provided/existing values
+      // - Update SO total_amount
+      // - Return updated values
+
+  # Delete SO Line with recalculation
+  - method: "DELETE"
+    path: "/api/shipping/sales-orders/:id/lines/:lineId"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/lines/[lineId]/route.ts"
+    description: "Delete line and recalculate SO total_amount"
+    auth: true
+    roles: ["sales", "manager", "admin"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        so_total: "number (updated SO total_amount)"
+
+    errors:
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Cannot modify non-draft SO"
+      - status: 404
+        code: "NOT_FOUND"
+
+    on_success:
+      - "Delete sales_order_lines record"
+      - "Recalculate SO total_amount = SUM(remaining line_total)"
+      - "Return updated SO total"
+
+# Service Layer: PricingService
+service:
+  name: "PricingService"
+  file: "apps/frontend/lib/services/pricing-service.ts"
+  description: "Business logic for pricing calculations"
+
+  methods:
+    - name: "getProductPrice"
+      signature: "async getProductPrice(productId: string, customerId?: string): Promise<number | null>"
+      description: "Get current selling price for product (Phase 1: std_price, Phase 2: customer-specific)"
+      returns: "Product std_price or null if not found"
+
+    - name: "calculateLineTotal"
+      signature: "static calculateLineTotal(quantity: number, unitPrice: number, discount?: Discount): number"
+      description: "Calculate line_total = qty * price - discount, rounded to 2 decimals"
+      parameters:
+        quantity: "Order quantity (DECIMAL(15,4))"
+        unitPrice: "Unit price (DECIMAL(15,4))"
+        discount: "Optional {type: 'percent'|'fixed', value: number}"
+      returns: "Calculated line total (DECIMAL(15,2) precision)"
+
+    - name: "calculateOrderTotal"
+      signature: "async static calculateOrderTotal(soId: string): Promise<number>"
+      description: "Sum all line_total values for SO"
+      returns: "Total amount (DECIMAL(15,2) precision)"
+
+    - name: "updateOrderTotal"
+      signature: "async static updateOrderTotal(soId: string): Promise<void>"
+      description: "Persist calculated total to sales_orders.total_amount"
+
+# Validation Schema
+validation:
+  - path: "apps/frontend/lib/validation/sales-order-line-schema.ts"
+    description: "Zod schema for SO line with pricing fields"
+    exports:
+      - name: "discountSchema"
+        description: "Validates discount JSONB structure"
+      - name: "salesOrderLineSchema"
+        description: "Full line validation including pricing"
+      - name: "SOLineInput"
+        description: "TypeScript type for line input"
+
+    schema: |
+      import { z } from 'zod';
+
+      const discountSchema = z.object({
+        type: z.enum(['percent', 'fixed']),
+        value: z.number()
+          .min(0, 'Discount cannot be negative')
+          .refine((val) => val >= 0, 'Discount must be non-negative'),
+      }).refine((data) => {
+        if (data.type === 'percent' && data.value > 100) {
+          return false;
+        }
+        return true;
+      }, {
+        message: 'Percentage discount cannot exceed 100%',
+      }).nullable().optional();
+
+      export const salesOrderLineSchema = z.object({
+        product_id: z.string().uuid('Invalid product ID'),
+        quantity_ordered: z.number()
+          .positive('Quantity must be greater than zero'),
+        unit_price: z.number()
+          .positive('Unit price must be greater than zero'),
+        discount: discountSchema,
+        line_total: z.number().optional(), // Calculated
+        requested_lot: z.string().optional(),
+        notes: z.string().optional(),
+      });
+
+      export type SOLineInput = z.infer<typeof salesOrderLineSchema>;
+
+# Error Handling
+error_handling:
+  validation_errors:
+    - "Quantity not positive: show inline error"
+    - "Unit price not positive: show inline error"
+    - "Discount negative: show inline error"
+    - "Discount % > 100: show inline error"
+
+  business_errors:
+    - "Product not found: show toast error 'Product not found'"
+    - "Product has no price: show warning 'No standard price, enter manually'"
+    - "SO not draft: show error 'Cannot modify confirmed/shipped order'"
+
+# Integration Notes
+integration_notes:
+  upstream:
+    - "Depends on products.std_price from Epic 02.1"
+    - "Depends on sales_orders.status from Story 07.2"
+
+  downstream:
+    - "Consumed by Story 07.5 (SO Confirmation) for validated pricing"
+    - "Consumed by Story 07.6 (SO Confirmation workflow) for total display"
+    - "Consumed by Finance module for invoicing"
+
+  caching:
+    - "No caching needed for pricing calculations (lightweight)"
+    - "Product prices change infrequently, consider caching in future"

@@ -1,0 +1,426 @@
+# Story 05.15 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/over-receipt-service.test.ts"
+    type: "unit"
+    description: "Unit tests for OverReceiptService methods"
+
+  - path: "apps/frontend/app/api/warehouse/over-receipt-approvals/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for approval API endpoints"
+
+  - path: "supabase/tests/over-receipt-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for over_receipt_approvals table"
+
+  - path: "apps/frontend/__tests__/e2e/warehouse/over-receipt-approval.spec.ts"
+    type: "e2e"
+    description: "End-to-end approval workflow tests"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # Settings
+  - id: "AC-01"
+    name: "Settings table has over-receipt columns"
+    given: "warehouse_settings table exists"
+    when: "schema is inspected"
+    then: "table has allow_over_receipt (BOOLEAN, default false) and over_receipt_tolerance_pct (NUMERIC 0-100)"
+    test_type: "migration"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Settings UI for over-receipt configuration"
+    given: "user with role 'warehouse_manager' navigates to /settings/warehouse"
+    when: "viewing Warehouse Settings page"
+    then: "Receiving Settings section displays toggle and tolerance input"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Validation
+  - id: "AC-03"
+    name: "Block over-receipt when not allowed"
+    given: "warehouse_settings.allow_over_receipt = false"
+    when: "validating receipt of 110 units on 100 ordered"
+    then: "returns { allowed: false, requiresApproval: false, error: 'Over-receipt not allowed' }"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Allow over-receipt within tolerance"
+    given: "allow_over_receipt = true, tolerance = 10%"
+    when: "validating receipt of 108 units on 100 ordered (8% over)"
+    then: "returns { allowed: true, requiresApproval: false, warning: 'Over-receipt within tolerance' }"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    name: "Require approval when exceeds tolerance"
+    given: "allow_over_receipt = true, tolerance = 10%"
+    when: "validating receipt of 115 units on 100 ordered (15% over)"
+    then: "returns { allowed: false, requiresApproval: true, maxAllowedQty: 110 }"
+    test_type: "unit"
+    priority: "P0"
+
+  # Approval Creation
+  - id: "AC-06"
+    name: "Create approval request"
+    given: "over-tolerance receipt requiring approval"
+    when: "POST /api/warehouse/over-receipt-approvals"
+    then: "approval created with status='pending', notification sent to managers"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    name: "Cannot create duplicate pending approval"
+    given: "pending approval exists for po_line_id"
+    when: "creating another approval for same po_line_id"
+    then: "returns 400 'Pending approval already exists'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    name: "Approval request requires reason"
+    given: "creating approval request"
+    when: "reason field is empty"
+    then: "returns 400 'Reason is required'"
+    test_type: "integration"
+    priority: "P1"
+
+  # Approve/Reject
+  - id: "AC-09"
+    name: "Manager approves over-receipt"
+    given: "user with role 'warehouse_manager', pending approval exists"
+    when: "POST /api/warehouse/over-receipt-approvals/:id/approve"
+    then: "status='approved', reviewed_by set, requester notified"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    name: "Non-manager cannot approve"
+    given: "user with role 'warehouse_operator'"
+    when: "attempting to approve"
+    then: "returns 403 'Only warehouse managers can approve'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    name: "Rejection requires review notes"
+    given: "manager rejecting approval"
+    when: "review_notes is empty"
+    then: "returns 400 'Review notes required for rejection'"
+    test_type: "integration"
+    priority: "P1"
+
+  # GRN Integration
+  - id: "AC-12"
+    name: "GRN checks for approved over-receipt"
+    given: "approved over-receipt exists for po_line_id"
+    when: "creating GRN with over-tolerance quantity"
+    then: "GRN created successfully, grn_items.over_receipt_approval_id set"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    name: "GRN blocks unapproved over-receipt"
+    given: "no approval exists for po_line_id"
+    when: "creating GRN with over-tolerance quantity"
+    then: "returns 400 'Over-receipt requires approval'"
+    test_type: "integration"
+    priority: "P0"
+
+  # RLS
+  - id: "AC-14"
+    name: "Org isolation on approval list"
+    given: "User A from Org A, User B from Org B, approvals in both orgs"
+    when: "User A requests GET /api/warehouse/over-receipt-approvals"
+    then: "only Org A approvals returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-15"
+    name: "Cannot approve from different org"
+    given: "User A from Org A, approval belongs to Org B"
+    when: "User A attempts to approve"
+    then: "returns 404 Not Found"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Performance
+  - id: "AC-16"
+    name: "Validation performance"
+    given: "PO with 10 lines"
+    when: "validating over-receipt for all lines"
+    then: "response time < 200ms"
+    test_type: "performance"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  over_receipt_service:
+    validateOverReceipt:
+      - name: "blocks when allow_over_receipt=false"
+        setup: "Mock settings.allow_over_receipt = false"
+        input: "poLineId, receivingQty=110 (orderedQty=100)"
+        expected: "{ allowed: false, requiresApproval: false, overReceiptPct: 10 }"
+
+      - name: "allows exact match"
+        setup: "Mock settings.allow_over_receipt = true, tolerance = 10"
+        input: "receivingQty=100 (orderedQty=100)"
+        expected: "{ allowed: true, requiresApproval: false, overReceiptPct: 0 }"
+
+      - name: "allows within tolerance"
+        setup: "Mock settings.allow_over_receipt = true, tolerance = 10"
+        input: "receivingQty=108 (orderedQty=100)"
+        expected: "{ allowed: true, requiresApproval: false, overReceiptPct: 8 }"
+
+      - name: "requires approval when exceeds tolerance"
+        setup: "Mock settings.allow_over_receipt = true, tolerance = 10"
+        input: "receivingQty=115 (orderedQty=100)"
+        expected: "{ allowed: false, requiresApproval: true, overReceiptPct: 15, maxAllowedQty: 110 }"
+
+      - name: "calculates cumulative with partial receipt"
+        setup: "receivedQty=50, orderedQty=100, tolerance=10"
+        input: "receivingQty=60 (total=110)"
+        expected: "{ overReceiptPct: 10 }"
+
+      - name: "finds existing pending approval"
+        setup: "Mock pending approval for poLineId"
+        expected: "{ existingApproval: { id: '...', status: 'pending' } }"
+
+      - name: "finds existing approved approval"
+        setup: "Mock approved approval for poLineId"
+        expected: "{ allowed: true, existingApproval: { status: 'approved' } }"
+
+    requestApproval:
+      - name: "creates approval record"
+        input: "{ poId, poLineId, requestingQty: 115, reason: 'Supplier shipped extra' }"
+        expected: "Approval created with status='pending'"
+
+      - name: "prevents duplicate pending"
+        setup: "Existing pending approval for poLineId"
+        expected: "throws 'Pending approval already exists'"
+
+      - name: "validates reason minimum length"
+        input: "{ reason: 'Short' }"
+        expected: "throws 'Reason must be at least 10 characters'"
+
+    approveRequest:
+      - name: "updates status to approved"
+        setup: "Pending approval, manager user"
+        expected: "status='approved', reviewed_by set, reviewed_at set"
+
+      - name: "rejects non-manager"
+        setup: "Pending approval, operator user"
+        expected: "throws 'Only warehouse managers can approve'"
+
+      - name: "rejects already reviewed"
+        setup: "Approval with status='approved'"
+        expected: "throws 'Approval already reviewed'"
+
+    rejectRequest:
+      - name: "requires review notes"
+        input: "{ reviewNotes: '' }"
+        expected: "throws 'Review notes required'"
+
+      - name: "updates status to rejected"
+        input: "{ reviewNotes: 'Return excess to supplier' }"
+        expected: "status='rejected', review_notes saved"
+
+    canApprove:
+      - name: "returns true for warehouse_manager"
+        setup: "User with role warehouse_manager"
+        expected: "true"
+
+      - name: "returns true for admin"
+        setup: "User with role admin"
+        expected: "true"
+
+      - name: "returns false for warehouse_operator"
+        setup: "User with role warehouse_operator"
+        expected: "false"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /validate-over-receipt returns validation result"
+      request:
+        method: "POST"
+        path: "/api/warehouse/grns/validate-over-receipt"
+        body: { po_line_id: "uuid", receiving_qty: 115 }
+      expected:
+        status: 200
+        body_contains: ["allowed", "requires_approval", "over_receipt_pct"]
+
+    - name: "POST /over-receipt-approvals creates approval"
+      request:
+        method: "POST"
+        path: "/api/warehouse/over-receipt-approvals"
+        body: { po_id: "uuid", po_line_id: "uuid", requesting_qty: 115, reason: "Supplier shipped extra units" }
+      expected:
+        status: 201
+        body_contains: ["id", "status"]
+
+    - name: "POST /over-receipt-approvals returns 400 for duplicate"
+      setup: "Create pending approval first"
+      request:
+        method: "POST"
+        path: "/api/warehouse/over-receipt-approvals"
+        body: { po_line_id: "same uuid", ... }
+      expected:
+        status: 400
+        error: "DUPLICATE_PENDING"
+
+    - name: "POST /:id/approve updates status (manager)"
+      setup: "Create pending approval, authenticate as manager"
+      request:
+        method: "POST"
+        path: "/api/warehouse/over-receipt-approvals/:id/approve"
+        body: { review_notes: "Accepted" }
+      expected:
+        status: 200
+        body_contains: { status: "approved" }
+
+    - name: "POST /:id/approve returns 403 (operator)"
+      setup: "Authenticate as warehouse_operator"
+      expected:
+        status: 403
+        error: "FORBIDDEN"
+
+    - name: "GET /over-receipt-approvals returns paginated list"
+      setup: "Create 5 approvals"
+      request:
+        method: "GET"
+        path: "/api/warehouse/over-receipt-approvals?status=pending&limit=10"
+      expected:
+        status: 200
+        body_contains: ["data", "pagination"]
+
+  rls_isolation:
+    - name: "User can only see own org approvals"
+      setup: "Create approvals in Org A and Org B"
+      action: "User A queries approvals"
+      expected: "Only Org A approvals returned"
+
+    - name: "Cross-org approve returns 404"
+      setup: "Create approval in Org B"
+      action: "User A (Org A) attempts to approve"
+      expected: "404 Not Found"
+
+    - name: "Non-manager cannot update approval"
+      setup: "Create pending approval"
+      action: "Operator attempts direct DB update"
+      expected: "RLS blocks update"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete over-receipt approval workflow"
+    steps:
+      - "Operator starts GRN, enters over-tolerance quantity"
+      - "System shows error, operator clicks 'Request Approval'"
+      - "Operator enters reason, submits request"
+      - "Manager logs in, sees pending approval"
+      - "Manager approves request"
+      - "Operator returns, sees approval granted"
+      - "Operator completes GRN successfully"
+    assertions:
+      - "GRN created with over_receipt_approval_id set"
+      - "Approval status is 'approved'"
+
+  - name: "Rejection workflow"
+    steps:
+      - "Operator requests approval for over-receipt"
+      - "Manager rejects with notes"
+      - "Operator sees rejection message"
+      - "Operator reduces quantity"
+      - "Operator completes GRN with reduced qty"
+    assertions:
+      - "Approval status is 'rejected'"
+      - "GRN created with correct quantity"
+
+  - name: "Settings configuration"
+    steps:
+      - "Admin navigates to warehouse settings"
+      - "Admin enables over-receipt with 10% tolerance"
+      - "Admin saves settings"
+      - "Operator creates GRN with 8% over-receipt"
+    assertions:
+      - "Over-receipt allowed with warning"
+      - "No approval required"
+
+# Definition of Done
+definition_of_done:
+  database:
+    - "warehouse_settings has allow_over_receipt and tolerance columns"
+    - "over_receipt_approvals table created with all columns"
+    - "grn_items.over_receipt_approval_id FK added"
+    - "RLS policies enforce org isolation"
+    - "RLS policies enforce manager-only updates"
+    - "Indexes created for performance"
+
+  api:
+    - "All 6 endpoints return correct status codes"
+    - "Validation errors return 400 with details"
+    - "Permission checks enforce manager-only approve/reject"
+    - "Cross-tenant access returns 404"
+    - "Response times meet targets (<200ms validation, <500ms list)"
+
+  service:
+    - "validateOverReceipt() handles all scenarios"
+    - "Approval workflow creates/updates correctly"
+    - "Permission checks work for manager role"
+    - "GRN integration verified"
+
+  frontend:
+    - "Settings UI allows configuring tolerance"
+    - "Warnings displayed for within-tolerance"
+    - "Errors displayed for over-tolerance"
+    - "Approval request modal works"
+    - "Manager approval page functional"
+
+  testing:
+    - "Unit tests >80% coverage on service"
+    - "Integration tests for all endpoints"
+    - "Permission tests verify manager-only"
+    - "RLS tests verify multi-tenancy"
+    - "E2E tests for full workflow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/over-receipt-service.ts: 80%"
+      - "lib/validation/over-receipt.ts: 90%"
+  integration:
+    target: 75
+    focus:
+      - "All API endpoints"
+      - "RLS policies"
+      - "Permission checks"
+  e2e:
+    target: 2  # 2 critical workflows
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Permission logic allows non-manager to approve"
+    mitigation: "Thorough role-based testing, RLS as backup"
+    severity: "high"
+    test_coverage: "integration_tests.api_endpoints.approve_403"
+
+  - id: "RISK-02"
+    description: "Duplicate approval requests possible via race condition"
+    mitigation: "Unique partial index on pending approvals"
+    severity: "medium"
+    test_coverage: "integration_tests.duplicate_pending"
+
+  - id: "RISK-03"
+    description: "Cross-tenant data leak"
+    mitigation: "RLS policies, 404 response for cross-tenant"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"

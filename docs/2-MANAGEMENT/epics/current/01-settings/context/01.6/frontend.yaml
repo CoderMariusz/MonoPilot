@@ -1,0 +1,269 @@
+# Story 01.6 - Frontend Specification
+# Purpose: Components, hooks, types
+# Agent: FRONTEND-DEV
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/settings/users/RoleSelector.tsx"
+    description: "Dropdown for role selection in user modal (SET-011)"
+    props:
+      - name: "value"
+        type: "string"
+        description: "Selected role code"
+      - name: "onChange"
+        type: "(roleCode: string) => void"
+        description: "Callback when role changes"
+      - name: "currentUserRole"
+        type: "string"
+        description: "Current user's role code (for owner restriction)"
+      - name: "disabled"
+        type: "boolean"
+        description: "Whether the field is disabled"
+    ux_reference: "SET-011"
+    implementation_notes:
+      - "Display role NAME (not code): 'Production Manager' not 'production_manager'"
+      - "Owner option disabled if current user is not owner"
+      - "Tooltip on owner role: 'Only owner can assign this role'"
+      - "Use ShadCN Select component"
+      - "Roles sorted by display_order"
+
+  - path: "apps/frontend/components/common/PermissionGuard.tsx"
+    description: "Wrapper component for permission-based rendering"
+    props:
+      - name: "module"
+        type: "ModuleCode"
+        description: "Module to check permission for"
+      - name: "action"
+        type: "PermissionAction"
+        description: "Action to check (C, R, U, D)"
+      - name: "fallback"
+        type: "ReactNode"
+        description: "Component to render if permission denied"
+      - name: "children"
+        type: "ReactNode"
+        description: "Component to render if permission granted"
+    implementation: |
+      export function PermissionGuard({
+        module,
+        action,
+        fallback = null,
+        children
+      }: PermissionGuardProps) {
+        const { can } = usePermissions();
+
+        if (!can(module, action)) {
+          return fallback;
+        }
+
+        return <>{children}</>;
+      }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/usePermissions.ts"
+    description: "Hook for permission checks in components"
+    exports:
+      - name: "usePermissions"
+        returns: "UsePermissionsResult"
+        description: "Provides permission checking functions"
+    pattern: |
+      import { useOrgContext } from './use-org-context';
+
+      export function usePermissions() {
+        const { data: context } = useOrgContext();
+
+        const can = (module: ModuleCode, action: PermissionAction): boolean => {
+          if (!context?.permissions) return false;
+
+          const modulePerms = context.permissions[module];
+          if (!modulePerms || modulePerms === '-') return false;
+
+          return modulePerms.includes(action);
+        };
+
+        const canAny = (module: ModuleCode): boolean => {
+          if (!context?.permissions) return false;
+
+          const modulePerms = context.permissions[module];
+          return modulePerms && modulePerms !== '-';
+        };
+
+        const hasRole = (roles: RoleCode[]): boolean => {
+          if (!context?.role_code) return false;
+          return roles.includes(context.role_code as RoleCode);
+        };
+
+        return {
+          can,
+          canAny,
+          hasRole,
+          role: context?.role_code,
+          isAdmin: hasRole(['owner', 'admin']),
+          isOwner: hasRole(['owner'])
+        };
+      }
+
+  - path: "apps/frontend/lib/hooks/useRoles.ts"
+    description: "Hook for fetching roles list"
+    exports:
+      - name: "useRoles"
+        returns: "UseQueryResult<Role[]>"
+        description: "Fetches all roles from API"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+
+      export function useRoles() {
+        return useQuery({
+          queryKey: ['roles'],
+          queryFn: fetchRoles,
+          staleTime: 60 * 60 * 1000, // 1 hour (roles rarely change)
+        });
+      }
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/role.ts"
+    description: "Role TypeScript interfaces"
+    content: |
+      export interface Role {
+        id: string;
+        code: string;
+        name: string;
+        description: string | null;
+        permissions: Record<string, string>;
+        is_system: boolean;
+        display_order: number;
+        created_at: string;
+      }
+
+      export type RoleCode =
+        | 'owner'
+        | 'admin'
+        | 'production_manager'
+        | 'quality_manager'
+        | 'warehouse_manager'
+        | 'production_operator'
+        | 'quality_inspector'
+        | 'warehouse_operator'
+        | 'planner'
+        | 'viewer';
+
+      export type PermissionAction = 'C' | 'R' | 'U' | 'D';
+
+      export type ModuleCode =
+        | 'settings'
+        | 'users'
+        | 'technical'
+        | 'planning'
+        | 'production'
+        | 'quality'
+        | 'warehouse'
+        | 'shipping'
+        | 'npd'
+        | 'finance'
+        | 'oee'
+        | 'integrations';
+
+      export interface UsePermissionsResult {
+        can: (module: ModuleCode, action: PermissionAction) => boolean;
+        canAny: (module: ModuleCode) => boolean;
+        hasRole: (roles: RoleCode[]) => boolean;
+        role: string | undefined;
+        isAdmin: boolean;
+        isOwner: boolean;
+      }
+
+# UX Wireframe Implementation
+ux:
+  wireframes:
+    - id: "SET-011"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-011-role-selector.md"
+      components:
+        - "RoleSelector.tsx"
+      states:
+        - state: "admin_user"
+          display: "All 10 roles except Super Admin (disabled)"
+        - state: "super_admin_user"
+          display: "All 10 roles including Super Admin"
+        - state: "disabled"
+          display: "Dropdown grayed out, not interactive"
+
+  patterns:
+    select: "ShadCN Select component"
+    tooltip: "ShadCN Tooltip for disabled Super Admin option"
+
+# Usage Examples
+usage_examples:
+  - scenario: "Hide create button for viewer role"
+    code: |
+      function UserListPage() {
+        const { can } = usePermissions();
+
+        return (
+          <div>
+            {can('users', 'C') && <Button onClick={openCreateModal}>Create User</Button>}
+            <UserTable />
+          </div>
+        );
+      }
+
+  - scenario: "Use PermissionGuard"
+    code: |
+      <PermissionGuard module="users" action="D">
+        <DeleteButton />
+      </PermissionGuard>
+
+  - scenario: "Role selector in user modal"
+    code: |
+      function UserModal() {
+        const { role: currentUserRole, isOwner } = usePermissions();
+        const { data: roles } = useRoles();
+
+        return (
+          <Form>
+            ...
+            <RoleSelector
+              value={formData.role_code}
+              onChange={(code) => setFormData({ ...formData, role_code: code })}
+              currentUserRole={currentUserRole}
+            />
+            ...
+          </Form>
+        );
+      }
+
+  - scenario: "API route permission check"
+    code: |
+      export async function POST(req: Request) {
+        const user = await getAuthUser(req);
+
+        if (!hasPermission(user, 'users', 'C')) {
+          return Response.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        // ... proceed
+      }
+
+# Error Handling
+error_handling:
+  - scenario: "No permission for action"
+    ui: "Hide button or show 'No permission' message"
+  - scenario: "Role fetch fails"
+    ui: "Disable role selector, show error toast"
+  - scenario: "Owner role assignment attempted by non-owner"
+    ui: "Show error toast: 'Only owner can assign owner role'"
+
+# Accessibility
+accessibility:
+  - "Role selector has label 'Role'"
+  - "Keyboard navigation works for role dropdown"
+  - "Screen reader announces disabled owner role option"
+  - "Tooltip on disabled option accessible via keyboard"
+  - "PermissionGuard does not render hidden elements in DOM"
+
+# Performance
+performance:
+  - "Roles list cached (1 hour TTL)"
+  - "Permission checks memoized"
+  - "usePermissions hook uses context (no redundant API calls)"
+  - "Permission cache invalidated on role change (<1 min)"

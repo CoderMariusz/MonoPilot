@@ -1,0 +1,184 @@
+# Story 04.1 - Production Dashboard
+# Index file with metadata, dependencies, deliverables, and technical notes
+
+story:
+  id: "04.1"
+  name: "Production Dashboard"
+  epic: "04-production"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3-4
+  priority: "P0"
+  type: "backend + frontend"
+  state: "ready"
+
+description: |
+  Production Dashboard provides real-time visibility into shop floor operations for
+  production managers and operators. Displays key performance indicators, active work
+  orders, and production alerts without requiring License Plate functionality.
+
+  Phase 0 MVP includes:
+  - 6 KPI cards with real-time metrics
+  - Active WOs table with filtering and sorting
+  - Alerts panel (material shortages, delayed WOs - placeholders for quality/OEE)
+  - Quick actions (Start WO, View Schedule)
+  - Auto-refresh every 30 seconds
+  - Manual refresh button
+  - CSV export of active WOs
+
+dependencies:
+  required:
+    - story: "01.1"
+      epic: "01-settings"
+      provides: ["organizations", "users", "roles", "RLS", "org_id filtering"]
+      status: "complete"
+    - story: "01.11"
+      epic: "01-settings"
+      provides: ["production_lines table", "line assignment to WOs"]
+      status: "complete"
+    - story: "03.10"
+      epic: "03-planning"
+      provides: ["work_orders table", "wo_number", "status", "planned_qty", "actual_qty", "scheduled_end_date"]
+      status: "required"
+    - story: "03.11a"
+      epic: "03-planning"
+      provides: ["wo_materials table", "required_qty", "consumed_qty", "material_availability calculation"]
+      status: "required"
+    - story: "03.12"
+      epic: "03-planning"
+      provides: ["wo_operations table", "operation timing for cycle time calculation"]
+      status: "required"
+
+  provides_to:
+    - story: "04.2a"
+      what: "Dashboard context for WO start workflow"
+    - story: "04.2b"
+      what: "Real-time status updates when WO paused/resumed"
+    - story: "04.2c"
+      what: "WO completion updates in Active WOs table"
+    - story: "04.9a"
+      what: "Dashboard placeholders for OEE metrics (Phase 2)"
+
+  external:
+    - name: "None"
+      note: "No external dependencies for Phase 0 dashboard"
+
+lp_dependency:
+  required: false
+  note: "Dashboard aggregates from existing work_orders table. Material availability calculated from wo_materials.required_qty vs consumed_qty. NO license_plates table dependency for Phase 0."
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/production.md"
+  prd_sections:
+    - "FR-PROD-001"
+    - "KPI Cards (lines 87-94)"
+    - "Active WOs Table (lines 97-100)"
+    - "Alerts Panel (lines 103-110)"
+    - "AC lines 119-128"
+  architecture: "docs/1-BASELINE/architecture/modules/production.md"
+  architecture_sections:
+    - "Dashboard Endpoints (lines 281-286)"
+    - "Query Optimization (lines 562-576)"
+    - "Caching Strategy (lines 584-591)"
+  story: "docs/2-MANAGEMENT/epics/current/04-production/04.1.production-dashboard.md"
+  wireframe: "docs/3-ARCHITECTURE/ux/wireframes/PROD-001-production-dashboard.md"
+  patterns:
+    - "apps/frontend/lib/services/*-service.ts"
+    - "apps/frontend/lib/validation/*-schema.ts"
+    - "apps/frontend/app/api/*/route.ts"
+
+phase_0_scope:
+  includes:
+    - "6 KPI cards (Active WOs, WOs Today, WOs This Week, Avg Cycle Time, On-Time %, placeholder for OEE)"
+    - "Active WOs table with filters (Line, Product, Status)"
+    - "Alerts panel (Material Shortages, Delayed WOs)"
+    - "Auto-refresh (30 second default, configurable)"
+    - "Manual refresh button"
+    - "CSV export of Active WOs"
+    - "Quick actions (Start WO, View Schedule)"
+  excludes:
+    - "OEE metrics (deferred to Phase 2 - Story 04.9a)"
+    - "Material consumption/output drill-down (requires Epic 05 LPs)"
+    - "Machine downtime tracking (Phase 2 - Story 04.9b)"
+    - "Quality alerts (requires Epic 06 Quality module)"
+    - "Real-time WebSocket updates (Phase 3 - polling only)"
+    - "Mobile-responsive dashboard (Phase 3)"
+
+technical_notes:
+  caching:
+    strategy: "Redis with 30-second TTL for KPIs"
+    keys:
+      - "dashboard:kpis:{orgId}"
+      - "dashboard:active-wos:{orgId}"
+      - "dashboard:alerts:{orgId}"
+  performance:
+    kpi_response: "<500ms"
+    active_wos_response: "<1s"
+    page_load: "<2s total"
+  database:
+    indexes_required:
+      - "idx_work_orders_dashboard ON work_orders(org_id, status, completed_at, started_at)"
+      - "idx_work_orders_scheduled ON work_orders(org_id, status, scheduled_end_date)"
+      - "idx_wo_materials_availability ON wo_materials(wo_id, required_qty, consumed_qty)"
+
+deliverables:
+  database:
+    - "Migration for dashboard-specific indexes (3 indexes)"
+    - "RPC function: get_material_shortage_alerts(p_org_id, p_threshold)"
+  api:
+    - "GET /api/production/dashboard/kpis"
+    - "GET /api/production/dashboard/active-wos"
+    - "GET /api/production/dashboard/alerts"
+    - "GET /api/production/dashboard/export"
+  services:
+    - "production-dashboard-service.ts (full implementation)"
+  validation:
+    - "production-dashboard-schemas.ts"
+  pages:
+    - "app/(authenticated)/production/dashboard/page.tsx"
+  components:
+    - "KPICard.tsx, KPIGrid.tsx"
+    - "ActiveWOsTable.tsx, WOTableRow.tsx"
+    - "AlertsPanel.tsx, AlertItem.tsx"
+    - "QuickActions.tsx, RefreshControls.tsx"
+    - "DashboardFilters.tsx, ExportButton.tsx"
+    - "StartWOModal.tsx"
+  tests:
+    unit:
+      - "production-dashboard-service.test.ts"
+      - "dashboard-kpi-calculations.test.ts"
+      - "dashboard-filters.test.ts"
+    e2e:
+      - "dashboard-load.spec.ts"
+      - "dashboard-filters.spec.ts"
+      - "dashboard-refresh.spec.ts"
+      - "dashboard-export.spec.ts"
+      - "dashboard-alerts.spec.ts"
+
+output_artifacts:
+  - "Migration file for indexes"
+  - "RPC function for material shortage calculation"
+  - "Production dashboard service with caching"
+  - "Dashboard API routes (4 endpoints)"
+  - "Dashboard page with all components"
+  - "Zod validation schemas"
+  - "Unit tests (>80% coverage)"
+  - "E2E smoke tests for critical paths"
+
+quality_gates:
+  - "All 25 acceptance criteria from story document verified"
+  - "API response times meet performance targets"
+  - "RLS policies enforced on all queries"
+  - "Cache invalidation working correctly"
+  - "Auto-refresh preserves user state (filters, scroll)"
+  - "CSV export includes all visible columns"
+  - "No console errors or warnings"
+  - "Code review completed"
+
+handoff:
+  to_dev:
+    story_file: "docs/2-MANAGEMENT/epics/current/04-production/04.1.production-dashboard.md"
+    context_folder: "docs/2-MANAGEMENT/epics/current/04-production/context/04.1/"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/PROD-001-production-dashboard.md"
+    adrs: []
+    technical_notes: "No LP dependency. Uses existing work_orders, wo_materials, wo_operations tables. 30s cache TTL."

@@ -1,0 +1,438 @@
+# Story 07.4 - Frontend Implementation
+# Purpose: Components for SO line pricing and discount handling
+# Agent: FRONTEND-DEV (primary)
+
+components:
+  - name: "SOLineForm"
+    file: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/SOLineForm.tsx"
+    description: "Form to add/edit SO line with auto-price population and discount input"
+    location: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/"
+    type: "ReactComponent"
+
+    props:
+      soId:
+        type: "string (UUID)"
+        required: true
+        description: "Sales order ID"
+
+      lineId:
+        type: "string (UUID)"
+        required: false
+        description: "When editing existing line"
+
+      onLineChange:
+        type: "(line: SOLine) => void"
+        required: true
+        description: "Callback when line values change (for real-time total update)"
+
+      onSuccess:
+        type: "(line: SOLine, soTotal: number) => void"
+        required: true
+        description: "Callback on successful save"
+
+      initialData:
+        type: "SOLine"
+        required: false
+        description: "For editing mode"
+
+    state:
+      productId: "string (UUID)"
+      quantity: "number"
+      unitPrice: "number"
+      discount: "Discount|null"
+      lineTotal: "number (calculated)"
+      loading: "boolean"
+      errors: "Record<string, string>"
+
+    behavior:
+      on_product_select:
+        - "Fetch product price via getProductPrice()"
+        - "If price found: auto-populate unit_price field"
+        - "If price NULL: show warning 'Product has no standard price, please enter manually'"
+        - "Trigger onLineChange callback with updated line"
+
+      on_qty_change:
+        - "Recalculate lineTotal = qty * unitPrice - discount"
+        - "Update display with new total"
+        - "Trigger onLineChange callback"
+
+      on_price_change:
+        - "Recalculate lineTotal"
+        - "Update display"
+        - "Trigger onLineChange callback"
+
+      on_discount_change:
+        - "Recalculate lineTotal with new discount"
+        - "Update display"
+        - "Trigger onLineChange callback"
+
+      on_save:
+        - "Validate all fields using salesOrderLineSchema"
+        - "If validation fails: show inline errors"
+        - "If valid: POST/PUT to API endpoint"
+        - "On success: call onSuccess callback with returned line and SO total"
+        - "On error: show toast error and display error details"
+
+    ui_elements:
+      - "Product Select (dropdown with search)"
+      - "Quantity Input (number field, min 0.01)"
+      - "Unit Price Input (editable, currency format)"
+      - "Discount Input (DiscountInput component)"
+      - "Line Total Display (read-only, bold, currency format)"
+      - "Requested Lot Input (optional text field)"
+      - "Notes Input (optional textarea)"
+      - "Save/Cancel Buttons"
+
+    validations:
+      - field: "quantity_ordered"
+        rule: "Must be > 0"
+        error_message: "Quantity must be greater than zero"
+
+      - field: "unit_price"
+        rule: "Must be > 0"
+        error_message: "Unit price must be greater than zero"
+
+      - field: "discount.value"
+        rule: "Must be >= 0"
+        error_message: "Discount cannot be negative"
+
+      - field: "discount.type + discount.value"
+        rule: "If type='percent', value <= 100"
+        error_message: "Percentage discount cannot exceed 100%"
+
+    example_usage: |
+      <SOLineForm
+        soId={params.id}
+        onLineChange={(line) => console.log('Line:', line)}
+        onSuccess={(line, total) => {
+          // Refresh SO total display
+          setSoTotal(total);
+          toast.success('Line added successfully');
+        }}
+      />
+
+  - name: "DiscountInput"
+    file: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/DiscountInput.tsx"
+    description: "Composite input for discount type (percent/fixed) and value"
+    type: "ReactComponent"
+
+    props:
+      value:
+        type: "Discount|null"
+        description: "{type: 'percent'|'fixed', value: number} or null"
+
+      onChange:
+        type: "(discount: Discount|null) => void"
+        required: true
+        description: "Callback when discount changes"
+
+      errors:
+        type: "string[]"
+        required: false
+        description: "Validation errors to display"
+
+      disabled:
+        type: "boolean"
+        required: false
+        default: false
+
+    state:
+      discountType: "'percent' | 'fixed' | null"
+      discountValue: "number | null"
+
+    behavior:
+      on_type_change:
+        - "Update discountType in state"
+        - "Call onChange with updated discount object"
+
+      on_value_change:
+        - "Validate value (>= 0, and <= 100 if percent)"
+        - "Update discountValue in state"
+        - "Call onChange with updated discount object"
+
+      on_clear:
+        - "Set both type and value to null"
+        - "Call onChange with null"
+
+    ui_elements:
+      - "Type Selector (Select: 'None', 'Percentage', 'Fixed Amount')"
+      - "Value Input (number, shows only if type selected)"
+      - "Clear Button (reset to null)"
+      - "Error Message (inline validation)"
+
+    example_usage: |
+      <DiscountInput
+        value={discount}
+        onChange={(d) => setDiscount(d)}
+        errors={discountErrors}
+      />
+
+  - name: "SOLineTable"
+    file: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/SOLineTable.tsx"
+    description: "Table displaying SO lines with pricing columns"
+    type: "ReactComponent (ShadCN DataTable)"
+
+    columns:
+      - name: "Product"
+        field: "product.name"
+        width: "25%"
+        sortable: true
+        filterable: true
+
+      - name: "Qty Order"
+        field: "quantity_ordered"
+        width: "10%"
+        format: "decimal(2)"
+        align: "right"
+
+      - name: "Qty Pick"
+        field: "quantity_picked"
+        width: "10%"
+        format: "decimal(2)"
+        align: "right"
+
+      - name: "Qty Pack"
+        field: "quantity_packed"
+        width: "10%"
+        format: "decimal(2)"
+        align: "right"
+
+      - name: "Unit Price"
+        field: "unit_price"
+        width: "12%"
+        format: "currency"
+        align: "right"
+        editable: "only in draft mode"
+
+      - name: "Discount"
+        field: "discount"
+        width: "12%"
+        format: "discount display (e.g., '10%' or '$50')"
+        align: "right"
+
+      - name: "Line Total"
+        field: "line_total"
+        width: "12%"
+        format: "currency"
+        align: "right"
+        highlight: true
+
+      - name: "Status"
+        field: "status"
+        width: "8%"
+        format: "badge (color-coded)"
+
+      - name: "Actions"
+        width: "8%"
+        actions: ["Edit", "Delete"]
+
+    features:
+      - "Row selection for bulk actions"
+      - "Sort by any column"
+      - "Filter by product, status"
+      - "Inline edit for quantity/price/discount (draft only)"
+      - "Row click to expand allocation details"
+      - "Delete with confirmation"
+
+    behavior:
+      on_row_edit:
+        - "Open SOLineForm modal for editing"
+        - "Pre-populate form with line data"
+        - "On save: update table row"
+
+      on_row_delete:
+        - "Show confirmation dialog"
+        - "DELETE to API endpoint"
+        - "On success: remove row, update SO total display"
+        - "Show toast 'Line deleted, total updated'"
+
+      on_quantity_change:
+        - "For draft SO: allow inline edit"
+        - "Recalculate line_total on blur"
+        - "PUT to API endpoint"
+        - "Update table row with new values"
+
+    example_usage: |
+      <SOLineTable
+        lines={soLines}
+        soStatus={so.status}
+        onLineChange={refreshLines}
+        onTotalChange={(total) => setSoTotal(total)}
+      />
+
+  - name: "SOTotalDisplay"
+    file: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/SOTotalDisplay.tsx"
+    description: "Prominent display of SO total_amount with breakdown"
+    type: "ReactComponent (ShadCN Card)"
+
+    props:
+      lines:
+        type: "SOLine[]"
+        required: true
+        description: "All SO lines"
+
+      total:
+        type: "number"
+        required: true
+        description: "Calculated SO total_amount"
+
+      currency:
+        type: "string"
+        default: "USD"
+        description: "Currency code for formatting"
+
+    state:
+      subtotal: "number (sum of line subtotals before discount)"
+      totalDiscounts: "number (sum of all discounts)"
+      total: "number (final total)"
+
+    behavior:
+      on_mount:
+        - "Calculate subtotal = SUM(qty * unitPrice) for each line"
+        - "Calculate total discounts = SUM(discount amount) for each line"
+        - "Calculate total = subtotal - total discounts"
+
+      on_lines_change:
+        - "Recalculate all values"
+        - "Update display with animation"
+
+    ui_elements:
+      - "Subtotal row: 'Subtotal: $XXX.XX' (optional, can hide)"
+      - "Discounts row: 'Total Discounts: -$XXX.XX' (only if > 0)"
+      - "Total row: 'Order Total: $XXX.XX' (bold, large font, currency color)"
+      - "Optional: breakdown card showing discount types and values"
+
+    styling:
+      - "Prominent position (bottom of form or sidebar)"
+      - "Bold, large font for total (18px+)"
+      - "Currency-colored text (green for positive, neutral for display)"
+      - "Card background with shadow for emphasis"
+
+    example_usage: |
+      <SOTotalDisplay
+        lines={soLines}
+        total={soTotal}
+        currency={org.currency}
+      />
+
+# Hooks (Custom React Hooks)
+hooks:
+  - name: "usePricingCalculation"
+    file: "apps/frontend/lib/hooks/usePricingCalculation.ts"
+    description: "Hook to manage pricing state and calculations"
+
+    parameters:
+      initialQuantity: "number (default: 1)"
+      initialUnitPrice: "number (default: 0)"
+      initialDiscount: "Discount|null (default: null)"
+
+    returns:
+      quantity: "number"
+      setQuantity: "(value: number) => void"
+      unitPrice: "number"
+      setUnitPrice: "(value: number) => void"
+      discount: "Discount|null"
+      setDiscount: "(value: Discount|null) => void"
+      lineTotal: "number (calculated)"
+      recalculate: "() => void"
+
+    usage: |
+      const { quantity, unitPrice, discount, lineTotal, setQuantity, setUnitPrice, setDiscount } = usePricingCalculation();
+
+# Services (Frontend)
+services:
+  - name: "getProductPrice"
+    file: "apps/frontend/lib/services/shipping-service.ts"
+    description: "Fetch product price from API"
+    signature: "async getProductPrice(productId: string): Promise<number | null>"
+    usage: "Called on product select in SOLineForm"
+
+  - name: "createSoLine"
+    file: "apps/frontend/lib/services/shipping-service.ts"
+    description: "POST new line to SO"
+    signature: "async createSoLine(soId: string, lineData: SOLineInput): Promise<{line: SOLine, so_total: number}>"
+
+  - name: "updateSoLine"
+    file: "apps/frontend/lib/services/shipping-service.ts"
+    description: "PUT updated line to SO"
+    signature: "async updateSoLine(soId: string, lineId: string, lineData: Partial<SOLineInput>): Promise<{line: SOLine, so_total: number}>"
+
+  - name: "deleteSoLine"
+    file: "apps/frontend/lib/services/shipping-service.ts"
+    description: "DELETE line from SO"
+    signature: "async deleteSoLine(soId: string, lineId: string): Promise<{so_total: number}>"
+
+# Types
+types:
+  - name: "Discount"
+    definition: |
+      type Discount = {
+        type: 'percent' | 'fixed';
+        value: number;
+      }
+
+  - name: "SOLine"
+    definition: |
+      type SOLine = {
+        id: string;
+        sales_order_id: string;
+        line_number: number;
+        product_id: string;
+        product?: {
+          name: string;
+          std_price?: number;
+        };
+        quantity_ordered: number;
+        quantity_allocated: number;
+        quantity_picked: number;
+        quantity_packed: number;
+        quantity_shipped: number;
+        unit_price: number;
+        line_total: number;
+        discount?: Discount | null;
+        requested_lot?: string;
+        notes?: string;
+        created_at: string;
+      }
+
+  - name: "SOLineInput"
+    definition: |
+      type SOLineInput = {
+        product_id: string;
+        quantity_ordered: number;
+        unit_price?: number;
+        discount?: Discount | null;
+        requested_lot?: string;
+        notes?: string;
+      }
+
+# Wireframe Reference
+wireframe_reference:
+  file: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-007-sales-order-detail.md"
+  focus:
+    - "Line items table (main): columns include product, qty order, qty pick, qty pack, unit price, discount, line total, status"
+    - "Pricing section: shows unit price and total columns"
+    - "SO total display: prominent at bottom showing order total"
+    - "Responsive: compact view on mobile shows subset of columns"
+
+  components_shown:
+    - "SOLineTable: Line items full table"
+    - "SOTotalDisplay: Order Total at bottom"
+    - "SOLineForm: In modal or inline form for add/edit"
+    - "DiscountInput: Part of SOLineForm"
+
+# Accessibility
+accessibility:
+  - "Input labels associated with form fields"
+  - "Currency formatting announced correctly"
+  - "Error messages linked to input fields with aria-describedby"
+  - "Table headers marked with <th scope='col'>"
+  - "Keyboard navigation: Tab through form fields, Enter to save"
+  - "WCAG 2.1 Level AA compliance"
+
+# Performance Notes
+performance_notes:
+  - "Calculations are lightweight (no API calls needed for recalculation)"
+  - "Debounce price/qty inputs if needed (optional, 300ms)"
+  - "Memoize SOLineTable to prevent unnecessary re-renders"
+  - "Virtual scrolling for large line lists (>50 lines)"

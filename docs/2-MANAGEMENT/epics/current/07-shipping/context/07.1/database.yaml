@@ -1,0 +1,490 @@
+database:
+  migration_file: "supabase/migrations/NNN_create_customers_tables.sql"
+
+  tables:
+    customers:
+      name: "customers"
+      description: "Customer master records (shipping module foundation)"
+      schema: |
+        CREATE TABLE customers (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          customer_code TEXT NOT NULL,
+          name TEXT NOT NULL,
+          email TEXT,
+          phone TEXT,
+          tax_id TEXT,  -- Encrypted via pgcrypto
+          credit_limit DECIMAL(15, 2),
+          payment_terms_days INTEGER DEFAULT 30,
+          category TEXT NOT NULL CHECK (category IN ('retail', 'wholesale', 'distributor')),
+          allergen_restrictions JSONB,  -- Array of allergen IDs [uuid, uuid, ...]
+          is_active BOOLEAN DEFAULT true,
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          created_by UUID NOT NULL REFERENCES users(id),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(org_id, LOWER(customer_code))
+        );
+
+      columns:
+        - column: "id"
+          type: "UUID"
+          pk: true
+          default: "gen_random_uuid()"
+          nullable: false
+
+        - column: "org_id"
+          type: "UUID"
+          fk: "organizations(id)"
+          nullable: false
+          ondelete: "CASCADE"
+          description: "Tenant isolation: multi-tenant key"
+
+        - column: "customer_code"
+          type: "TEXT"
+          nullable: false
+          description: "Business-friendly code, unique per org (e.g., ACME001)"
+          validation: "3-20 alphanumeric + dash/underscore"
+
+        - column: "name"
+          type: "TEXT"
+          nullable: false
+          description: "Company/entity name"
+          validation: "1-255 chars, required"
+
+        - column: "email"
+          type: "TEXT"
+          nullable: true
+          description: "General customer email for order notifications"
+          validation: "Optional valid email format"
+
+        - column: "phone"
+          type: "TEXT"
+          nullable: true
+          description: "Customer service phone number"
+
+        - column: "tax_id"
+          type: "TEXT"
+          nullable: true
+          description: "VAT/EIN - ENCRYPTED at storage level with pgcrypto"
+          encryption: "pgcrypto with organization key"
+          pii: true
+
+        - column: "credit_limit"
+          type: "DECIMAL(15,2)"
+          nullable: true
+          description: "Maximum credit exposure for customer"
+          validation: "Must be > 0 if provided"
+
+        - column: "payment_terms_days"
+          type: "INTEGER"
+          nullable: false
+          default: 30
+          description: "Net days for payment (e.g., 30 = Net 30)"
+          validation: "1-365 days"
+
+        - column: "category"
+          type: "TEXT"
+          nullable: false
+          check: "category IN ('retail', 'wholesale', 'distributor')"
+          description: "Customer type/classification"
+
+        - column: "allergen_restrictions"
+          type: "JSONB"
+          nullable: true
+          description: "Array of allergen IDs customer cannot receive (food safety)"
+          example: "['550e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440002']"
+          validation: "Array of valid allergen UUIDs, max 20 items"
+
+        - column: "is_active"
+          type: "BOOLEAN"
+          nullable: false
+          default: true
+          description: "Soft delete flag; false = archived"
+          business_rule: "Cannot archive customer with open sales orders"
+
+        - column: "notes"
+          type: "TEXT"
+          nullable: true
+          description: "Internal notes (payment issues, special requirements, etc)"
+
+        - column: "created_at"
+          type: "TIMESTAMPTZ"
+          nullable: false
+          default: "NOW()"
+          readonly: true
+
+        - column: "created_by"
+          type: "UUID"
+          fk: "users(id)"
+          nullable: false
+          description: "User who created customer record"
+
+        - column: "updated_at"
+          type: "TIMESTAMPTZ"
+          nullable: false
+          default: "NOW()"
+          onupdate: "NOW()"
+
+      constraints:
+        - type: "primary_key"
+          columns: ["id"]
+
+        - type: "unique"
+          name: "uq_customers_org_code"
+          columns: ["org_id", "LOWER(customer_code)"]
+          description: "Case-insensitive unique customer code per org"
+
+        - type: "check"
+          name: "ck_customers_category"
+          condition: "category IN ('retail', 'wholesale', 'distributor')"
+
+        - type: "check"
+          name: "ck_customers_payment_terms"
+          condition: "payment_terms_days BETWEEN 1 AND 365"
+
+        - type: "check"
+          name: "ck_customers_credit_limit"
+          condition: "credit_limit IS NULL OR credit_limit > 0"
+
+      indexes:
+        - name: "idx_customers_org_code"
+          columns: ["org_id", "LOWER(customer_code)"]
+          unique: false
+          description: "Fast lookup by customer code within org"
+
+        - name: "idx_customers_org_active"
+          columns: ["org_id", "is_active"]
+          unique: false
+          description: "Filter active customers in list views"
+
+        - name: "idx_customers_org_name"
+          columns: ["org_id", "name"]
+          unique: false
+          description: "Search by customer name"
+
+      triggers:
+        - name: "tg_customers_updated_at"
+          event: "BEFORE UPDATE"
+          action: "SET updated_at = NOW()"
+
+      rls_policies:
+        - name: "Customers org isolation - SELECT"
+          target: "customers"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["authenticated"]
+
+        - name: "Customers org isolation - INSERT"
+          target: "customers"
+          operation: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+        - name: "Customers org isolation - UPDATE"
+          target: "customers"
+          operation: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+        - name: "Customers org isolation - DELETE"
+          target: "customers"
+          operation: "DELETE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager"]
+
+    customer_contacts:
+      name: "customer_contacts"
+      description: "Contact persons for customers (1:N relationship)"
+      schema: |
+        CREATE TABLE customer_contacts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          title TEXT,
+          email TEXT,
+          phone TEXT,
+          is_primary BOOLEAN DEFAULT false,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(customer_id, LOWER(email)) WHERE email IS NOT NULL
+        );
+
+      columns:
+        - column: "id"
+          type: "UUID"
+          pk: true
+          default: "gen_random_uuid()"
+          nullable: false
+
+        - column: "org_id"
+          type: "UUID"
+          fk: "organizations(id)"
+          nullable: false
+          ondelete: "CASCADE"
+          description: "Denormalized for RLS efficiency"
+
+        - column: "customer_id"
+          type: "UUID"
+          fk: "customers(id)"
+          nullable: false
+          ondelete: "CASCADE"
+          description: "Parent customer record"
+
+        - column: "name"
+          type: "TEXT"
+          nullable: false
+          description: "Contact person name"
+          validation: "1-255 chars"
+
+        - column: "title"
+          type: "TEXT"
+          nullable: true
+          description: "Job title (e.g., Purchasing Manager, Logistics)"
+
+        - column: "email"
+          type: "TEXT"
+          nullable: true
+          description: "Contact email"
+          validation: "Valid email format if provided"
+
+        - column: "phone"
+          type: "TEXT"
+          nullable: true
+          description: "Contact phone"
+
+        - column: "is_primary"
+          type: "BOOLEAN"
+          nullable: false
+          default: false
+          description: "Flag for default contact selection in UI"
+
+        - column: "created_at"
+          type: "TIMESTAMPTZ"
+          nullable: false
+          default: "NOW()"
+          readonly: true
+
+      constraints:
+        - type: "primary_key"
+          columns: ["id"]
+
+        - type: "unique"
+          name: "uq_customer_contacts_email"
+          columns: ["customer_id", "LOWER(email)"]
+          where: "email IS NOT NULL"
+          description: "Email unique per customer (null values allowed)"
+
+      indexes:
+        - name: "idx_customer_contacts_customer"
+          columns: ["customer_id"]
+          description: "Join to parent customer"
+
+        - name: "idx_customer_contacts_org"
+          columns: ["org_id"]
+          description: "RLS filter index"
+
+      rls_policies:
+        - name: "Customer contacts org isolation - SELECT"
+          target: "customer_contacts"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["authenticated"]
+
+        - name: "Customer contacts org isolation - INSERT"
+          target: "customer_contacts"
+          operation: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+        - name: "Customer contacts org isolation - UPDATE"
+          target: "customer_contacts"
+          operation: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+        - name: "Customer contacts org isolation - DELETE"
+          target: "customer_contacts"
+          operation: "DELETE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+    customer_addresses:
+      name: "customer_addresses"
+      description: "Shipping/billing addresses for customers (1:N relationship)"
+      schema: |
+        CREATE TABLE customer_addresses (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+          address_type TEXT NOT NULL CHECK (address_type IN ('billing', 'shipping')),
+          is_default BOOLEAN DEFAULT false,
+          address_line1 TEXT NOT NULL,
+          address_line2 TEXT,
+          city TEXT NOT NULL,
+          state TEXT,
+          postal_code TEXT NOT NULL,
+          country TEXT NOT NULL,
+          dock_hours JSONB,  -- {mon: "8-17", tue: "8-17", ...}
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+      columns:
+        - column: "id"
+          type: "UUID"
+          pk: true
+          default: "gen_random_uuid()"
+          nullable: false
+
+        - column: "org_id"
+          type: "UUID"
+          fk: "organizations(id)"
+          nullable: false
+          ondelete: "CASCADE"
+          description: "Denormalized for RLS efficiency"
+
+        - column: "customer_id"
+          type: "UUID"
+          fk: "customers(id)"
+          nullable: false
+          ondelete: "CASCADE"
+          description: "Parent customer record"
+
+        - column: "address_type"
+          type: "TEXT"
+          nullable: false
+          check: "address_type IN ('billing', 'shipping')"
+          description: "Billing or shipping address designation"
+
+        - column: "is_default"
+          type: "BOOLEAN"
+          nullable: false
+          default: false
+          description: "Whether this is default for its type (billing or shipping)"
+
+        - column: "address_line1"
+          type: "TEXT"
+          nullable: false
+          description: "Street address"
+
+        - column: "address_line2"
+          type: "TEXT"
+          nullable: true
+          description: "Suite, building number, etc"
+
+        - column: "city"
+          type: "TEXT"
+          nullable: false
+
+        - column: "state"
+          type: "TEXT"
+          nullable: true
+          description: "State/province/region"
+
+        - column: "postal_code"
+          type: "TEXT"
+          nullable: false
+
+        - column: "country"
+          type: "TEXT"
+          nullable: false
+          description: "Country code or full name"
+
+        - column: "dock_hours"
+          type: "JSONB"
+          nullable: true
+          description: "Weekly delivery window constraints"
+          example: |
+            {
+              "mon": "08:00-17:00",
+              "tue": "08:00-17:00",
+              "wed": "08:00-17:00",
+              "thu": "08:00-17:00",
+              "fri": "08:00-16:00",
+              "sat": null,
+              "sun": null
+            }
+
+        - column: "notes"
+          type: "TEXT"
+          nullable: true
+          description: "Delivery instructions (gate code, loading dock info, etc)"
+
+        - column: "created_at"
+          type: "TIMESTAMPTZ"
+          nullable: false
+          default: "NOW()"
+          readonly: true
+
+      constraints:
+        - type: "primary_key"
+          columns: ["id"]
+
+        - type: "check"
+          name: "ck_customer_addresses_type"
+          condition: "address_type IN ('billing', 'shipping')"
+
+        - type: "check"
+          name: "ck_customer_addresses_default"
+          condition: "is_default = false OR (is_default = true AND customer_id IS NOT NULL)"
+
+      indexes:
+        - name: "idx_customer_addresses_customer"
+          columns: ["customer_id"]
+          description: "Join to parent customer"
+
+        - name: "idx_customer_addresses_org_type"
+          columns: ["org_id", "address_type"]
+          description: "Filter by address type in UI"
+
+        - name: "idx_customer_addresses_org_default"
+          columns: ["org_id", "address_type", "is_default"]
+          description: "Find default addresses for order selection"
+
+      rls_policies:
+        - name: "Customer addresses org isolation - SELECT"
+          target: "customer_addresses"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["authenticated"]
+
+        - name: "Customer addresses org isolation - INSERT"
+          target: "customer_addresses"
+          operation: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+        - name: "Customer addresses org isolation - UPDATE"
+          target: "customer_addresses"
+          operation: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+        - name: "Customer addresses org isolation - DELETE"
+          target: "customer_addresses"
+          operation: "DELETE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+          roles: ["admin", "manager", "sales"]
+
+  seed_data: |
+    -- Optional test data for development/testing
+    INSERT INTO customers (org_id, customer_code, name, category, created_by)
+    VALUES (
+      (SELECT id FROM organizations LIMIT 1),
+      'TEST001',
+      'Test Customer Inc',
+      'wholesale',
+      (SELECT id FROM users LIMIT 1)
+    );
+
+  migration_notes: |
+    - Tax ID encryption handled at application layer or via pgcrypto
+    - Customer code case-insensitive unique index using LOWER()
+    - allergen_restrictions is stored as JSONB array of UUIDs (not populated here, just schema)
+    - All timestamps auto-managed by triggers
+    - Soft delete pattern via is_active flag (not hard delete)
+    - Consider adding audit_log trigger for PII tracking

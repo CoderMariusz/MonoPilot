@@ -1,0 +1,516 @@
+story:
+  id: "07.14"
+  name: "Shipment Manifest & Ship + Tracking"
+  epic: "07-shipping"
+  phase: "1C"
+  complexity: "M"
+  estimate_days: 3
+  status: "ready"
+  priority: "P0"
+  type: "backend + frontend"
+
+dependencies:
+  required:
+    - story: "07.11"
+      provides: ["shipments", "shipment_boxes", "shipment_box_contents", "packed_status"]
+      reason: "Story 07.11 provides packing workflow and box creation"
+    - story: "07.13"
+      provides: ["SSCC_generation", "boxes.sscc", "bol_base_data"]
+      reason: "Story 07.13 generates SSCC codes required for manifest validation"
+  blocking:
+    - epic: "01.1"
+      feature: "organizations, RLS, users, roles"
+    - epic: "01.8"
+      feature: "warehouses, locations"
+    - epic: "02.1"
+      feature: "products"
+    - epic: "05.1"
+      feature: "license_plates"
+
+provides:
+  - "shipments with shipped_at, delivered_at, shipped_by timestamps"
+  - "shipment status workflow enforcement (packed → manifested → shipped → delivered)"
+  - "LP status updates (license_plates.status = 'shipped')"
+  - "SO cascade updates (status, shipped_at, quantity_shipped)"
+  - "tracking endpoint and timeline component"
+
+files_to_read:
+  story_md: "docs/2-MANAGEMENT/epics/current/07-shipping/07.14.shipment-manifest-ship.md"
+  prd: "docs/1-BASELINE/product/modules/shipping.md"
+  prd_sections:
+    - "FR-7.41: BOL Generation"
+    - "FR-7.15: Partial Fulfillment"
+  architecture: "docs/1-BASELINE/architecture/modules/shipping.md"
+  architecture_sections:
+    - "lines 178-202 (Manifest & Ship workflow)"
+    - "lines 448-454 (LP consumption)"
+    - "lines 757-788 (Status workflow)"
+  wireframes:
+    - "SHIP-007-sales-order-detail.md (shipment section)"
+    - "SHIP-021-bill-of-lading.md (BOL finalization section)"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/07-shipping/context/07.11/07.11.context.yaml"
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/manifest/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["Warehouse", "Manager", "Admin"]
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/ship/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["Warehouse", "Manager", "Admin"]
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/mark-delivered/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["Manager", "Admin"]
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/tracking/route.ts"
+      methods: ["GET"]
+      auth: true
+      roles: ["Authenticated"]
+  services:
+    - path: "apps/frontend/lib/services/shipment-service.ts"
+      methods: ["manifestShipment", "shipShipment", "markDelivered", "getTrackingInfo"]
+  validation:
+    - path: "apps/frontend/lib/validation/shipment-schema.ts"
+      schemas: ["manifestShipmentSchema", "shipShipmentSchema", "markDeliveredSchema", "trackingInfoSchema"]
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/page.tsx"
+      note: "Update existing shipment detail page with new actions"
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/ShipmentActions.tsx"
+      description: "Action buttons: Manifest, Ship, Mark Delivered, View Tracking"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/ShipConfirmDialog.tsx"
+      description: "Confirmation dialog for irreversible ship action"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/TrackingDialog.tsx"
+      description: "Modal with tracking info and timeline"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/TrackingTimeline.tsx"
+      description: "Status timeline with badges and dates"
+  database:
+    - path: "supabase/migrations/XXXXX_ship_shipment_rpc.sql"
+      type: "migration"
+      description: "RPC function for ship_shipment transaction"
+    - path: "supabase/migrations/XXXXX_shipment_indexes.sql"
+      type: "migration"
+      description: "Indexes on shipped_at, delivered_at for reporting"
+
+database:
+  tables:
+    - name: "shipments"
+      existing: true
+      columns_to_add:
+        - "shipped_at (timestamptz, nullable)"
+        - "shipped_by (uuid, FK users, nullable)"
+        - "delivered_at (timestamptz, nullable)"
+        - "delivered_by (uuid, FK users, nullable)"
+        - "manifested_at (timestamptz, nullable)"
+      rls: true
+      indexes:
+        - "idx_shipments_shipped_at (on shipped_at WHERE shipped_at IS NOT NULL)"
+        - "idx_shipments_delivered_at (on delivered_at WHERE delivered_at IS NOT NULL)"
+        - "idx_shipments_status (on status for workflow filtering)"
+    - name: "license_plates"
+      existing: true
+      columns_updated:
+        - "status (can be 'shipped')"
+      rls: true
+    - name: "sales_orders"
+      existing: true
+      columns_updated:
+        - "shipped_at (populated on ship)"
+        - "status (updated to 'shipped')"
+      rls: true
+    - name: "sales_order_lines"
+      existing: true
+      columns_updated:
+        - "quantity_shipped (populated on ship)"
+      rls: true
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/manifest"
+    auth: true
+    roles: ["Warehouse", "Manager", "Admin"]
+    description: "Validate SSCC completeness and update status to manifested"
+    request:
+      type: "object"
+      properties: {}
+      required: []
+    response_success:
+      status: 200
+      schema:
+        type: "object"
+        properties:
+          success: { type: "boolean" }
+          data:
+            type: "object"
+            properties:
+              id: { type: "string", format: "uuid" }
+              status: { type: "string", enum: ["manifested"] }
+              manifested_at: { type: "string", format: "date-time" }
+    response_errors:
+      - status: 400
+        code: "SSCC_VALIDATION_FAILED"
+        message: "Cannot manifest: {N} boxes missing SSCC"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Shipment must be in 'packed' status to manifest"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Shipment not found"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions for this action"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/ship"
+    auth: true
+    roles: ["Warehouse", "Manager", "Admin"]
+    description: "Confirm shipment (irreversible): consume LPs, update SO cascade"
+    request:
+      type: "object"
+      properties:
+        confirm:
+          type: "boolean"
+          description: "Must be true to proceed"
+      required: ["confirm"]
+    response_success:
+      status: 200
+      schema:
+        type: "object"
+        properties:
+          success: { type: "boolean" }
+          data:
+            type: "object"
+            properties:
+              id: { type: "string", format: "uuid" }
+              status: { type: "string", enum: ["shipped"] }
+              shipped_at: { type: "string", format: "date-time" }
+              shipped_by: { type: "string", format: "uuid" }
+              lps_consumed: { type: "integer" }
+              so_updated: { type: "boolean" }
+    response_errors:
+      - status: 400
+        code: "NOT_MANIFESTED"
+        message: "Shipment must be manifested before shipping"
+      - status: 400
+        code: "CONFIRMATION_REQUIRED"
+        message: "Ship action requires explicit confirmation"
+      - status: 409
+        code: "TRANSACTION_FAILED"
+        message: "Failed to consume inventory. Please retry."
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions for this action"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/mark-delivered"
+    auth: true
+    roles: ["Manager", "Admin"]
+    description: "Mark shipment as delivered (Manager+ only)"
+    request:
+      type: "object"
+      properties: {}
+      required: []
+    response_success:
+      status: 200
+      schema:
+        type: "object"
+        properties:
+          success: { type: "boolean" }
+          data:
+            type: "object"
+            properties:
+              id: { type: "string", format: "uuid" }
+              status: { type: "string", enum: ["delivered"] }
+              delivered_at: { type: "string", format: "date-time" }
+              delivered_by: { type: "string", format: "uuid" }
+    response_errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Shipment must be in 'shipped' status to mark as delivered"
+      - status: 403
+        code: "INSUFFICIENT_PERMISSIONS"
+        message: "Manager role required to mark as delivered"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Shipment not found"
+
+  - method: "GET"
+    path: "/api/shipping/shipments/:id/tracking"
+    auth: true
+    roles: ["Authenticated"]
+    description: "Get tracking info with status timeline and carrier URL"
+    request:
+      type: "object"
+      properties: {}
+      required: []
+    response_success:
+      status: 200
+      schema:
+        type: "object"
+        properties:
+          success: { type: "boolean" }
+          data:
+            type: "object"
+            properties:
+              carrier: { type: ["string", "null"] }
+              tracking_number: { type: ["string", "null"] }
+              status: { type: "string", enum: ["pending", "packing", "packed", "manifested", "shipped", "delivered", "exception"] }
+              timeline:
+                type: "object"
+                properties:
+                  packed_at: { type: ["string", "null"], format: "date-time" }
+                  packed_by: { type: ["string", "null"] }
+                  manifested_at: { type: ["string", "null"], format: "date-time" }
+                  shipped_at: { type: ["string", "null"], format: "date-time" }
+                  shipped_by: { type: ["string", "null"] }
+                  delivered_at: { type: ["string", "null"], format: "date-time" }
+                  delivered_by: { type: ["string", "null"] }
+              external_url: { type: ["string", "null"], format: "uri" }
+    response_errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Shipment not found"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Access denied"
+
+ux:
+  wireframes:
+    - id: "SHIP-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-007-sales-order-detail.md"
+      sections: ["Shipment Detail - Actions section"]
+      components: ["ShipmentActions buttons area"]
+    - id: "SHIP-021"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-021-bill-of-lading.md"
+      sections: ["BOL success state with manifest section"]
+      components: ["Manifest info block showing SSCC validation"]
+  patterns:
+    - name: "Action Buttons"
+      description: "Manifest, Ship, Mark Delivered, View Tracking"
+      states: ["loading", "disabled", "enabled"]
+      usage: "ShipmentActions.tsx"
+    - name: "Confirmation Dialog"
+      description: "Irreversible action warning for ship"
+      template: "ShadCN Dialog"
+      usage: "ShipConfirmDialog.tsx"
+    - name: "Tracking Timeline"
+      description: "Status badges with timestamps and user info"
+      template: "Vertical timeline with icons"
+      usage: "TrackingTimeline.tsx"
+    - name: "Status Badges"
+      description: "Visual indicators for workflow states"
+      colors: { pending: "gray", packing: "yellow", packed: "blue", manifested: "purple", shipped: "green", delivered: "dark-green", exception: "red" }
+  states:
+    - name: "shipment_pending"
+      display: "No actions available"
+      buttons_disabled: ["Manifest", "Ship", "Mark Delivered"]
+    - name: "shipment_packed"
+      display: "Ready to manifest"
+      buttons_enabled: ["Manifest"]
+      buttons_disabled: ["Ship", "Mark Delivered"]
+    - name: "shipment_manifested"
+      display: "Ready to ship"
+      buttons_enabled: ["Manifest", "Ship"]
+      buttons_disabled: ["Mark Delivered"]
+    - name: "shipment_shipped"
+      display: "In transit"
+      buttons_enabled: ["Mark Delivered", "View Tracking"]
+      buttons_disabled: ["Manifest", "Ship"]
+    - name: "shipment_delivered"
+      display: "Delivery complete"
+      buttons_disabled: ["All"]
+      show: ["View Tracking"]
+
+validation_rules:
+  manifest_validation:
+    - "Shipment status must be 'packed'"
+    - "All shipment_boxes must have non-null sscc"
+    - "If validation fails: 400 error with count of missing SSCC boxes"
+    - "Success: shipment.status → 'manifested', manifested_at → NOW()"
+  ship_validation:
+    - "Shipment status must be 'manifested' or 'packed' (allow skip for MVP)"
+    - "confirm parameter must be true"
+    - "All updates in transaction (rollback on error)"
+    - "LP consumption: SELECT license_plate_id FROM shipment_box_contents WHERE shipment_box_id IN (SELECT id FROM shipment_boxes WHERE shipment_id)"
+    - "SO updates: status → 'shipped', shipped_at → NOW()"
+    - "SO line updates: quantity_shipped = quantity_packed for all lines"
+  delivered_validation:
+    - "Shipment status must be 'shipped'"
+    - "User role must be Manager or Admin"
+    - "On success: status → 'delivered', delivered_at → NOW()"
+    - "On success: sales_orders.status → 'delivered'"
+  tracking_validation:
+    - "Shipment must exist and belong to user org (RLS)"
+    - "Return carrier, tracking_number, status, timeline, external_url"
+    - "Generate carrier URL: DHL/UPS/DPD/FedEx patterns"
+
+patterns:
+  rls: "All queries must filter on org_id (multi-tenant isolation)"
+  api: "REST POST/GET with org_id implicit from JWT auth"
+  service: "class-based ShipmentService with static methods"
+  validation: "Zod schemas for request/response validation"
+  permission_check: "Role-based (Warehouse+, Manager+) enforced in API route"
+  transaction: "PostgreSQL transaction for ship_shipment RPC"
+  audit: "Log status changes with user_id and timestamp"
+
+business_logic:
+  manifest_workflow:
+    - "Validate all boxes have SSCC assigned (Story 07.13 requirement)"
+    - "If validation passes: Update shipment.status → 'manifested', manifested_at = NOW()"
+    - "If validation fails: Return 400 error with specific count of missing SSCC boxes"
+  ship_workflow:
+    - "Validate shipment is in 'manifested' or 'packed' status"
+    - "Require explicit confirmation (confirm=true parameter)"
+    - "Within transaction: Update shipment status → 'shipped', shipped_at = NOW(), shipped_by = current_user_id"
+    - "Within transaction: Update all license_plates in shipment_box_contents → status='shipped'"
+    - "Within transaction: Update sales_orders → status='shipped', shipped_at = NOW()"
+    - "Within transaction: Update sales_order_lines → quantity_shipped = quantity_packed"
+    - "If any step fails: Rollback entire transaction"
+    - "Log audit entry with shipment_id, user_id, status_change"
+  delivered_workflow:
+    - "Validate user role is Manager or Admin (403 if not)"
+    - "Validate shipment is in 'shipped' status"
+    - "Update shipment → status='delivered', delivered_at=NOW(), delivered_by=current_user_id"
+    - "Update related sales_orders → status='delivered'"
+    - "Log audit entry"
+  tracking_info:
+    - "Fetch shipment with related user records (packed_by, shipped_by, delivered_by)"
+    - "Construct timeline object from timestamps"
+    - "Generate carrier tracking URL using getCarrierTrackingUrl(carrier, tracking_number)"
+    - "Return complete tracking object with external URL"
+  status_workflow_enforcement:
+    - "Invalid transitions blocked: packed→shipped (skip manifest), pending→shipped, shipped→packed, delivered→shipped"
+    - "Valid transitions: pending→packing→packed→manifested→shipped→delivered"
+    - "Status machine enforced in backend validation layer"
+  lp_consumption:
+    - "On ship: SELECT license_plate_id FROM shipment_box_contents sbc JOIN shipment_boxes sb ON sbc.shipment_box_id = sb.id WHERE sb.shipment_id = :id"
+    - "Update all selected LPs: status = 'shipped'"
+    - "Inventory moves not logged yet (future: integrate with inventory_moves table)"
+  so_cascade_updates:
+    - "When shipment shipped: Update related SO status, shipped_at, and all SO line quantity_shipped values"
+    - "Supports partial fulfillment: quantity_shipped = quantity_packed (not quantity_ordered)"
+    - "Example: 10 ordered, 8 packed → quantity_shipped = 8"
+  partial_fulfillment:
+    - "If quantity_packed < quantity_ordered: quantity_shipped = quantity_packed"
+    - "Backorder creation deferred to Phase 2 (Story 07.29)"
+    - "No blocking validation (allow partial shipments)"
+  permission_enforcement:
+    - "Manifest: Warehouse, Manager, Admin"
+    - "Ship: Warehouse, Manager, Admin"
+    - "Mark Delivered: Manager, Admin only (Warehouse users cannot)"
+    - "View Tracking: Any authenticated user"
+    - "Return 403 if user lacks required role"
+    - "Hide UI buttons for users without permission"
+  carrier_tracking_urls:
+    - "DHL: https://www.dhl.com/en/express/tracking.html?AWB={tracking}"
+    - "UPS: https://www.ups.com/track?tracknum={tracking}"
+    - "DPD: https://tracking.dpd.de/status/en_US/parcel/{tracking}"
+    - "FedEx: https://www.fedex.com/fedextrack/?tracknumbers={tracking}"
+    - "Return null if carrier or tracking_number is null"
+
+acceptance_checklist:
+  - "[x] Manifest endpoint validates SSCC presence on all boxes"
+  - "[x] Manifest endpoint updates status to 'manifested'"
+  - "[x] Manifest validation shows specific error if boxes missing SSCC"
+  - "[x] Ship endpoint validates shipment is manifested or packed"
+  - "[x] Ship endpoint requires explicit confirm=true parameter"
+  - "[x] Ship endpoint updates shipment status → 'shipped', shipped_at → NOW()"
+  - "[x] Ship endpoint updates all license_plates in box_contents → status='shipped'"
+  - "[x] Ship endpoint updates sales_orders → status='shipped', shipped_at → NOW()"
+  - "[x] Ship endpoint updates sales_order_lines → quantity_shipped = quantity_packed"
+  - "[x] Ship endpoint wrapped in PostgreSQL transaction (rollback on error)"
+  - "[x] Ship confirmation dialog displays with irreversible warning"
+  - "[x] Mark Delivered endpoint restricted to Manager+ only"
+  - "[x] Mark Delivered endpoint updates shipment → status='delivered', delivered_at → NOW()"
+  - "[x] Mark Delivered endpoint updates related SO status"
+  - "[x] Tracking endpoint returns carrier, tracking_number, status, timeline, external_url"
+  - "[x] Tracking timeline shows packed_at, manifested_at, shipped_at, delivered_at with user names"
+  - "[x] Action buttons disabled/enabled based on shipment status"
+  - "[x] Permission checks enforced in API routes (403 for unauthorized)"
+  - "[x] UI buttons hidden for users without permission"
+  - "[x] RLS policies verified (org isolation on all queries)"
+  - "[x] Audit trail logged for status transitions"
+  - "[x] Partial fulfillment support (quantity_shipped = quantity_packed)"
+
+output_artifacts:
+  - "POST /api/shipping/shipments/:id/manifest endpoint (SSCC validation)"
+  - "POST /api/shipping/shipments/:id/ship endpoint (irreversible ship action)"
+  - "POST /api/shipping/shipments/:id/mark-delivered endpoint (manager-only)"
+  - "GET /api/shipping/shipments/:id/tracking endpoint (tracking info)"
+  - "ShipmentActions.tsx component (action buttons with status-based disabling)"
+  - "ShipConfirmDialog.tsx component (irreversible action confirmation)"
+  - "TrackingDialog.tsx component (modal with tracking info)"
+  - "TrackingTimeline.tsx component (status timeline with badges)"
+  - "ShipmentService methods: manifestShipment, shipShipment, markDelivered, getTrackingInfo"
+  - "Validation schemas: manifestShipmentSchema, shipShipmentSchema, markDeliveredSchema, trackingInfoSchema"
+  - "PostgreSQL RPC: ship_shipment(p_shipment_id, p_shipped_at)"
+  - "Database indexes on shipped_at, delivered_at for reporting"
+  - "Status workflow state machine enforcement logic"
+  - "Carrier URL generation functions (DHL, UPS, DPD, FedEx)"
+  - "Unit tests for ShipmentService (>80% coverage)"
+  - "E2E test: Pack → Manifest → Ship → Deliver workflow"
+  - "Permission tests: Manager-only mark delivered"
+  - "Status workflow validation tests"
+
+testing:
+  unit_tests:
+    - "ShipmentService.manifestShipment(): Validates SSCC presence, updates status"
+    - "ShipmentService.shipShipment(): Consumes LPs, updates SO, wraps transaction"
+    - "ShipmentService.markDelivered(): Restricted to Manager+, updates SO"
+    - "ShipmentService.getTrackingInfo(): Returns timeline and carrier URL"
+    - "getCarrierTrackingUrl(): Generates correct URLs for DHL/UPS/DPD/FedEx"
+    - "All Zod schemas: Valid/invalid requests parsed correctly"
+  integration_tests:
+    - "Manifest API: Valid request returns 200 with manifested status"
+    - "Manifest API: Missing SSCC returns 400 with count"
+    - "Ship API: Valid request consumes LPs, updates SO, returns 200"
+    - "Ship API: Requires confirm=true, returns 400 if false"
+    - "Ship API: RLS: Cross-org request returns 403"
+    - "Mark Delivered API: Manager role succeeds, Picker role returns 403"
+    - "Tracking API: Returns complete timeline with user names"
+  e2e_tests:
+    - "Full workflow: Create SO → Allocate → Pick → Pack → Manifest → Ship → Deliver"
+    - "Confirm dialogs and error handling"
+    - "Button state transitions as shipment status changes"
+    - "Permission checks for each role"
+
+definition_of_done:
+  - "[x] All acceptance criteria met"
+  - "[x] Manifest endpoint deployed and tested"
+  - "[x] Ship endpoint deployed and tested"
+  - "[x] Mark Delivered endpoint deployed and tested"
+  - "[x] Tracking endpoint deployed and tested"
+  - "[x] ShipmentActions component deployed with correct button states"
+  - "[x] ShipConfirmDialog component requires explicit confirmation"
+  - "[x] TrackingDialog and TrackingTimeline components display correctly"
+  - "[x] Permission checks enforced (403 for unauthorized)"
+  - "[x] RLS policies verified (org isolation)"
+  - "[x] Unit tests >80% coverage"
+  - "[x] E2E tests pass (full workflow)"
+  - "[x] Permission tests verify Manager-only access"
+  - "[x] Status workflow tests verify no invalid transitions"
+  - "[x] Partial fulfillment scenario tested"
+  - "[x] Audit trail logged for all status changes"
+  - "[x] Carrier URL generation tested (DHL, UPS, DPD, FedEx)"
+
+future_phases:
+  phase_2:
+    - "Story 07.25: Carrier API integration (bookShipment, get tracking number)"
+    - "Story 07.27: Tracking webhooks (receive delivery confirmation from carrier)"
+    - "Story 07.24: POD upload (Proof of Delivery)"
+    - "Story 07.18: Dock door assignment"
+    - "Story 07.19: Load scheduling"
+    - "Story 07.29: Backorder management"
+  phase_3:
+    - "Story 07.31: Rate shopping (compare carrier rates)"
+    - "Predictive delivery dates (ML)"
+    - "Real-time shipment visibility dashboard"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    author: "TECH-WRITER"
+    changes: "Initial context file creation from 07.14.shipment-manifest-ship.md"

@@ -1,0 +1,84 @@
+# Story 01.2 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.2"
+  name: "Settings Shell: Navigation + Role Guards"
+  slug: "settings-shell-navigation"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 2
+  type: "frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # N/A - no database changes
+  - api.yaml         # Consumed endpoints only
+  - frontend.yaml    # PRIMARY - components, hooks, pages
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table"
+        - "roles table"
+        - "organization_modules table"
+        - "getOrgContext() helper"
+        - "RLS policies for org isolation"
+        - "GET /api/v1/settings/context endpoint"
+  optional: []
+  blocks:
+    - story: "01.3"
+      name: "Onboarding Wizard Launcher"
+    - story: "01.4"
+      name: "Organization Profile Step"
+    - story: "01.5"
+      name: "Users CRUD"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-030", "FR-SET-031"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Component Architecture", "API Design", "Security - Role Requirements"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.2.settings-shell-navigation.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-011-module-toggle-storage.md"
+  patterns:
+    - "apps/frontend/app/(authenticated)/layout.tsx"
+    - "apps/frontend/lib/hooks/"
+
+# High-level deliverables
+deliverables:
+  - type: "page"
+    count: 2
+    description: "Settings page + layout"
+  - type: "component"
+    count: 4
+    description: "SettingsLayout, SettingsNav, SettingsNavItem, SettingsEmptyState"
+  - type: "hook"
+    count: 2
+    description: "useSettingsGuard, useSettingsPermissions"
+  - type: "service"
+    count: 1
+    description: "settings-navigation-service.ts"
+
+# Technical notes
+technical_notes:
+  - "Frontend-focused story - no database migrations"
+  - "Consumes GET /api/v1/settings/context from 01.1"
+  - "Navigation items filtered by role permissions"
+  - "Module toggles hide/disable related navigation"
+  - "Mobile responsive with collapsible sidebar"

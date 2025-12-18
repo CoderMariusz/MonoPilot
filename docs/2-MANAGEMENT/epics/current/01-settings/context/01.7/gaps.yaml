@@ -1,0 +1,293 @@
+# Story 01.7 - Module Toggles
+# GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built
+# Status: READY (94% quality score)
+
+gap_summary:
+  overall_readiness: "5%"
+  critical_blockers: 0
+  components_done: 0
+  components_partial: 0
+  components_missing: 10
+
+database_gaps:
+  - component: "modules table"
+    expected: "supabase/migrations/053_create_modules_tables.sql"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "System-defined modules table (11 modules: 7 core + 4 premium)"
+    refactor_action: "Create migration with 11 seeded modules"
+    priority: "P0"
+
+  - component: "organization_modules table"
+    expected: "In migration 053"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Org-specific module enabled status with RLS"
+    refactor_action: "Create in migration 053"
+    priority: "P0"
+
+  - component: "RLS policies for modules"
+    expected: "SELECT for authenticated users (system data)"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Public read for all authenticated users"
+    refactor_action: "Create policy in migration"
+    priority: "P0"
+
+api_gaps:
+  - component: "GET /api/v1/settings/modules"
+    expected: "New route returning Module[]"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "List all modules with org-specific enabled status"
+    refactor_action: "Create apps/frontend/app/api/settings/modules/route.ts"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/modules/:id/toggle"
+    expected: "New route for module toggle"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Toggle enabled/disabled with dependency validation"
+    refactor_action: "Create apps/frontend/app/api/settings/modules/[id]/toggle/route.ts"
+    priority: "P0"
+
+service_gaps:
+  - component: "module-settings-service.ts"
+    expected: "apps/frontend/lib/services/module-settings-service.ts"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Service with toggle logic and dependency validation"
+    refactor_action: "Create new file"
+    priority: "P0"
+
+type_gaps:
+  - component: "Module interface"
+    expected: "apps/frontend/lib/types/module.ts"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Module entity type with dependencies, dependents, etc."
+    refactor_action: "Create lib/types/module.ts"
+    priority: "P0"
+
+  - component: "ModuleCode type"
+    expected: "Union type of 11 module codes"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Type-safe enum for all modules"
+    refactor_action: "Create in lib/types/module.ts"
+    priority: "P1"
+
+component_gaps:
+  - component: "ModuleCard.tsx"
+    expected: "apps/frontend/components/settings/modules/ModuleCard.tsx"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Individual module card with toggle and dependencies"
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "ModuleToggleList.tsx"
+    expected: "apps/frontend/components/settings/modules/ModuleToggleList.tsx"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "List of modules grouped by type (Core, Premium)"
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "DependencyWarningModal.tsx"
+    expected: "apps/frontend/components/settings/modules/DependencyWarningModal.tsx"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Modal for dependency warnings and cascade option"
+    refactor_action: "Create new component"
+    priority: "P0"
+
+page_gaps:
+  - component: "modules page"
+    expected: "apps/frontend/app/(authenticated)/settings/modules/page.tsx"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "Module toggles management page"
+    refactor_action: "Create new page"
+    priority: "P0"
+
+hook_gaps:
+  - component: "useModules"
+    expected: "apps/frontend/lib/hooks/use-modules.ts"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "React Query hook for modules data"
+    refactor_action: "Create hook"
+    priority: "P0"
+
+  - component: "useToggleModule"
+    expected: "In use-modules.ts"
+    found: "NOT_FOUND"
+    status: "MISSING"
+    gap_description: "React Query mutation for toggle"
+    refactor_action: "Create hook in same file"
+    priority: "P0"
+
+shadcn_dependencies:
+  - component: "Switch"
+    expected: "apps/frontend/components/ui/switch.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Switch component for toggles"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add switch"
+    priority: "P0"
+
+  - component: "Card"
+    expected: "apps/frontend/components/ui/card.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Card for module cards"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add card"
+    priority: "P0"
+
+  - component: "Dialog"
+    expected: "apps/frontend/components/ui/dialog.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Dialog for dependency modal"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add dialog"
+    priority: "P0"
+
+  - component: "Alert"
+    expected: "apps/frontend/components/ui/alert.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Alert for warnings/errors"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add alert"
+    priority: "P1"
+
+critical_blockers: []
+
+implementation_order:
+  phase_0_prerequisites:
+    - "Verify dependencies: story 01.1, 01.2, 01.6 complete"
+    - "Check ShadCN UI components installed"
+
+  phase_1_database:
+    - "migration 053: Create modules and organization_modules tables"
+    - "Seed 11 modules (7 core + 4 premium)"
+    - "Create RLS policies"
+
+  phase_2_types_and_services:
+    - "lib/types/module.ts"
+    - "lib/services/module-settings-service.ts"
+
+  phase_3_api:
+    - "app/api/settings/modules/route.ts"
+    - "app/api/settings/modules/[id]/toggle/route.ts"
+
+  phase_4_hooks:
+    - "lib/hooks/use-modules.ts"
+
+  phase_5_components:
+    - "components/settings/modules/ModuleCard.tsx"
+    - "components/settings/modules/ModuleToggleList.tsx"
+    - "components/settings/modules/DependencyWarningModal.tsx"
+
+  phase_6_pages:
+    - "app/(authenticated)/settings/modules/page.tsx"
+
+  phase_7_integration:
+    - "Update settings navigation"
+    - "Add module guard middleware"
+    - "Update layout guards for disabled modules"
+    - "Add API guards for disabled module endpoints"
+
+  phase_8_tests:
+    - "Unit tests for module-settings-service"
+    - "Unit tests for components"
+    - "Integration tests for API endpoints"
+    - "E2E tests for module toggle workflows"
+
+validation_checklist:
+  - "[ ] 11 modules seeded in database"
+  - "[ ] GET /api/v1/settings/modules returns all modules with org status"
+  - "[ ] PATCH /api/v1/settings/modules/:id/toggle works with validation"
+  - "[ ] ModuleCard component renders with toggle"
+  - "[ ] ModuleToggleList groups modules by type"
+  - "[ ] DependencyWarningModal shows warnings"
+  - "[ ] Modules page accessible at /settings/modules"
+  - "[ ] Module toggle updates navigation within 1 second"
+  - "[ ] Disabled module routes redirect with error"
+  - "[ ] API returns 403 for disabled modules"
+  - "[ ] Settings module cannot be toggled"
+  - "[ ] Dependencies validated on enable/disable"
+  - "[ ] Cascade option works for multi-module toggles"
+  - "[ ] Unit test coverage >= 85%"
+  - "[ ] Integration test coverage >= 80%"
+  - "[ ] E2E tests pass (8 workflows)"
+
+readiness_breakdown:
+  database: "0% (2 tables missing)"
+  api: "0% (2 endpoints missing)"
+  services: "0% (1 service missing)"
+  types: "0% (2 types missing)"
+  components: "0% (3 components missing)"
+  pages: "0% (1 page missing)"
+  hooks: "0% (2 hooks missing)"
+  navigation: "0% (not integrated)"
+  tests: "0% (6 test files missing)"
+  shadcn_ui: "50% (assuming some components exist)"
+
+  overall: "5% (ready to implement)"
+
+effort_estimate:
+  database_migrations: "2 hours"
+  types_and_services: "4 hours"
+  api_endpoints: "4 hours"
+  hooks: "2 hours"
+  components: "8 hours"
+  pages: "3 hours"
+  integration: "4 hours"
+  tests: "6 hours"
+  total: "33 hours (4 days)"
+
+  assumptions:
+    - "Dependencies 01.1, 01.2, 01.6 complete"
+    - "ShadCN UI components available"
+    - "No major architecture changes"
+
+risk_assessment:
+  - id: "RISK-01"
+    description: "Complex dependency validation logic"
+    impact: "MEDIUM - validation logic must handle cycles/cascades"
+    mitigation: "Design careful validation algorithm, write unit tests first"
+    status: "MITIGATED"
+
+  - id: "RISK-02"
+    description: "Navigation integration complexity"
+    impact: "MEDIUM - navigation must update instantly on toggle"
+    mitigation: "Use React context for module state, invalidate cache on toggle"
+    status: "PLANNED"
+
+  - id: "RISK-03"
+    description: "RLS policy performance with joins"
+    impact: "LOW - organization_modules join may be slow at scale"
+    mitigation: "Add indexes on org_id, module_id; test with large datasets"
+    status: "PLANNED"
+
+next_steps:
+  - step: "Review story 01.7.context.yaml (main file)"
+    status: "READY"
+
+  - step: "Create migration 053 with module tables"
+    status: "BLOCKED_WAITING_IMPLEMENTATION"
+
+  - step: "Implement module-settings-service.ts"
+    status: "BLOCKED_WAITING_MIGRATION"
+
+  - step: "Implement API endpoints"
+    status: "BLOCKED_WAITING_SERVICE"
+
+  - step: "Implement components and page"
+    status: "BLOCKED_WAITING_API"
+
+  - step: "Integration tests and E2E"
+    status: "BLOCKED_WAITING_COMPONENTS"

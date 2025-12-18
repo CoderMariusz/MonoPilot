@@ -1,0 +1,412 @@
+# Story 07.5 - Database Schema
+# Purpose: Tables and operations used (no new migrations required)
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story uses existing tables from Story 07.2
+# No new migrations required - only uses existing sales_orders and sales_order_lines tables
+no_new_migrations: true
+
+# Tables used
+tables_used:
+  - name: "sales_orders"
+    columns_read:
+      - name: "id"
+        type: "UUID"
+        description: "Primary key"
+      - name: "org_id"
+        type: "UUID"
+        description: "Organization ID for multi-tenancy"
+      - name: "order_number"
+        type: "TEXT"
+        description: "Human-readable order number (SO-YYYY-NNNNN)"
+      - name: "customer_id"
+        type: "UUID"
+        description: "FK to customers table"
+      - name: "shipping_address_id"
+        type: "UUID"
+        description: "FK to customer_addresses table"
+      - name: "order_date"
+        type: "DATE"
+        description: "Date order was placed"
+      - name: "promised_ship_date"
+        type: "DATE"
+        description: "Customer-promised ship date (optional)"
+      - name: "required_delivery_date"
+        type: "DATE"
+        description: "Customer-required delivery date"
+      - name: "customer_po"
+        type: "TEXT"
+        description: "Customer PO number (optional)"
+      - name: "notes"
+        type: "TEXT"
+        description: "Internal notes"
+      - name: "status"
+        type: "TEXT"
+        description: "draft | confirmed | allocated | picking | picked | packed | shipped | cancelled"
+      - name: "total_amount"
+        type: "DECIMAL(15,2)"
+        description: "Total SO amount"
+      - name: "allergen_validated"
+        type: "BOOLEAN"
+        description: "Whether allergen validation completed"
+      - name: "confirmed_at"
+        type: "TIMESTAMPTZ"
+        description: "When order was confirmed (set on status change to confirmed)"
+      - name: "shipped_at"
+        type: "TIMESTAMPTZ"
+        description: "When order was shipped"
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        description: "Record creation timestamp"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        description: "Record last update timestamp"
+
+    columns_written_on_clone:
+      - name: "id"
+        new_value: "Generated UUID"
+      - name: "org_id"
+        new_value: "Same as original (RLS scope)"
+      - name: "order_number"
+        new_value: "New auto-generated (SO-YYYY-NNNNN)"
+      - name: "customer_id"
+        new_value: "Same as original"
+      - name: "shipping_address_id"
+        new_value: "Same as original"
+      - name: "order_date"
+        new_value: "Today (new Date())"
+      - name: "promised_ship_date"
+        new_value: "NULL (reset)"
+      - name: "required_delivery_date"
+        new_value: "NULL (reset)"
+      - name: "customer_po"
+        new_value: "NULL (reset)"
+      - name: "notes"
+        new_value: "Same as original"
+      - name: "status"
+        new_value: "draft"
+      - name: "total_amount"
+        new_value: "Recalculated from cloned lines"
+      - name: "allergen_validated"
+        new_value: "false (must re-validate)"
+      - name: "confirmed_at"
+        new_value: "NULL"
+      - name: "shipped_at"
+        new_value: "NULL"
+      - name: "created_at"
+        new_value: "NOW()"
+      - name: "updated_at"
+        new_value: "NOW()"
+
+    columns_written_on_import:
+      - name: "id"
+        new_value: "Generated UUID"
+      - name: "org_id"
+        new_value: "From auth context (user's org)"
+      - name: "order_number"
+        new_value: "Auto-generated (SO-YYYY-NNNNN)"
+      - name: "customer_id"
+        new_value: "Looked up from CSV customer_code (validated)"
+      - name: "shipping_address_id"
+        new_value: "Customer's default shipping address"
+      - name: "order_date"
+        new_value: "Today"
+      - name: "promised_ship_date"
+        new_value: "From CSV if provided, else NULL"
+      - name: "required_delivery_date"
+        new_value: "From CSV if provided, else NULL"
+      - name: "customer_po"
+        new_value: "From CSV if provided (SO-level), else NULL"
+      - name: "notes"
+        new_value: "From CSV if provided, else NULL"
+      - name: "status"
+        new_value: "draft"
+      - name: "total_amount"
+        new_value: "Calculated from imported lines"
+      - name: "allergen_validated"
+        new_value: "false"
+      - name: "confirmed_at"
+        new_value: "NULL"
+      - name: "shipped_at"
+        new_value: "NULL"
+      - name: "created_at"
+        new_value: "NOW()"
+      - name: "updated_at"
+        new_value: "NOW()"
+
+    rls: true
+    note: "RLS ensures org_id match with user's organization"
+
+  - name: "sales_order_lines"
+    columns_read:
+      - name: "id"
+        type: "UUID"
+        description: "Primary key"
+      - name: "sales_order_id"
+        type: "UUID"
+        description: "FK to sales_orders table"
+      - name: "line_number"
+        type: "INTEGER"
+        description: "Sequential line number (1, 2, 3...)"
+      - name: "product_id"
+        type: "UUID"
+        description: "FK to products table"
+      - name: "quantity_ordered"
+        type: "DECIMAL(15,4)"
+        description: "Ordered quantity"
+      - name: "quantity_allocated"
+        type: "DECIMAL(15,4)"
+        description: "Allocated quantity (0 on creation)"
+      - name: "quantity_picked"
+        type: "DECIMAL(15,4)"
+        description: "Picked quantity (0 on creation)"
+      - name: "quantity_packed"
+        type: "DECIMAL(15,4)"
+        description: "Packed quantity (0 on creation)"
+      - name: "quantity_shipped"
+        type: "DECIMAL(15,4)"
+        description: "Shipped quantity (0 on creation)"
+      - name: "unit_price"
+        type: "DECIMAL(15,4)"
+        description: "Unit price at time of order"
+      - name: "notes"
+        type: "TEXT"
+        description: "Line-level notes (optional)"
+      - name: "requested_lot"
+        type: "TEXT"
+        description: "Requested lot number (optional)"
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        description: "Record creation timestamp"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        description: "Record last update timestamp"
+
+    columns_written_on_clone:
+      - name: "id"
+        new_value: "Generated UUID"
+      - name: "sales_order_id"
+        new_value: "New cloned SO id"
+      - name: "line_number"
+        new_value: "Sequential: 1, 2, 3... (renumbered)"
+      - name: "product_id"
+        new_value: "Same as original"
+      - name: "quantity_ordered"
+        new_value: "Same as original"
+      - name: "quantity_allocated"
+        new_value: "0 (reset)"
+      - name: "quantity_picked"
+        new_value: "0 (reset)"
+      - name: "quantity_packed"
+        new_value: "0 (reset)"
+      - name: "quantity_shipped"
+        new_value: "0 (reset)"
+      - name: "unit_price"
+        new_value: "Same as original"
+      - name: "notes"
+        new_value: "Same as original"
+      - name: "requested_lot"
+        new_value: "Same as original"
+      - name: "created_at"
+        new_value: "NOW()"
+      - name: "updated_at"
+        new_value: "NOW()"
+
+    columns_written_on_import:
+      - name: "id"
+        new_value: "Generated UUID"
+      - name: "sales_order_id"
+        new_value: "Imported SO id"
+      - name: "line_number"
+        new_value: "Sequential per SO (1, 2, 3...)"
+      - name: "product_id"
+        new_value: "Looked up from CSV product_code (validated)"
+      - name: "quantity_ordered"
+        new_value: "From CSV quantity column"
+      - name: "quantity_allocated"
+        new_value: "0"
+      - name: "quantity_picked"
+        new_value: "0"
+      - name: "quantity_packed"
+        new_value: "0"
+      - name: "quantity_shipped"
+        new_value: "0"
+      - name: "unit_price"
+        new_value: "From CSV unit_price (or product.standard_price)"
+      - name: "notes"
+        new_value: "From CSV notes column if provided"
+      - name: "requested_lot"
+        new_value: "NULL"
+      - name: "created_at"
+        new_value: "NOW()"
+      - name: "updated_at"
+        new_value: "NOW()"
+
+    rls: true
+    note: "RLS inherits from sales_orders via org_id join"
+
+  - name: "organizations"
+    columns_read:
+      - name: "next_so_sequence"
+        type: "BIGINT"
+        description: "Counter for next SO order number (SO-YYYY-NNNNN)"
+
+    columns_written_on_clone:
+      - name: "next_so_sequence"
+        new_value: "Incremented by 1 on new SO creation"
+
+    columns_written_on_import:
+      - name: "next_so_sequence"
+        new_value: "Incremented by number of SOs created"
+
+# Query Patterns
+
+query_patterns:
+  clone_read_so: |
+    SELECT
+      id, org_id, customer_id, shipping_address_id,
+      order_date, promised_ship_date, required_delivery_date,
+      customer_po, notes, total_amount
+    FROM sales_orders
+    WHERE
+      id = $1
+      AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+  clone_read_lines: |
+    SELECT
+      line_number, product_id, quantity_ordered,
+      quantity_allocated, quantity_picked, quantity_packed,
+      quantity_shipped, unit_price, notes, requested_lot
+    FROM sales_order_lines
+    WHERE sales_order_id = $1
+    ORDER BY line_number ASC
+
+  clone_create_so: |
+    INSERT INTO sales_orders (
+      id, org_id, order_number, customer_id, shipping_address_id,
+      order_date, promised_ship_date, required_delivery_date,
+      customer_po, notes, status, total_amount,
+      allergen_validated, created_at, updated_at
+    )
+    VALUES (
+      gen_random_uuid(), $1, $2, $3, $4,
+      NOW()::date, NULL, NULL,
+      NULL, $5, 'draft', $6,
+      false, NOW(), NOW()
+    )
+    RETURNING id, order_number
+
+  clone_create_lines: |
+    INSERT INTO sales_order_lines (
+      id, sales_order_id, line_number, product_id,
+      quantity_ordered, quantity_allocated, quantity_picked,
+      quantity_packed, quantity_shipped, unit_price,
+      notes, requested_lot, created_at, updated_at
+    )
+    VALUES
+      (gen_random_uuid(), $1, $2, $3, $4, 0, 0, 0, 0, $5, $6, $7, NOW(), NOW())
+    RETURNING id, line_number
+
+  import_validate_customer: |
+    SELECT id, default_shipping_address_id
+    FROM customers
+    WHERE
+      customer_code = $1
+      AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    LIMIT 1
+
+  import_validate_product: |
+    SELECT id, standard_price
+    FROM products
+    WHERE
+      product_code = $1
+      AND is_finished_good = true
+      AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    LIMIT 1
+
+  import_batch_create_sos: |
+    INSERT INTO sales_orders (
+      id, org_id, order_number, customer_id, shipping_address_id,
+      order_date, promised_ship_date, required_delivery_date,
+      customer_po, notes, status, total_amount,
+      allergen_validated, created_at, updated_at
+    )
+    SELECT
+      gen_random_uuid(), $1, 'SO-' || to_char(NOW(), 'YYYY') || '-' || lpad(row_number() OVER (ORDER BY 1)::text, 5, '0'),
+      customer_id, shipping_address_id, NOW()::date, promised_ship_date, required_delivery_date,
+      customer_po, notes, 'draft', 0, false, NOW(), NOW()
+    FROM (
+      VALUES ('cust1', 'addr1', null, null, 'note1', (SELECT id FROM customers WHERE customer_code = 'ACME001'))
+      -- ... multiple rows ...
+    ) AS import_rows(customer_code, address_id, promised_date, delivery_date, notes, customer_id)
+    RETURNING id, order_number
+
+# Sequence Management
+
+sequence_management:
+  so_number_generation: |
+    -- SO numbers: SO-YYYY-NNNNN (e.g., SO-2025-00123)
+    -- NNNNN increments per organization (not global)
+
+    DECLARE @org_id UUID;
+    DECLARE @next_seq BIGINT;
+
+    BEGIN TRANSACTION;
+      SELECT org_id INTO @org_id FROM users WHERE id = auth.uid();
+
+      UPDATE organizations
+      SET next_so_sequence = next_so_sequence + 1
+      WHERE id = @org_id
+      RETURNING next_so_sequence INTO @next_seq;
+
+      -- Order number: SO-YYYY-NNNNN
+      RETURN CONCAT('SO-', to_char(NOW(), 'YYYY'), '-', LPAD(@next_seq::text, 5, '0'));
+    COMMIT;
+
+# Data Transformation Rules
+
+data_transformation:
+  clone_line_renumbering: |
+    -- Original SO may have gaps in line_number (1, 5, 10)
+    -- Cloned SO must have sequential numbering (1, 2, 3)
+    -- Use ROW_NUMBER() to resequence
+
+    SELECT
+      ROW_NUMBER() OVER (ORDER BY line_number ASC) as new_line_number,
+      product_id,
+      quantity_ordered,
+      unit_price,
+      notes,
+      requested_lot
+    FROM sales_order_lines
+    WHERE sales_order_id = original_so_id
+    ORDER BY line_number ASC
+
+  import_grouping_by_customer: |
+    -- CSV rows grouped by customer_code
+    -- One SO created per unique customer_code
+    -- Lines added to SO in CSV row order
+
+    SELECT
+      customer_code,
+      customer_id,
+      shipping_address_id,
+      promised_ship_date,
+      required_delivery_date,
+      customer_po,
+      notes,
+      ARRAY_AGG(ROW(product_code, quantity, unit_price, line_notes) ORDER BY csv_row_number) as lines
+    FROM parsed_csv_data
+    WHERE validation_status = 'valid'
+    GROUP BY customer_code, customer_id, shipping_address_id
+
+# Cascade and Constraints
+
+cascades:
+  sales_orders: "ON DELETE CASCADE -> sales_order_lines (deleting SO deletes all lines)"
+
+constraints:
+  rls_org_isolation: "SELECT (auth.uid() -> orgs WHERE id = org_id) prevents cross-org access"
+  unique_per_org: "order_number scoped per org (SO-2025-00001 unique within org)"
+  line_number: "Sequential per SO (1, 2, 3) renumbered on delete or clone"
+

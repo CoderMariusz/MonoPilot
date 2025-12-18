@@ -1,0 +1,396 @@
+# Story Delivery Workflow
+# TDD-based story implementation: RED → GREEN → REFACTOR → REVIEW → QA
+#
+# Documentation: @.claude/workflows/documentation/STORY-WORKFLOW.md
+
+name: story-delivery
+description: Complete TDD workflow for implementing a single story
+trigger: "story_implementation | feature_development"
+
+# Expected duration: 1-3 sessions per story
+# Parallelization: Frontend + Backend can run in parallel after RED phase
+
+prerequisites:
+  - story_approved_by_po
+  - acceptance_criteria_defined
+  - dependencies_resolved
+
+steps:
+  - id: ux_design
+    agent: UX-DESIGNER
+    type: wireframe
+    description: "Design UI components (if story has UI)"
+    condition: "story.has_ui_component == true"
+    optional: true
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+        - "@docs/1-BASELINE/product/prd.md"
+    output:
+      deliverables:
+        - "docs/3-ARCHITECTURE/ux/wireframes/wireframe-{feature}.md"
+    checkpoint:
+      - "All 4 states defined (loading, empty, error, success)"
+      - "Accessibility notes included"
+      - "Touch targets >= 48x48dp"
+    next: red_phase
+
+  - id: red_phase
+    agent: TEST-WRITER
+    type: write_failing_tests
+    description: "Write failing tests for all acceptance criteria"
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+        - "@docs/3-ARCHITECTURE/ux/wireframes/*.md"
+    output:
+      deliverables:
+        - "tests/**/*-{feature}.test.{ext}"
+    checkpoint:
+      - "Tests cover all acceptance criteria"
+      - "Tests fail with expected errors"
+      - "No tests pass yet"
+    gate:
+      id: RED_COMPLETE
+      type: test_gate
+      enforcer: TEST-WRITER
+      criteria:
+        - "Tests written for all acceptance criteria"
+        - "All tests FAIL (proving they test something real)"
+        - "Test error messages are descriptive"
+      on_pass: green_phase
+      on_fail:
+        action: return_to_phase
+        target: red_phase
+        message: "Tests incomplete or already passing"
+      block_message: |
+        Cannot proceed to GREEN phase:
+        - Tests written: [status]
+        - Tests failing: [status] (tests must FAIL to prove they test real behavior)
+        - Coverage: [X/Y acceptance criteria covered]
+    next: green_phase
+
+  - id: green_phase
+    description: "Implement minimal code to make tests pass"
+    parallel:
+      - agent: BACKEND-DEV
+        type: implement
+        condition: "story.type in ['backend', 'full-stack']"
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+            - "@tests/**/*-{feature}.test.{ext}"
+        checkpoint:
+          - "All backend tests pass"
+          - "No security vulnerabilities"
+          - "API contracts match spec"
+
+      - agent: FRONTEND-DEV
+        type: implement
+        condition: "story.type in ['frontend', 'full-stack']"
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+            - "@docs/3-ARCHITECTURE/ux/wireframes/*.md"
+            - "@tests/**/*-{feature}.test.{ext}"
+        checkpoint:
+          - "All frontend tests pass"
+          - "Accessibility checks pass"
+          - "Responsive design verified"
+
+    gate:
+      id: GREEN_COMPLETE
+      type: test_gate
+      enforcer: BACKEND-DEV | FRONTEND-DEV
+      criteria:
+        - "All tests PASS"
+        - "Build succeeds without errors"
+        - "Code implements requirements (no extra functionality)"
+        - "No security vulnerabilities introduced"
+      on_pass: refactor_phase
+      on_fail:
+        action: return_to_phase
+        target: green_phase
+        max_retries: 3
+        message: "Tests still failing or build broken"
+      block_message: |
+        Cannot proceed to REFACTOR phase:
+        - Tests passing: [X/Y tests pass]
+        - Build status: [PASS/FAIL]
+        - Failing tests:
+          - [test_name_1]: [error]
+          - [test_name_2]: [error]
+    next: refactor_phase
+
+  - id: refactor_phase
+    agent: SENIOR-DEV
+    type: refactor
+    description: "Improve code quality without changing behavior"
+    input:
+      context_refs:
+        - "src/**/{feature}*"
+        - "@tests/**/*-{feature}.test.{ext}"
+    output:
+      improvements:
+        - "Code quality improvements"
+        - "Performance optimizations"
+        - "Pattern alignment"
+    checkpoint:
+      - "All tests still pass"
+      - "No new functionality added"
+      - "Code follows patterns"
+    gate:
+      id: REFACTOR_COMPLETE
+      type: quality_gate
+      enforcer: SENIOR-DEV
+      criteria:
+        - "All tests still PASS (behavior unchanged)"
+        - "Code complexity reduced or maintained"
+        - "No new functionality added"
+        - "Code follows established patterns"
+      on_pass: code_review
+      on_fail:
+        action: return_to_phase
+        target: refactor_phase
+        message: "Tests broken or behavior changed during refactor"
+      block_message: |
+        Cannot proceed to REVIEW phase:
+        - Tests status: [PASS/FAIL] (must still pass)
+        - Behavior changed: [YES/NO] (must be NO)
+        - If tests fail, UNDO refactor immediately
+    next: code_review
+
+  - id: code_review
+    agent: CODE-REVIEWER
+    type: full_review
+    description: "Review code for quality, security, and best practices"
+    input:
+      context_refs:
+        - "src/**/{feature}*"
+        - "@tests/**/*-{feature}.test.{ext}"
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+    decision:
+      approved: qa_testing
+      request_changes: return_to_green
+    checkpoint:
+      - "Security checklist passed"
+      - "Code quality acceptable"
+      - "Tests adequate"
+    gate:
+      id: REVIEW_APPROVED
+      type: review_gate
+      enforcer: CODE-REVIEWER
+      criteria:
+        - "No blocking issues found"
+        - "Security checklist passed"
+        - "Code quality meets standards"
+        - "Test coverage adequate"
+        - "Code approved by reviewer"
+      on_pass: qa_testing
+      on_fail:
+        action: return_to_phase
+        target: green_phase
+        message: "Review rejected - issues must be fixed"
+      block_message: |
+        Cannot proceed to QA phase:
+        - Review status: [APPROVED/REJECTED]
+        - Blocking issues:
+          - [issue_1]: [severity]
+          - [issue_2]: [severity]
+        - Fix all 'Must Fix' items before re-review
+
+  - id: qa_testing
+    agent: QA-AGENT
+    type: acceptance_testing
+    description: "Verify story meets acceptance criteria"
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+    decision:
+      pass: complete
+      fail: return_to_green
+    checkpoint:
+      - "All AC verified"
+      - "Edge cases tested"
+      - "No regressions"
+    gate:
+      id: QA_PASSED
+      type: quality_gate
+      enforcer: QA-AGENT
+      criteria:
+        - "All acceptance criteria verified"
+        - "Edge cases tested and passing"
+        - "No regressions found"
+        - "No bugs with severity >= HIGH"
+      on_pass: complete
+      on_fail:
+        action: return_to_phase
+        target: green_phase
+        message: "QA failed - bugs found or AC not met"
+      block_message: |
+        Cannot proceed to COMPLETE:
+        - Acceptance criteria: [X/Y verified]
+        - Bugs found:
+          - [BUG-001]: [severity] - [description]
+          - [BUG-002]: [severity] - [description]
+        - Fix all bugs and re-submit for QA
+
+  - id: complete
+    type: story_complete
+    summary: "Story implemented and verified"
+    actions:
+      - "Update PROJECT-STATE.md"
+      - "Mark story as Done"
+      - "Notify scrum-master"
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        update_root: true
+        script: "bash scripts/sync-state.sh --commit"
+      commit:
+        enabled: true
+        message: "Complete story {story_id}: {story_title}"
+
+# TDD Phase enforcement
+tdd_rules:
+  - "RED must complete before GREEN"
+  - "GREEN must complete before REFACTOR"
+  - "Tests must pass before REVIEW"
+  - "REVIEW must APPROVE before QA"
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: SCRUM-MASTER
+
+# Error Recovery Paths
+error_recovery:
+  test_failure:
+    description: "Tests cannot pass or fail unexpectedly"
+    steps:
+      - "Analyze test failures"
+      - "Review test expectations"
+      - "Clarify with TEST-ENGINEER if needed"
+      - "If AC unclear, escalate to PRODUCT-OWNER"
+      - "Update tests if AC changed"
+      - "Fix implementation and re-run tests"
+    action: return_to_green
+    agent: BACKEND-DEV | frontend-dev
+
+  review_rejected:
+    description: "Code review identifies issues that must be fixed"
+    steps:
+      - "Review feedback carefully"
+      - "Address 'Must Fix' items first"
+      - "Address 'Should Fix' items"
+      - "Return to testing phase"
+      - "Request re-review"
+      - "Iterate until approved"
+    action: return_to_green
+    agent: BACKEND-DEV | frontend-dev
+
+  qa_failed:
+    description: "QA finds bugs during acceptance testing"
+    steps:
+      - "QA creates bug tickets with severity"
+      - "Route critical bugs to BUG-WORKFLOW"
+      - "Fix minor bugs in current story"
+      - "Return to QA validation"
+      - "Re-validate all acceptance criteria"
+    action: return_to_green
+    agent: BACKEND-DEV | frontend-dev
+
+  blocked:
+    description: "Story is blocked by external dependency or unclear requirements"
+    steps:
+      - "Identify blocking issue"
+      - "Escalate to SCRUM-MASTER"
+      - "If requirements unclear, involve PRODUCT-OWNER"
+      - "If technical blocker, involve ARCHITECT-AGENT"
+      - "Update story status to BLOCKED"
+      - "Resume when unblocked"
+    action: escalate
+    agent: SCRUM-MASTER
+
+# Artifacts
+artifacts:
+  test_files:
+    path: "tests/**/*-{feature}.test.{ext}"
+    created_by: red_phase
+    description: "Test files covering all acceptance criteria"
+
+  implementation_code:
+    path: "src/**/{feature}*"
+    created_by: green_phase
+    description: "Implementation code that makes tests pass"
+
+  review_report:
+    path: "docs/2-MANAGEMENT/reviews/review-{story}.md"
+    created_by: code_review
+    description: "Code review findings and approval status"
+
+  qa_report:
+    path: "docs/2-MANAGEMENT/qa/qa-{story}.md"
+    created_by: qa_testing
+    description: "QA test results and acceptance validation"
+
+  documentation_updates:
+    path: "docs/**/*.md"
+    created_by: complete
+    description: "Updated documentation reflecting story changes"
+
+# =============================================================================
+# QUALITY GATES SUMMARY
+# =============================================================================
+quality_gates:
+  RED_COMPLETE:
+    phase: red_phase
+    enforcer: TEST-WRITER
+    type: test_gate
+    blocker: "Cannot proceed to GREEN - tests not written or already passing"
+    criteria:
+      - "Tests written for all acceptance criteria"
+      - "All tests FAIL"
+      - "Test error messages descriptive"
+
+  GREEN_COMPLETE:
+    phase: green_phase
+    enforcer: BACKEND-DEV | FRONTEND-DEV
+    type: test_gate
+    blocker: "Cannot proceed to REFACTOR - tests still failing"
+    criteria:
+      - "All tests PASS"
+      - "Build succeeds"
+      - "No security vulnerabilities"
+
+  REFACTOR_COMPLETE:
+    phase: refactor_phase
+    enforcer: SENIOR-DEV
+    type: quality_gate
+    blocker: "Cannot proceed to REVIEW - tests broken during refactor"
+    criteria:
+      - "All tests still PASS"
+      - "Behavior unchanged"
+      - "Code quality improved"
+
+  REVIEW_APPROVED:
+    phase: code_review
+    enforcer: CODE-REVIEWER
+    type: review_gate
+    blocker: "Cannot proceed to QA - review rejected"
+    criteria:
+      - "No blocking issues"
+      - "Security checklist passed"
+      - "Code approved"
+
+  QA_PASSED:
+    phase: qa_testing
+    enforcer: QA-AGENT
+    type: quality_gate
+    blocker: "Cannot mark COMPLETE - QA failed"
+    criteria:
+      - "All acceptance criteria verified"
+      - "No regressions"
+      - "No HIGH/CRITICAL bugs"

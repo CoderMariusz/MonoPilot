@@ -1,0 +1,335 @@
+# Story 02.10a - Frontend Specification
+# Purpose: Pages, components, hooks, services, UX patterns
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/traceability/page.tsx"
+    name: "Traceability Search (Framework)"
+    description: "Traceability search page - framework only with empty state until Epic 05"
+    type: "page"
+    wireframe: "TEC-016"
+    components:
+      - "TraceabilitySearch"
+      - "TraceabilityEmptyState"
+    states:
+      - loading: "Shows spinner while page loads"
+      - empty: "Shows empty state with Epic 05 dependency message"
+      - search_ready: "Shows search form with direction toggle (results empty)"
+
+# Components
+components:
+  - path: "apps/frontend/components/technical/traceability/TraceabilitySearch.tsx"
+    name: "TraceabilitySearch"
+    description: "Search form framework with direction toggle - shows empty results in MVP"
+    type: "component"
+    wireframe: "TEC-016"
+    props:
+      - { name: "onSearch", type: "(params: TraceSearchParams) => void", description: "Search callback (no-op in MVP)" }
+      - { name: "disabled", type: "boolean", description: "Disable search (always true in MVP)" }
+    features:
+      - "Direction radio buttons (Forward / Backward / Recall)"
+      - "Lot ID input with autocomplete (disabled in MVP)"
+      - "Batch Number input (optional)"
+      - "Date range picker (optional)"
+      - "Advanced options collapsible"
+      - "Search button (disabled until Epic 05)"
+      - "Clear button"
+    notes:
+      - "Form is rendered but search is disabled until Epic 05 provides LP tables"
+      - "Clicking Search shows empty state message"
+
+  - path: "apps/frontend/components/technical/traceability/TraceabilityEmptyState.tsx"
+    name: "TraceabilityEmptyState"
+    description: "Empty state component explaining Epic 05 dependency"
+    type: "component"
+    props:
+      - { name: "variant", type: "'no_search' | 'no_lp_tables'", description: "Which empty state to show" }
+    content:
+      no_lp_tables:
+        icon: "PackageSearch"
+        heading: "Traceability Coming Soon"
+        message: "License Plates and genealogy tracking will be available in Epic 05 (Warehouse). Configure your product traceability settings now to be ready."
+        actions:
+          - { label: "Configure Product Traceability", link: "/technical/products" }
+          - { label: "View Traceability Guide", link: "/help/traceability" }
+
+  - path: "apps/frontend/components/technical/traceability/LotConfigModal.tsx"
+    name: "LotConfigModal"
+    description: "Modal for configuring product lot number format and traceability settings"
+    type: "modal"
+    wireframe: "TEC-014 (pattern)"
+    props:
+      - { name: "productId", type: "string", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+      - { name: "onSave", type: "(config: TraceabilityConfig) => void", required: true }
+    sections:
+      - name: "Lot Number Format"
+        fields:
+          - { name: "lot_number_format", label: "Lot Format Pattern", type: "text", placeholder: "LOT-{YYYY}-{SEQ:6}" }
+          - { name: "lot_number_prefix", label: "Prefix", type: "text", placeholder: "LOT-" }
+          - { name: "lot_number_sequence_length", label: "Sequence Length", type: "number", min: 4, max: 10 }
+        helper: "Preview: LOT-2025-000001"
+
+      - name: "Traceability Level"
+        fields:
+          - name: "traceability_level"
+            label: "Tracking Granularity"
+            type: "radio"
+            options:
+              - { value: "lot", label: "Lot", description: "Multiple units per lot (most common)" }
+              - { value: "batch", label: "Batch", description: "Production run based tracking" }
+              - { value: "serial", label: "Serial", description: "Unit-level tracking (1:1)" }
+
+      - name: "Batch Size Defaults"
+        fields:
+          - { name: "standard_batch_size", label: "Standard Batch Size", type: "number" }
+          - { name: "min_batch_size", label: "Minimum Batch Size", type: "number" }
+          - { name: "max_batch_size", label: "Maximum Batch Size", type: "number" }
+
+      - name: "Expiry Calculation"
+        fields:
+          - name: "expiry_calculation_method"
+            label: "Calculation Method"
+            type: "radio"
+            options:
+              - { value: "fixed_days", label: "Fixed Days", description: "Expiry = production date + shelf life" }
+              - { value: "rolling", label: "Rolling", description: "Based on ingredient expiry dates" }
+              - { value: "manual", label: "Manual", description: "Manually entered per lot" }
+          - { name: "processing_buffer_days", label: "Processing Buffer (days)", type: "number", show_when: "expiry_calculation_method === 'rolling'" }
+
+      - name: "GS1 Compliance"
+        fields:
+          - { name: "gs1_lot_encoding_enabled", label: "Enable GS1-128 Lot Encoding (AI 10)", type: "checkbox" }
+          - { name: "gs1_expiry_encoding_enabled", label: "Enable GS1-128 Expiry Encoding (AI 17)", type: "checkbox" }
+          - { name: "gs1_sscc_enabled", label: "Enable SSCC-18 for Pallets", type: "checkbox" }
+
+    features:
+      - "Live lot number preview based on format"
+      - "Placeholder help tooltip"
+      - "Batch size validation (min <= standard <= max)"
+      - "GS1 format preview"
+      - "Save/Cancel buttons"
+
+  - path: "apps/frontend/components/technical/products/TraceabilityConfigSection.tsx"
+    name: "TraceabilityConfigSection"
+    description: "Collapsible section in product form showing traceability summary"
+    type: "section"
+    props:
+      - { name: "productId", type: "string" }
+      - { name: "config", type: "TraceabilityConfig | null" }
+      - { name: "onEdit", type: "() => void", description: "Opens LotConfigModal" }
+    display:
+      - { label: "Lot Format", value: "config.lot_number_format", fallback: "Not configured" }
+      - { label: "Traceability Level", value: "config.traceability_level", fallback: "lot (default)" }
+      - { label: "GS1 Enabled", value: "Yes/No based on config" }
+    actions:
+      - { label: "Configure", icon: "Settings", onClick: "onEdit" }
+
+  - path: "apps/frontend/components/technical/traceability/LotFormatBuilder.tsx"
+    name: "LotFormatBuilder"
+    description: "Visual builder for lot number format with drag-drop placeholders"
+    type: "component"
+    props:
+      - { name: "value", type: "string", required: true }
+      - { name: "onChange", type: "(format: string) => void", required: true }
+      - { name: "productCode", type: "string", description: "Product code for preview" }
+    features:
+      - "Placeholder buttons ({YYYY}, {SEQ:6}, etc.)"
+      - "Click to insert at cursor"
+      - "Live preview with current date"
+      - "Validation feedback"
+      - "Help tooltip with placeholder descriptions"
+
+  - path: "apps/frontend/components/technical/traceability/GS1Preview.tsx"
+    name: "GS1Preview"
+    description: "Preview component showing GS1-128 barcode encoding"
+    type: "component"
+    props:
+      - { name: "lotNumber", type: "string" }
+      - { name: "expiryDate", type: "Date | null" }
+      - { name: "gtin", type: "string | null" }
+      - { name: "enabledEncodings", type: "{ lot: boolean; expiry: boolean; sscc: boolean }" }
+    display:
+      - "GS1-128 AI 10 (Lot): (10)LOT-2025-000001"
+      - "GS1-128 AI 17 (Expiry): (17)250615"
+      - "Combined barcode string preview"
+      - "Visual barcode representation (optional)"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-traceability-config.ts"
+    name: "useTraceabilityConfig"
+    description: "React Query hook for fetching product traceability config"
+    exports:
+      - name: "useTraceabilityConfig"
+        params:
+          - "productId: string"
+        returns: "UseQueryResult<TraceabilityConfig>"
+        staleTime: "5 minutes"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getProductTraceabilityConfig } from '@/lib/services/traceability-config-service';
+
+      export function useTraceabilityConfig(productId: string) {
+        return useQuery({
+          queryKey: ['traceability-config', productId],
+          queryFn: () => getProductTraceabilityConfig(productId),
+          enabled: !!productId,
+          staleTime: 5 * 60 * 1000, // 5 minutes
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-update-traceability-config.ts"
+    name: "useUpdateTraceabilityConfig"
+    description: "React Query mutation for updating traceability config"
+    exports:
+      - name: "useUpdateTraceabilityConfig"
+        returns: "UseMutationResult"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { updateProductTraceabilityConfig } from '@/lib/services/traceability-config-service';
+      import { toast } from '@/components/ui/sonner';
+
+      export function useUpdateTraceabilityConfig() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: ({ productId, config }: { productId: string; config: TraceabilityConfigInput }) =>
+            updateProductTraceabilityConfig(productId, config),
+          onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['traceability-config', variables.productId] });
+            toast.success('Traceability configuration saved');
+          },
+          onError: (error) => {
+            toast.error('Failed to save configuration', {
+              description: error.message,
+            });
+          },
+        });
+      }
+
+# UX States
+ux:
+  wireframes:
+    - id: "TEC-016"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-016-traceability-search.md"
+      relevance: "Framework only - empty state pattern"
+      components:
+        - "TraceabilitySearch (form framework)"
+        - "TraceabilityEmptyState (Epic 05 message)"
+    - id: "TEC-014"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-014-shelf-life-config.md"
+      relevance: "Configuration modal pattern"
+      components:
+        - "Modal layout pattern"
+        - "Section organization"
+        - "Validation display"
+
+  patterns:
+    modal: "ShadCN Dialog with Form inside"
+    form: "React Hook Form + Zod validation"
+    table: "ShadCN DataTable (not used in this story)"
+    section: "Collapsible card with summary"
+
+  states:
+    loading:
+      description: "Spinner centered in container"
+      component: "Spinner from lucide-react"
+    empty:
+      description: "Empty state with icon, message, and actions"
+      icon: "PackageSearch"
+      message: "License Plates and genealogy tracking will be available in Epic 05 (Warehouse)"
+    error:
+      description: "Error banner with retry action"
+      color: "#DC2626"
+    success:
+      description: "Toast notification on save"
+      message: "Traceability configuration saved"
+
+  validation_display:
+    inline_errors: true
+    error_color: "#DC2626"
+    warning_color: "#F59E0B"
+    success_color: "#16A34A"
+    examples:
+      - field: "lot_number_format"
+        error: "Invalid placeholder. Use {YYYY}, {SEQ:N}, etc."
+      - field: "min_batch_size"
+        error: "Minimum batch size cannot exceed maximum"
+      - field: "lot_number_format"
+        warning: "Lot numbers may exceed 20 characters (GS1 AI 10 max)"
+
+# Accessibility
+accessibility:
+  touch_targets: "All buttons, inputs >= 48x48dp"
+  contrast: "WCAG AA compliance"
+  keyboard:
+    - "Tab through form fields"
+    - "Escape closes modal"
+    - "Enter submits form"
+  screen_reader:
+    - "Modal announced as dialog"
+    - "Form fields have labels"
+    - "Errors announced on validation"
+    - "Success toast announced"
+  focus:
+    - "Auto-focus first field in modal"
+    - "Return focus to trigger on close"
+    - "Focus trap in modal"
+  aria:
+    - "role='dialog' on modal"
+    - "aria-labelledby for modal title"
+    - "aria-describedby for errors"
+    - "aria-invalid on invalid fields"
+
+# Mobile Responsive
+responsive:
+  breakpoints:
+    mobile: "< 768px"
+    tablet: "768px - 1024px"
+    desktop: "> 1024px"
+  modal:
+    mobile: "Full screen (sheet style)"
+    tablet: "Centered, max-width 600px"
+    desktop: "Centered, max-width 600px"
+  form:
+    mobile: "Single column, stacked sections"
+    tablet: "Two columns where appropriate"
+    desktop: "Two columns where appropriate"
+
+# File Structure
+file_structure:
+  pages:
+    - "apps/frontend/app/(authenticated)/technical/traceability/page.tsx"
+  components:
+    - "apps/frontend/components/technical/traceability/TraceabilitySearch.tsx"
+    - "apps/frontend/components/technical/traceability/TraceabilityEmptyState.tsx"
+    - "apps/frontend/components/technical/traceability/LotConfigModal.tsx"
+    - "apps/frontend/components/technical/traceability/LotFormatBuilder.tsx"
+    - "apps/frontend/components/technical/traceability/GS1Preview.tsx"
+    - "apps/frontend/components/technical/products/TraceabilityConfigSection.tsx"
+  services:
+    - "apps/frontend/lib/services/traceability-config-service.ts"
+    - "apps/frontend/lib/services/gs1-service.ts"
+  hooks:
+    - "apps/frontend/lib/hooks/use-traceability-config.ts"
+    - "apps/frontend/lib/hooks/use-update-traceability-config.ts"
+  validation:
+    - "apps/frontend/lib/validation/traceability.ts"
+  types:
+    - "apps/frontend/lib/types/traceability.ts"
+
+# Integration Points
+integration:
+  product_form:
+    description: "TraceabilityConfigSection added to product edit form"
+    location: "apps/frontend/app/(authenticated)/technical/products/[id]/edit/page.tsx"
+    position: "After Storage Conditions section"
+  navigation:
+    description: "Traceability link in Technical module sidebar"
+    location: "apps/frontend/components/layout/TechnicalSidebar.tsx"
+    label: "Traceability"
+    icon: "GitBranch"
+    path: "/technical/traceability"

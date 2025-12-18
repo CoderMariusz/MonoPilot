@@ -1,0 +1,515 @@
+# Story 07.3 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/sales-order-service.test.ts"
+    type: "unit"
+    description: "Unit tests for holdOrder() and cancelOrder() methods"
+
+  - path: "apps/frontend/lib/validation/__tests__/sales-order-validation.test.ts"
+    type: "unit"
+    description: "Unit tests for hold/cancel Zod validation schemas"
+
+  - path: "apps/frontend/components/shipping/sales-orders/__tests__/SOStatusBadge.test.tsx"
+    type: "unit"
+    description: "Unit tests for status badge component rendering"
+
+  - path: "apps/frontend/components/shipping/sales-orders/__tests__/SOStatusTimeline.test.tsx"
+    type: "unit"
+    description: "Unit tests for status timeline component"
+
+  - path: "apps/frontend/components/shipping/sales-orders/__tests__/HoldOrderDialog.test.tsx"
+    type: "unit"
+    description: "Unit tests for hold order dialog"
+
+  - path: "apps/frontend/components/shipping/sales-orders/__tests__/CancelOrderDialog.test.tsx"
+    type: "unit"
+    description: "Unit tests for cancel order dialog"
+
+  - path: "apps/frontend/app/api/shipping/sales-orders/__tests__/hold.test.ts"
+    type: "integration"
+    description: "Integration tests for POST /hold endpoint"
+
+  - path: "apps/frontend/app/api/shipping/sales-orders/__tests__/cancel.test.ts"
+    type: "integration"
+    description: "Integration tests for POST /cancel endpoint"
+
+  - path: "tests/e2e/shipping/hold-cancel-workflow.spec.ts"
+    type: "e2e"
+    description: "E2E test for complete hold and cancel workflows"
+
+# Acceptance Criteria (from story markdown)
+acceptance_criteria:
+  # Status Enum Extension
+  - id: "AC-01"
+    given: "sales_orders.status enum is extended"
+    when: "database migration runs"
+    then: "on_hold value added to enum after confirmed"
+    test_type: "integration"
+    priority: "P0"
+
+  # Hold Sales Order - Valid Cases
+  - id: "AC-02"
+    given: "sales order with status 'draft'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/hold"
+    then: "status changes to 'on_hold', updated_at set, response 200"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "sales order with status 'confirmed'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/hold"
+    then: "status changes to 'on_hold', updated_at set, response 200"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "sales order with optional reason 'Customer requested delay'"
+    when: "POST /hold called with reason"
+    then: "notes field appended with '[HOLD - <timestamp>] Customer requested delay'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Hold Sales Order - Invalid Cases
+  - id: "AC-05"
+    given: "sales order with status 'allocated'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/hold"
+    then: "error 400 'Cannot hold order after allocation has started'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "sales order with status 'picking'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/hold"
+    then: "error 400 'Cannot hold order after allocation has started'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "sales order with status 'cancelled'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/hold"
+    then: "error 400 'Cannot hold a cancelled order'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Cancel Sales Order - Valid Cases
+  - id: "AC-08"
+    given: "sales order with status 'draft'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/cancel with reason"
+    then: "status changes to 'cancelled', updated_at set, response 200"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "sales order with status 'confirmed'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/cancel with reason"
+    then: "status changes to 'cancelled', updated_at set, response 200"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "sales order with status 'on_hold'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/cancel with reason"
+    then: "status changes to 'cancelled', response 200"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "sales order with reason 'Customer cancelled order'"
+    when: "POST /cancel called with reason"
+    then: "notes field appended with '[CANCELLED - <timestamp>] Customer cancelled order'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Cancel Sales Order - Invalid Cases
+  - id: "AC-12"
+    given: "sales order with status 'picking'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/cancel"
+    then: "error 400 'Cannot cancel order after picking has started'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    given: "sales order with status 'shipped'"
+    when: "manager calls POST /api/shipping/sales-orders/:id/cancel"
+    then: "error 400 'Cannot cancel order after picking has started'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    given: "POST /cancel without reason"
+    when: "cancel is attempted"
+    then: "error 400 'Cancel reason is required'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    given: "POST /cancel with reason < 10 chars"
+    when: "cancel is attempted"
+    then: "error 400 (validation error from Zod)"
+    test_type: "integration"
+    priority: "P0"
+
+  # Role-Based Authorization
+  - id: "AC-16"
+    given: "user with 'Sales' role"
+    when: "calling POST /api/shipping/sales-orders/:id/hold"
+    then: "operation succeeds (200)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-17"
+    given: "user with 'Sales' role"
+    when: "calling POST /api/shipping/sales-orders/:id/cancel"
+    then: "error 403 'Insufficient permissions to cancel orders'"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-18"
+    given: "user with 'Manager' role"
+    when: "calling POST /api/shipping/sales-orders/:id/cancel"
+    then: "operation succeeds (200)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-19"
+    given: "user with 'Warehouse' role"
+    when: "calling POST /api/shipping/sales-orders/:id/cancel"
+    then: "error 403 'Insufficient permissions to cancel orders'"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Status Badge Display
+  - id: "AC-20"
+    given: "SO status 'on_hold'"
+    when: "SOStatusBadge renders"
+    then: "yellow badge with 'On Hold' text and PauseCircle icon"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-21"
+    given: "SO status 'cancelled'"
+    when: "SOStatusBadge renders"
+    then: "red badge with 'Cancelled' text and XCircle icon"
+    test_type: "unit"
+    priority: "P1"
+
+  # Status Timeline
+  - id: "AC-22"
+    given: "SO with 3 status changes"
+    when: "SOStatusTimeline renders"
+    then: "timeline displays all 3 statuses chronologically with timestamps and user names"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-23"
+    given: "SO with status 'cancelled'"
+    when: "SOStatusTimeline renders"
+    then: "cancelled status at bottom with red badge, no further statuses below"
+    test_type: "unit"
+    priority: "P1"
+
+  # Hold/Cancel Dialogs
+  - id: "AC-24"
+    given: "HoldOrderDialog with status 'draft'"
+    when: "dialog opens"
+    then: "hold button enabled, optional reason input shows"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-25"
+    given: "HoldOrderDialog with status 'allocated'"
+    when: "dialog opens"
+    then: "hold button disabled, error message 'Cannot hold order after allocation'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-26"
+    given: "CancelOrderDialog with status 'picking'"
+    when: "dialog opens"
+    then: "cancel button disabled, error message 'Cannot cancel order after picking'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-27"
+    given: "CancelOrderDialog with reason < 10 chars"
+    when: "user types short reason"
+    then: "validation error shown, submit button disabled"
+    test_type: "unit"
+    priority: "P1"
+
+  # Multi-Tenancy
+  - id: "AC-28"
+    given: "User from Org A, SO from Org B"
+    when: "POST /hold called for Org B SO"
+    then: "error 404 'Sales order not found' (RLS enforcement)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-29"
+    given: "User from Org A, SO from Org B"
+    when: "POST /cancel called for Org B SO"
+    then: "error 404 'Sales order not found' (RLS enforcement)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  sales_order_service:
+    - name: "holdOrder allows transition from draft"
+      setup: "Mock SO with status='draft'"
+      expected: "Returns SO with status='on_hold'"
+
+    - name: "holdOrder allows transition from confirmed"
+      setup: "Mock SO with status='confirmed'"
+      expected: "Returns SO with status='on_hold'"
+
+    - name: "holdOrder throws error for status='allocated'"
+      setup: "Mock SO with status='allocated'"
+      expected: "Throws Error('Cannot hold order after allocation has started')"
+
+    - name: "holdOrder appends reason to notes"
+      setup: "Mock SO, reason='Customer delay'"
+      expected: "notes contains '[HOLD - <timestamp>] Customer delay'"
+
+    - name: "holdOrder works without reason"
+      setup: "Mock SO, no reason provided"
+      expected: "notes not modified if no reason"
+
+    - name: "cancelOrder requires reason"
+      setup: "Mock SO, no reason provided"
+      expected: "Throws Error('Cancel reason is required')"
+
+    - name: "cancelOrder allows transition from draft"
+      setup: "Mock SO with status='draft', reason provided"
+      expected: "Returns SO with status='cancelled'"
+
+    - name: "cancelOrder allows transition from allocated"
+      setup: "Mock SO with status='allocated', reason provided"
+      expected: "Returns SO with status='cancelled'"
+
+    - name: "cancelOrder throws error for status='picking'"
+      setup: "Mock SO with status='picking'"
+      expected: "Throws Error('Cannot cancel order after picking has started')"
+
+    - name: "cancelOrder appends reason to notes"
+      setup: "Mock SO, reason='Customer cancelled'"
+      expected: "notes contains '[CANCELLED - <timestamp>] Customer cancelled'"
+
+  validation:
+    - name: "holdOrderSchema accepts optional reason"
+      input: "{ reason: 'Customer delay' }"
+      expected: "Validation passes"
+
+    - name: "holdOrderSchema accepts no reason"
+      input: "{}"
+      expected: "Validation passes"
+
+    - name: "cancelOrderSchema requires reason"
+      input: "{}"
+      expected: "Validation fails with 'reason' error"
+
+    - name: "cancelOrderSchema requires min 10 chars"
+      input: "{ reason: 'short' }"
+      expected: "Validation fails with 'at least 10 characters' error"
+
+    - name: "cancelOrderSchema accepts 10+ char reason"
+      input: "{ reason: 'Customer cancelled order' }"
+      expected: "Validation passes"
+
+  status_badge:
+    - name: "renders on_hold with yellow color"
+      props: "{ status: 'on_hold' }"
+      expected: "Badge has yellow background, 'On Hold' text, PauseCircle icon"
+
+    - name: "renders cancelled with red color"
+      props: "{ status: 'cancelled' }"
+      expected: "Badge has red background, 'Cancelled' text, XCircle icon"
+
+    - name: "renders confirmed with blue color"
+      props: "{ status: 'confirmed' }"
+      expected: "Badge has blue background, 'Confirmed' text, CheckCircle icon"
+
+  status_timeline:
+    - name: "displays status history chronologically"
+      props: "{ salesOrderId: 'uuid' }"
+      expected: "Timeline shows statuses in order, most recent at top"
+
+    - name: "shows user name for each status change"
+      data: "3 status changes by different users"
+      expected: "Each timeline entry shows 'Changed by [username]'"
+
+    - name: "shows cancelled as endpoint"
+      props: "{ salesOrderId: 'uuid' with status=cancelled }"
+      expected: "Cancelled shown at bottom with red badge"
+
+# Integration Test Cases
+integration_tests:
+  hold_endpoint:
+    - name: "POST /hold from draft to on_hold succeeds"
+      setup: "Authenticated manager user, SO with status='draft'"
+      action: "POST /api/shipping/sales-orders/:id/hold"
+      expected: "200 OK, SO.status='on_hold', SO.updated_at set"
+
+    - name: "POST /hold with reason appends to notes"
+      setup: "Manager user, SO status='draft', body has reason"
+      expected: "200 OK, notes field contains '[HOLD - <timestamp>] <reason>'"
+
+    - name: "POST /hold from allocated fails"
+      setup: "Manager user, SO status='allocated'"
+      expected: "400 Bad Request, message 'Cannot hold order after allocation'"
+
+    - name: "POST /hold requires role=Sales/Manager/Admin"
+      setup: "Viewer user"
+      expected: "403 Forbidden, message 'Insufficient permissions to hold orders'"
+
+    - name: "POST /hold enforces org isolation"
+      setup: "User from Org A, SO from Org B"
+      expected: "404 Not Found"
+
+  cancel_endpoint:
+    - name: "POST /cancel from draft to cancelled succeeds"
+      setup: "Authenticated manager user, SO status='draft', reason provided"
+      action: "POST /api/shipping/sales-orders/:id/cancel"
+      expected: "200 OK, SO.status='cancelled', SO.updated_at set"
+
+    - name: "POST /cancel requires reason"
+      setup: "Manager user, SO status='draft', no reason"
+      expected: "400 Bad Request, message 'Cancel reason is required'"
+
+    - name: "POST /cancel validates reason length"
+      setup: "Manager user, reason < 10 chars"
+      expected: "400 Bad Request (validation error)"
+
+    - name: "POST /cancel appends reason to notes"
+      setup: "Manager user, valid reason"
+      expected: "200 OK, notes contains '[CANCELLED - <timestamp>] <reason>'"
+
+    - name: "POST /cancel from picking fails"
+      setup: "Manager user, SO status='picking'"
+      expected: "400 Bad Request, message 'Cannot cancel order after picking'"
+
+    - name: "POST /cancel requires role=Manager/Admin"
+      setup: "Sales user"
+      expected: "403 Forbidden, message 'Insufficient permissions to cancel orders'"
+
+    - name: "POST /cancel enforces org isolation"
+      setup: "User from Org A, SO from Org B"
+      expected: "404 Not Found"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete hold workflow"
+    steps:
+      - "Login as Sales Manager"
+      - "Navigate to sales order detail page"
+      - "Click 'Hold Order' button"
+      - "Enter reason 'Awaiting customer confirmation'"
+      - "Click 'Confirm Hold'"
+    expected:
+      - "Success toast displayed"
+      - "Status badge updates to yellow 'On Hold'"
+      - "Status timeline shows new entry"
+      - "SO can be resumed (confirmed) or cancelled"
+
+  - name: "Complete cancel workflow"
+    steps:
+      - "Login as Manager"
+      - "Navigate to sales order detail page"
+      - "Click 'Cancel Order' button"
+      - "Enter reason 'Customer requested cancellation'"
+      - "Click 'Confirm Cancel'"
+    expected:
+      - "Confirmation modal shown ('Are you sure?')"
+      - "Success toast after confirmation"
+      - "Status badge updates to red 'Cancelled'"
+      - "Status timeline shows cancellation entry"
+
+  - name: "Invalid action prevented"
+    steps:
+      - "Login as Manager"
+      - "Navigate to SO with status='picking'"
+      - "Attempt to hold/cancel"
+    expected:
+      - "'Hold Order' button disabled with tooltip"
+      - "'Cancel Order' button disabled with tooltip"
+
+  - name: "Permission enforcement in UI"
+    steps:
+      - "Login as Sales role user"
+      - "Navigate to sales order detail page"
+    expected:
+      - "'Hold Order' button visible and enabled"
+      - "'Cancel Order' button hidden or disabled"
+
+# Definition of Done
+definition_of_done:
+  - "sales_order_status enum extended with 'on_hold' value"
+  - "Index created on (org_id, status, updated_at)"
+  - "POST /hold endpoint implemented with validation"
+  - "POST /cancel endpoint implemented with validation"
+  - "Status state machine enforced (valid transitions only)"
+  - "Role-based authorization enforced (Sales for hold, Manager+ for cancel)"
+  - "Reason tracking appended to notes with timestamp"
+  - "updated_at timestamp updated on status change"
+  - "SOStatusBadge component with 9 status colors"
+  - "SOStatusTimeline component showing status history"
+  - "HoldOrderDialog with optional reason input"
+  - "CancelOrderDialog with required reason input"
+  - "RLS policies enforce org isolation"
+  - "Multi-tenancy tested (cross-org returns 404)"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for both endpoints"
+  - "E2E tests for hold/cancel flows"
+  - "Toast notifications on success/error"
+  - "Permission matrix enforced in UI"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 85
+    reason: "Status workflow is critical for order management"
+  integration:
+    target: 90
+    reason: "API endpoints and permissions must be thoroughly tested"
+  files:
+    - "lib/services/sales-order-service.ts: 85%"
+    - "lib/validation/sales-order-schema.ts: 95%"
+    - "components/shipping/sales-orders/SOStatusBadge.tsx: 80%"
+    - "components/shipping/sales-orders/SOStatusTimeline.tsx: 85%"
+    - "components/shipping/sales-orders/HoldOrderDialog.tsx: 85%"
+    - "components/shipping/sales-orders/CancelOrderDialog.tsx: 85%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Invalid state transitions could corrupt order workflow"
+    mitigation: "Comprehensive state machine tests, transition matrix validation"
+    severity: "high"
+    test_coverage: "integration_tests.hold_endpoint, integration_tests.cancel_endpoint"
+
+  - id: "RISK-02"
+    description: "RLS policy could leak cross-org orders"
+    mitigation: "Multi-org integration tests verify isolation"
+    severity: "critical"
+    test_coverage: "integration_tests (org isolation test cases)"
+
+  - id: "RISK-03"
+    description: "Permission bypass if role check missing in API"
+    mitigation: "Integration tests for each role + permission matrix tests"
+    severity: "high"
+    test_coverage: "integration_tests (role-based authorization)"
+
+  - id: "RISK-04"
+    description: "Data loss if notes field overwritten instead of appended"
+    mitigation: "Unit tests verify notes append with timestamp"
+    severity: "medium"
+    test_coverage: "unit_tests.sales_order_service"

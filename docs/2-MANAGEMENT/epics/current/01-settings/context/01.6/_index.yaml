@@ -1,0 +1,101 @@
+# Story 01.6 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.6"
+  name: "Role-Based Permissions (10 Roles)"
+  slug: "role-permissions"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # roles table with permissions JSONB
+  - api.yaml         # Permission enforcement endpoints
+  - frontend.yaml    # Role selector, permission hooks
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "users table with role_id FK"
+        - "getOrgContext() helper"
+        - "RLS policy pattern (ADR-013)"
+  blocks:
+    - story: "01.2"
+      name: "Settings Shell Navigation"
+      reason: "Navigation needs permission filtering"
+    - story: "01.5"
+      name: "Users CRUD"
+      reason: "User management needs role assignment"
+    - story: "01.7"
+      name: "Module Toggles"
+      reason: "Only admin can toggle modules"
+    - story: "All Settings Stories"
+      name: "Permission enforcement required everywhere"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-011", "FR-SET-020-029", "FR-SET-030", "FR-SET-031"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["roles table", "RLS Policies", "Permission Checks"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.6.role-permissions.md"
+  ux_wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/SET-011-role-selector.md"
+      description: "Role dropdown in user modal"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+      relevance: "PRIMARY - Defines roles table with JSONB permissions"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for roles table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "roles table + seed 10 system roles"
+  - type: "service"
+    count: 1
+    description: "permission-service.ts"
+  - type: "api"
+    count: 1
+    description: "GET /api/settings/roles"
+  - type: "hook"
+    count: 1
+    description: "usePermissions hook"
+  - type: "component"
+    count: 2
+    description: "RoleSelector, PermissionGuard"
+  - type: "middleware"
+    count: 1
+    description: "requirePermission middleware"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + permission enforcement tests"
+
+# Technical notes
+technical_notes:
+  - "10 system roles with fixed permissions (not editable)"
+  - "JSONB permissions: { module: 'CRUD' | 'CRU' | 'RU' | 'CR' | 'R' | '-' }"
+  - "Permission matrix covers 12 modules (8 core + 4 premium: settings, users, technical, planning, production, quality, warehouse, shipping, npd, finance, oee, integrations)"
+  - "Role codes use lowercase snake_case per ADR-012 (owner, admin, production_manager, etc.)"
+  - "hasPermission() checks: module + action (C|R|U|D)"
+  - "requirePermission() middleware for API routes"
+  - "usePermissions() hook for UI conditional rendering"
+  - "Only owner can assign owner role (privilege escalation prevention)"
+  - "Role changes take effect immediately (<1 min cache)"
+  - "ADR-012: JSONB permissions more flexible than role_module_permissions junction"

@@ -1,0 +1,21 @@
+# Story 01.2 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This is a frontend-only story. No database changes required.
+no_database_changes: true
+
+# Tables consumed (from 01.1)
+tables_consumed:
+  - name: "users"
+    usage: "Get current user's role_id"
+    operations: ["SELECT"]
+  - name: "roles"
+    usage: "Get role permissions for navigation filtering"
+    operations: ["SELECT"]
+  - name: "organization_modules"
+    usage: "Get enabled modules for navigation filtering"
+    operations: ["SELECT"]
+
+# No migrations for this story
+migrations: []

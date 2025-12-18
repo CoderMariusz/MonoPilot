@@ -1,0 +1,560 @@
+# Story 05.12 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # Main endpoint: Create GRN from TO
+  - method: "POST"
+    path: "/api/warehouse/grns/from-to/:toId"
+    description: "Create GRN from Transfer Order - receive goods at destination warehouse"
+    file: "apps/frontend/app/api/warehouse/grns/from-to/[toId]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    params:
+      toId:
+        type: "UUID"
+        description: "Transfer Order ID to receive from"
+        validation: "Must exist, status IN ['shipped', 'partial'], user has access"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        warehouse_id:
+          type: "UUID"
+          required: true
+          description: "Receiving warehouse ID - must match TO.to_warehouse_id"
+        location_id:
+          type: "UUID"
+          required: true
+          description: "Default receiving location"
+        notes:
+          type: "string"
+          required: false
+          max_length: 2000
+          description: "Optional GRN notes"
+        items:
+          type: "array"
+          required: true
+          min_items: 1
+          max_items: 100
+          description: "Line items to receive"
+          item_schema:
+            to_line_id:
+              type: "UUID"
+              required: true
+              description: "TO line ID to receive"
+            received_qty:
+              type: "number"
+              required: true
+              min: 0.0001
+              max: 999999999
+              description: "Quantity being received"
+            variance_reason:
+              type: "string"
+              required: "conditional"
+              condition: "Required if received_qty != shipped_qty - sum(previous_received_qty)"
+              max_length: 500
+              description: "Reason for variance"
+            batch_number:
+              type: "string"
+              required: "conditional"
+              condition: "Required if warehouse_settings.require_batch_on_receipt = true"
+              max_length: 100
+            supplier_batch_number:
+              type: "string"
+              required: false
+              max_length: 100
+              description: "Source warehouse batch number if different"
+            expiry_date:
+              type: "string"
+              required: "conditional"
+              condition: "Required if warehouse_settings.require_expiry_on_receipt = true"
+              format: "YYYY-MM-DD"
+            manufacture_date:
+              type: "string"
+              required: false
+              format: "YYYY-MM-DD"
+            location_id:
+              type: "UUID"
+              required: false
+              description: "Override default location for this line"
+            notes:
+              type: "string"
+              required: false
+              max_length: 500
+
+    response:
+      success:
+        status: 201
+        body:
+          grn:
+            id: "UUID"
+            grn_number: "string (GRN-YYYY-NNNNN)"
+            source_type: "'to'"
+            to_id: "UUID"
+            from_warehouse_id: "UUID"
+            to_warehouse_id: "UUID"
+            receipt_date: "ISO8601 datetime"
+            warehouse_id: "UUID"
+            location_id: "UUID"
+            status: "'completed'"
+            notes: "string | null"
+            created_at: "ISO8601 datetime"
+            received_by: "UUID"
+          items:
+            type: "array"
+            item:
+              id: "UUID"
+              product_id: "UUID"
+              product_name: "string"
+              shipped_qty: "number"
+              received_qty: "number"
+              variance_qty: "number (shipped - received)"
+              variance_reason: "string | null"
+              uom: "string"
+              lp_id: "UUID"
+              lp_number: "string"
+              batch_number: "string | null"
+              expiry_date: "string | null"
+              location_id: "UUID"
+              qa_status: "string"
+          to_status: "string (updated TO status)"
+          variances:
+            type: "array"
+            description: "Lines with variance"
+            item:
+              to_line_id: "UUID"
+              product_name: "string"
+              shipped_qty: "number"
+              received_qty: "number"
+              variance_qty: "number"
+              variance_pct: "number"
+
+    errors:
+      - status: 400
+        code: "INVALID_TO_STATUS"
+        message: "Cannot receive from TO with status '{status}'. TO must be shipped or partial."
+        when: "TO status not in ['shipped', 'partial']"
+      - status: 400
+        code: "WAREHOUSE_MISMATCH"
+        message: "Receipt must occur at destination warehouse ({expected_warehouse_name})"
+        when: "warehouse_id != TO.to_warehouse_id"
+      - status: 400
+        code: "VARIANCE_REASON_REQUIRED"
+        message: "Variance reason required for line {line_number} ({product_name}). Shipped: {shipped_qty}, Received: {received_qty}"
+        when: "received_qty != remaining_qty and no variance_reason"
+      - status: 400
+        code: "OVER_RECEIPT"
+        message: "Cannot receive more than shipped quantity. Shipped: {shipped_qty}, Already received: {already_received}, Attempting: {receive_qty}"
+        when: "total received would exceed shipped"
+      - status: 400
+        code: "BATCH_REQUIRED"
+        message: "Batch number required for receipt"
+        when: "warehouse_settings.require_batch_on_receipt = true and batch_number missing"
+      - status: 400
+        code: "EXPIRY_REQUIRED"
+        message: "Expiry date required for receipt"
+        when: "warehouse_settings.require_expiry_on_receipt = true and expiry_date missing"
+      - status: 400
+        code: "INVALID_TO_LINE"
+        message: "TO line {to_line_id} not found or does not belong to this TO"
+        when: "Invalid to_line_id"
+      - status: 400
+        code: "LOCATION_INVALID"
+        message: "Location {location_id} not found or not in destination warehouse"
+        when: "Invalid location"
+      - status: 404
+        code: "TO_NOT_FOUND"
+        message: "Transfer order not found"
+        when: "TO not found or belongs to different org (404 for security)"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT"
+      - status: 500
+        code: "TRANSACTION_FAILED"
+        message: "Failed to create GRN. Transaction rolled back."
+        when: "Database transaction failed"
+
+  # Supporting endpoint: Get pending TOs for receipt
+  - method: "GET"
+    path: "/api/warehouse/receiving/pending-tos"
+    description: "List Transfer Orders available for receipt at destination warehouse"
+    file: "apps/frontend/app/api/warehouse/receiving/pending-tos/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner", "viewer"]
+
+    query_params:
+      warehouse_id:
+        type: "UUID"
+        required: false
+        description: "Filter by destination warehouse"
+      page:
+        type: "number"
+        default: 1
+      limit:
+        type: "number"
+        default: 20
+        max: 100
+      search:
+        type: "string"
+        required: false
+        description: "Search by TO number or source warehouse name"
+
+    response:
+      success:
+        status: 200
+        body:
+          data:
+            type: "array"
+            item:
+              to_id: "UUID"
+              to_number: "string"
+              from_warehouse:
+                id: "UUID"
+                name: "string"
+                code: "string"
+              to_warehouse:
+                id: "UUID"
+                name: "string"
+                code: "string"
+              status: "string ('shipped' | 'partial')"
+              shipped_date: "ISO8601 date"
+              items_count: "number"
+              remaining_items_count: "number"
+          pagination:
+            page: "number"
+            limit: "number"
+            total: "number"
+            total_pages: "number"
+
+  # Supporting endpoint: Get TO lines for receipt wizard
+  - method: "GET"
+    path: "/api/warehouse/receiving/to/:toId/lines"
+    description: "Get TO lines with shipped/received quantities for receipt wizard"
+    file: "apps/frontend/app/api/warehouse/receiving/to/[toId]/lines/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner", "viewer"]
+
+    params:
+      toId:
+        type: "UUID"
+        description: "Transfer Order ID"
+
+    response:
+      success:
+        status: 200
+        body:
+          to:
+            id: "UUID"
+            to_number: "string"
+            status: "string"
+            from_warehouse:
+              id: "UUID"
+              code: "string"
+              name: "string"
+            to_warehouse:
+              id: "UUID"
+              code: "string"
+              name: "string"
+            actual_ship_date: "ISO8601 date | null"
+            transit_location_enabled: "boolean"
+            transit_location:
+              id: "UUID | null"
+              code: "string | null"
+              name: "string | null"
+          lines:
+            type: "array"
+            item:
+              to_line_id: "UUID"
+              line_number: "number"
+              product:
+                id: "UUID"
+                code: "string"
+                name: "string"
+              requested_qty: "number"
+              shipped_qty: "number"
+              received_qty: "number"
+              remaining_qty: "number (shipped - received)"
+              uom: "string"
+              transit_lp_ids: "UUID[] (LPs in transit location)"
+              transit_lp_numbers: "string[]"
+          default_location:
+            id: "UUID"
+            code: "string"
+            name: "string"
+          settings:
+            require_batch_on_receipt: "boolean"
+            require_expiry_on_receipt: "boolean"
+            default_qa_status: "string"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/grn-service.ts"
+    description: "GRN service - extend with TO receipt methods"
+    methods:
+      - name: "createFromTO"
+        type: "async static method"
+        params:
+          - "input: CreateGRNFromTOInput"
+        returns: "Promise<GRN>"
+        description: |
+          Create GRN from Transfer Order:
+          1. Validate TO status (shipped/partial) and destination warehouse
+          2. Validate all line items
+          3. Check variance reasons if needed
+          4. Begin transaction
+          5. Create GRN header (source_type='to', to_id)
+          6. For each line: create/move LP, create grn_item, update to_line.received_qty
+          7. Update TO status (partial/received)
+          8. Commit transaction
+          9. Return created GRN with items
+
+      - name: "validateTOReceipt"
+        type: "async static method"
+        params:
+          - "input: CreateGRNFromTOInput"
+        returns: "Promise<GRNValidationResult>"
+        description: "Pre-validation before commit - returns errors and warnings"
+
+      - name: "handleTransitLP"
+        type: "async static method"
+        params:
+          - "toLineId: string"
+          - "warehouseId: string"
+          - "locationId: string"
+          - "transitEnabled: boolean"
+        returns: "Promise<string>"
+        description: "If transit enabled, move existing LP. If disabled, create new LP. Returns LP ID."
+
+      - name: "calculateTOVariance"
+        type: "async static method"
+        params:
+          - "toLineId: string"
+          - "receivedQty: number"
+        returns: "Promise<TOVariance>"
+        description: "Calculate variance between shipped and received quantities"
+
+      - name: "getReceivableTOs"
+        type: "async static method"
+        params:
+          - "warehouseId?: string"
+          - "page?: number"
+          - "limit?: number"
+          - "search?: string"
+        returns: "Promise<PaginatedResult<TransferOrder>>"
+        description: "Get TOs with status in [shipped, partial] for receipt"
+
+      - name: "getTOLinesForReceipt"
+        type: "async static method"
+        params:
+          - "toId: string"
+        returns: "Promise<TOLineWithReceived[]>"
+        description: "Get TO lines with current shipped/received quantities"
+
+      - name: "updateTOStatus"
+        type: "async static method"
+        params:
+          - "toId: string"
+        returns: "Promise<void>"
+        description: "Update TO status based on line receipt status"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/grn.ts"
+    description: "GRN types - extend for TO receipt"
+    exports:
+      - name: "CreateGRNFromTOInput"
+        fields:
+          - "toId: string"
+          - "warehouseId: string"
+          - "locationId: string"
+          - "notes?: string"
+          - "items: CreateGRNFromTOItemInput[]"
+      - name: "CreateGRNFromTOItemInput"
+        fields:
+          - "toLineId: string"
+          - "receivedQty: number"
+          - "varianceReason?: string"
+          - "batchNumber?: string"
+          - "supplierBatchNumber?: string"
+          - "expiryDate?: string"
+          - "manufactureDate?: string"
+          - "locationId?: string"
+          - "notes?: string"
+      - name: "TOVariance"
+        fields:
+          - "toLineId: string"
+          - "productName: string"
+          - "shippedQty: number"
+          - "receivedQty: number"
+          - "varianceQty: number"
+          - "variancePct: number"
+      - name: "TOLineWithReceived"
+        fields:
+          - "toLineId: string"
+          - "lineNumber: number"
+          - "product: { id: string; code: string; name: string }"
+          - "requestedQty: number"
+          - "shippedQty: number"
+          - "receivedQty: number"
+          - "remainingQty: number"
+          - "uom: string"
+          - "transitLpIds: string[]"
+          - "transitLpNumbers: string[]"
+
+# Validation schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/grn.ts"
+    description: "GRN validation schemas - extend for TO receipt"
+    schemas:
+      createGRNItemFromTOSchema: |
+        z.object({
+          to_line_id: z.string().uuid("Invalid TO line ID"),
+          received_qty: z.number()
+            .positive("Received quantity must be positive")
+            .max(999999999, "Quantity too large"),
+          variance_reason: z.string()
+            .max(500, "Variance reason max 500 characters")
+            .nullable()
+            .optional(),
+          batch_number: z.string()
+            .max(100, "Batch number max 100 characters")
+            .nullable()
+            .optional(),
+          supplier_batch_number: z.string()
+            .max(100, "Supplier batch number max 100 characters")
+            .nullable()
+            .optional(),
+          expiry_date: z.string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
+            .nullable()
+            .optional(),
+          manufacture_date: z.string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
+            .nullable()
+            .optional(),
+          location_id: z.string().uuid("Invalid location ID").optional(),
+          notes: z.string().max(500).nullable().optional(),
+        })
+
+      createGRNFromTOSchema: |
+        z.object({
+          warehouse_id: z.string().uuid("Invalid warehouse ID"),
+          location_id: z.string().uuid("Invalid location ID"),
+          notes: z.string().max(2000).optional(),
+          items: z.array(createGRNItemFromTOSchema)
+            .min(1, "At least one item required")
+            .max(100, "Maximum 100 items per GRN"),
+        })
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/warehouse/grns/from-to/[toId]/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { GRNService } from '@/lib/services/grn-service';
+    import { createGRNFromTOSchema } from '@/lib/validation/grn';
+
+    export async function POST(
+      request: NextRequest,
+      { params }: { params: { toId: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      try {
+        const body = await request.json();
+        const validated = createGRNFromTOSchema.parse(body);
+
+        const grn = await GRNService.createFromTO({
+          toId: params.toId,
+          warehouseId: validated.warehouse_id,
+          locationId: validated.location_id,
+          notes: validated.notes,
+          items: validated.items.map(item => ({
+            toLineId: item.to_line_id,
+            receivedQty: item.received_qty,
+            varianceReason: item.variance_reason,
+            batchNumber: item.batch_number,
+            supplierBatchNumber: item.supplier_batch_number,
+            expiryDate: item.expiry_date,
+            manufactureDate: item.manufacture_date,
+            locationId: item.location_id,
+            notes: item.notes,
+          })),
+        });
+
+        return NextResponse.json(grn, { status: 201 });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return NextResponse.json({
+            error: 'VALIDATION_ERROR',
+            details: error.errors,
+          }, { status: 400 });
+        }
+
+        if (error.code === 'TO_NOT_FOUND') {
+          return NextResponse.json({ error: error.message }, { status: 404 });
+        }
+
+        if (error.code) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
+
+  transaction_pattern: |
+    // Transaction handling in GRNService.createFromTO()
+    const { data, error } = await supabase.rpc('create_grn_from_to', {
+      p_to_id: input.toId,
+      p_warehouse_id: input.warehouseId,
+      p_location_id: input.locationId,
+      p_notes: input.notes,
+      p_items: JSON.stringify(input.items),
+      p_user_id: userId
+    });
+
+    // OR use supabase transaction helper
+    const result = await supabase.transaction(async (tx) => {
+      // 1. Validate TO
+      const to = await tx.from('transfer_orders')
+        .select('*')
+        .eq('id', input.toId)
+        .single();
+
+      if (!to || !['shipped', 'partial'].includes(to.status)) {
+        throw { code: 'INVALID_TO_STATUS', message: '...' };
+      }
+
+      // 2. Validate warehouse
+      if (to.to_warehouse_id !== input.warehouseId) {
+        throw { code: 'WAREHOUSE_MISMATCH', message: '...' };
+      }
+
+      // 3. Create GRN
+      const grn = await tx.from('grns').insert({...}).select().single();
+
+      // 4. Process each line
+      for (const item of input.items) {
+        // Create/move LP
+        // Create grn_item
+        // Update to_line.received_qty
+      }
+
+      // 5. Update TO status
+      await updateTOStatus(tx, input.toId);
+
+      return grn;
+    });

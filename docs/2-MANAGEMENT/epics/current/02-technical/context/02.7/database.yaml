@@ -1,0 +1,193 @@
+# Story 02.7 - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers
+# Agent: BACKEND-DEV (database focus)
+
+# Note: Routings table already exists from migrations 043, 044
+# This story uses existing schema - no new migrations needed
+
+existing_migrations:
+  - path: "supabase/migrations/043_add_routing_costs.sql"
+    description: "Added routing cost fields (setup_cost, working_cost_per_unit, overhead_percent, currency)"
+  - path: "supabase/migrations/044_add_routing_fields.sql"
+    description: "Added routing.code, routing.is_reusable fields"
+
+tables:
+  - name: "routings"
+    description: "Production routing templates with cost configuration (ADR-009)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "NOT NULL", description: "Unique routing identifier (e.g., RTG-BREAD-01)" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL", description: "Descriptive routing name" }
+      - { name: "description", type: "TEXT", constraints: "", description: "Optional description" }
+      - { name: "version", type: "INTEGER", constraints: "DEFAULT 1", description: "Auto-increment on edit via trigger" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true", description: "Active = can be assigned to BOMs" }
+      - { name: "is_reusable", type: "BOOLEAN", constraints: "DEFAULT true", description: "Reusable = can be shared across multiple products/BOMs" }
+      - { name: "setup_cost", type: "DECIMAL(10,2)", constraints: "DEFAULT 0", description: "Fixed cost per routing run (ADR-009)" }
+      - { name: "working_cost_per_unit", type: "DECIMAL(10,4)", constraints: "DEFAULT 0", description: "Variable cost per output unit (ADR-009)" }
+      - { name: "overhead_percent", type: "DECIMAL(5,2)", constraints: "DEFAULT 0", description: "Factory overhead % (ADR-009)" }
+      - { name: "currency", type: "TEXT", constraints: "DEFAULT 'PLN'", description: "Currency for cost fields (ADR-009)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_routings_org_code ON routings(org_id, code)"
+      - "idx_routings_org_active ON routings(org_id, is_active)"
+      - "idx_routings_org_name ON routings(org_id, name)"
+    constraints:
+      - "UNIQUE(org_id, code)"
+      - "UNIQUE(org_id, name, version)"
+      - "CHECK (overhead_percent >= 0 AND overhead_percent <= 100)"
+      - "CHECK (setup_cost >= 0)"
+      - "CHECK (working_cost_per_unit >= 0)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    - table: "routings"
+      name: "routings_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only read routings from their organization"
+
+    - table: "routings"
+      name: "routings_admin_write"
+      operation: "INSERT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only create routings in their organization"
+
+    - table: "routings"
+      name: "routings_admin_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only update routings in their organization"
+
+    - table: "routings"
+      name: "routings_admin_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only delete routings in their organization"
+
+# Triggers
+triggers:
+  - name: "routing_version_increment"
+    table: "routings"
+    event: "BEFORE UPDATE"
+    description: "Auto-increment version on edit of key fields"
+    function: "increment_routing_version"
+    sql: |
+      CREATE OR REPLACE FUNCTION increment_routing_version()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF OLD.name != NEW.name
+           OR OLD.description IS DISTINCT FROM NEW.description
+           OR OLD.is_active != NEW.is_active
+           OR OLD.is_reusable != NEW.is_reusable
+           OR OLD.setup_cost IS DISTINCT FROM NEW.setup_cost
+           OR OLD.working_cost_per_unit IS DISTINCT FROM NEW.working_cost_per_unit
+           OR OLD.overhead_percent IS DISTINCT FROM NEW.overhead_percent
+        THEN
+          NEW.version = OLD.version + 1;
+        END IF;
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER routing_version_increment
+      BEFORE UPDATE ON routings
+      FOR EACH ROW EXECUTE FUNCTION increment_routing_version();
+
+# Related Tables (for reference, not modified in this story)
+related_tables:
+  - name: "boms"
+    relationship: "boms.routing_id -> routings.id"
+    description: "BOMs reference routings via FK (ON DELETE SET NULL)"
+    impact: "Delete routing sets bom.routing_id to NULL"
+
+  - name: "routing_operations"
+    relationship: "routing_operations.routing_id -> routings.id"
+    description: "Operations belong to routings (ON DELETE CASCADE)"
+    impact: "Delete routing cascades to delete all operations"
+
+# Data Validation Rules
+validation_rules:
+  code:
+    - "Required"
+    - "Min 2 characters, max 50 characters"
+    - "Uppercase alphanumeric + hyphens only: ^[A-Z0-9-]+$"
+    - "Unique per organization"
+    - "Auto-transform to uppercase on insert/update"
+
+  name:
+    - "Required"
+    - "Min 3 characters, max 100 characters"
+
+  description:
+    - "Optional"
+    - "Max 500 characters"
+
+  is_active:
+    - "Boolean, default true"
+    - "Inactive routings cannot be assigned to new BOMs"
+
+  is_reusable:
+    - "Boolean, default true"
+    - "If false, routing is product-specific (1:1 with BOM)"
+
+  setup_cost:
+    - "Decimal(10,2), default 0"
+    - "Must be >= 0"
+    - "Fixed cost per routing run"
+
+  working_cost_per_unit:
+    - "Decimal(10,4), default 0"
+    - "Must be >= 0"
+    - "Variable cost per output unit"
+
+  overhead_percent:
+    - "Decimal(5,2), default 0"
+    - "Must be between 0 and 100"
+    - "Factory overhead percentage"
+
+  currency:
+    - "Text, default 'PLN'"
+    - "Enum: PLN, EUR, USD, GBP"
+
+# Business Rules
+business_rules:
+  - id: "BR-01"
+    rule: "Code uniqueness"
+    description: "Routing code must be unique within organization"
+    enforcement: "Database UNIQUE constraint + API validation"
+
+  - id: "BR-02"
+    rule: "Version auto-increment"
+    description: "Version increments on edit of name, description, is_active, is_reusable, or cost fields"
+    enforcement: "Database trigger"
+
+  - id: "BR-03"
+    rule: "Inactive routing restriction"
+    description: "Inactive routings cannot be assigned to new BOMs"
+    enforcement: "API validation on BOM create/update"
+
+  - id: "BR-04"
+    rule: "Delete cascading"
+    description: "Deleting routing sets bom.routing_id to NULL, deletes all routing_operations"
+    enforcement: "Database FK constraints"
+
+  - id: "BR-05"
+    rule: "Clone behavior"
+    description: "Clone creates new routing with code + '-COPY' suffix and copies all operations"
+    enforcement: "API service logic"

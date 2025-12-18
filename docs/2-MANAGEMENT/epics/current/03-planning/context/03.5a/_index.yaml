@@ -1,0 +1,94 @@
+# Story 03.5a - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.5a"
+  name: "PO Approval Setup (Basic CRUD)"
+  slug: "po-approval-setup"
+  epic: "03-planning"
+  phase: "1"
+  complexity: "S"
+  estimate_days: 2
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, types, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "roles table"]
+    - story: "03.3"
+      name: "PO CRUD + Lines"
+      provides: ["purchase_orders table", "PO service patterns"]
+  soft:
+    - story: "01.10"
+      name: "Roles CRUD"
+      provides: ["roles dropdown data"]
+    - story: "03.16"
+      name: "Planning Settings CRUD"
+      provides: ["planning_settings table foundation"]
+  blocked_by: []
+  blocks:
+    - story: "03.5b"
+      name: "PO Approval Workflow"
+      reason: "Reads approval settings configured here"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-009"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["planning_settings table"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.5a.po-approval-setup.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-008-po-approval-modal.md"
+      relevance: "UX patterns for approval workflow (future reference)"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for planning_settings"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "YAML context structure pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add PO approval columns to planning_settings table"
+  - type: "api"
+    count: 2
+    description: "GET/PUT /api/settings/planning"
+  - type: "service"
+    count: 1
+    description: "planning-settings-service.ts"
+  - type: "validation"
+    count: 1
+    description: "planning-settings-schema.ts (Zod)"
+  - type: "component"
+    count: 2
+    description: "POApprovalSettings.tsx, PlanningSettingsForm.tsx"
+  - type: "test"
+    count: 3
+    description: "Unit + API + component tests"
+
+# Technical notes
+technical_notes:
+  - "Settings singleton per org (UNIQUE constraint on org_id)"
+  - "Auto-create default settings on first GET if not exists"
+  - "Roles stored as TEXT[] PostgreSQL array, not JSONB"
+  - "Threshold validation: positive number, max 4 decimal places"
+  - "Admin-only access enforced via RLS and permission check"
+  - "Story 03.5b will consume these settings for actual approval workflow"

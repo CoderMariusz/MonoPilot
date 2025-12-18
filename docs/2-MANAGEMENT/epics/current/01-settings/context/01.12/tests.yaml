@@ -1,0 +1,220 @@
+# Story 01.12 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/allergen-service.test.ts"
+    type: "unit"
+    description: "Unit tests for allergen service methods"
+  - path: "apps/frontend/app/api/v1/settings/allergens/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for allergen API endpoints"
+  - path: "apps/frontend/e2e/settings/allergens.spec.ts"
+    type: "e2e"
+    description: "E2E tests for allergen list flows"
+
+# Acceptance Criteria (key examples from flat file)
+acceptance_criteria:
+  allergen_list_page:
+    - id: "AC-AL-01"
+      given: "authenticated user navigates to /settings/allergens"
+      when: "page loads"
+      then: "allergen list displays 14 EU allergens within 200ms"
+      priority: "P0"
+
+    - id: "AC-AL-02"
+      given: "allergen list displayed"
+      when: "columns rendered"
+      then: "columns show: Code, Icon, Name (current language), Name EN, Name PL, Status"
+      priority: "P0"
+
+    - id: "AC-AL-03"
+      given: "allergen list displayed"
+      when: "allergens rendered"
+      then: "sorted by display_order (A01 first, A14 last)"
+      priority: "P0"
+
+  allergen_search:
+    - id: "AC-AS-01"
+      given: "allergen list displayed"
+      when: "user searches 'milk'"
+      then: "A07 (Milk/Mleko) displays within 100ms"
+      priority: "P0"
+
+    - id: "AC-AS-02"
+      given: "allergen list displayed"
+      when: "user searches 'orzechy' (Polish for nuts)"
+      then: "A08 Nuts displays"
+      priority: "P1"
+
+    - id: "AC-AS-03"
+      given: "allergen list displayed"
+      when: "user types in search box"
+      then: "search filters across code AND all language name fields"
+      priority: "P0"
+
+  allergen_icons:
+    - id: "AC-AI-01"
+      given: "allergen list displayed"
+      when: "icon column rendered"
+      then: "each allergen shows its unique icon at 24x24 size"
+      priority: "P0"
+
+    - id: "AC-AI-02"
+      given: "allergen icon not available (icon_url is null)"
+      when: "row rendered"
+      then: "placeholder icon (warning triangle or generic allergen icon) displays"
+      priority: "P1"
+
+  read_only_mode:
+    - id: "AC-RO-01"
+      given: "user is SUPER_ADMIN"
+      when: "viewing allergen list"
+      then: "no Add/Edit/Delete buttons visible (read-only)"
+      priority: "P0"
+
+    - id: "AC-RO-02"
+      given: "user attempts to POST /api/v1/settings/allergens"
+      when: "request processed"
+      then: "405 Method Not Allowed returned"
+      priority: "P0"
+
+    - id: "AC-RO-03"
+      given: "allergen list page"
+      when: "rendered"
+      then: "info banner displays: 'EU-mandated allergens are system-managed. Contact support for custom allergen requests.'"
+      priority: "P1"
+
+  multi_language_display:
+    - id: "AC-ML-01"
+      given: "allergen list displayed"
+      when: "user hovers over allergen row"
+      then: "tooltip shows all available translations: EN, PL, DE, FR"
+      priority: "P1"
+
+    - id: "AC-ML-02"
+      given: "allergen used in product form (Technical module)"
+      when: "allergen selector rendered"
+      then: "allergen displays in user's language preference with code prefix"
+      priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  allergen_service:
+    - name: "getAllergens() returns all 14 EU allergens"
+      expected: "14 allergens returned"
+
+    - name: "getAllergenById() returns single allergen"
+      expected: "Allergen object returned"
+
+    - name: "getAllergenByCode('A01') returns Gluten"
+      expected: "Gluten allergen returned"
+
+    - name: "searchAllergens('milk') returns A07"
+      expected: "Milk allergen in results"
+
+    - name: "getName(allergen, 'pl') returns Polish name"
+      expected: "Polish name returned"
+
+    - name: "getName(allergen, 'invalid') falls back to English"
+      expected: "English name returned"
+
+    - name: "getAllergensForSelect() returns 14 select options"
+      expected: "14 options with value, label, code, icon_url"
+
+  allergen_icon:
+    - name: "AllergenIcon renders SVG when icon_url provided"
+      expected: "SVG rendered"
+
+    - name: "AllergenIcon renders fallback when icon_url is null"
+      expected: "Fallback icon rendered"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/v1/settings/allergens returns all 14 allergens"
+      test_id: "IT-01"
+      expected: "14 allergens in response"
+
+    - name: "GET /api/v1/settings/allergens?search=gluten returns A01"
+      test_id: "IT-02"
+      expected: "Gluten in results"
+
+    - name: "GET /api/v1/settings/allergens/:id (valid) returns allergen detail"
+      test_id: "IT-04"
+      expected: "Allergen object returned"
+
+    - name: "POST /api/v1/settings/allergens returns 405 Method Not Allowed"
+      test_id: "IT-06"
+      expected: "405 status code"
+
+    - name: "Response includes all language fields (name_en, name_pl, name_de, name_fr)"
+      test_id: "IT-10"
+      expected: "All language fields present"
+
+    - name: "Response ordered by display_order (A01 first, A14 last)"
+      test_id: "IT-11"
+      expected: "Correct order"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Navigate to allergens page, verify 14 allergens displayed"
+    test_id: "E2E-01"
+    steps:
+      - "Navigate to /settings/allergens"
+      - "Wait for page load"
+    expected: "14 rows in table"
+
+  - name: "Search for 'milk', verify A07 filtered and shown"
+    test_id: "E2E-02"
+    steps:
+      - "Enter 'milk' in search"
+      - "Wait for results"
+    expected: "Only A07 Milk shown"
+
+  - name: "Verify all icons load (no broken images)"
+    test_id: "E2E-05"
+    expected: "All 14 icons visible or fallback shown"
+
+  - name: "Hover row, verify multi-language tooltip shows"
+    test_id: "E2E-06"
+    expected: "Tooltip with 4 translations visible"
+
+  - name: "Verify read-only banner visible"
+    test_id: "E2E-07"
+    expected: "Banner displayed"
+
+  - name: "Verify no edit/delete buttons present"
+    test_id: "E2E-08"
+    expected: "No edit/delete UI elements"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates allergens table with all constraints"
+  - "Seed migration populates 14 EU allergens with all 4 language translations"
+  - "RLS policy allows authenticated read access"
+  - "API endpoint GET /api/v1/settings/allergens returns all 14 allergens"
+  - "POST/PUT/DELETE endpoints return 405 Method Not Allowed"
+  - "allergen-service.ts with all read methods (list, get, search, select options)"
+  - "Allergens list page displays 14 items sorted by display_order"
+  - "Search filters across code and all language name fields"
+  - "Allergen icons display with fallback for missing icons"
+  - "Multi-language tooltip on row hover"
+  - "Read-only info banner displayed"
+  - "Page loads within 200ms"
+  - "Unit tests for allergen-service (>80% coverage)"
+  - "Integration tests for API endpoints"
+  - "E2E tests for critical flows"
+  - "Allergen icons added to /public/icons/allergens/ directory (14 SVG files)"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/allergen-service.ts: 80%"
+  integration:
+    target: 80
+    files:
+      - "app/api/v1/settings/allergens/route.ts: 80%"

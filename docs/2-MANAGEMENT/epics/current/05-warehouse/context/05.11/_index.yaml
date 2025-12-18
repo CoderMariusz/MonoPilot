@@ -1,0 +1,175 @@
+# Story 05.11 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.11"
+  name: "GRN from PO (Create LPs)"
+  slug: "grn-from-po"
+  epic: "05-warehouse"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 5
+  type: "full-stack"
+  state: "ready"
+  model: "OPUS"
+
+# Files in this context folder
+context_files:
+  - _index.yaml       # This file - metadata, dependencies
+  - database.yaml     # Tables, RLS, indexes, functions
+  - api.yaml          # Endpoints, request/response, validation
+  - frontend.yaml     # Pages, components, wizard flow
+  - tests.yaml        # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides:
+        - "warehouse_settings table"
+        - "allow_over_receipt setting"
+        - "over_receipt_tolerance_pct setting"
+        - "require_batch_on_receipt setting"
+        - "require_expiry_on_receipt setting"
+        - "default_qa_status setting"
+        - "auto_generate_lp_number setting"
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides:
+        - "license_plates table"
+        - "LicensePlateService"
+        - "LP number generation"
+    - story: "05.10"
+      name: "GRN CRUD + Items"
+      provides:
+        - "grns table"
+        - "grn_items table"
+        - "grn_number_sequences table"
+        - "generate_grn_number() function"
+    - story: "03.3"
+      name: "PO CRUD"
+      epic: "03-planning"
+      provides:
+        - "purchase_orders table"
+        - "purchase_order_lines table"
+        - "PO status transitions"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      epic: "01-settings"
+      provides:
+        - "warehouses table"
+    - story: "01.9"
+      name: "Locations CRUD"
+      epic: "01-settings"
+      provides:
+        - "locations table"
+    - story: "02.1"
+      name: "Products CRUD"
+      epic: "02-technical"
+      provides:
+        - "products table"
+
+  blocks:
+    - story: "05.12"
+      name: "GRN from TO"
+      reason: "Shares GRN infrastructure, service patterns"
+    - story: "05.13"
+      name: "ASN Management"
+      reason: "ASN links to GRN on receipt"
+    - story: "05.17"
+      name: "Scanner Receive"
+      reason: "Uses GRN service for receipt creation"
+    - epic: "03"
+      name: "Planning - Receiving Workflow"
+      reason: "PO receiving workflow depends on GRN creation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections:
+      - "WH-FR-001"  # LP Creation
+      - "WH-FR-003"  # GRN from PO
+      - "WH-FR-009"  # Batch Tracking
+      - "WH-FR-010"  # Expiry Tracking
+      - "WH-FR-029"  # Over-Receipt Control
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.11.grn-from-po.md"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/WH-004-grn-from-po-modal.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for grns/grn_items"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Context file structure reference"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Schema extension - GRN-PO integration columns if needed"
+  - type: "service"
+    count: 1
+    description: "GRNService.createFromPO() - Complex transaction orchestration"
+  - type: "api"
+    count: 6
+    description: "GRN from PO endpoints + validation"
+  - type: "page"
+    count: 2
+    description: "Receiving wizard, GRN list/detail pages"
+  - type: "component"
+    count: 10
+    description: "Wizard steps, form components, tables"
+  - type: "test"
+    count: 3
+    description: "Unit, integration, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Complex transaction: GRN + items + LPs + PO updates in single atomic operation"
+  - "Use ADR-013 RLS pattern for grns and grn_items tables"
+  - "Over-receipt validation must check warehouse_settings per org"
+  - "One LP created per GRN item (batch splitting deferred to 05.11b)"
+  - "PO status transitions: confirmed/approved/partial -> partial/closed"
+  - "Rollback entire transaction on any failure (LP, GRN item, PO update)"
+  - "GRN number auto-generated via generate_grn_number(org_id) function"
+  - "LP number auto-generated via existing LP service from 05.1"
+
+# Key business rules
+business_rules:
+  - rule: "PO Status for Receiving"
+    description: "Only POs with status in ['approved', 'confirmed', 'partial'] can be received"
+  - rule: "Over-Receipt Control"
+    description: "If allow_over_receipt=false, block. If true, allow within tolerance_pct"
+  - rule: "Batch/Expiry Requirements"
+    description: "Configurable via warehouse_settings per org"
+  - rule: "One LP Per Line"
+    description: "Each GRN item creates exactly one LP (splitting in 05.11b)"
+  - rule: "QA Status"
+    description: "LP qa_status set from warehouse_settings.default_qa_status"
+  - rule: "PO Status Updates"
+    description: "First receipt -> 'partial', all complete -> 'closed'"
+  - rule: "Transaction Atomicity"
+    description: "GRN + LPs + PO updates all in single transaction"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Transaction complexity with multiple table updates"
+    severity: "high"
+    mitigation: "Thorough transaction testing, explicit rollback on any failure"
+  - id: "RISK-02"
+    description: "Over-receipt edge cases with partial receipts"
+    severity: "medium"
+    mitigation: "Comprehensive test coverage for all cumulative scenarios"
+  - id: "RISK-03"
+    description: "PO status race conditions with concurrent receipts"
+    severity: "high"
+    mitigation: "Database-level locking on PO updates (SELECT FOR UPDATE)"
+  - id: "RISK-04"
+    description: "Wizard state management complexity"
+    severity: "medium"
+    mitigation: "Use React state or Zustand for multi-step form state"

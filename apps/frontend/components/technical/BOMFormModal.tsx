@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import type { BOMWithProduct } from '@/lib/validation/bom-schemas'
+import type { BOM, BOMWithProduct } from '@/lib/validation/bom-schemas'
 import { CreateBOMSchema, UpdateBOMSchema } from '@/lib/validation/bom-schemas'
 import { ZodError } from 'zod'
 
@@ -52,7 +52,7 @@ interface SelectedLine {
 }
 
 interface BOMFormModalProps {
-  bom?: BOMWithProduct | null // undefined = create, BOM = edit
+  bom?: BOMWithProduct | BOM | null // undefined = create, BOM = edit
   onClose: () => void
   onSuccess: () => void
 }
@@ -312,7 +312,7 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
           </h2>
           {isEditMode && (
             <p className="text-sm text-gray-500 mt-1">
-              Product: {bom.product.code} - {bom.product.name}
+              Product: {(bom as BOMWithProduct).product?.code || ''} - {(bom as BOMWithProduct).product?.name || ''}
             </p>
           )}
         </div>

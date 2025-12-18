@@ -1,0 +1,649 @@
+# Story 03.3 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/purchase-order-service.test.ts"
+    type: "unit"
+    description: "Unit tests for PO service methods"
+  - path: "apps/frontend/lib/validation/__tests__/purchase-order.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "__tests__/integration/api/planning/purchase-orders.test.ts"
+    type: "integration"
+    description: "Integration tests for PO API endpoints"
+  - path: "__tests__/e2e/planning/purchase-orders.spec.ts"
+    type: "e2e"
+    description: "E2E tests for critical PO flows"
+  - path: "supabase/tests/po-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for purchase_orders and po_lines"
+
+# Acceptance Criteria (from Story 03.3.po-crud-lines.md)
+acceptance_criteria:
+  # AC-1: PO List Page
+  - id: "AC-01-1"
+    title: "View purchase orders list"
+    given: "planner navigates to /planning/purchase-orders"
+    when: "page loads"
+    then: "PO list displays within 300ms with columns: PO Number, Supplier, Status, Expected Date, Total, Created"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-01-2"
+    title: "Search POs by number or supplier"
+    given: "PO list with 20+ orders"
+    when: "planner enters search 'PO-2024'"
+    then: "only POs matching number or supplier name display within 200ms"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-01-3"
+    title: "Filter by status"
+    given: "PO list displayed"
+    when: "planner selects filter 'Draft'"
+    then: "only draft POs appear"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-01-4"
+    title: "Pagination"
+    given: "100 POs exist"
+    when: "planner views PO list"
+    then: "20 POs display per page with pagination controls"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-2: Create PO Header
+  - id: "AC-02-1"
+    title: "Supplier selection cascades defaults"
+    given: "planner selects supplier 'Mill Co.' (currency: EUR, tax: VAT-23, terms: Net 30)"
+    when: "supplier selected"
+    then: "currency auto-fills 'EUR', tax code auto-fills 'VAT-23', payment terms auto-fills 'Net 30'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02-2"
+    title: "PO number auto-generated"
+    given: "planner saves a new PO"
+    when: "PO is created"
+    then: "PO number generated as 'PO-2024-00001' (next sequence) and is immutable"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02-3"
+    title: "Required field validation"
+    given: "planner leaves supplier empty"
+    when: "save attempted"
+    then: "error 'Supplier is required' displays inline and form submission blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02-4"
+    title: "Create PO without lines (draft)"
+    given: "planner fills header fields without adding lines"
+    when: "'Save as Draft' clicked"
+    then: "PO created with status 'draft' and 0 lines"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-3: PO Line Management
+  - id: "AC-03-1"
+    title: "Add line item to PO"
+    given: "planner is on PO detail page"
+    when: "'Add Line' button clicked"
+    then: "line form appears with: product search, quantity, UoM, unit price, discount %, notes"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03-2"
+    title: "Product selection defaults pricing"
+    given: "product 'RM-FLOUR-001' has supplier-product price of 2.50 EUR"
+    when: "planner selects the product"
+    then: "unit price auto-fills 2.50 and UoM auto-fills product's base UoM (kg)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03-3"
+    title: "Fallback to product std_price"
+    given: "product 'RM-YEAST-001' has no supplier-product assignment"
+    when: "planner selects the product"
+    then: "unit price defaults to product.std_price and warning displays"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-03-4"
+    title: "Line total calculation"
+    given: "planner enters: quantity 100, unit price 2.50, discount 10%"
+    when: "fields change"
+    then: "discount amount shows 25.00, line total shows 225.00, updates in real-time"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03-5"
+    title: "Remove line item"
+    given: "PO has 3 line items"
+    when: "planner clicks delete on line 2"
+    then: "confirmation dialog displays, upon confirm line removed and line numbers re-sequenced"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-03-6"
+    title: "Cannot add duplicate product"
+    given: "PO already has line for 'RM-FLOUR-001'"
+    when: "planner attempts to add same product again"
+    then: "error 'Product already exists on this PO' displays"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-4: PO Totals Calculation
+  - id: "AC-04-1"
+    title: "Subtotal calculation"
+    given: "PO has lines totaling 1000.00"
+    when: "viewing PO summary"
+    then: "subtotal displays 1000.00"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04-2"
+    title: "Tax calculation"
+    given: "PO has subtotal 1000.00 and tax code VAT-23 (23%)"
+    when: "viewing PO summary"
+    then: "tax amount displays 230.00"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04-3"
+    title: "Grand total calculation"
+    given: "PO has subtotal 1000.00 and tax 230.00"
+    when: "viewing PO summary"
+    then: "grand total displays 1230.00"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04-4"
+    title: "Real-time recalculation"
+    given: "planner modifies a line quantity"
+    when: "field changes"
+    then: "all totals (line, subtotal, tax, grand) recalculate within 100ms"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-5: PO Status Lifecycle
+  - id: "AC-05-1"
+    title: "Draft status capabilities"
+    given: "PO is in 'draft' status"
+    when: "planner views available actions"
+    then: "can: edit header, add/edit/remove lines, submit, cancel"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05-2"
+    title: "Submit PO (no approval required)"
+    given: "settings have approval disabled and PO has at least 1 line"
+    when: "planner clicks 'Submit'"
+    then: "status changes to 'confirmed' and status history records transition"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05-3"
+    title: "Cannot submit PO without lines"
+    given: "PO has 0 lines"
+    when: "planner clicks 'Submit'"
+    then: "error 'Cannot submit PO without line items' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05-4"
+    title: "Confirmed PO restrictions"
+    given: "PO is 'confirmed'"
+    when: "planner views available actions"
+    then: "cannot add/remove lines, can only update notes/dates, can cancel if no receipts"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-05-5"
+    title: "Cancel PO"
+    given: "PO has no receipts (all received_qty = 0)"
+    when: "planner clicks 'Cancel'"
+    then: "confirmation dialog displays, upon confirm status changes to 'cancelled'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05-6"
+    title: "Cannot cancel PO with receipts"
+    given: "PO has received_qty > 0 on any line"
+    when: "planner attempts to cancel"
+    then: "error 'Cannot cancel PO with recorded receipts' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-8: Permission Enforcement
+  - id: "AC-08-1"
+    title: "Planner full access"
+    given: "user has PLANNER role"
+    when: "accessing /planning/purchase-orders"
+    then: "all CRUD actions available"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08-2"
+    title: "Viewer read only"
+    given: "user has VIEWER role"
+    when: "accessing /planning/purchase-orders"
+    then: "table displays read-only and all action buttons hidden"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-9: Multi-tenancy
+  - id: "AC-09-1"
+    title: "Org isolation on list"
+    given: "User A from Org A"
+    when: "requesting /api/planning/purchase-orders"
+    then: "only Org A POs returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-09-2"
+    title: "Cross-tenant access returns 404"
+    given: "User A from Org A"
+    when: "requesting PO ID from Org B"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-09-3"
+    title: "Lines inherit org isolation"
+    given: "PO belongs to Org A"
+    when: "requesting its lines"
+    then: "only lines for that PO returned (via po_id FK)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # AC-10: Transaction Integrity
+  - id: "AC-10-1"
+    title: "Create PO with lines in single transaction"
+    given: "planner creates PO with 3 lines"
+    when: "save is triggered"
+    then: "header and all lines created atomically"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10-2"
+    title: "Rollback on error"
+    given: "planner creates PO with invalid line (negative quantity)"
+    when: "save is triggered"
+    then: "transaction fails, no header record created, appropriate error message returned"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  purchase_order_service:
+    - name: "calculateTotals returns correct subtotal"
+      setup: "Lines array with quantities and prices"
+      expected: "Correct subtotal calculation"
+      priority: "P0"
+
+    - name: "calculateTotals handles discounts correctly"
+      setup: "Lines with discount_percent values"
+      expected: "Discount amount and line total calculated correctly"
+      priority: "P0"
+
+    - name: "calculateTotals applies tax rate"
+      setup: "Lines with tax rate"
+      expected: "Tax amount = subtotal * rate / 100"
+      priority: "P0"
+
+    - name: "validateStatusTransition allows valid transitions"
+      setup: "draft -> submitted"
+      expected: "Returns true"
+      priority: "P0"
+
+    - name: "validateStatusTransition blocks invalid transitions"
+      setup: "closed -> draft"
+      expected: "Returns false"
+      priority: "P0"
+
+    - name: "canEditLines returns true for draft"
+      setup: "status = 'draft'"
+      expected: "Returns true"
+      priority: "P0"
+
+    - name: "canEditLines returns false for confirmed"
+      setup: "status = 'confirmed'"
+      expected: "Returns false"
+      priority: "P0"
+
+  validation_schemas:
+    - name: "createPOSchema validates required fields"
+      setup: "Empty object"
+      expected: "Validation errors for supplier_id, warehouse_id, expected_delivery_date"
+      priority: "P0"
+
+    - name: "createPOSchema validates expected_delivery_date is future"
+      setup: "{ expected_delivery_date: '2020-01-01' }"
+      expected: "Validation error for past date"
+      priority: "P0"
+
+    - name: "createPOLineSchema validates positive quantity"
+      setup: "{ quantity: -1 }"
+      expected: "Validation error for negative quantity"
+      priority: "P0"
+
+    - name: "createPOLineSchema validates discount range"
+      setup: "{ discount_percent: 150 }"
+      expected: "Validation error for discount > 100"
+      priority: "P0"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /purchase-orders returns paginated list"
+      setup: "Create 25 POs"
+      action: "GET /api/planning/purchase-orders?limit=20"
+      expected: "20 items returned with pagination meta"
+      priority: "P0"
+
+    - name: "GET /purchase-orders filters by status"
+      setup: "Create 5 draft, 3 confirmed POs"
+      action: "GET /api/planning/purchase-orders?status=draft"
+      expected: "5 draft POs returned"
+      priority: "P1"
+
+    - name: "GET /purchase-orders filters by supplier_id"
+      setup: "Create POs for 2 different suppliers"
+      action: "GET /api/planning/purchase-orders?supplier_id={id}"
+      expected: "Only POs for specified supplier returned"
+      priority: "P1"
+
+    - name: "POST /purchase-orders creates with lines"
+      setup: "Valid CreatePOInput with 2 lines"
+      action: "POST /api/planning/purchase-orders"
+      expected: "201 response with PO and lines"
+      priority: "P0"
+
+    - name: "POST /purchase-orders generates unique PO number"
+      setup: "Existing PO-2024-00001"
+      action: "POST /api/planning/purchase-orders"
+      expected: "New PO gets PO-2024-00002"
+      priority: "P0"
+
+    - name: "POST /purchase-orders validates required fields"
+      setup: "Missing supplier_id"
+      action: "POST /api/planning/purchase-orders"
+      expected: "400 with validation error"
+      priority: "P0"
+
+    - name: "PUT /purchase-orders/:id updates header"
+      setup: "Existing draft PO"
+      action: "PUT /api/planning/purchase-orders/:id with new notes"
+      expected: "200 with updated PO"
+      priority: "P0"
+
+    - name: "PUT /purchase-orders/:id blocked for confirmed PO"
+      setup: "Existing confirmed PO"
+      action: "PUT /api/planning/purchase-orders/:id"
+      expected: "400 INVALID_STATUS error"
+      priority: "P0"
+
+    - name: "DELETE /purchase-orders/:id deletes draft"
+      setup: "Existing draft PO"
+      action: "DELETE /api/planning/purchase-orders/:id"
+      expected: "200 success"
+      priority: "P0"
+
+    - name: "DELETE /purchase-orders/:id blocked for non-draft"
+      setup: "Existing confirmed PO"
+      action: "DELETE /api/planning/purchase-orders/:id"
+      expected: "400 INVALID_STATUS error"
+      priority: "P0"
+
+    - name: "POST /purchase-orders/:id/submit changes status"
+      setup: "Draft PO with 1 line"
+      action: "POST /api/planning/purchase-orders/:id/submit"
+      expected: "200 with status = 'confirmed'"
+      priority: "P0"
+
+    - name: "POST /purchase-orders/:id/submit fails without lines"
+      setup: "Draft PO with 0 lines"
+      action: "POST /api/planning/purchase-orders/:id/submit"
+      expected: "400 NO_LINES error"
+      priority: "P0"
+
+    - name: "POST /purchase-orders/:id/cancel with no receipts"
+      setup: "Confirmed PO with received_qty = 0"
+      action: "POST /api/planning/purchase-orders/:id/cancel"
+      expected: "200 with status = 'cancelled'"
+      priority: "P0"
+
+    - name: "POST /purchase-orders/:id/cancel blocked with receipts"
+      setup: "PO with received_qty > 0"
+      action: "POST /api/planning/purchase-orders/:id/cancel"
+      expected: "400 HAS_RECEIPTS error"
+      priority: "P0"
+
+    - name: "POST /purchase-orders/:id/lines adds line"
+      setup: "Draft PO"
+      action: "POST /api/planning/purchase-orders/:id/lines"
+      expected: "201 with new line"
+      priority: "P0"
+
+    - name: "POST /purchase-orders/:id/lines detects duplicate product"
+      setup: "PO with existing product line"
+      action: "POST /api/planning/purchase-orders/:id/lines with same product"
+      expected: "400 DUPLICATE_PRODUCT error"
+      priority: "P1"
+
+    - name: "DELETE /purchase-orders/:id/lines/:lineId removes line"
+      setup: "PO with 3 lines, received_qty = 0"
+      action: "DELETE line 2"
+      expected: "200 success, line numbers re-sequenced"
+      priority: "P0"
+
+  rls_isolation:
+    - name: "User can only read own org POs"
+      setup: "Create Org A PO, Org B PO"
+      action: "User A queries purchase_orders"
+      expected: "Only Org A PO returned"
+      priority: "P0"
+      security: true
+
+    - name: "Cross-org PO access returns 404"
+      setup: "PO in Org B"
+      action: "User A requests Org B PO by ID"
+      expected: "404 Not Found"
+      priority: "P0"
+      security: true
+
+    - name: "User can only read lines from own org POs"
+      setup: "Org A PO with lines, Org B PO with lines"
+      action: "User A queries purchase_order_lines"
+      expected: "Only Org A lines returned"
+      priority: "P0"
+      security: true
+
+    - name: "Non-planner cannot create PO"
+      setup: "User with VIEWER role"
+      action: "POST /api/planning/purchase-orders"
+      expected: "403 Forbidden"
+      priority: "P0"
+      security: true
+
+    - name: "Draft PO can only be deleted by owner/admin/planner"
+      setup: "Draft PO, user with VIEWER role"
+      action: "DELETE /api/planning/purchase-orders/:id"
+      expected: "403 Forbidden"
+      priority: "P0"
+      security: true
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create PO flow"
+    steps:
+      - "Navigate to /planning/purchase-orders"
+      - "Click '+ Create PO' button"
+      - "Select supplier 'Mill Co.'"
+      - "Verify currency/tax/terms auto-filled"
+      - "Set expected delivery date"
+      - "Select warehouse"
+      - "Click 'Add Line'"
+      - "Search and select product"
+      - "Enter quantity"
+      - "Verify price auto-filled"
+      - "Click 'Add Line' button"
+      - "Verify totals calculated"
+      - "Click 'Save as Draft'"
+      - "Verify toast 'PO created'"
+      - "Verify redirected to PO detail"
+    priority: "P0"
+
+  - name: "Edit PO flow"
+    steps:
+      - "Navigate to draft PO detail"
+      - "Click 'Edit' button"
+      - "Change expected delivery date"
+      - "Add another line"
+      - "Click 'Save'"
+      - "Verify changes saved"
+    priority: "P0"
+
+  - name: "Submit PO flow"
+    steps:
+      - "Navigate to draft PO with lines"
+      - "Click 'Submit' button"
+      - "Confirm in dialog"
+      - "Verify status changed to 'Confirmed'"
+      - "Verify Edit button hidden"
+    priority: "P0"
+
+  - name: "Cancel PO flow"
+    steps:
+      - "Navigate to draft PO"
+      - "Click 'Cancel' from actions menu"
+      - "Enter cancellation reason"
+      - "Confirm"
+      - "Verify status changed to 'Cancelled'"
+    priority: "P1"
+
+  - name: "Filter and search"
+    steps:
+      - "Navigate to PO list"
+      - "Enter search term"
+      - "Verify results filtered"
+      - "Select status filter"
+      - "Verify results filtered"
+      - "Clear filters"
+      - "Verify all results shown"
+    priority: "P1"
+
+  - name: "Real-time totals calculation"
+    steps:
+      - "Create new PO with line"
+      - "Change quantity"
+      - "Verify line total updates immediately"
+      - "Verify subtotal updates"
+      - "Verify tax updates"
+      - "Verify total updates"
+    priority: "P0"
+
+  - name: "Mobile responsive layout"
+    steps:
+      - "Set viewport to mobile"
+      - "Navigate to PO list"
+      - "Verify card layout"
+      - "Open create PO"
+      - "Verify stacked form fields"
+      - "Verify action buttons at bottom"
+    priority: "P2"
+
+# Definition of Done
+definition_of_done:
+  database:
+    - "Migration creates purchase_orders, purchase_order_lines, po_status_history tables"
+    - "All constraints and indexes created"
+    - "Triggers for line total and PO total calculations working"
+    - "PO number generation function working (sequence per org/year)"
+    - "RLS policies enforce org isolation and role permissions"
+
+  api:
+    - "All API endpoints implemented (list, CRUD, status actions, lines)"
+    - "Zod schemas validate all inputs (header + lines)"
+    - "Transaction handling for create/update with rollback"
+    - "404 (not 403) for cross-tenant access"
+
+  frontend:
+    - "PO list page with DataTable (PLAN-004)"
+    - "PO detail page with embedded lines table (PLAN-006)"
+    - "PO create/edit form with lines management (PLAN-005)"
+    - "Line management: add, edit, delete with validation"
+    - "Supplier cascade working (defaults auto-fill)"
+    - "Product price lookup working (supplier-product > std_price)"
+    - "Real-time totals calculation"
+    - "Status badges with correct colors"
+    - "Status transitions enforced with validation"
+    - "Submit/Cancel actions with proper checks"
+    - "Permission matrix implemented"
+    - "Loading, empty, error states implemented"
+    - "Toast notifications on success/error"
+    - "Accessibility: keyboard nav, ARIA labels"
+
+  tests:
+    - "Unit tests >= 80% coverage"
+    - "Integration tests for all endpoints"
+    - "E2E tests for critical flows"
+    - "RLS isolation tests passing"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/purchase-order-service.ts: 80%"
+      - "lib/validation/purchase-order.ts: 90%"
+
+  integration:
+    target: 75
+    focus:
+      - "All API endpoints tested"
+      - "All status transitions tested"
+      - "RLS policies 100% tested"
+
+  e2e:
+    target: "Critical flows"
+    flows:
+      - "Create PO with lines"
+      - "Edit PO"
+      - "Submit PO"
+      - "Cancel PO"
+      - "Search and filter"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Transaction failure during PO+lines creation"
+    mitigation: "Use database transaction, rollback on any error"
+    severity: "high"
+    test_coverage: "AC-10-1, AC-10-2"
+
+  - id: "RISK-02"
+    description: "RLS bypass allows cross-tenant data access"
+    mitigation: "Comprehensive RLS tests with 2+ org fixtures"
+    severity: "critical"
+    test_coverage: "AC-09-1, AC-09-2, AC-09-3"
+
+  - id: "RISK-03"
+    description: "PO number collision in high-concurrency scenarios"
+    mitigation: "Use database sequence or SELECT FOR UPDATE"
+    severity: "medium"
+    test_coverage: "Integration test with concurrent creates"
+
+  - id: "RISK-04"
+    description: "Totals calculation precision issues with decimals"
+    mitigation: "Use DECIMAL(15,4) in database, proper rounding"
+    severity: "medium"
+    test_coverage: "Unit tests for calculation edge cases"

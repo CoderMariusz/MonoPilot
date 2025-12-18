@@ -1,0 +1,377 @@
+# Story 07.2 - Frontend Specification
+# Purpose: Components, pages, services, hooks, UX specification
+# Agent: FRONTEND-DEV
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/page.tsx"
+    description: "Sales order list page with DataTable, search, filters, pagination"
+    layout: "Shipping module layout with breadcrumbs"
+    wireframe: "SHIP-005"
+    sections:
+      - "Page header with title and 'Create Sales Order' button"
+      - "Search bar + Filter controls (status, customer, date range)"
+      - "Sales orders DataTable with sorting"
+      - "Pagination controls and results summary"
+      - "Empty state (no orders), filtered empty state, error state, loading state"
+
+  - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/page.tsx"
+    description: "Sales order detail page with lines, allocations, status timeline"
+    layout: "Full-width detail page with sidebar"
+    wireframe: "SHIP-007"
+    sections:
+      - "Order header: SO#, customer, status badge, dates"
+      - "Lines table with quantities at each stage (ordered → allocated → picked → packed → shipped)"
+      - "Shipping address, notes, customer PO"
+      - "Status timeline showing: draft → confirmed transition"
+      - "Actions: Edit (draft only), Confirm (draft only), Delete (draft only)"
+
+  - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/new/page.tsx"
+    description: "Sales order creation wizard with multi-step flow"
+    layout: "Modal overlay on sales orders list"
+    wireframe: "SHIP-006"
+    sections:
+      - "Step 1: Customer selection with dropdown + address selection"
+      - "Step 2: Add order lines with product search, qty, unit price"
+      - "Step 3: Review order summary + totals"
+      - "Step 4: Save as draft or confirm + allocate"
+
+# Components
+components:
+  base_path: "apps/frontend/components/shipping/sales-orders"
+
+  pages:
+    - name: "SalesOrdersListPage.tsx"
+      description: "Main list page component"
+      props:
+        - "initialFilters?: SalesOrderListParams"
+        - "onOrderSelect?: (order: SalesOrder) => void"
+
+    - name: "SalesOrderDetailPage.tsx"
+      description: "Detail page component"
+      props:
+        - "orderId: string"
+        - "onEdit?: () => void"
+        - "onDelete?: () => void"
+
+  tables:
+    - name: "SalesOrdersDataTable.tsx"
+      description: "Main data table with sorting, filtering, pagination"
+      props:
+        - "orders: SalesOrder[]"
+        - "total: number"
+        - "page: number"
+        - "limit: number"
+        - "isLoading: boolean"
+        - "onPageChange: (page: number) => void"
+        - "onSort: (field: string, order: 'asc' | 'desc') => void"
+      columns:
+        - { key: "order_number", label: "SO #", sortable: true, width: "120px" }
+        - { key: "customer_name", label: "Customer", sortable: true, width: "200px" }
+        - { key: "order_date", label: "Order Date", sortable: true, width: "120px" }
+        - { key: "required_delivery_date", label: "Req. Delivery", sortable: true, width: "120px" }
+        - { key: "status", label: "Status", sortable: true, width: "120px", component: "SOStatusBadge" }
+        - { key: "total_amount", label: "Total", sortable: true, width: "100px" }
+        - { key: "line_count", label: "Lines", sortable: false, width: "70px" }
+        - { key: "actions", label: "Actions", sortable: false, width: "120px" }
+
+    - name: "SOLinesTable.tsx"
+      description: "Lines table within detail page"
+      props:
+        - "lines: SalesOrderLine[]"
+        - "editable: boolean"
+        - "onAddLine?: () => void"
+        - "onEditLine?: (line: SalesOrderLine) => void"
+        - "onDeleteLine?: (lineId: string) => void"
+      columns:
+        - { key: "line_number", label: "#", width: "40px" }
+        - { key: "product_name", label: "Product", width: "250px" }
+        - { key: "quantity_ordered", label: "Qty Ordered", width: "100px" }
+        - { key: "quantity_allocated", label: "Qty Allocated", width: "100px" }
+        - { key: "quantity_picked", label: "Qty Picked", width: "100px" }
+        - { key: "quantity_packed", label: "Qty Packed", width: "100px" }
+        - { key: "quantity_shipped", label: "Qty Shipped", width: "100px" }
+        - { key: "unit_price", label: "Unit Price", width: "100px" }
+        - { key: "line_total", label: "Total", width: "100px" }
+        - { key: "actions", label: "Actions", width: "80px", hidden_if: "!editable" }
+
+  modals:
+    - name: "SOWizard.tsx"
+      description: "Multi-step sales order creation wizard"
+      props:
+        - "mode: 'create' | 'edit'"
+        - "salesOrder?: SalesOrder"
+        - "onClose: () => void"
+        - "onSave: (order: SalesOrder) => void"
+      steps:
+        - name: "Step 1: Customer"
+          components: ["CustomerSelect", "AddressSelect"]
+        - name: "Step 2: Lines"
+          components: ["SOLinesTable", "AddLineModal"]
+        - name: "Step 3: Review"
+          components: ["OrderSummary", "TotalsDisplay"]
+        - name: "Step 4: Confirm"
+          components: ["ConfirmDialog", "AllocationSummary"]
+
+    - name: "AddSOLineModal.tsx"
+      description: "Modal for adding/editing order lines"
+      props:
+        - "mode: 'add' | 'edit'"
+        - "line?: SalesOrderLine"
+        - "customerID?: string"
+        - "onClose: () => void"
+        - "onSubmit: (line: SalesOrderLineRequest) => void"
+      fields:
+        - product_id: "Searchable autocomplete (products filtered to finished goods)"
+        - quantity_ordered: "Number input with live availability check"
+        - unit_price: "Number input (auto-filled from product, user-editable)"
+        - requested_lot: "Text input (optional, specific lot request)"
+        - notes: "Textarea (optional)"
+      features:
+        - "Real-time inventory availability display below qty input"
+        - "Warning badge if qty > available"
+        - "Line total auto-calculated and displayed"
+
+    - name: "ConfirmSODialog.tsx"
+      description: "Confirmation dialog for SO confirmation"
+      props:
+        - "order: SalesOrder"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+      displays:
+        - "Order summary (SO#, customer, dates, total)"
+        - "Lines summary (count, allocation status)"
+        - "Warning if any line has insufficient inventory"
+
+    - name: "DeleteSODialog.tsx"
+      description: "Confirmation for SO deletion"
+      props:
+        - "order: SalesOrder"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+      displays:
+        - "Warning: 'This action cannot be undone'"
+        - "Will delete X lines associated with this order"
+
+  badges:
+    - name: "SOStatusBadge.tsx"
+      description: "Status display with icon and color"
+      props:
+        - "status: 'draft' | 'confirmed'"
+      variants:
+        - { status: "draft", color: "bg-gray-100 text-gray-800", icon: "DraftIcon", label: "Draft" }
+        - { status: "confirmed", color: "bg-blue-100 text-blue-800", icon: "CheckIcon", label: "Confirmed" }
+
+    - name: "SOTotalsBadge.tsx"
+      description: "Totals display with formatting"
+      props:
+        - "subtotal: number"
+        - "tax?: number"
+        - "shipping?: number"
+        - "total: number"
+        - "currency: string"
+
+  filters:
+    - name: "SOFilters.tsx"
+      description: "Filter controls"
+      props:
+        - "onStatusChange: (status: string) => void"
+        - "onCustomerChange: (customerId: string) => void"
+        - "onDateRangeChange: (start: string, end: string) => void"
+        - "onApply: () => void"
+        - "onReset: () => void"
+      filters:
+        - status: "Dropdown (Draft, Confirmed, All)"
+        - customer: "Autocomplete dropdown"
+        - date_range: "From-to date picker (defaults to last 30 days)"
+
+  actions:
+    - name: "SOActionsMenu.tsx"
+      description: "Row actions dropdown"
+      props:
+        - "order: SalesOrder"
+        - "onEdit: () => void"
+        - "onDelete: () => void"
+        - "onConfirm: () => void"
+      actions:
+        - { label: "View", icon: "Eye", always: true }
+        - { label: "Edit", icon: "Pencil", hidden_if: "status !== 'draft'" }
+        - { label: "Confirm", icon: "Check", hidden_if: "status !== 'draft'" }
+        - { label: "Delete", icon: "Trash", hidden_if: "status !== 'draft'" }
+
+  timeline:
+    - name: "SOStatusTimeline.tsx"
+      description: "Visual status workflow timeline"
+      props:
+        - "order: SalesOrder"
+      displays:
+        - "draft → confirmed (with timestamps)"
+        - "Grey out future statuses (allocated, picking, etc)"
+
+  empty_states:
+    - name: "EmptySOState.tsx"
+      description: "Empty state when no orders exist"
+      displays:
+        - "Icon + heading 'No Sales Orders Yet'"
+        - "Description + quick tips"
+        - "CTA: Create Your First Sales Order"
+
+    - name: "FilteredEmptySOState.tsx"
+      description: "Empty state when filters return no results"
+      displays:
+        - "Icon + heading 'No Orders Match Your Filters'"
+        - "Description + adjustment tips"
+        - "CTA: Clear All Filters"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-sales-orders.ts"
+    description: "React Query hooks for sales orders"
+    exports:
+      - name: "useSalesOrders"
+        params: ["params: SalesOrderListParams"]
+        returns: "UseQueryResult<PaginatedResult<SalesOrder>>"
+
+      - name: "useSalesOrder"
+        params: ["id: string"]
+        returns: "UseQueryResult<SalesOrder>"
+
+      - name: "useCreateSalesOrder"
+        returns: "UseMutationResult<SalesOrder, Error, CreateSalesOrderRequest>"
+
+      - name: "useUpdateSalesOrder"
+        returns: "UseMutationResult<SalesOrder, Error, { id: string; data: UpdateSalesOrderRequest }>"
+
+      - name: "useDeleteSalesOrder"
+        returns: "UseMutationResult<void, Error, string>"
+
+      - name: "useConfirmSalesOrder"
+        returns: "UseMutationResult<SalesOrder, Error, string>"
+
+      - name: "useAddSOLine"
+        params: ["soId: string"]
+        returns: "UseMutationResult<SalesOrderLine, Error, CreateSalesOrderLineRequest>"
+
+      - name: "useUpdateSOLine"
+        params: ["soId: string", "lineId: string"]
+        returns: "UseMutationResult<SalesOrderLine, Error, UpdateSalesOrderLineRequest>"
+
+      - name: "useDeleteSOLine"
+        params: ["soId: string", "lineId: string"]
+        returns: "UseMutationResult<void, Error, void>"
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SHIP-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-005-sales-order-list.md"
+      name: "Sales Order List"
+      components:
+        - "SalesOrdersDataTable"
+        - "SOFilters"
+        - "SOStatusBadge"
+        - "SOActionsMenu"
+        - "EmptySOState"
+        - "FilteredEmptySOState"
+
+    - id: "SHIP-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-006-sales-order-create.md"
+      name: "Sales Order Create Wizard"
+      components:
+        - "SOWizard"
+        - "AddSOLineModal"
+        - "OrderSummary"
+        - "ConfirmSODialog"
+
+    - id: "SHIP-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-007-sales-order-detail.md"
+      name: "Sales Order Detail"
+      components:
+        - "SalesOrderDetailPage"
+        - "SOLinesTable"
+        - "SOStatusTimeline"
+        - "SOActionsMenu"
+        - "DeleteSODialog"
+
+  states:
+    loading: "Skeleton rows in table, 10 rows with shimmer animation"
+    empty: "Empty state with icon + CTA"
+    filtered_empty: "Filtered empty state with reset filters option"
+    error: "Error banner with retry button"
+    success: "Full data table with all features"
+
+  toasts:
+    - event: "create_success"
+      message: "Sales order {{order_number}} created"
+      type: "success"
+    - event: "confirm_success"
+      message: "Order {{order_number}} confirmed and locked"
+      type: "success"
+    - event: "delete_success"
+      message: "Order deleted"
+      type: "success"
+    - event: "line_add_success"
+      message: "Line {{line_number}} added"
+      type: "success"
+    - event: "line_delete_success"
+      message: "Line deleted"
+      type: "success"
+    - event: "inventory_warning"
+      message: "Line {{line_number}}: {{qty_requested}} requested, {{qty_available}} available"
+      type: "warning"
+    - event: "validation_error"
+      message: "{{field}}: {{error}}"
+      type: "error"
+    - event: "api_error"
+      message: "Failed to save order. {{error}}"
+      type: "error"
+
+  patterns:
+    table: "ShadCN DataTable with TanStack Table, sorting, pagination"
+    modal: "ShadCN Dialog with React Hook Form + Zod validation"
+    wizard: "Multi-step form with progress indicator"
+    badge: "ShadCN Badge component with status colors"
+
+# Responsive Design
+responsive:
+  desktop:
+    breakpoint: ">1024px"
+    layout: "Full table with 8 columns + actions"
+    features: "All features visible"
+
+  tablet:
+    breakpoint: "768-1024px"
+    layout: "Compact table (5 columns: SO#, customer, status, total, actions)"
+    features: "Hide order_date, delivery_date; collapse actions to dropdown"
+
+  mobile:
+    breakpoint: "<768px"
+    layout: "Card-based (1 card per SO)"
+    features: "Show: SO#, customer, dates, status, total; actions as vertical list"
+
+# Accessibility
+accessibility:
+  touch_targets: "All buttons >= 48x48dp"
+  contrast: "Text 4.5:1 minimum, status badges tested"
+  screen_reader:
+    - "Table: role='table' aria-label='Sales order list'"
+    - "Status badge: aria-label='Status: Draft'"
+    - "Action buttons: aria-label='Edit sales order SO-2025-00001'"
+    - "Live region for status updates: aria-live='polite'"
+  keyboard:
+    - "Tab through table rows"
+    - "Enter to view details"
+    - "Arrow keys to navigate pagination"
+    - "Escape to close modals"
+
+# Performance
+performance:
+  caching:
+    sales_orders_list: "2min TTL"
+    sales_order_detail: "5min TTL"
+    customer_list: "5min TTL"
+  load_targets:
+    list_load: "<500ms"
+    search: "<300ms"
+    filter_apply: "<400ms"
+    modal_open: "<200ms"
+  pagination: "25 default, options: 15/25/50"

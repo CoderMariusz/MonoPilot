@@ -1,0 +1,442 @@
+story:
+  id: "07.11"
+  name: "Packing & Shipment Creation"
+  epic: "07-shipping"
+  phase: "1C"
+  complexity: "L"
+  estimate_days: 5
+  priority: "P0"
+  state: "ready"
+  type: "backend + frontend"
+
+dependencies:
+  required:
+    - story: "07.9"
+      provides: ["pick_list_lines_status_picked", "pick_confirmation_workflow"]
+      blocking: true
+    - story: "07.3"
+      provides: ["sales_orders"]
+    - story: "07.4"
+      provides: ["sales_order_lines"]
+    - story: "06.11"
+      provides: ["batch_release_workflow", "batch_quality_status"]
+    - epic: "01-settings"
+      provides: ["organizations", "users", "roles", "rls_policies"]
+    - epic: "01-warehouses"
+      provides: ["warehouse_locations", "staging_locations"]
+    - epic: "02-technical"
+      provides: ["products", "allergens", "product_allergens"]
+    - epic: "05-warehouse"
+      provides: ["license_plates", "locations"]
+
+provides_to:
+  - story: "07.12"
+    consumes: ["shipments", "shipment_boxes", "pack_confirmation_scanner"]
+  - story: "07.13"
+    consumes: ["shipments", "shipment_boxes", "sscc_generation", "packing_slip", "bol"]
+  - story: "07.14"
+    consumes: ["shipments", "shipment_manifest", "shipment_confirmation"]
+
+files_to_read:
+  prd:
+    - path: "docs/1-BASELINE/product/modules/shipping.md"
+      sections: ["FR-7.34", "FR-7.35", "FR-7.37", "FR-7.40", "FR-7.42"]
+
+  architecture:
+    - path: "docs/1-BASELINE/architecture/modules/shipping.md"
+      sections: ["Shipments Table", "Shipment Boxes", "Shipment Box Contents", "Weight/Dimensions"]
+
+  story:
+    - path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.11.packing-shipment-creation.md"
+
+  wireframes:
+    - id: "SHIP-017"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-017-packing-station.md"
+      description: "Desktop packing workbench with picked items, carton management, LP assignment"
+      components: ["PackingWorkbench", "BoxBuilder", "LPSelector", "PackingSummary", "AllergenWarningDialog"]
+    - id: "SHIP-020"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-020-packing-slip.md"
+      description: "Packing slip PDF generation, preview, print, email workflows"
+      components: ["PackingSlipPreview", "EmailModal", "PrintDialog"]
+
+  patterns:
+    - path: "docs/1-BASELINE/architecture/patterns/multi-tenancy.md"
+    - path: "docs/1-BASELINE/architecture/patterns/rls-isolation.md"
+    - path: "docs/1-BASELINE/architecture/patterns/api-patterns.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_shipments_packing.sql"
+      type: "migration"
+      description: "Create shipments, shipment_boxes, shipment_box_contents tables with RLS, auto-numbering (SH-YYYY-NNNNN), and cascade deletes"
+
+  api:
+    - path: "apps/frontend/app/api/shipping/shipments/route.ts"
+      methods: ["GET", "POST"]
+      description: "List shipments with filters, create shipment from SO"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/route.ts"
+      methods: ["GET"]
+      description: "Get shipment detail with boxes and contents"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/available-lps/route.ts"
+      methods: ["GET"]
+      description: "Get picked LPs available for packing (from completed pick lists)"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/boxes/route.ts"
+      methods: ["POST"]
+      description: "Add box to shipment (creates shipment_box with auto box_number)"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/boxes/[boxId]/route.ts"
+      methods: ["PUT"]
+      description: "Update box weight/dimensions"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/boxes/[boxId]/contents/route.ts"
+      methods: ["POST"]
+      description: "Add LP to box (creates shipment_box_contents with lot_number traceability)"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/complete-packing/route.ts"
+      methods: ["POST"]
+      description: "Complete packing (validates all boxes have weight, updates status to packed)"
+
+  services:
+    - path: "lib/services/shipment-service.ts"
+      description: "Core shipment CRUD, box management, LP assignment, allergen separation check, packing completion"
+
+  validation:
+    - path: "lib/validation/shipment-schema.ts"
+      description: "Zod schemas for shipment creation, box updates, LP assignment, weight/dimension validation"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/page.tsx"
+      description: "Shipments list page with status, customer, weight filters and pagination"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/page.tsx"
+      description: "Shipment detail page showing boxes and contents with timeline"
+    - path: "apps/frontend/app/(authenticated)/shipping/packing/[shipmentId]/page.tsx"
+      description: "Packing workbench page - main UI for packers (3-column layout)"
+
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/components/ShipmentsTable.tsx"
+      description: "Sortable, filterable table with shipment#, SO#, customer, status, boxes, weight"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/components/BoxesTable.tsx"
+      description: "Collapsible table showing boxes with weight, dimensions, contents count"
+    - path: "apps/frontend/app/(authenticated)/shipping/packing/components/PackingWorkbench.tsx"
+      description: "3-column grid layout: Available LPs (left), BoxBuilder tabs (center), PackingSummary (right)"
+    - path: "apps/frontend/app/(authenticated)/shipping/packing/components/BoxBuilder.tsx"
+      description: "Tabs for each box, weight/dimensions inputs, contents list, add LP button"
+    - path: "apps/frontend/app/(authenticated)/shipping/packing/components/LPSelector.tsx"
+      description: "Searchable combobox for available LPs (LP#, Product, Lot, Qty)"
+    - path: "apps/frontend/app/(authenticated)/shipping/packing/components/PackingSummary.tsx"
+      description: "Summary card: SO#, Customer, Total Boxes, Total Weight, Pack Progress %, Status badge, Complete Packing button"
+    - path: "apps/frontend/app/(authenticated)/shipping/packing/components/AllergenWarningDialog.tsx"
+      description: "Modal warning about allergen separation with Continue/Cancel buttons"
+
+database:
+  tables:
+    - name: "shipments"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL (FK organizations)"
+        - "shipment_number TEXT NOT NULL (SH-YYYY-NNNNN format)"
+        - "sales_order_id UUID NOT NULL (FK sales_orders)"
+        - "customer_id UUID NOT NULL (FK customers)"
+        - "shipping_address_id UUID NOT NULL (FK customer_addresses)"
+        - "status TEXT DEFAULT 'pending' CHECK (pending|packing|packed|manifested|shipped|delivered|exception)"
+        - "carrier TEXT (dhl|ups|dpd|fedex|other)"
+        - "service_level TEXT (Ground|Express)"
+        - "tracking_number TEXT (nullable)"
+        - "sscc TEXT (nullable, generated in Story 07.13)"
+        - "total_weight DECIMAL(10,2) (nullable until packing complete)"
+        - "total_boxes INTEGER DEFAULT 0"
+        - "dock_door_id UUID (FK dock_doors)"
+        - "staged_location_id UUID (FK locations)"
+        - "packed_at TIMESTAMPTZ (nullable)"
+        - "packed_by UUID (FK users)"
+        - "shipped_at TIMESTAMPTZ (nullable)"
+        - "delivered_at TIMESTAMPTZ (nullable)"
+        - "created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+        - "created_by UUID NOT NULL (FK users)"
+        - "UNIQUE(org_id, shipment_number)"
+      rls: true
+      indexes:
+        - "idx_shipments_org_status ON shipments(org_id, status)"
+        - "idx_shipments_customer ON shipments(customer_id)"
+        - "idx_shipments_so ON shipments(sales_order_id)"
+        - "idx_shipments_tracking ON shipments(tracking_number)"
+
+    - name: "shipment_boxes"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL (FK organizations)"
+        - "shipment_id UUID NOT NULL (FK shipments, ON DELETE CASCADE)"
+        - "box_number INTEGER NOT NULL (sequential per shipment: 1, 2, 3)"
+        - "sscc TEXT (nullable, generated in Story 07.13)"
+        - "weight DECIMAL(10,3) (kg, nullable until box complete)"
+        - "length DECIMAL(10,2) (cm, optional)"
+        - "width DECIMAL(10,2) (cm, optional)"
+        - "height DECIMAL(10,2) (cm, optional)"
+        - "tracking_number TEXT (nullable, for multi-package shipments)"
+        - "created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+        - "UNIQUE(shipment_id, box_number)"
+        - "UNIQUE(sscc)"
+        - "CHECK(weight > 0 OR weight IS NULL)"
+        - "CHECK(length > 0 OR length IS NULL)"
+        - "CHECK(width > 0 OR width IS NULL)"
+        - "CHECK(height > 0 OR height IS NULL)"
+      rls: true
+      indexes:
+        - "idx_shipment_boxes_shipment ON shipment_boxes(shipment_id)"
+
+    - name: "shipment_box_contents"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL (FK organizations)"
+        - "shipment_box_id UUID NOT NULL (FK shipment_boxes, ON DELETE CASCADE)"
+        - "sales_order_line_id UUID NOT NULL (FK sales_order_lines)"
+        - "product_id UUID NOT NULL (FK products)"
+        - "license_plate_id UUID NOT NULL (FK license_plates)"
+        - "lot_number TEXT (from LP, for traceability)"
+        - "quantity DECIMAL(15,4) NOT NULL"
+        - "created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+      rls: true
+      indexes:
+        - "idx_shipment_box_contents_box ON shipment_box_contents(shipment_box_id)"
+        - "idx_shipment_box_contents_lp ON shipment_box_contents(license_plate_id)"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/shipments"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Packer", "Admin"]
+    description: "Create shipment from sales order"
+    request_body:
+      sales_order_id: "UUID"
+    response:
+      shipment_id: "UUID"
+      shipment_number: "SH-YYYY-NNNNN"
+
+  - method: "GET"
+    path: "/api/shipping/shipments"
+    auth: true
+    roles: ["All authenticated"]
+    description: "List shipments with filters"
+    query_params:
+      status: "comma-separated enum (pending,packing,packed,manifested,shipped,delivered,exception)"
+      customer_id: "UUID (optional filter)"
+      page: "integer (default 1)"
+      limit: "1-50 (default 20)"
+    response:
+      shipments: "Shipment[]"
+      total: "integer"
+
+  - method: "GET"
+    path: "/api/shipping/shipments/:id"
+    auth: true
+    roles: ["All authenticated"]
+    description: "Get shipment detail with boxes and contents"
+    response:
+      shipment: "Shipment (full)"
+      boxes: "ShipmentBox[]"
+      contents: "ShipmentBoxContent[]"
+      sales_order: "SalesOrder (minimal)"
+
+  - method: "GET"
+    path: "/api/shipping/shipments/:id/available-lps"
+    auth: true
+    roles: ["Warehouse Manager", "Packer", "Admin"]
+    description: "Get picked LPs available for packing (from completed pick lists)"
+    response:
+      license_plates: "PickedLP[] (includes LP#, product, lot, qty, location)"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/boxes"
+    auth: true
+    roles: ["Warehouse Manager", "Packer", "Admin"]
+    description: "Add box to shipment"
+    request_body: "{}"
+    response:
+      box_id: "UUID"
+      box_number: "integer"
+
+  - method: "PUT"
+    path: "/api/shipping/shipments/:id/boxes/:boxId"
+    auth: true
+    roles: ["Warehouse Manager", "Packer", "Admin"]
+    description: "Update box weight/dimensions"
+    request_body:
+      weight: "number (optional, kg)"
+      length: "number (optional, cm)"
+      width: "number (optional, cm)"
+      height: "number (optional, cm)"
+    response:
+      success: true
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/boxes/:boxId/contents"
+    auth: true
+    roles: ["Warehouse Manager", "Packer", "Admin"]
+    description: "Add LP to box"
+    request_body:
+      license_plate_id: "UUID"
+      sales_order_line_id: "UUID"
+      quantity: "number"
+    response:
+      content_id: "UUID"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/complete-packing"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Complete packing (validates all boxes have weight, updates status to packed)"
+    request_body: "{}"
+    response:
+      success: true
+
+ux:
+  wireframes:
+    - id: "SHIP-017"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-017-packing-station.md"
+      description: "Desktop packing station showing picked items, active carton, carton label preview, history"
+      screens:
+        - "success: Packing workbench with 3-column layout (items, active carton, summary)"
+        - "pack_confirmation_modal: Scan/manual LP entry, qty confirmation, allergen check, carton selection"
+        - "close_carton_modal: Dimensions/weight entry, SSCC generation/preview, staging assignment"
+        - "complete_packing_modal: Summary of cartons, quality checks, document generation (labels, slip, BOL)"
+        - "loading: Progress bars for shipment fetch, picked items load"
+        - "empty: No shipments ready for packing"
+        - "error_weight_exceeded: Carton weight exceeds capacity"
+        - "error_lp_not_found: Scanned LP not found or consumed"
+        - "error_sscc_failed: SSCC generation failed"
+        - "error_shipment_cancelled: Shipment cancelled"
+      components:
+        - "PackingWorkbench: 3-column grid layout"
+        - "BoxBuilder: Box tabs with weight/dimensions and contents list"
+        - "LPSelector: Searchable combobox for available LPs"
+        - "PackingSummary: Summary card with progress %"
+        - "AllergenWarningDialog: Warning modal (non-blocking)"
+
+    - id: "SHIP-020"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-020-packing-slip.md"
+      description: "Packing slip PDF generation, print, email workflows"
+      screens:
+        - "success: PDF preview with Print/Email/Download buttons"
+        - "loading: Progress bar 'Generating packing slip...'"
+        - "empty: No packing slip available (incomplete shipment)"
+        - "error_pdf_generation: PDF generation timeout"
+        - "error_missing_data: Missing SSCC/weight/address"
+        - "error_email_failed: SMTP connection failure"
+        - "print_dialog: Browser native print dialog"
+        - "email_modal: Email recipient form with validation"
+      components:
+        - "PackingSlipPreview: PDF viewer (8.5x11 letter, 1-page)"
+        - "EmailModal: Recipient dropdown, CC, subject, message, send button"
+        - "PrintButton: Triggers window.print()"
+
+  patterns:
+    table: "ShadCN DataTable (ShipmentsTable, BoxesTable)"
+    modal: "ShadCN Dialog (Pack Confirmation, Close Carton, Complete Packing, Allergen Warning)"
+    combobox: "ShadCN Combobox (LPSelector)"
+    layout: "3-column grid for packing workbench (responsive: stacked on mobile)"
+    badge: "Status badges with color (pending=yellow, packing=blue, packed=green)"
+
+  states:
+    - "loading (skeleton loaders, progress bars)"
+    - "empty (no shipments ready)"
+    - "error (weight exceeded, LP not found, SSCC failed)"
+    - "success (packing workbench active)"
+    - "modal (pack confirmation, close carton, complete packing)"
+
+validation_rules:
+  shipment_creation:
+    sales_order_id: "UUID, must exist and have status='picked'"
+
+  box_weight_dimensions:
+    weight: "number > 0, optional, must be <= carton capacity (25kg default)"
+    length: "number > 0 or null, range 10-200 cm"
+    width: "number > 0 or null, range 10-200 cm"
+    height: "number > 0 or null, range 10-200 cm"
+
+  lp_assignment:
+    license_plate_id: "UUID, must exist and have qty available > 0"
+    quantity: "number > 0, cannot exceed quantity in LP or remaining SO line qty"
+    sales_order_line_id: "UUID, must match SO line associated with shipment"
+
+  allergen_separation:
+    carton_allergens: "collect all product allergens in box"
+    customer_restrictions: "check if customer has allergen_restrictions JSONB"
+    conflict: "warn if product allergen in customer restrictions (non-blocking)"
+
+  complete_packing:
+    all_boxes_have_weight: "all shipment_boxes.weight must be > 0"
+    all_lps_packed: "all picked LPs from pick_list_lines must be in shipment_box_contents OR marked exception"
+
+patterns:
+  rls: "org_id isolation on all tables (shipments, shipment_boxes, shipment_box_contents)"
+  api: "REST endpoints with query filters (status, customer_id, pagination)"
+  service: "class-based ShipmentService with static async methods"
+  validation: "Zod schemas for all requests"
+  numbering: "DB function generate_shipment_number(org_id) → SH-YYYY-NNNNN (per-org, annual reset)"
+  cascade_delete: "shipment → boxes → contents (ON DELETE CASCADE)"
+  traceability: "lot_number captured in shipment_box_contents from license_plate"
+
+acceptance_checklist:
+  - "shipments table created with auto-generated shipment_number SH-YYYY-NNNNN"
+  - "shipment_boxes table created with auto-incremented box_number per shipment"
+  - "shipment_box_contents table created with lot_number traceability"
+  - "generate_shipment_number() function generates SH-YYYY-NNNNN per org, resets annually"
+  - "POST /api/shipping/shipments creates shipment from SO, updates SO.status to 'packing'"
+  - "GET /api/shipping/shipments/:id/available-lps returns picked LPs not yet packed"
+  - "POST /api/shipping/shipments/:id/boxes creates box with auto box_number, updates shipment status to 'packing' if pending"
+  - "PUT /api/shipping/shipments/:id/boxes/:boxId updates weight/dimensions with validation"
+  - "POST /api/shipping/shipments/:id/boxes/:boxId/contents adds LP to box, captures lot_number"
+  - "POST /api/shipping/shipments/:id/complete-packing validates all boxes have weight, updates status to 'packed', calculates totals"
+  - "Allergen separation warning displayed (non-blocking) when assigning LP with allergen to box with customer restrictions"
+  - "Weight validation enforces positive values, dimension validation enforces 10-200 cm range"
+  - "PackingWorkbench displays 3-column layout: Available LPs (left), BoxBuilder with tabs (center), PackingSummary (right)"
+  - "BoxBuilder manages multiple boxes with weight/dimensions inputs and contents list"
+  - "LPSelector displays searchable list of available LPs with product, lot, qty"
+  - "PackingSummary shows SO#, customer, total boxes, total weight, pack progress %, status badge"
+  - "ShipmentsTable displays shipments with filters (status, customer) and pagination"
+  - "BoxesTable displays boxes with collapsible contents rows"
+  - "SO status updates to 'packing' on shipment creation, 'packed' on packing completion"
+  - "Cascade delete works: cancel SO deletes pending/packing shipments and all associated boxes/contents"
+  - "RLS policies prevent cross-org access to shipments, boxes, contents"
+  - "Unit tests: >80% coverage for ShipmentService"
+  - "E2E test: Create shipment → Add boxes → Add LPs → Complete packing → Verify status"
+  - "E2E test: Allergen warning displayed when packing allergen product with restricted customer"
+  - "Multi-tenant isolation verified"
+
+output_artifacts:
+  - "Migration file creating shipments, shipment_boxes, shipment_box_contents tables with RLS and indexes"
+  - "ShipmentService with createShipment(), addBox(), addContent(), completePacking(), getAvailableLPs() methods"
+  - "API routes for all 7 endpoints (shipments CRUD, boxes CRUD, available-lps, complete-packing)"
+  - "ShipmentsTable component with filters, search, pagination, status badges"
+  - "BoxesTable component with collapsible contents"
+  - "PackingWorkbench component with 3-column responsive layout"
+  - "BoxBuilder, LPSelector, PackingSummary components"
+  - "AllergenWarningDialog component"
+  - "Validation schemas for shipment creation, box updates, LP assignment"
+  - "Unit tests for ShipmentService (shipment creation, box management, allergen checks)"
+  - "E2E tests for packing workflows (create → box → LP → complete)"
+
+database_notes:
+  shipment_number_format: "SH-YYYY-NNNNN (e.g., SH-2025-00123), auto-incremented per org, resets annually"
+  status_workflow: "pending → packing → packed → manifested → shipped → delivered (or exception)"
+  box_number: "auto-incremented 1, 2, 3 per shipment"
+  lot_number: "captured from license_plate at pack time for traceability"
+  sscc: "nullable in this story, generated in Story 07.13"
+  total_weight: "sum of shipment_boxes.weight, calculated on packing completion"
+  cascade_delete: "deleting SO deletes associated shipments (if pending/packing), which cascade-delete boxes and contents"
+
+technical_notes:
+  - "Shipment number generation: database function using LPAD and SUBSTRING"
+  - "Available LPs query: pick_list_lines with status='picked' minus already-packed LPs"
+  - "Allergen check: compare product.allergens with customer.allergen_restrictions"
+  - "Weight validation: current_box_weight + item_weight <= 25kg (configurable by org)"
+  - "Dimension validation: 10cm <= dimension <= 200cm for each (L, W, H)"
+  - "Cascade delete: PostgreSQL ON DELETE CASCADE for referential integrity"
+  - "RLS policies: org_id isolation on all three tables"
+  - "Traceability: lot_number and LP ID preserved in shipment_box_contents"
+
+estimated_effort: "20-28 hours (database, 7 endpoints, 3 pages, 6 components, packing workbench UI, tests)"
+quality_target: "95%+"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    changes: "Initial YAML context creation for Story 07.11"
+    author: "TECH-WRITER"

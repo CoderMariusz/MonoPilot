@@ -1,0 +1,254 @@
+# Story 02.13 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_product_nutrition_table.sql"
+    type: "migration"
+    description: "Product nutrition facts with FDA 2016 fields"
+  - path: "supabase/migrations/XXX_create_ingredient_nutrition_table.sql"
+    type: "migration"
+    description: "Ingredient/raw material nutrition data"
+  - path: "supabase/migrations/XXX_nutrition_rls_policies.sql"
+    type: "migration"
+    description: "RLS policies for nutrition tables"
+
+tables:
+  - name: "product_nutrition"
+    description: "Calculated or manually entered nutrition facts per product"
+    columns:
+      # Primary keys
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE" }
+
+      # Serving information
+      - { name: "serving_size", type: "DECIMAL(10,2)", constraints: "", description: "Serving size in serving_unit" }
+      - { name: "serving_unit", type: "TEXT", constraints: "DEFAULT 'g'", description: "g, ml, oz, cup, tbsp, piece" }
+      - { name: "servings_per_container", type: "INTEGER", constraints: "", description: "Number of servings per package" }
+
+      # Override tracking
+      - { name: "is_manual_override", type: "BOOLEAN", constraints: "DEFAULT false", description: "True if manually entered, false if calculated" }
+      - { name: "override_source", type: "TEXT", constraints: "", description: "lab_test, supplier_coa, database, calculated, manual" }
+      - { name: "override_reference", type: "TEXT", constraints: "", description: "CoA number, lab report ID" }
+      - { name: "override_notes", type: "TEXT", constraints: "", description: "User notes about override reason" }
+      - { name: "override_by", type: "UUID", constraints: "REFERENCES auth.users(id)", description: "User who entered override" }
+      - { name: "override_at", type: "TIMESTAMPTZ", constraints: "", description: "When override was entered" }
+
+      # Calculation metadata
+      - { name: "calculated_at", type: "TIMESTAMPTZ", constraints: "", description: "When nutrition was auto-calculated" }
+      - { name: "bom_version_used", type: "INTEGER", constraints: "", description: "BOM version used for calculation" }
+      - { name: "bom_id_used", type: "UUID", constraints: "REFERENCES boms(id) ON DELETE SET NULL", description: "BOM used for calculation" }
+
+      # Macronutrients (per 100g/100ml)
+      - { name: "energy_kcal", type: "DECIMAL(10,2)", constraints: "", description: "Calories" }
+      - { name: "energy_kj", type: "DECIMAL(10,2)", constraints: "", description: "Kilojoules" }
+      - { name: "protein_g", type: "DECIMAL(10,2)", constraints: "", description: "Total protein" }
+      - { name: "fat_g", type: "DECIMAL(10,2)", constraints: "", description: "Total fat" }
+      - { name: "saturated_fat_g", type: "DECIMAL(10,2)", constraints: "", description: "Saturated fat" }
+      - { name: "trans_fat_g", type: "DECIMAL(10,2)", constraints: "", description: "Trans fat" }
+      - { name: "carbohydrate_g", type: "DECIMAL(10,2)", constraints: "", description: "Total carbohydrates" }
+      - { name: "sugar_g", type: "DECIMAL(10,2)", constraints: "", description: "Total sugars" }
+      - { name: "added_sugar_g", type: "DECIMAL(10,2)", constraints: "", description: "Added sugars (FDA 2016)" }
+      - { name: "fiber_g", type: "DECIMAL(10,2)", constraints: "", description: "Dietary fiber" }
+      - { name: "sodium_mg", type: "DECIMAL(10,2)", constraints: "", description: "Sodium in mg" }
+      - { name: "salt_g", type: "DECIMAL(10,4)", constraints: "", description: "Salt (sodium * 2.5 / 1000)" }
+      - { name: "cholesterol_mg", type: "DECIMAL(10,2)", constraints: "", description: "Cholesterol in mg" }
+
+      # Micronutrients (FDA 2016 required)
+      - { name: "vitamin_d_mcg", type: "DECIMAL(10,4)", constraints: "", description: "Vitamin D in mcg" }
+      - { name: "calcium_mg", type: "DECIMAL(10,2)", constraints: "", description: "Calcium in mg" }
+      - { name: "iron_mg", type: "DECIMAL(10,2)", constraints: "", description: "Iron in mg" }
+      - { name: "potassium_mg", type: "DECIMAL(10,2)", constraints: "", description: "Potassium in mg" }
+
+      # Optional micronutrients
+      - { name: "vitamin_c_mg", type: "DECIMAL(10,2)", constraints: "", description: "Vitamin C in mg (optional)" }
+      - { name: "vitamin_a_mcg", type: "DECIMAL(10,4)", constraints: "", description: "Vitamin A in mcg RAE (optional)" }
+
+      # Serving calculation metadata
+      - { name: "serving_calculation_method", type: "TEXT", constraints: "", description: "weight, dimensions, volume, manual" }
+      - { name: "fda_racc_category", type: "TEXT", constraints: "", description: "FDA RACC category used" }
+      - { name: "fda_racc_value_g", type: "DECIMAL(10,2)", constraints: "", description: "FDA RACC reference value in grams" }
+
+      # Timestamps
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_product_nutrition_org_product ON product_nutrition(org_id, product_id)"
+      - "idx_product_nutrition_product ON product_nutrition(product_id)"
+    constraints:
+      - "UNIQUE(org_id, product_id)"
+      - "CHECK (serving_size IS NULL OR serving_size > 0)"
+      - "CHECK (serving_unit IN ('g', 'ml', 'oz', 'cup', 'tbsp', 'piece'))"
+      - "CHECK (override_source IS NULL OR override_source IN ('lab_test', 'supplier_coa', 'database', 'calculated', 'manual'))"
+
+  - name: "ingredient_nutrition"
+    description: "Nutrition data for raw materials/ingredients used in BOM calculations"
+    columns:
+      # Primary keys
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "ingredient_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE", description: "FK to products (raw materials)" }
+
+      # Per unit basis
+      - { name: "per_unit", type: "DECIMAL(10,2)", constraints: "DEFAULT 100", description: "Basis for nutrition values (100g, 100ml)" }
+      - { name: "unit", type: "TEXT", constraints: "DEFAULT 'g'", description: "g or ml" }
+
+      # Data source
+      - { name: "source", type: "TEXT", constraints: "DEFAULT 'manual'", description: "usda, eurofir, supplier_coa, manual" }
+      - { name: "source_id", type: "TEXT", constraints: "", description: "External ID (e.g., USDA NDB number)" }
+      - { name: "source_date", type: "DATE", constraints: "", description: "When data was retrieved from source" }
+      - { name: "verified_by", type: "UUID", constraints: "REFERENCES auth.users(id)", description: "User who verified the data" }
+      - { name: "confidence", type: "TEXT", constraints: "DEFAULT 'medium'", description: "high, medium, low" }
+      - { name: "notes", type: "TEXT", constraints: "", description: "Notes about data quality/source" }
+
+      # Macronutrients (per 100g/100ml)
+      - { name: "energy_kcal", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "energy_kj", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "protein_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "fat_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "saturated_fat_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "trans_fat_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "carbohydrate_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "sugar_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "added_sugar_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "fiber_g", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "sodium_mg", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "salt_g", type: "DECIMAL(10,4)", constraints: "" }
+      - { name: "cholesterol_mg", type: "DECIMAL(10,2)", constraints: "" }
+
+      # Micronutrients
+      - { name: "vitamin_d_mcg", type: "DECIMAL(10,4)", constraints: "" }
+      - { name: "calcium_mg", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "iron_mg", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "potassium_mg", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "vitamin_c_mg", type: "DECIMAL(10,2)", constraints: "" }
+      - { name: "vitamin_a_mcg", type: "DECIMAL(10,4)", constraints: "" }
+
+      # Moisture (for yield calculations)
+      - { name: "moisture_g", type: "DECIMAL(10,2)", constraints: "", description: "Moisture content per 100g" }
+
+      # Timestamps
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_ingredient_nutrition_org ON ingredient_nutrition(org_id)"
+      - "idx_ingredient_nutrition_ingredient ON ingredient_nutrition(ingredient_id)"
+      - "idx_ingredient_nutrition_source ON ingredient_nutrition(org_id, source)"
+    constraints:
+      - "UNIQUE(org_id, ingredient_id)"
+      - "CHECK (per_unit > 0)"
+      - "CHECK (unit IN ('g', 'ml'))"
+      - "CHECK (source IN ('usda', 'eurofir', 'supplier_coa', 'manual'))"
+      - "CHECK (confidence IN ('high', 'medium', 'low'))"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    # product_nutrition
+    - table: "product_nutrition"
+      name: "product_nutrition_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_nutrition"
+      name: "product_nutrition_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_nutrition"
+      name: "product_nutrition_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_nutrition"
+      name: "product_nutrition_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    # ingredient_nutrition
+    - table: "ingredient_nutrition"
+      name: "ingredient_nutrition_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "ingredient_nutrition"
+      name: "ingredient_nutrition_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "ingredient_nutrition"
+      name: "ingredient_nutrition_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "ingredient_nutrition"
+      name: "ingredient_nutrition_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Triggers
+triggers:
+  - name: "update_product_nutrition_updated_at"
+    table: "product_nutrition"
+    timing: "BEFORE UPDATE"
+    sql: "updated_at = NOW()"
+  - name: "update_ingredient_nutrition_updated_at"
+    table: "ingredient_nutrition"
+    timing: "BEFORE UPDATE"
+    sql: "updated_at = NOW()"
+
+# ERD Diagram
+erd: |
+  +------------------+     +----------------------+
+  |    products      |     |  product_nutrition   |
+  +------------------+     +----------------------+
+  | id (PK)          |<----| product_id (FK)      |
+  | org_id           |     | org_id (FK)          |
+  | code             |     | serving_size         |
+  | name             |     | serving_unit         |
+  +------------------+     | is_manual_override   |
+         |                 | energy_kcal          |
+         |                 | protein_g            |
+         | 1:1             | fat_g                |
+         v                 | carbohydrate_g       |
+  +----------------------+ | ... (all nutrients)  |
+  | ingredient_nutrition | +----------------------+
+  +----------------------+
+  | id (PK)            |
+  | org_id (FK)        |
+  | ingredient_id (FK) |<---- products (raw materials)
+  | per_unit (100)     |
+  | source             |
+  | energy_kcal        |
+  | protein_g          |
+  | ... (all nutrients)|
+  +----------------------+
+         |
+         | Used in BOM calculation
+         v
+  +------------------+
+  |    bom_items     |
+  +------------------+
+  | component_id (FK)| ---> ingredient_nutrition
+  | quantity         |
+  | uom              |
+  +------------------+
+
+# FDA RACC Reference Table (seed data - stored in cache/constant)
+fda_racc_categories:
+  description: "FDA Reference Amounts Customarily Consumed - 139 categories"
+  sample_data:
+    - { category: "bread", racc_g: 50, common_serving: "2 slices" }
+    - { category: "cookies", racc_g: 30, common_serving: "2-3 cookies" }
+    - { category: "crackers", racc_g: 30, common_serving: "15 crackers" }
+    - { category: "cereals_hot", racc_g: 40, common_serving: "1 cup cooked" }
+    - { category: "cereals_cold", racc_g: 40, common_serving: "1 cup" }
+    - { category: "milk", racc_g: 240, common_serving: "1 cup (8 fl oz)" }
+    - { category: "yogurt", racc_g: 225, common_serving: "1 container" }
+    - { category: "cheese", racc_g: 30, common_serving: "1 slice" }
+    - { category: "butter", racc_g: 15, common_serving: "1 tbsp" }
+    - { category: "soft_drinks", racc_g: 360, common_serving: "12 fl oz" }
+    - { category: "juice", racc_g: 240, common_serving: "8 fl oz" }
+  note: "Full table (139 categories) stored in frontend constant or Redis cache"

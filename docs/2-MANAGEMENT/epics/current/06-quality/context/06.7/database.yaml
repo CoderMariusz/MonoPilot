@@ -1,0 +1,277 @@
+# Story 06.7 - Database Schema & Seed Data
+# Purpose: Tables, RLS policies, indexes, ISO 2859 seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/057_create_sampling_plans_table.sql"
+    type: "migration"
+    description: "Sampling plans table with AQL configuration, lot size ranges, acceptance/rejection criteria"
+  - path: "supabase/migrations/058_create_sampling_records_table.sql"
+    type: "migration"
+    description: "Sampling records table for individual sample collection during inspections"
+  - path: "supabase/migrations/059_seed_iso_2859_reference_table.sql"
+    type: "seed"
+    description: "ISO 2859-1 / ANSI Z1.4 sample size reference table (General Inspection Levels I, II, III)"
+
+# Primary Tables
+tables:
+  - name: "sampling_plans"
+    description: "AQL-based statistical sampling plans for quality inspections"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "inspection_type", type: "TEXT", constraints: "NOT NULL CHECK (inspection_type IN ('incoming', 'in_process', 'final'))" }
+      - { name: "product_id", type: "UUID", constraints: "REFERENCES products(id)" }
+
+      # AQL Configuration (ISO 2859 / ANSI Z1.4)
+      - { name: "aql_level", type: "TEXT", constraints: "CHECK (aql_level IN ('I', 'II', 'III'))" }
+      - { name: "special_level", type: "TEXT", constraints: "CHECK (special_level IN ('S-1', 'S-2', 'S-3', 'S-4'))" }
+
+      # Lot Size Range
+      - { name: "lot_size_min", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "lot_size_max", type: "INTEGER", constraints: "NOT NULL" }
+
+      # Sample Size and Acceptance Criteria
+      - { name: "sample_size", type: "INTEGER", constraints: "NOT NULL CHECK (sample_size > 0)" }
+      - { name: "acceptance_number", type: "INTEGER", constraints: "NOT NULL CHECK (acceptance_number >= 0)" }
+      - { name: "rejection_number", type: "INTEGER", constraints: "NOT NULL CHECK (rejection_number > 0)" }
+
+      # Status
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    constraints:
+      - "UNIQUE(org_id, name)"
+      - "CHECK (lot_size_min <= lot_size_max)"
+      - "CHECK (acceptance_number < rejection_number)"
+
+    indexes:
+      - "idx_sampling_plans_org ON sampling_plans(org_id)"
+      - "idx_sampling_plans_type ON sampling_plans(org_id, inspection_type)"
+      - "idx_sampling_plans_product ON sampling_plans(product_id) WHERE product_id IS NOT NULL"
+      - "idx_sampling_plans_lot_range ON sampling_plans(org_id, lot_size_min, lot_size_max)"
+      - "idx_sampling_plans_active ON sampling_plans(org_id, is_active)"
+
+    comments:
+      table: "AQL-based sampling plans for quality inspections (ISO 2859 / ANSI Z1.4)"
+      aql_level: "General Inspection Level (I, II, III) - II is most common"
+      special_level: "Special Inspection Level (S-1 to S-4) for small sample sizes (Phase 2)"
+      acceptance_number: "Ac - Maximum defects allowed to accept lot"
+      rejection_number: "Re - Minimum defects to reject lot"
+
+  - name: "sampling_records"
+    description: "Individual sample records taken during quality inspections"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "plan_id", type: "UUID", constraints: "NOT NULL REFERENCES sampling_plans(id)" }
+      - { name: "inspection_id", type: "UUID", constraints: "NOT NULL REFERENCES quality_inspections(id)" }
+
+      # Sample Identification
+      - { name: "sample_identifier", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "location_description", type: "TEXT", constraints: "" }
+
+      # Sampling Details
+      - { name: "sampled_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "sampled_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    constraints:
+      - "UNIQUE(inspection_id, sample_identifier)"
+
+    indexes:
+      - "idx_sampling_records_org ON sampling_records(org_id)"
+      - "idx_sampling_records_plan ON sampling_records(plan_id)"
+      - "idx_sampling_records_inspection ON sampling_records(inspection_id)"
+      - "idx_sampling_records_sampled_at ON sampling_records(sampled_at)"
+
+    comments:
+      table: "Individual sample records taken during inspections"
+      sample_identifier: "Unique sample ID within inspection (e.g., S-001, S-002)"
+      location_description: "Physical location where sample was taken (e.g., top/middle/bottom of lot)"
+
+  - name: "iso_2859_reference"
+    description: "ISO 2859-1 / ANSI Z1.4 sample size reference table (read-only, for lookups)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "lot_size_min", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "lot_size_max", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "sample_size_code", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "inspection_level", type: "TEXT", constraints: "NOT NULL CHECK (inspection_level IN ('I', 'II', 'III'))" }
+      - { name: "sample_size", type: "INTEGER", constraints: "NOT NULL" }
+
+      # AQL Acceptance/Rejection criteria (JSONB per AQL level)
+      - { name: "aql_065", type: "JSONB", constraints: "" }
+      - { name: "aql_10", type: "JSONB", constraints: "" }
+      - { name: "aql_15", type: "JSONB", constraints: "" }
+      - { name: "aql_25", type: "JSONB", constraints: "" }
+      - { name: "aql_40", type: "JSONB", constraints: "" }
+      - { name: "aql_65", type: "JSONB", constraints: "" }
+      - { name: "aql_100", type: "JSONB", constraints: "" }
+      - { name: "aql_150", type: "JSONB", constraints: "" }
+      - { name: "aql_250", type: "JSONB", constraints: "" }
+      - { name: "aql_400", type: "JSONB", constraints: "" }
+      - { name: "aql_650", type: "JSONB", constraints: "" }
+      - { name: "aql_1000", type: "JSONB", constraints: "" }
+
+    rls: false
+    visibility: "public read-only (used for lookups)"
+
+    comments:
+      table: "ISO 2859 / ANSI Z1.4 sample size reference table (static, non-organization-specific)"
+      aql_values: "Each JSONB contains {Ac: number, Re: number} for acceptance and rejection numbers"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  sampling_plans:
+    - operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can view sampling plans for their organization"
+
+    - operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can create sampling plans for their organization"
+
+    - operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can update sampling plans for their organization"
+
+    - operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can delete sampling plans for their organization"
+
+  sampling_records:
+    - operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can view sampling records for their organization"
+
+    - operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can create sampling records for their organization"
+
+    - operation: "UPDATE"
+      using: "FALSE"
+      description: "Sampling records are immutable once created (UPDATE disabled)"
+
+    - operation: "DELETE"
+      using: "FALSE"
+      description: "Sampling records are immutable once created (DELETE disabled)"
+
+# Seed Data
+seed_data:
+  table: "iso_2859_reference"
+  description: "ISO 2859-1 / ANSI Z1.4 sample size table (General Inspection Level II, single sampling)"
+  notes:
+    - "Reference table for AQL calculations"
+    - "Contains 15 lot size ranges from 2-8 to 3201-10000+"
+    - "Includes acceptance (Ac) and rejection (Re) numbers for AQL 0.65, 1.0, 1.5, 2.5, 4.0, 6.5, 10.0"
+    - "Used for plan creation and ISO 2859 helper table display"
+    - "Data based on ANSI/ASQ Z1.4 standard"
+
+  ranges:
+    - lot_range: "2-8"
+      code: "A"
+      sample_size: 2
+      aql_levels: { "0.65": { Ac: 0, Re: 1 }, "1.0": { Ac: 0, Re: 1 }, "1.5": { Ac: 0, Re: 1 }, "2.5": { Ac: 0, Re: 1 }, "4.0": { Ac: 0, Re: 1 } }
+
+    - lot_range: "9-15"
+      code: "A"
+      sample_size: 2
+      aql_levels: { "0.65": { Ac: 0, Re: 1 }, "1.0": { Ac: 0, Re: 1 }, "1.5": { Ac: 0, Re: 1 }, "2.5": { Ac: 0, Re: 1 }, "4.0": { Ac: 0, Re: 1 } }
+
+    - lot_range: "16-25"
+      code: "B"
+      sample_size: 3
+      aql_levels: { "0.65": { Ac: 0, Re: 1 }, "1.0": { Ac: 0, Re: 1 }, "1.5": { Ac: 0, Re: 1 }, "2.5": { Ac: 0, Re: 1 }, "4.0": { Ac: 0, Re: 1 } }
+
+    - lot_range: "26-50"
+      code: "C"
+      sample_size: 5
+      aql_levels: { "0.65": { Ac: 0, Re: 1 }, "1.0": { Ac: 0, Re: 1 }, "1.5": { Ac: 0, Re: 1 }, "2.5": { Ac: 0, Re: 1 }, "4.0": { Ac: 0, Re: 1 } }
+
+    - lot_range: "51-90"
+      code: "D"
+      sample_size: 8
+      aql_levels: { "0.65": { Ac: 0, Re: 1 }, "1.0": { Ac: 0, Re: 1 }, "1.5": { Ac: 0, Re: 1 }, "2.5": { Ac: 1, Re: 2 }, "4.0": { Ac: 1, Re: 2 } }
+
+    - lot_range: "91-150"
+      code: "E"
+      sample_size: 13
+      aql_levels: { "0.65": { Ac: 0, Re: 1 }, "1.0": { Ac: 0, Re: 1 }, "1.5": { Ac: 1, Re: 2 }, "2.5": { Ac: 1, Re: 2 }, "4.0": { Ac: 2, Re: 3 } }
+
+    - lot_range: "151-280"
+      code: "F"
+      sample_size: 20
+      aql_levels: { "0.65": { Ac: 0, Re: 1 }, "1.0": { Ac: 1, Re: 2 }, "1.5": { Ac: 1, Re: 2 }, "2.5": { Ac: 3, Re: 4 }, "4.0": { Ac: 5, Re: 6 } }
+
+    - lot_range: "281-500"
+      code: "G"
+      sample_size: 32
+      aql_levels: { "0.65": { Ac: 1, Re: 2 }, "1.0": { Ac: 2, Re: 3 }, "1.5": { Ac: 3, Re: 4 }, "2.5": { Ac: 5, Re: 6 }, "4.0": { Ac: 7, Re: 8 } }
+
+    - lot_range: "501-1200"
+      code: "H"
+      sample_size: 50
+      aql_levels: { "0.65": { Ac: 1, Re: 2 }, "1.0": { Ac: 3, Re: 4 }, "1.5": { Ac: 5, Re: 6 }, "2.5": { Ac: 7, Re: 8 }, "4.0": { Ac: 10, Re: 11 } }
+
+    - lot_range: "1201-3200"
+      code: "J"
+      sample_size: 80
+      aql_levels: { "0.65": { Ac: 2, Re: 3 }, "1.0": { Ac: 5, Re: 6 }, "1.5": { Ac: 7, Re: 8 }, "2.5": { Ac: 10, Re: 11 }, "4.0": { Ac: 14, Re: 15 } }
+
+    - lot_range: "3201-10000"
+      code: "K"
+      sample_size: 125
+      aql_levels: { "0.65": { Ac: 3, Re: 4 }, "1.0": { Ac: 7, Re: 8 }, "1.5": { Ac: 10, Re: 11 }, "2.5": { Ac: 14, Re: 15 }, "4.0": { Ac: 21, Re: 22 } }
+
+    - lot_range: "10001-35000"
+      code: "L"
+      sample_size: 200
+      aql_levels: { "0.65": { Ac: 5, Re: 6 }, "1.0": { Ac: 10, Re: 11 }, "1.5": { Ac: 14, Re: 15 }, "2.5": { Ac: 21, Re: 22 }, "4.0": { Ac: 21, Re: 22 } }
+
+    - lot_range: "35001-150000"
+      code: "M"
+      sample_size: 315
+      aql_levels: { "0.65": { Ac: 7, Re: 8 }, "1.0": { Ac: 14, Re: 15 }, "1.5": { Ac: 21, Re: 22 }, "2.5": { Ac: 21, Re: 22 }, "4.0": { Ac: 21, Re: 22 } }
+
+    - lot_range: "150001-500000"
+      code: "N"
+      sample_size: 500
+      aql_levels: { "0.65": { Ac: 10, Re: 11 }, "1.0": { Ac: 21, Re: 22 }, "1.5": { Ac: 21, Re: 22 }, "2.5": { Ac: 21, Re: 22 }, "4.0": { Ac: 21, Re: 22 } }
+
+    - lot_range: "500001+"
+      code: "P"
+      sample_size: 800
+      aql_levels: { "0.65": { Ac: 14, Re: 15 }, "1.0": { Ac: 21, Re: 22 }, "1.5": { Ac: 21, Re: 22 }, "2.5": { Ac: 21, Re: 22 }, "4.0": { Ac: 21, Re: 22 } }
+
+# Business Rules
+business_rules:
+  - "Plan name must be unique within organization"
+  - "One active plan per (product_id OR category) + inspection_type combination"
+  - "Lot size range: lot_size_min must be < lot_size_max"
+  - "Sample size must be > 0 and <= lot_size_max"
+  - "Acceptance number must be >= 0 and < rejection number"
+  - "Sampling records are immutable after inspection completion"
+  - "Plan deletion blocked if used by active or recent (30 days) inspections"
+  - "Auto-detection of plan during inspection: product + type + lot size match"
+  - "Sampling plan selection based on: product_id match OR null (applies to all), inspection_type match, lot_size BETWEEN min/max"
+  - "Sample identifiers auto-generated: SMP-{product_id}-{date}-{sequence}"

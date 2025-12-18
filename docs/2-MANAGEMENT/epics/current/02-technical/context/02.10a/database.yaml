@@ -1,0 +1,214 @@
+# Story 02.10a - Database Schema
+# Purpose: Tables, RLS policies, indexes, constraints
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_product_traceability_config.sql"
+    type: "migration"
+    description: "product_traceability_config table with RLS policies and indexes"
+
+tables:
+  - name: "product_traceability_config"
+    description: "Per-product traceability and lot number configuration"
+    columns:
+      # Primary keys
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE UNIQUE" }
+
+      # Lot Number Format Configuration
+      - { name: "lot_number_format", type: "TEXT", constraints: "NOT NULL DEFAULT 'LOT-{YYYY}-{SEQ:6}'", description: "Lot format pattern with placeholders" }
+      - { name: "lot_number_prefix", type: "TEXT", constraints: "NOT NULL DEFAULT 'LOT-'", description: "Lot number prefix" }
+      - { name: "lot_number_sequence_length", type: "INTEGER", constraints: "NOT NULL DEFAULT 6 CHECK (lot_number_sequence_length >= 4 AND lot_number_sequence_length <= 10)", description: "Sequence number padding" }
+
+      # Traceability Level
+      - { name: "traceability_level", type: "TEXT", constraints: "NOT NULL DEFAULT 'lot' CHECK (traceability_level IN ('lot', 'batch', 'serial'))", description: "Tracking granularity" }
+
+      # Batch Size Defaults
+      - { name: "standard_batch_size", type: "DECIMAL(15,4)", constraints: "", description: "Default batch size for WO creation" }
+      - { name: "min_batch_size", type: "DECIMAL(15,4)", constraints: "", description: "Minimum allowed batch size" }
+      - { name: "max_batch_size", type: "DECIMAL(15,4)", constraints: "", description: "Maximum allowed batch size" }
+
+      # Expiry Calculation
+      - { name: "expiry_calculation_method", type: "TEXT", constraints: "NOT NULL DEFAULT 'fixed_days' CHECK (expiry_calculation_method IN ('fixed_days', 'rolling', 'manual'))", description: "How expiry date is calculated" }
+      - { name: "processing_buffer_days", type: "INTEGER", constraints: "DEFAULT 0 CHECK (processing_buffer_days >= 0 AND processing_buffer_days <= 365)", description: "Buffer days for rolling expiry" }
+
+      # GS1 Encoding Settings
+      - { name: "gs1_lot_encoding_enabled", type: "BOOLEAN", constraints: "NOT NULL DEFAULT true", description: "Enable GS1-128 AI 10 for lots" }
+      - { name: "gs1_expiry_encoding_enabled", type: "BOOLEAN", constraints: "NOT NULL DEFAULT true", description: "Enable GS1-128 AI 17 for expiry" }
+      - { name: "gs1_sscc_enabled", type: "BOOLEAN", constraints: "NOT NULL DEFAULT false", description: "Enable SSCC-18 for pallets" }
+
+      # Audit Fields
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_product_traceability_config_product ON product_traceability_config(product_id)"
+      - "idx_product_traceability_config_org ON product_traceability_config(org_id)"
+      - "idx_product_traceability_config_level ON product_traceability_config(org_id, traceability_level)"
+
+    constraints:
+      - name: "batch_size_min_max_check"
+        type: "CHECK"
+        definition: "(min_batch_size IS NULL OR max_batch_size IS NULL OR min_batch_size <= max_batch_size)"
+        description: "Minimum batch size cannot exceed maximum"
+      - name: "batch_size_standard_check"
+        type: "CHECK"
+        definition: "(standard_batch_size IS NULL OR ((min_batch_size IS NULL OR standard_batch_size >= min_batch_size) AND (max_batch_size IS NULL OR standard_batch_size <= max_batch_size)))"
+        description: "Standard batch size must be within min/max range"
+      - name: "unique_product_config"
+        type: "UNIQUE"
+        definition: "(product_id)"
+        description: "One config per product"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    - table: "product_traceability_config"
+      name: "traceability_config_select_own"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can read traceability config for their org only"
+
+    - table: "product_traceability_config"
+      name: "traceability_config_insert_own"
+      operation: "INSERT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can create traceability config for their org only"
+
+    - table: "product_traceability_config"
+      name: "traceability_config_update_own"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can update traceability config for their org only"
+
+    - table: "product_traceability_config"
+      name: "traceability_config_delete_own"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can delete traceability config for their org only"
+
+# Triggers
+triggers:
+  - name: "update_traceability_config_timestamp"
+    table: "product_traceability_config"
+    timing: "BEFORE UPDATE"
+    description: "Auto-update updated_at timestamp"
+    function: |
+      CREATE OR REPLACE FUNCTION update_traceability_config_timestamp()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+# Full Migration SQL
+migration_sql: |
+  -- Create product_traceability_config table
+  CREATE TABLE IF NOT EXISTS product_traceability_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+
+    -- Lot Number Format
+    lot_number_format TEXT NOT NULL DEFAULT 'LOT-{YYYY}-{SEQ:6}',
+    lot_number_prefix TEXT NOT NULL DEFAULT 'LOT-',
+    lot_number_sequence_length INTEGER NOT NULL DEFAULT 6,
+
+    -- Traceability Level
+    traceability_level TEXT NOT NULL DEFAULT 'lot',
+
+    -- Batch Size Defaults
+    standard_batch_size DECIMAL(15,4),
+    min_batch_size DECIMAL(15,4),
+    max_batch_size DECIMAL(15,4),
+
+    -- Expiry Calculation
+    expiry_calculation_method TEXT NOT NULL DEFAULT 'fixed_days',
+    processing_buffer_days INTEGER DEFAULT 0,
+
+    -- GS1 Settings
+    gs1_lot_encoding_enabled BOOLEAN NOT NULL DEFAULT true,
+    gs1_expiry_encoding_enabled BOOLEAN NOT NULL DEFAULT true,
+    gs1_sscc_enabled BOOLEAN NOT NULL DEFAULT false,
+
+    -- Audit
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by UUID REFERENCES users(id),
+    updated_by UUID REFERENCES users(id),
+
+    -- Constraints
+    CONSTRAINT unique_product_traceability_config UNIQUE (product_id),
+    CONSTRAINT traceability_level_check CHECK (traceability_level IN ('lot', 'batch', 'serial')),
+    CONSTRAINT expiry_method_check CHECK (expiry_calculation_method IN ('fixed_days', 'rolling', 'manual')),
+    CONSTRAINT sequence_length_check CHECK (lot_number_sequence_length >= 4 AND lot_number_sequence_length <= 10),
+    CONSTRAINT processing_buffer_check CHECK (processing_buffer_days >= 0 AND processing_buffer_days <= 365),
+    CONSTRAINT batch_size_min_max_check CHECK (
+      min_batch_size IS NULL OR max_batch_size IS NULL OR min_batch_size <= max_batch_size
+    ),
+    CONSTRAINT batch_size_standard_check CHECK (
+      standard_batch_size IS NULL OR
+      ((min_batch_size IS NULL OR standard_batch_size >= min_batch_size) AND
+       (max_batch_size IS NULL OR standard_batch_size <= max_batch_size))
+    )
+  );
+
+  -- RLS
+  ALTER TABLE product_traceability_config ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policies
+  CREATE POLICY "traceability_config_select_own" ON product_traceability_config
+    FOR SELECT USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "traceability_config_insert_own" ON product_traceability_config
+    FOR INSERT WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "traceability_config_update_own" ON product_traceability_config
+    FOR UPDATE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "traceability_config_delete_own" ON product_traceability_config
+    FOR DELETE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Indexes
+  CREATE INDEX idx_product_traceability_config_product ON product_traceability_config(product_id);
+  CREATE INDEX idx_product_traceability_config_org ON product_traceability_config(org_id);
+  CREATE INDEX idx_product_traceability_config_level ON product_traceability_config(org_id, traceability_level);
+
+  -- Timestamp trigger
+  CREATE OR REPLACE FUNCTION update_traceability_config_timestamp()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  CREATE TRIGGER trg_update_traceability_config_timestamp
+    BEFORE UPDATE ON product_traceability_config
+    FOR EACH ROW
+    EXECUTE FUNCTION update_traceability_config_timestamp();
+
+  -- Comments
+  COMMENT ON TABLE product_traceability_config IS 'Per-product traceability configuration including lot format, batch defaults, and GS1 settings';
+  COMMENT ON COLUMN product_traceability_config.lot_number_format IS 'Lot format pattern with placeholders: {YYYY}, {YY}, {MM}, {DD}, {SEQ:N}, {JULIAN}, {PROD}, {LINE}';
+  COMMENT ON COLUMN product_traceability_config.traceability_level IS 'Tracking granularity: lot (multiple units), batch (production run), serial (unit level)';
+  COMMENT ON COLUMN product_traceability_config.expiry_calculation_method IS 'How expiry date is calculated: fixed_days (from production), rolling (from ingredients), manual';
+  COMMENT ON COLUMN product_traceability_config.gs1_lot_encoding_enabled IS 'Enable GS1-128 AI 10 encoding for lot numbers';
+  COMMENT ON COLUMN product_traceability_config.gs1_expiry_encoding_enabled IS 'Enable GS1-128 AI 17 encoding for expiry dates';
+  COMMENT ON COLUMN product_traceability_config.gs1_sscc_enabled IS 'Enable SSCC-18 encoding for pallet tracking';

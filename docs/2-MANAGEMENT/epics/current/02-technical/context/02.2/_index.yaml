@@ -1,0 +1,119 @@
+# Story 02.2 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.2"
+  name: "Product Versioning + History"
+  slug: "product-versioning-history"
+  epic: "02-technical"
+  phase: "2A-1"
+  complexity: "S"
+  estimate_days: 1
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, validation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.1"
+      name: "Products CRUD Core"
+      provides:
+        - "products table"
+        - "product-service.ts"
+        - "product validation schemas"
+  blocked_by:
+    - story: "02.1"
+      reason: "Needs products table and base product service"
+  blocks:
+    - story: "02.3"
+      name: "Product Allergens"
+    - story: "02.4"
+      name: "BOMs CRUD"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.2"   # Product versioning (auto-increment on edit)
+      - "FR-2.3"   # Product history audit log
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections:
+      - "Database Schema"
+      - "product_version_history"
+      - "API Design"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.2.product-versioning-history.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-002-product-modal.md"
+      relevance: "Version display in edit mode, version history panel"
+      components:
+        - "Version badge in modal header"
+        - "Save button with version indicator"
+        - "Version warning banner"
+        - "Version history side panel"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for product_version_history"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "product_version_history table + RLS + indexes"
+  - type: "service"
+    count: 1
+    description: "product-history-service.ts (history operations + diff detection)"
+  - type: "api"
+    count: 2
+    description: "GET /api/v1/technical/products/:id/versions, GET /api/v1/technical/products/:id/history"
+  - type: "component"
+    count: 5
+    description: "VersionBadge, VersionHistoryPanel, VersionHistoryItem, VersionDiff, VersionWarningBanner"
+  - type: "test"
+    count: 3
+    description: "Unit tests for diff detection, integration tests for version increment, RLS tests"
+
+# Technical notes
+technical_notes:
+  - "Depends on Story 02.1 - products table must exist"
+  - "Version auto-increments on any field change (except if no actual changes)"
+  - "Version never decreases (system-managed, reject manual decrease)"
+  - "History records are immutable (no UPDATE/DELETE allowed)"
+  - "changed_fields JSONB format: {field: {old: value, new: value}}"
+  - "Initial creation (v1) shows 'Initial creation' instead of field changes"
+  - "Use ADR-013 RLS pattern via product_id lookup"
+  - "Version history panel slides in from right (400px width)"
+  - "Performance target: History query < 500ms for 100 versions"
+
+# MVP scope
+mvp_scope:
+  included:
+    - "Automatic version creation on product changes"
+    - "Version history list with timestamp, user, change summary"
+    - "View previous version details (read-only)"
+    - "Version numbering (auto-increment)"
+    - "Audit trail for product changes"
+  deferred_to_phase_1:
+    - "Version comparison (side-by-side diff view)"
+    - "Version labels/tags"
+    - "Version export to PDF/Excel"
+    - "Version comments"
+    - "Restore previous version"
+  deferred_to_phase_2:
+    - "Version branching"
+    - "Change approval workflow"
+    - "Version merge"
+    - "Automated version snapshots"
+    - "Version analytics"

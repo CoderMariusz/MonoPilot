@@ -1,0 +1,370 @@
+# Story 04.4 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # PATCH - Update yield (manual entry)
+  - method: "PATCH"
+    path: "/api/production/work-orders/:id/yield"
+    description: "Update produced quantity (manual yield entry)"
+    file: "apps/frontend/app/api/production/work-orders/[id]/yield/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "admin", "owner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Work Order ID"
+      body:
+        type: "UpdateYieldRequest"
+        schema:
+          produced_quantity:
+            type: "number"
+            required: true
+            validation: "nonnegative, finite"
+          notes:
+            type: "string"
+            required: false
+            maxLength: 1000
+
+    response:
+      status: 200
+      type: "YieldUpdateResult"
+      schema:
+        wo_id: "UUID"
+        produced_quantity: "number"
+        planned_quantity: "number"
+        yield_percent: "number"
+        yield_status: "'excellent' | 'below_target' | 'low_yield' | 'not_started'"
+        updated_at: "string (ISO timestamp)"
+
+    errors:
+      - status: 400
+        code: "INVALID_PRODUCED_QUANTITY"
+        message: "Produced quantity must be positive"
+        when: "produced_quantity is negative"
+      - status: 400
+        code: "OVERPRODUCTION_NOT_ALLOWED"
+        message: "Produced quantity cannot exceed planned quantity ({planned})"
+        when: "allow_overproduction = false AND produced_quantity > planned_quantity"
+      - status: 400
+        code: "WO_NOT_IN_PROGRESS"
+        message: "Yield can only be updated for Work Orders with status 'In Progress'"
+        when: "WO status is not 'in_progress'"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO with given ID not found or not accessible"
+
+  # GET - Yield history
+  - method: "GET"
+    path: "/api/production/work-orders/:id/yield/history"
+    description: "Get yield update history for a work order"
+    file: "apps/frontend/app/api/production/work-orders/[id]/yield/history/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "quality_manager", "admin", "owner", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Work Order ID"
+      query:
+        limit:
+          type: "number"
+          required: false
+          default: 50
+        offset:
+          type: "number"
+          required: false
+          default: 0
+
+    response:
+      status: 200
+      type: "YieldHistoryResponse"
+      schema:
+        logs:
+          type: "array"
+          items:
+            id: "UUID"
+            timestamp: "string (ISO)"
+            user_name: "string"
+            old_quantity: "number"
+            new_quantity: "number"
+            old_yield_percent: "number"
+            new_yield_percent: "number"
+            notes: "string | null"
+        total: "number"
+        has_more: "boolean"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO with given ID not found or not accessible"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/yield-service.ts"
+    description: "Business logic for yield tracking"
+    exports:
+      - name: "updateWorkOrderYield"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "producedQuantity: number"
+          - "notes?: string"
+        returns: "Promise<YieldUpdateResult>"
+        description: "Update produced quantity and calculate yield"
+
+      - name: "getYieldHistory"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "options?: { limit?: number; offset?: number }"
+        returns: "Promise<YieldHistoryResponse>"
+        description: "Fetch yield update history for a work order"
+
+      - name: "calculateYieldPercentage"
+        type: "function"
+        params:
+          - "producedQuantity: number"
+          - "plannedQuantity: number"
+        returns: "number"
+        description: "Calculate yield percentage, rounded to 1 decimal"
+
+      - name: "getYieldIndicatorStatus"
+        type: "function"
+        params:
+          - "yieldPercent: number"
+        returns: "'excellent' | 'below_target' | 'low_yield' | 'not_started'"
+        description: "Get yield status based on thresholds"
+
+      - name: "getYieldIndicatorColor"
+        type: "function"
+        params:
+          - "yieldPercent: number"
+        returns: "'green' | 'yellow' | 'red' | 'gray'"
+        description: "Get color indicator based on yield percentage"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/yield.ts"
+    description: "Yield TypeScript interfaces"
+    exports:
+      - "YieldUpdateRequest"
+      - "YieldUpdateResult"
+      - "YieldLog"
+      - "YieldHistoryResponse"
+      - "YieldStatus"
+      - "YieldColor"
+
+# Implementation patterns
+patterns:
+  api_route_patch: |
+    // apps/frontend/app/api/production/work-orders/[id]/yield/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { updateYieldSchema } from '@/lib/validation/yield-validation';
+
+    export async function PATCH(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // 1. Verify auth
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // 2. Parse and validate request body
+      const body = await request.json();
+      const validation = updateYieldSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: validation.error.errors[0].message },
+          { status: 400 }
+        );
+      }
+
+      const { produced_quantity, notes } = validation.data;
+
+      // 3. Fetch WO with org context (RLS applied)
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id, status, planned_quantity, produced_quantity, org_id')
+        .eq('id', params.id)
+        .single();
+
+      if (woError || !wo) {
+        return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
+      }
+
+      // 4. Validate WO status
+      if (wo.status !== 'in_progress') {
+        return NextResponse.json(
+          { error: 'Yield can only be updated for Work Orders with status In Progress' },
+          { status: 400 }
+        );
+      }
+
+      // 5. Check overproduction setting
+      const { data: settings } = await supabase
+        .from('production_settings')
+        .select('allow_overproduction')
+        .eq('org_id', wo.org_id)
+        .single();
+
+      const allowOverproduction = settings?.allow_overproduction ?? false;
+      if (!allowOverproduction && produced_quantity > wo.planned_quantity) {
+        return NextResponse.json(
+          { error: `Produced quantity cannot exceed planned quantity (${wo.planned_quantity})` },
+          { status: 400 }
+        );
+      }
+
+      // 6. Calculate yields
+      const oldYieldPercent = wo.planned_quantity > 0
+        ? Math.round((wo.produced_quantity / wo.planned_quantity) * 1000) / 10
+        : 0;
+      const newYieldPercent = wo.planned_quantity > 0
+        ? Math.round((produced_quantity / wo.planned_quantity) * 1000) / 10
+        : 0;
+
+      // 7. Start transaction: update WO + insert log
+      const { error: updateError } = await supabase
+        .from('work_orders')
+        .update({
+          produced_quantity,
+          yield_percent: newYieldPercent,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', params.id);
+
+      if (updateError) {
+        return NextResponse.json({ error: 'Failed to update yield' }, { status: 500 });
+      }
+
+      // 8. Insert yield log
+      await supabase.from('yield_logs').insert({
+        org_id: wo.org_id,
+        wo_id: params.id,
+        old_quantity: wo.produced_quantity,
+        new_quantity: produced_quantity,
+        old_yield_percent: oldYieldPercent,
+        new_yield_percent: newYieldPercent,
+        notes,
+        created_by: user.id
+      });
+
+      // 9. Return result
+      return NextResponse.json({
+        wo_id: params.id,
+        produced_quantity,
+        planned_quantity: wo.planned_quantity,
+        yield_percent: newYieldPercent,
+        yield_status: getYieldStatus(newYieldPercent),
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    function getYieldStatus(yieldPercent: number): string {
+      if (yieldPercent === 0) return 'not_started';
+      if (yieldPercent >= 80) return 'excellent';
+      if (yieldPercent >= 70) return 'below_target';
+      return 'low_yield';
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/yield-service.ts
+
+    export type YieldStatus = 'excellent' | 'below_target' | 'low_yield' | 'not_started';
+    export type YieldColor = 'green' | 'yellow' | 'red' | 'gray';
+
+    export interface YieldUpdateResult {
+      wo_id: string;
+      produced_quantity: number;
+      planned_quantity: number;
+      yield_percent: number;
+      yield_status: YieldStatus;
+      updated_at: string;
+    }
+
+    export async function updateWorkOrderYield(
+      woId: string,
+      producedQuantity: number,
+      notes?: string
+    ): Promise<YieldUpdateResult> {
+      const response = await fetch(`/api/production/work-orders/${woId}/yield`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ produced_quantity: producedQuantity, notes })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update yield');
+      }
+
+      return response.json();
+    }
+
+    export function calculateYieldPercentage(
+      producedQuantity: number,
+      plannedQuantity: number
+    ): number {
+      if (plannedQuantity === 0) return 0;
+      return Math.round((producedQuantity / plannedQuantity) * 1000) / 10;
+    }
+
+    export function getYieldIndicatorStatus(yieldPercent: number): YieldStatus {
+      if (yieldPercent === 0) return 'not_started';
+      if (yieldPercent >= 80) return 'excellent';
+      if (yieldPercent >= 70) return 'below_target';
+      return 'low_yield';
+    }
+
+    export function getYieldIndicatorColor(yieldPercent: number): YieldColor {
+      if (yieldPercent === 0) return 'gray';
+      if (yieldPercent >= 80) return 'green';
+      if (yieldPercent >= 70) return 'yellow';
+      return 'red';
+    }
+
+# Business rules
+business_rules:
+  yield_calculation:
+    formula: "(produced_quantity / planned_quantity) * 100"
+    rounding: "1 decimal place"
+    edge_case: "If planned_quantity = 0, yield = 0"
+
+  yield_thresholds:
+    excellent: ">= 80%"
+    below_target: "70% - 79%"
+    low_yield: "< 70%"
+    not_started: "0%"
+
+  status_restriction:
+    - "Yield entry only allowed when WO status = 'In Progress'"
+    - "Completed WO shows final yield (read-only)"
+    - "Draft/Released WO shows message 'Start WO to enter yield'"
+
+  overproduction:
+    - "If allow_overproduction = false, reject produced_quantity > planned_quantity"
+    - "If allow_overproduction = true, allow yield > 100%"
+
+  audit_trail:
+    - "Every yield update creates yield_logs entry"
+    - "Logs include old/new quantities, old/new yield %, notes, user, timestamp"

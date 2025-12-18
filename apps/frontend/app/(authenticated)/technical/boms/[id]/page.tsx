@@ -48,63 +48,7 @@ import { BOMFormModal } from '@/components/technical/BOMFormModal'
 import { BOMCloneModal } from '@/components/technical/BOMCloneModal'
 import { BOMCompareModal } from '@/components/technical/BOMCompareModal'
 import { BOMItemFormModal } from '@/components/technical/BOMItemFormModal'
-
-interface Product {
-  id: string
-  code: string
-  name: string
-  type: string
-  uom: string
-}
-
-interface BOMItem {
-  id: string
-  bom_id: string
-  component_id: string
-  component?: Product
-  operation_seq: number
-  is_output: boolean
-  quantity: number
-  uom: string
-  scrap_percent: number
-  sequence: number
-  line_ids?: string[] | null
-  consume_whole_lp: boolean
-  notes?: string | null
-}
-
-interface BOM {
-  id: string
-  org_id: string
-  product_id: string
-  product: Product
-  version: string
-  effective_from: string | Date
-  effective_to: string | Date | null
-  status: 'Draft' | 'Active' | 'Phased Out' | 'Inactive'
-  output_qty: number
-  output_uom: string
-  notes: string | null
-  // Story 2.28/2.29: New fields
-  routing_id?: string | null
-  units_per_box: number | null
-  boxes_per_pallet: number | null
-  created_by: string
-  updated_by: string
-  created_at: string | Date
-  updated_at: string | Date
-}
-
-interface Allergen {
-  id: string
-  code: string
-  name: string
-}
-
-interface BOMAllergens {
-  contains: Allergen[]
-  may_contain: Allergen[]
-}
+import type { BOMWithProduct, BOMItem, BOMAllergens } from '@/lib/validation/bom-schemas'
 
 // Status config
 const STATUS_COLORS: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
@@ -118,7 +62,7 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
   const { id } = use(params)
   const router = useRouter()
 
-  const [bom, setBOM] = useState<BOM | null>(null)
+  const [bom, setBOM] = useState<BOMWithProduct | null>(null)
   const [items, setItems] = useState<BOMItem[]>([])
   const [allergens, setAllergens] = useState<BOMAllergens>({ contains: [], may_contain: [] })
   const [loading, setLoading] = useState(true)

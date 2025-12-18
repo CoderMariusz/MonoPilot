@@ -1,0 +1,112 @@
+# Story 07.5 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.5"
+  name: "SO Clone/Import"
+  slug: "so-clone-import"
+  epic: "07-shipping"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "fullstack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # No new tables (uses existing sales_orders, sales_order_lines)
+  - api.yaml         # POST /:id/clone and POST /import endpoints
+  - frontend.yaml    # PRIMARY - Clone dialog, Import dialog, Preview table, Result summary
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "07.2"
+      name: "Sales Orders Core CRUD"
+      provides:
+        - "sales_orders table"
+        - "sales_order_lines table"
+        - "SO CRUD services and endpoints"
+  optional:
+    - story: "07.4"
+      name: "SO Line Pricing"
+      reason: "Pricing gets cloned with lines"
+  blocks:
+    - story: "07.7"
+      name: "Inventory Allocation"
+      reason: "Cloned/imported orders can be allocated"
+  blocked_by: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.14 (Clone SO)", "FR-7.20 (CSV Import)"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["lines 382-405: Clone and Import patterns"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.5.so-clone-import.md"
+  wireframes:
+    - id: "SHIP-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-006-sales-order-create.md"
+      focus: "Create wizard with clone/template option tabs"
+    - id: "SHIP-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-007-sales-order-detail.md"
+      focus: "Clone button in SO detail page"
+  patterns:
+    - "apps/frontend/lib/services/*-service.ts (service pattern)"
+    - "apps/frontend/lib/validation/*.ts (Zod schemas)"
+    - "apps/frontend/components/ui/dialog.tsx (modal patterns)"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "POST /api/shipping/sales-orders/:id/clone and POST /api/shipping/sales-orders/import"
+  - type: "service"
+    count: 2
+    description: "SalesOrderService.cloneSalesOrder and .importSalesOrdersFromCSV methods"
+  - type: "utility"
+    count: 2
+    description: "CSV parser and validator utility, order number generator"
+  - type: "component"
+    count: 4
+    description: "CloneOrderDialog, ImportOrdersDialog, ImportPreviewTable, ImportResultSummary"
+  - type: "validation"
+    count: 1
+    description: "CSV row schema with customer/product/qty/price validation"
+  - type: "hook"
+    count: 1
+    description: "useCloneSalesOrder hook for clone mutation"
+  - type: "test"
+    count: 3
+    description: "Unit (clone logic, CSV validation), Integration (API), E2E (workflows)"
+
+# Technical notes
+technical_notes:
+  - "Clone: Read original SO + lines, create new SO with reset fields, renumber lines sequentially"
+  - "Clone: Resets order_number (auto-generated), status (draft), dates, quantities (ordered only)"
+  - "Clone: Preserves customer_id, shipping_address_id, lines, unit_price, notes"
+  - "Clone: Resets allergen_validated to false (must re-validate in Story 07.6)"
+  - "Import: Parse CSV, validate rows (customer/product/qty exist), group by customer_code"
+  - "Import: Create one SO per unique customer_code with lines in CSV order"
+  - "Import: Required columns: customer_code, product_code, quantity"
+  - "Import: Optional columns: unit_price (defaults to product.unit_price), customer_po, promised_ship_date, required_delivery_date, notes"
+  - "Import: Row-level error reporting with line numbers and specific error messages"
+  - "Import: Continue processing valid rows even if some rows fail"
+  - "RLS: Clone ensures original SO belongs to user's org"
+  - "RLS: Import validates customer_code and product_code against org_id scope"
+  - "Permissions: SALES, MANAGER, ADMIN, SUPER_ADMIN roles required"
+  - "Unit price: Cloned at original price; import defaults to product standard price unless CSV specifies"
+
+# Phase notes
+phase_notes:
+  phase_1b: "Clone and import for Phase 1B (Phase 1A: core SO CRUD)"
+  future_phase_2: "SO templates (save as reusable template with name)"
+  future_phase_2_b: "Recurring orders (auto-generate on schedule)"
+  future_epic_11: "EDI 850 integration and API-based order import"
+

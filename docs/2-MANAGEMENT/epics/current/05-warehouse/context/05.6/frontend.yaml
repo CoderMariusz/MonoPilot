@@ -1,0 +1,405 @@
+# Story 05.6 - Frontend Specification
+# Purpose: Components, pages, UX patterns, wireframe references
+# Agent: FRONTEND-DEV
+
+# Page structure
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/page.tsx"
+    type: "Server Component"
+    description: "LP detail page - main entry point"
+    props:
+      params: "{ id: string }"
+    data_fetching: "Server-side fetch via getLPDetail()"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/loading.tsx"
+    type: "Loading UI"
+    description: "Skeleton loader matching final layout"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/error.tsx"
+    type: "Error Boundary"
+    description: "Error state with retry button"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/not-found.tsx"
+    type: "Not Found"
+    description: "404 page with Go Back button"
+
+# Components
+components:
+  # Layout Components
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPDetailHeader.tsx"
+    description: "Page header with LP number, status badges, breadcrumb"
+    props:
+      lpNumber: "string"
+      status: "LPStatus"
+      qaStatus: "QAStatus"
+      onBack: "() => void"
+    features:
+      - "Back button"
+      - "LP Number (large, prominent)"
+      - "Status badge with color"
+      - "QA Status badge with color"
+      - "Breadcrumb: Warehouse > License Plates > LP-XXXXXXXX"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPDetailTabs.tsx"
+    description: "Tab navigation for Overview, Genealogy, History"
+    props:
+      activeTab: "'overview' | 'genealogy' | 'history'"
+      onTabChange: "(tab: string) => void"
+    tabs:
+      - { id: "overview", label: "Overview", default: true }
+      - { id: "genealogy", label: "Genealogy" }
+      - { id: "history", label: "History" }
+
+  # Overview Tab Components
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPOverviewTab.tsx"
+    description: "Overview tab container with card grid"
+    props:
+      lp: "LPDetailView"
+    layout: "2-column grid (3 columns on xl screens)"
+    children:
+      - "LPIdentityCard"
+      - "LPProductCard"
+      - "LPLocationCard"
+      - "LPTrackingCard"
+      - "LPReferencesCard"
+      - "LPGS1Card"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPIdentityCard.tsx"
+    description: "Identity section - LP number, status, dates"
+    props:
+      lpNumber: "string"
+      status: "LPStatus"
+      qaStatus: "QAStatus"
+      source: "LPSource"
+      createdAt: "string"
+      updatedAt: "string"
+    displays:
+      - "LP Number (large)"
+      - "Status badge"
+      - "QA Status badge"
+      - "Source type"
+      - "Created date (formatted)"
+      - "Updated date (formatted)"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPProductCard.tsx"
+    description: "Product section - name, code, qty, UoM"
+    props:
+      product: "{ id: string; name: string; code: string }"
+      quantity: "number"
+      uom: "string"
+      catchWeightKg: "number | null"
+    displays:
+      - "Product name (link to product detail)"
+      - "Product code"
+      - "Quantity with UoM"
+      - "Catch weight (if applicable)"
+      - "Visual quantity indicator (progress bar)"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPLocationCard.tsx"
+    description: "Location section - warehouse, location path"
+    props:
+      warehouse: "{ id: string; name: string; code: string }"
+      location: "{ id: string; full_path: string }"
+    displays:
+      - "Warehouse name and code (link)"
+      - "Full location path"
+      - "Location type badge (if available)"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPTrackingCard.tsx"
+    description: "Tracking section - batch, expiry, manufacture date"
+    props:
+      batchNumber: "string | null"
+      supplierBatchNumber: "string | null"
+      expiryDate: "string | null"
+      manufactureDate: "string | null"
+    displays:
+      - "Batch number"
+      - "Supplier batch number"
+      - "Expiry date with warning indicator"
+      - "Manufacture date"
+      - "Days until expiry (calculated)"
+    uses:
+      - "LPExpiryIndicator"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPReferencesCard.tsx"
+    description: "References section - source links"
+    props:
+      source: "LPSource"
+      woId: "string | null"
+      grnId: "string | null"
+      poNumber: "string | null"
+      parentLpId: "string | null"
+      consumedByWoId: "string | null"
+      palletId: "string | null"
+    displays:
+      - "Source type"
+      - "Work Order link (if production)"
+      - "GRN link (if receipt)"
+      - "PO Number (if from PO)"
+      - "Parent LP link (if split)"
+      - "Consumed by WO link (if consumed)"
+      - "Pallet link (Phase 3 placeholder)"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPGS1Card.tsx"
+    description: "GS1 section - GTIN, SSCC (Phase 3 placeholder)"
+    props:
+      gtin: "string | null"
+      sscc: "string | null"
+    displays:
+      - "GTIN field (placeholder note)"
+      - "SSCC field (placeholder note)"
+      - "Greyed out to indicate future feature"
+
+  # Genealogy Tab
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPGenealogyTab.tsx"
+    description: "Genealogy tab - uses Story 05.2 components"
+    props:
+      lpId: "string"
+    integration: "Uses GenealogyTree from 05.2"
+    empty_state: "No genealogy history for this LP"
+
+  # History Tab (Placeholder)
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPHistoryTab.tsx"
+    description: "History tab container"
+    props:
+      lpId: "string"
+    phase_0_behavior: "Shows placeholder message"
+    uses:
+      - "LPHistoryPlaceholder"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPHistoryPlaceholder.tsx"
+    description: "Phase 2 placeholder for movement history"
+    displays:
+      - "Icon/illustration for 'under construction'"
+      - "Message: 'Movement History Coming in Phase 2'"
+      - "Description of future feature"
+      - "Link: 'Learn more about Phase 2 features'"
+
+  # Quick Actions
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPQuickActions.tsx"
+    description: "Quick actions panel"
+    props:
+      lpId: "string"
+      status: "LPStatus"
+      onBlock: "() => void"
+      onUnblock: "() => void"
+      onRefresh: "() => void"
+    actions:
+      - { id: "block", label: "Block", visible: "status === 'available'", variant: "destructive" }
+      - { id: "unblock", label: "Unblock", visible: "status === 'blocked'" }
+      - { id: "print", label: "Print Label", disabled: true, tooltip: "Coming in Phase 1 (Story 05.14)" }
+      - { id: "history", label: "View History", action: "switches to history tab" }
+
+  # Modals
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPBlockModal.tsx"
+    description: "Block LP confirmation modal"
+    props:
+      lpId: "string"
+      lpNumber: "string"
+      isOpen: "boolean"
+      onClose: "() => void"
+      onSuccess: "() => void"
+    form:
+      reason:
+        type: "textarea"
+        required: true
+        maxLength: 500
+        placeholder: "Enter reason for blocking this LP..."
+    buttons:
+      - { label: "Cancel", variant: "outline", action: "onClose" }
+      - { label: "Block LP", variant: "destructive", action: "submit" }
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPUnblockModal.tsx"
+    description: "Unblock LP confirmation modal"
+    props:
+      lpId: "string"
+      lpNumber: "string"
+      blockReason: "string | null"
+      isOpen: "boolean"
+      onClose: "() => void"
+      onSuccess: "() => void"
+    displays:
+      - "Original block reason (if available)"
+      - "Confirmation message"
+    buttons:
+      - { label: "Cancel", variant: "outline", action: "onClose" }
+      - { label: "Unblock LP", variant: "default", action: "submit" }
+
+  # Shared Components
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPExpiryIndicator.tsx"
+    description: "Expiry date with color-coded warning"
+    props:
+      expiryDate: "string | null"
+    logic:
+      - "Calculate days remaining"
+      - "Red badge 'EXPIRED' if < 0"
+      - "Red text with warning icon if 0-7 days"
+      - "Yellow text with warning icon if 8-30 days"
+      - "Green text if > 30 days"
+      - "Gray text 'N/A' if null"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPQuantityProgress.tsx"
+    description: "Visual quantity indicator"
+    props:
+      quantity: "number"
+      reservedQuantity: "number"
+    displays:
+      - "Progress bar showing reserved vs total"
+      - "Text: {quantity} {uom}"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPFieldLabel.tsx"
+    description: "Consistent field label component"
+    props:
+      label: "string"
+      value: "string | React.ReactNode"
+      emptyText: "string (default: '-')"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/LPEmptyState.tsx"
+    description: "Empty state message component"
+    props:
+      title: "string"
+      description: "string"
+      icon: "React.ComponentType"
+
+# UX Patterns
+ux:
+  wireframes:
+    - id: "WH-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      sections:
+        - "Header Info Section"
+        - "Tabs Navigation"
+        - "Details Tab"
+        - "Genealogy Tab View"
+        - "Movement History Tab"
+        - "Audit Tab"
+        - "Quick Actions"
+        - "Loading State"
+        - "Error States"
+
+  status_badges:
+    available:
+      background: "bg-green-100"
+      border: "border-green-300"
+      text: "text-green-800"
+      icon: "CheckCircle"
+    reserved:
+      background: "bg-yellow-100"
+      border: "border-yellow-300"
+      text: "text-yellow-800"
+      icon: "Lock"
+    consumed:
+      background: "bg-gray-100"
+      border: "border-gray-300"
+      text: "text-gray-500"
+      icon: "Archive"
+    blocked:
+      background: "bg-red-100"
+      border: "border-red-300"
+      text: "text-red-800"
+      icon: "Ban"
+
+  qa_badges:
+    pending:
+      background: "bg-yellow-100"
+      border: "border-yellow-300"
+      text: "text-yellow-800"
+      icon: "Clock"
+    passed:
+      background: "bg-green-100"
+      border: "border-green-300"
+      text: "text-green-800"
+      icon: "CheckCircle"
+    failed:
+      background: "bg-red-100"
+      border: "border-red-300"
+      text: "text-red-800"
+      icon: "XCircle"
+    quarantine:
+      background: "bg-orange-100"
+      border: "border-orange-300"
+      text: "text-orange-800"
+      icon: "AlertTriangle"
+
+  expiry_colors:
+    expired: { text: "text-red-600", badge: "EXPIRED", icon: "AlertCircle" }
+    critical: { text: "text-red-600", days: "0-7", icon: "AlertTriangle" }
+    warning: { text: "text-yellow-600", days: "8-30", icon: "AlertTriangle" }
+    normal: { text: "text-green-600", days: ">30", icon: "CheckCircle" }
+    na: { text: "text-gray-400", value: "N/A" }
+
+  states:
+    - loading: "Skeleton loaders matching final layout"
+    - empty: "Empty state with helpful message"
+    - error: "Error boundary with retry button"
+    - not_found: "404 page with Go Back button"
+    - success: "Full detail view with all tabs"
+
+  transitions:
+    - "Smooth tab switching (<100ms client-side)"
+    - "Modal open/close with animation"
+    - "Status badge color transition on block/unblock"
+    - "Skeleton to content fade transition"
+
+  accessibility:
+    touch_targets: "48dp minimum"
+    contrast: "WCAG AA 4.5:1 minimum"
+    keyboard_nav:
+      - "Tab through interactive elements"
+      - "Enter to activate buttons/links"
+      - "Escape to close modals"
+    screen_reader:
+      - "Page title announced"
+      - "Status badges have aria-label"
+      - "Tab panels properly labeled"
+      - "Modal focus trap"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-lp-detail.ts"
+    description: "React Query hook for LP detail"
+    exports:
+      - name: "useLPDetail"
+        params: "lpId: string"
+        returns: "UseQueryResult<LPDetailView>"
+        pattern: |
+          import { useQuery } from '@tanstack/react-query';
+
+          export function useLPDetail(lpId: string) {
+            return useQuery({
+              queryKey: ['lp-detail', lpId],
+              queryFn: () => fetch(`/api/warehouse/license-plates/${lpId}`).then(r => r.json()),
+              staleTime: 30 * 1000, // 30 seconds
+              enabled: !!lpId,
+            });
+          }
+
+  - path: "apps/frontend/lib/hooks/use-lp-transactions.ts"
+    description: "React Query hook for LP transactions"
+    exports:
+      - name: "useLPTransactions"
+        params: "lpId: string, options?: { page?: number; limit?: number }"
+        returns: "UseQueryResult<PaginatedResult<LPTransaction>>"
+
+  - path: "apps/frontend/lib/hooks/use-lp-block.ts"
+    description: "Mutation hook for block/unblock"
+    exports:
+      - name: "useLPBlock"
+        params: "lpId: string"
+        returns: "UseMutationResult"
+        invalidates: "['lp-detail', lpId]"
+      - name: "useLPUnblock"
+        params: "lpId: string"
+        returns: "UseMutationResult"
+        invalidates: "['lp-detail', lpId]"
+
+# Performance
+performance:
+  initial_load: "<500ms"
+  tab_switch: "<100ms (client-side)"
+  modal_open: "<50ms"
+  block_action: "<300ms"
+  bundle_size:
+    - "Code split by tab"
+    - "Lazy load genealogy components"
+    - "Skeleton components minimal"

@@ -1,0 +1,336 @@
+# Story 05.11 - Database Schema
+# Purpose: Tables, RLS policies, indexes, functions for GRN from PO
+# Agent: BACKEND-DEV (database focus)
+# Note: Core grns/grn_items tables created in 05.10. This extends for PO integration.
+
+# Dependencies from other stories (pre-existing tables)
+table_dependencies:
+  from_05_0:
+    - table: "warehouse_settings"
+      columns_used:
+        - "allow_over_receipt"
+        - "over_receipt_tolerance_pct"
+        - "require_batch_on_receipt"
+        - "require_expiry_on_receipt"
+        - "require_qa_on_receipt"
+        - "default_qa_status"
+        - "auto_generate_lp_number"
+        - "lp_number_prefix"
+  from_05_1:
+    - table: "license_plates"
+      columns_used:
+        - "id"
+        - "lp_number"
+        - "product_id"
+        - "quantity"
+        - "uom"
+        - "batch_number"
+        - "expiry_date"
+        - "location_id"
+        - "warehouse_id"
+        - "qa_status"
+        - "status"
+        - "source"
+        - "grn_id"
+        - "po_number"
+  from_05_10:
+    - table: "grns"
+      columns_used:
+        - "id"
+        - "org_id"
+        - "grn_number"
+        - "source_type"
+        - "po_id"
+        - "supplier_id"
+        - "receipt_date"
+        - "warehouse_id"
+        - "location_id"
+        - "status"
+        - "notes"
+        - "received_by"
+    - table: "grn_items"
+      columns_used:
+        - "id"
+        - "grn_id"
+        - "product_id"
+        - "po_line_id"
+        - "ordered_qty"
+        - "received_qty"
+        - "uom"
+        - "lp_id"
+        - "batch_number"
+        - "supplier_batch_number"
+        - "gtin"
+        - "catch_weight_kg"
+        - "expiry_date"
+        - "manufacture_date"
+        - "location_id"
+        - "qa_status"
+        - "notes"
+    - table: "grn_number_sequences"
+    - function: "generate_grn_number(p_org_id UUID)"
+  from_03_3:
+    - table: "purchase_orders"
+      columns_used:
+        - "id"
+        - "org_id"
+        - "po_number"
+        - "status"
+        - "supplier_id"
+        - "warehouse_id"
+        - "expected_delivery_date"
+    - table: "purchase_order_lines"
+      columns_used:
+        - "id"
+        - "po_id"
+        - "product_id"
+        - "quantity"
+        - "received_qty"
+        - "uom"
+
+# Schema for GRN from PO - extends existing tables
+tables:
+  - name: "grns"
+    description: "GRN header - source_type='po' for PO receipts"
+    extends_from: "05.10"
+    key_columns_for_po:
+      - name: "source_type"
+        value: "'po'"
+        description: "Set to 'po' for PO receipts"
+      - name: "po_id"
+        type: "UUID"
+        references: "purchase_orders(id)"
+        description: "FK to source purchase order"
+      - name: "supplier_id"
+        type: "UUID"
+        references: "suppliers(id)"
+        description: "Copied from PO for denormalization"
+
+  - name: "grn_items"
+    description: "GRN line items with PO line reference and LP"
+    extends_from: "05.10"
+    key_columns_for_po:
+      - name: "po_line_id"
+        type: "UUID"
+        references: "purchase_order_lines(id)"
+        description: "FK to source PO line"
+      - name: "ordered_qty"
+        type: "DECIMAL(15,4)"
+        description: "Copied from PO line at receipt time"
+      - name: "lp_id"
+        type: "UUID"
+        references: "license_plates(id)"
+        description: "FK to created License Plate"
+
+  - name: "license_plates"
+    description: "LP created from GRN receipt"
+    extends_from: "05.1"
+    key_columns_for_grn:
+      - name: "grn_id"
+        type: "UUID"
+        references: "grns(id)"
+        description: "FK to source GRN"
+      - name: "source"
+        value: "'receipt'"
+        description: "Set to 'receipt' for GRN-created LPs"
+      - name: "po_number"
+        type: "TEXT"
+        description: "Denormalized PO number for quick reference"
+
+# PO Line Update for Received Qty
+po_line_updates:
+  table: "purchase_order_lines"
+  column: "received_qty"
+  operation: "INCREMENT"
+  description: "Add received quantity to existing received_qty"
+  sql_pattern: |
+    UPDATE purchase_order_lines
+    SET received_qty = COALESCE(received_qty, 0) + :new_received_qty
+    WHERE id = :po_line_id
+
+# PO Status Update Logic
+po_status_updates:
+  table: "purchase_orders"
+  logic: |
+    -- Check if all lines fully received
+    SELECT
+      CASE
+        WHEN SUM(CASE WHEN received_qty >= quantity THEN 1 ELSE 0 END) = COUNT(*)
+        THEN 'closed'
+        WHEN SUM(COALESCE(received_qty, 0)) > 0
+        THEN 'partial'
+        ELSE status  -- Keep current
+      END as new_status
+    FROM purchase_order_lines
+    WHERE po_id = :po_id
+  status_transitions:
+    - from: ["approved", "confirmed"]
+      to: "partial"
+      condition: "First receipt on any line"
+    - from: ["approved", "confirmed", "partial"]
+      to: "closed"
+      condition: "All lines fully received (received_qty >= quantity)"
+
+# Indexes specific to GRN from PO queries
+indexes:
+  - name: "idx_grn_po_lookup"
+    table: "grns"
+    columns: ["po_id"]
+    condition: "WHERE po_id IS NOT NULL"
+    description: "Fast lookup of GRNs for a specific PO"
+
+  - name: "idx_grn_items_po_line"
+    table: "grn_items"
+    columns: ["po_line_id"]
+    condition: "WHERE po_line_id IS NOT NULL"
+    description: "Fast lookup of GRN items for a PO line"
+
+  - name: "idx_po_lines_received"
+    table: "purchase_order_lines"
+    columns: ["po_id", "received_qty"]
+    description: "Fast check of received quantities per PO"
+
+  - name: "idx_lp_grn_lookup"
+    table: "license_plates"
+    columns: ["grn_id"]
+    condition: "WHERE grn_id IS NOT NULL"
+    description: "Fast lookup of LPs created by a GRN"
+
+# RLS Policies (already defined in 05.10, reference here)
+rls_policies:
+  grns:
+    reference: "05.10"
+    pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  grn_items:
+    reference: "05.10"
+    pattern: "grn_id IN (SELECT id FROM grns WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+
+  license_plates:
+    reference: "05.1"
+    pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Transaction Pattern for createFromPO
+transaction_pattern:
+  name: "createFromPO"
+  description: "Atomic transaction for GRN creation from PO"
+  steps:
+    - step: 1
+      operation: "Validate PO status and lines"
+      sql: |
+        SELECT po.*, pol.*
+        FROM purchase_orders po
+        JOIN purchase_order_lines pol ON pol.po_id = po.id
+        WHERE po.id = :po_id
+        AND po.status IN ('approved', 'confirmed', 'partial')
+        FOR UPDATE  -- Lock PO for concurrent receipt prevention
+
+    - step: 2
+      operation: "Validate over-receipt per settings"
+      sql: |
+        SELECT allow_over_receipt, over_receipt_tolerance_pct
+        FROM warehouse_settings
+        WHERE org_id = :org_id
+
+    - step: 3
+      operation: "Generate GRN number"
+      sql: "SELECT generate_grn_number(:org_id)"
+
+    - step: 4
+      operation: "Create GRN header"
+      sql: |
+        INSERT INTO grns (
+          org_id, grn_number, source_type, po_id, supplier_id,
+          receipt_date, warehouse_id, location_id, status, notes, received_by
+        ) VALUES (
+          :org_id, :grn_number, 'po', :po_id, :supplier_id,
+          :receipt_date, :warehouse_id, :location_id, 'completed', :notes, :user_id
+        ) RETURNING id
+
+    - step: 5
+      operation: "Create GRN items and LPs (loop per item)"
+      sql: |
+        -- For each item in request:
+        -- 5a. Create LP
+        INSERT INTO license_plates (...)
+        RETURNING id as lp_id;
+
+        -- 5b. Create GRN item with LP reference
+        INSERT INTO grn_items (grn_id, po_line_id, lp_id, ...)
+        VALUES (:grn_id, :po_line_id, :lp_id, ...);
+
+    - step: 6
+      operation: "Update PO line received quantities"
+      sql: |
+        UPDATE purchase_order_lines
+        SET received_qty = COALESCE(received_qty, 0) + :received_qty
+        WHERE id = :po_line_id
+
+    - step: 7
+      operation: "Update PO status"
+      sql: |
+        UPDATE purchase_orders
+        SET status = CASE
+          WHEN (SELECT SUM(CASE WHEN received_qty >= quantity THEN 1 ELSE 0 END) = COUNT(*)
+                FROM purchase_order_lines WHERE po_id = :po_id) THEN 'closed'
+          ELSE 'partial'
+        END
+        WHERE id = :po_id
+
+    - step: 8
+      operation: "COMMIT or ROLLBACK"
+      description: "Rollback entire transaction on any error"
+
+# Over-Receipt Calculation
+over_receipt_validation:
+  description: "Validate receipt quantity against ordered and tolerance"
+  inputs:
+    - "ordered_qty: DECIMAL - Original PO line quantity"
+    - "already_received_qty: DECIMAL - Sum of previous receipts"
+    - "attempting_qty: DECIMAL - Current receipt quantity"
+    - "allow_over_receipt: BOOLEAN - From settings"
+    - "tolerance_pct: DECIMAL - From settings"
+  calculation: |
+    total_after_receipt = already_received_qty + attempting_qty
+    max_allowed = ordered_qty * (1 + tolerance_pct / 100)
+
+    IF total_after_receipt > ordered_qty THEN
+      IF NOT allow_over_receipt THEN
+        RAISE ERROR "Over-receipt not allowed"
+      ELSE IF total_after_receipt > max_allowed THEN
+        RAISE ERROR "Over-receipt exceeds tolerance"
+      ELSE
+        LOG WARNING "Over-receipt within tolerance"
+      END IF
+    END IF
+  output:
+    - "is_valid: BOOLEAN"
+    - "is_over_receipt: BOOLEAN"
+    - "over_receipt_pct: DECIMAL (if applicable)"
+    - "max_allowed: DECIMAL"
+
+# Audit Trail
+audit_logging:
+  events:
+    - event: "grn_created"
+      fields:
+        - "grn_id"
+        - "po_id"
+        - "user_id"
+        - "items_count"
+        - "timestamp"
+    - event: "over_receipt"
+      fields:
+        - "grn_id"
+        - "po_line_id"
+        - "ordered_qty"
+        - "received_qty"
+        - "over_receipt_pct"
+        - "timestamp"
+    - event: "po_status_changed"
+      fields:
+        - "po_id"
+        - "previous_status"
+        - "new_status"
+        - "triggered_by_grn_id"
+        - "timestamp"

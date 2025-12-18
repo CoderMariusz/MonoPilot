@@ -1,0 +1,481 @@
+# Story 02.5b - API Specification
+# Purpose: Endpoints, request/response schemas for Phase 1B advanced BOM items
+# Agent: BACKEND-DEV (API focus)
+
+# Extended endpoints for Phase 1B
+endpoints:
+  # Existing endpoint - extended request/response
+  - method: "POST"
+    path: "/api/v1/technical/boms/:id/items"
+    description: "Create BOM item - extended with Phase 1B fields"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+    phase: "1B extension"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "CreateBOMItemRequest"
+        schema:
+          # Core fields (from 02.5a)
+          product_id: { type: "string", format: "uuid", required: true }
+          quantity: { type: "number", required: true, validation: "> 0, max 6 decimals" }
+          uom: { type: "string", required: true }
+          sequence: { type: "integer", required: false, default: "auto-increment" }
+          scrap_percent: { type: "number", required: false, default: 0, range: "0-100" }
+          operation_seq: { type: "integer", required: false, nullable: true }
+          notes: { type: "string", required: false, nullable: true, maxLength: 500 }
+
+          # Phase 1B fields (this story)
+          consume_whole_lp: { type: "boolean", required: false, default: false }
+          line_ids: { type: "array", items: "uuid", required: false, nullable: true, description: "NULL = all lines" }
+          is_by_product: { type: "boolean", required: false, default: false }
+          yield_percent: { type: "number", required: "conditional", description: "Required if is_by_product=true" }
+          condition_flags: { type: "object", required: false, nullable: true, description: "JSONB e.g., {organic: true}" }
+
+    response:
+      status: 201
+      type: "BOMItem"
+      schema:
+        id: "UUID"
+        bom_id: "UUID"
+        product_id: "UUID"
+        product_code: "string"
+        product_name: "string"
+        product_type: "RM | ING | PKG | WIP | FG | BP"
+        quantity: "number"
+        uom: "string"
+        sequence: "integer"
+        scrap_percent: "number"
+        operation_seq: "integer | null"
+        operation_name: "string | null"
+        consume_whole_lp: "boolean"
+        line_ids: "UUID[] | null"
+        line_names: "string[] | null"
+        is_by_product: "boolean"
+        is_output: "boolean"  # alias for is_by_product
+        yield_percent: "number | null"
+        condition_flags: "object | null"
+        notes: "string | null"
+        created_at: "ISO timestamp"
+        updated_at: "ISO timestamp"
+
+    errors:
+      - status: 400
+        code: "INVALID_QUANTITY"
+        message: "Quantity must be greater than 0"
+      - status: 400
+        code: "YIELD_REQUIRED"
+        message: "yield_percent is required when is_by_product=true"
+      - status: 400
+        code: "INVALID_LINE_IDS"
+        message: "One or more line_ids are invalid"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+      - status: 403
+        code: "PERMISSION_DENIED"
+        message: "You do not have permission to modify this BOM"
+
+  # Existing endpoint - extended response
+  - method: "PUT"
+    path: "/api/v1/technical/boms/:id/items/:itemId"
+    description: "Update BOM item - extended with Phase 1B fields"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/[itemId]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+    phase: "1B extension"
+
+    request:
+      body:
+        type: "UpdateBOMItemRequest"
+        description: "Same as CreateBOMItemRequest - all fields optional"
+
+    response:
+      status: 200
+      type: "BOMItem"
+      description: "Same as POST response"
+
+  # NEW endpoint - Bulk import
+  - method: "POST"
+    path: "/api/v1/technical/boms/:id/items/bulk"
+    description: "Bulk create BOM items from import (CSV/JSON)"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+    phase: "1B new"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "BulkImportRequest"
+        schema:
+          items:
+            type: "array"
+            items: "CreateBOMItemRequest"
+            minItems: 1
+            maxItems: 500
+            description: "Array of BOM items to create"
+
+    response:
+      status: 201
+      type: "BulkImportResponse"
+      schema:
+        created: { type: "integer", description: "Number of items successfully created" }
+        total: { type: "integer", description: "Total items in request" }
+        items: { type: "array", items: "BOMItem", description: "Successfully created items" }
+        errors:
+          type: "array"
+          items:
+            row: { type: "integer", description: "Row number in original request" }
+            error: { type: "string", description: "Error message" }
+
+    errors:
+      - status: 400
+        code: "TOO_MANY_ITEMS"
+        message: "Maximum 500 items allowed per bulk import"
+      - status: 400
+        code: "VALIDATION_ERRORS"
+        message: "Some items failed validation"
+        details: "errors array in response body"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+
+  # Extended GET response - items list with byproducts separation
+  - method: "GET"
+    path: "/api/v1/technical/boms/:id/items"
+    description: "Get BOM items - extended response with byproducts separation"
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/route.ts"
+    auth: "required"
+    roles: ["*"]
+    phase: "1B extension"
+
+    response:
+      status: 200
+      type: "BOMItemsListResponse"
+      schema:
+        items:
+          type: "array"
+          items: "BOMItem"
+          description: "Input components (is_by_product=false)"
+        byproducts:
+          type: "array"
+          items: "BOMItem"
+          description: "Byproduct outputs (is_by_product=true)"
+        total: { type: "integer", description: "Total count (items + byproducts)" }
+        summary:
+          total_items: "integer"
+          total_input_qty: "number"
+          expected_output_qty: "number"
+          yield_percent: "number"
+          conditional_flags_summary: { type: "object", description: "{organic: 2, vegan: 1}" }
+
+  # Get production lines for dropdown
+  - method: "GET"
+    path: "/api/v1/settings/production-lines"
+    description: "Get production lines for checkbox selection"
+    file: "apps/frontend/app/api/v1/settings/production-lines/route.ts"
+    auth: "required"
+    roles: ["*"]
+    phase: "existing"
+    note: "Used by ProductionLinesCheckbox component"
+
+    response:
+      status: 200
+      type: "ProductionLinesResponse"
+      schema:
+        lines:
+          type: "array"
+          items:
+            id: "UUID"
+            name: "string"
+            code: "string"
+            is_active: "boolean"
+
+  # Get conditional flags for dropdown
+  - method: "GET"
+    path: "/api/v1/technical/conditional-flags"
+    description: "Get conditional flags for multi-select"
+    file: "apps/frontend/app/api/v1/technical/conditional-flags/route.ts"
+    auth: "required"
+    roles: ["*"]
+    phase: "existing"
+
+    response:
+      status: 200
+      type: "ConditionalFlagsResponse"
+      schema:
+        flags:
+          type: "array"
+          items:
+            id: "UUID"
+            code: "string"
+            name: "string"
+            is_active: "boolean"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/bom-items-service.ts"
+    description: "Extended BOM items service with Phase 1B functions"
+    exports:
+      # Existing exports (from 02.5a)
+      - name: "getBOMItems"
+        type: "async function"
+        params: ["bomId: string"]
+        returns: "Promise<BOMItemsListResponse>"
+        phase: "existing"
+
+      - name: "createBOMItem"
+        type: "async function"
+        params: ["bomId: string", "data: CreateBOMItemRequest"]
+        returns: "Promise<BOMItem>"
+        phase: "extended"
+        description: "Extended to handle Phase 1B fields"
+
+      - name: "updateBOMItem"
+        type: "async function"
+        params: ["bomId: string", "itemId: string", "data: UpdateBOMItemRequest"]
+        returns: "Promise<BOMItem>"
+        phase: "extended"
+
+      # NEW exports (Phase 1B)
+      - name: "bulkCreateBOMItems"
+        type: "async function"
+        params: ["bomId: string", "items: CreateBOMItemRequest[]"]
+        returns: "Promise<BulkImportResponse>"
+        phase: "1B new"
+        description: "Bulk import up to 500 items"
+
+      - name: "getByproducts"
+        type: "async function"
+        params: ["bomId: string"]
+        returns: "Promise<BOMItem[]>"
+        phase: "1B new"
+        description: "Get byproducts only (is_by_product=true)"
+
+      - name: "calculateYieldPercent"
+        type: "function"
+        params: ["byproductQty: number", "bomOutputQty: number"]
+        returns: "number"
+        phase: "1B new"
+        description: "Calculate byproduct yield percentage"
+
+      - name: "getProductionLines"
+        type: "async function"
+        params: ["orgId: string"]
+        returns: "Promise<ProductionLine[]>"
+        phase: "1B new"
+        description: "Get production lines for dropdown"
+
+      - name: "getConditionalFlags"
+        type: "async function"
+        params: []
+        returns: "Promise<ConditionalFlag[]>"
+        phase: "1B new"
+        description: "Get conditional flags for multi-select"
+
+      - name: "getItemsForLine"
+        type: "async function"
+        params: ["bomId: string", "lineId: string"]
+        returns: "Promise<BOMItem[]>"
+        phase: "1B new"
+        description: "Filter items by production line"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/bom.ts"
+    description: "Extended BOM TypeScript interfaces"
+    exports:
+      - name: "BOMItem"
+        phase: "extended"
+        fields:
+          # Core fields (02.5a)
+          - "id: string"
+          - "bom_id: string"
+          - "product_id: string"
+          - "product_code: string"
+          - "product_name: string"
+          - "product_type: ProductType"
+          - "quantity: number"
+          - "uom: string"
+          - "sequence: number"
+          - "scrap_percent: number"
+          - "operation_seq: number | null"
+          - "operation_name: string | null"
+          - "notes: string | null"
+          - "created_at: string"
+          - "updated_at: string"
+          # Phase 1B fields
+          - "consume_whole_lp: boolean"
+          - "line_ids: string[] | null"
+          - "line_names: string[] | null"
+          - "is_by_product: boolean"
+          - "is_output: boolean"
+          - "yield_percent: number | null"
+          - "condition_flags: ConditionFlags | null"
+
+      - name: "ConditionFlags"
+        phase: "1B new"
+        content: |
+          interface ConditionFlags {
+            organic?: boolean;
+            vegan?: boolean;
+            gluten_free?: boolean;
+            kosher?: boolean;
+            halal?: boolean;
+            [key: string]: boolean | undefined;
+          }
+
+      - name: "BOMItemsListResponse"
+        phase: "extended"
+        content: |
+          interface BOMItemsListResponse {
+            items: BOMItem[];
+            byproducts: BOMItem[];
+            total: number;
+            summary: BOMItemsSummary;
+          }
+
+      - name: "BulkImportRequest"
+        phase: "1B new"
+        content: |
+          interface BulkImportRequest {
+            items: CreateBOMItemRequest[];
+          }
+
+      - name: "BulkImportResponse"
+        phase: "1B new"
+        content: |
+          interface BulkImportResponse {
+            created: number;
+            total: number;
+            items: BOMItem[];
+            errors: { row: number; error: string }[];
+          }
+
+# Implementation patterns
+patterns:
+  bulk_import: |
+    // apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { bulkImportSchema } from '@/lib/validation/bom-items';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const bomId = params.id;
+
+      // Validate request
+      const body = await request.json();
+      const validation = bulkImportSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+
+      const { items } = validation.data;
+
+      // Check limit
+      if (items.length > 500) {
+        return NextResponse.json(
+          { error: 'Maximum 500 items allowed per bulk import' },
+          { status: 400 }
+        );
+      }
+
+      // Verify BOM exists and user has access
+      const { data: bom, error: bomError } = await supabase
+        .from('boms')
+        .select('id, output_qty')
+        .eq('id', bomId)
+        .single();
+
+      if (bomError || !bom) {
+        return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+      }
+
+      // Process items - validate each and collect results
+      const results = { created: 0, items: [], errors: [] };
+      const maxSequence = await getMaxSequence(supabase, bomId);
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        try {
+          // Auto-increment sequence if not provided
+          const sequence = item.sequence ?? maxSequence + (i + 1) * 10;
+
+          // Calculate yield if byproduct
+          let yieldPercent = item.yield_percent;
+          if (item.is_by_product && !yieldPercent && bom.output_qty > 0) {
+            yieldPercent = (item.quantity / bom.output_qty) * 100;
+          }
+
+          const { data, error } = await supabase
+            .from('bom_items')
+            .insert({
+              bom_id: bomId,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              uom: item.uom,
+              sequence,
+              scrap_percent: item.scrap_percent ?? 0,
+              operation_seq: item.operation_seq,
+              consume_whole_lp: item.consume_whole_lp ?? false,
+              line_ids: item.line_ids,
+              is_by_product: item.is_by_product ?? false,
+              is_output: item.is_by_product ?? false,
+              yield_percent: yieldPercent,
+              condition_flags: item.condition_flags,
+              notes: item.notes,
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          results.items.push(data);
+          results.created++;
+        } catch (error) {
+          results.errors.push({ row: i + 1, error: error.message });
+        }
+      }
+
+      return NextResponse.json(results, {
+        status: results.errors.length > 0 ? 207 : 201  // 207 Multi-Status if partial success
+      });
+    }
+
+  yield_calculation: |
+    // apps/frontend/lib/services/bom-items-service.ts
+    export function calculateYieldPercent(
+      byproductQty: number,
+      bomOutputQty: number
+    ): number {
+      if (bomOutputQty <= 0) return 0;
+      return Math.round((byproductQty / bomOutputQty) * 10000) / 100; // 2 decimal places
+    }
+
+  condition_flags_filter: |
+    // Example: Filter items by condition flag
+    export async function getItemsWithFlag(
+      bomId: string,
+      flagCode: string
+    ): Promise<BOMItem[]> {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('bom_items')
+        .select('*, products(*)')
+        .eq('bom_id', bomId)
+        .containedBy('condition_flags', { [flagCode]: true });
+
+      if (error) throw error;
+      return data;
+    }

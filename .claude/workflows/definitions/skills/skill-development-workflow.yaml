@@ -1,0 +1,473 @@
+# Skill Development Workflow
+# End-to-end workflow for developing and validating skills
+# From research/discovery through implementation, validation, and integration
+#
+# Documentation:
+#   - @.claude/agents/skills/SKILL-CREATOR.md
+#   - @.claude/agents/skills/SKILL-VALIDATOR.md
+
+name: skill-development-workflow
+description: Complete workflow for developing, validating, and integrating new skills
+trigger: "skill_creation | skill_update | pattern_detected | skill_request"
+
+# Expected duration: 1-2 sessions per skill
+# Parallelization: Research can run in parallel with initial design
+
+prerequisites:
+  - skill_need_identified
+  - pattern_observed_3_plus_times OR explicit_skill_request
+
+modes:
+  - id: new_skill
+    description: "Create a completely new skill from scratch"
+    triggers:
+      - "new_pattern_detected"
+      - "skill_request"
+      - "technology_adoption"
+    phases: [research, design, implementation, validation, integration]
+
+  - id: skill_update
+    description: "Update an existing skill based on validation feedback"
+    triggers:
+      - "validation_minor_update"
+      - "validation_major_update"
+      - "source_change_detected"
+    phases: [research, implementation, validation, integration]
+    skip_phases: [design]
+
+  - id: skill_review
+    description: "Periodic review of existing skills"
+    triggers:
+      - "next_review_date_reached"
+      - "manual_review_request"
+    phases: [validation, integration]
+    skip_phases: [research, design, implementation]
+
+# ======================================================================
+# PHASE 1: RESEARCH / DISCOVERY
+# ======================================================================
+phases:
+
+  - id: research
+    name: "Research & Discovery"
+    description: "Identify skill need, gather authoritative sources, understand domain"
+    agent: RESEARCH-AGENT
+    type: research
+    optional_for_modes: [skill_review]
+
+    activities:
+      - "Identify why skill is needed (pattern frequency, explicit request)"
+      - "Research authoritative sources (Tier 1-3)"
+      - "Check current version of technology/framework"
+      - "Identify existing related skills to avoid duplication"
+      - "Document key patterns and anti-patterns"
+
+    input:
+      context_refs:
+        - "@.claude/skills/REGISTRY.yaml"
+        - "@.claude/skills/generic/*.md"
+        - "@.claude/skills/domain/*.md"
+
+    output:
+      deliverables:
+        - "docs/skills/research/{skill-name}-research.md"
+
+    checkpoint:
+      - "At least 2 authoritative sources identified"
+      - "Sources are Tier 1-3 (official docs, recognized experts)"
+      - "No duplicate skill exists in registry"
+      - "Clear use case defined"
+
+    gate:
+      pass: design
+      fail: escalate_to_user
+      fail_reason: "Insufficient sources or skill already exists"
+
+    on_blocked:
+      action: request_user_input
+      message: "Cannot find authoritative sources. Please provide references or clarify requirements."
+
+  # ======================================================================
+  # PHASE 2: DESIGN
+  # ======================================================================
+  - id: design
+    name: "Skill Design"
+    description: "Define skill structure, interface, and boundaries"
+    agent: SKILL-CREATOR
+    type: design
+    optional_for_modes: [skill_update, skill_review]
+
+    activities:
+      - "Define skill type (generic, domain, project)"
+      - "Draft 'When to Use' trigger conditions"
+      - "Outline patterns to include (2+ minimum)"
+      - "Plan anti-patterns section"
+      - "Estimate token count (target < 1500)"
+      - "Determine if skill should be split"
+
+    input:
+      context_refs:
+        - "docs/skills/research/{skill-name}-research.md"
+        - "@.claude/skills/skill-quality-standards.md"
+
+    output:
+      deliverables:
+        - "docs/skills/design/{skill-name}-design.md"
+
+    checkpoint:
+      - "Skill type determined"
+      - "Clear 'When to Use' trigger defined"
+      - "At least 2 patterns planned"
+      - "Anti-patterns identified"
+      - "Token estimate under 1500 OR split plan defined"
+
+    gate:
+      pass: implementation
+      needs_revision:
+        action: iterate
+        max_iterations: 2
+        return_to: design
+
+  # ======================================================================
+  # PHASE 3: IMPLEMENTATION
+  # ======================================================================
+  - id: implementation
+    name: "Skill Implementation"
+    description: "SKILL-CREATOR creates the actual skill file"
+    agent: SKILL-CREATOR
+    type: implementation
+
+    activities:
+      - "Create skill file following template"
+      - "Add source links to EVERY pattern"
+      - "Write clear code examples"
+      - "Add verification checklist"
+      - "Validate token count (< 1500)"
+      - "Add entry to REGISTRY.yaml (status: draft)"
+
+    input:
+      context_refs:
+        - "docs/skills/design/{skill-name}-design.md"
+        - "docs/skills/research/{skill-name}-research.md"
+        - "@.claude/skills/skill-quality-standards.md"
+      templates:
+        - "@.claude/templates/skill-template.md"
+
+    output:
+      deliverables:
+        - ".claude/skills/{type}/{skill-name}.md"
+        - ".claude/skills/REGISTRY.yaml (updated)"
+
+    checkpoint:
+      - "Skill file follows template structure"
+      - "Every pattern has source link"
+      - "Token count under 1500"
+      - "REGISTRY.yaml entry added with status: draft"
+      - "'When to Use' section is specific trigger"
+      - "Anti-patterns section exists"
+      - "Verification checklist present"
+
+    gate:
+      pass: validation
+      token_exceeded:
+        action: split_skill
+        return_to: implementation
+        message: "Skill exceeds 1500 tokens - splitting into multiple skills"
+
+  # ======================================================================
+  # PHASE 4: VALIDATION
+  # ======================================================================
+  - id: validation
+    name: "Skill Validation"
+    description: "SKILL-VALIDATOR validates accuracy, freshness, and quality"
+    agent: SKILL-VALIDATOR
+    type: validation
+
+    sub_phases:
+
+      - id: source_check
+        description: "Verify all source URLs and content accuracy"
+        activities:
+          - "Fetch each source URL"
+          - "Compare skill content with current source"
+          - "Verify sources are Tier 1-3"
+          - "Check for outdated version references"
+
+        checkpoint:
+          - "All URLs accessible (not 404)"
+          - "Content matches current source"
+          - "No outdated version references"
+
+      - id: freshness_check
+        description: "Verify skill reflects current technology state"
+        activities:
+          - "Check current version of technology"
+          - "Identify breaking changes since skill creation"
+          - "Verify patterns not deprecated"
+
+        checkpoint:
+          - "Skill version matches current lib version"
+          - "No breaking changes since skill creation"
+          - "Patterns not deprecated"
+
+      - id: quality_check
+        description: "Verify skill meets quality standards"
+        activities:
+          - "Validate structure against template"
+          - "Check token count"
+          - "Verify required sections exist"
+          - "Test pattern examples if possible"
+
+        checkpoint:
+          - "Under 1500 tokens"
+          - "Has 'When to Use' section"
+          - "Has 2+ patterns with code"
+          - "Has anti-patterns section"
+          - "Has verification checklist"
+
+    output:
+      deliverables:
+        - "docs/skills/validation/{skill-name}-validation-report.md"
+
+    decision:
+      VALID: integration
+      MINOR_UPDATE:
+        action: return_to_implementation
+        agent: SKILL-CREATOR
+        message: "Minor fixes needed - returning to SKILL-CREATOR"
+      MAJOR_UPDATE:
+        action: return_to_research
+        agent: SKILL-CREATOR
+        message: "Major rewrite required - returning to research phase"
+      DEPRECATED:
+        action: archive_skill
+        message: "Technology obsolete - archiving skill"
+      INVALID:
+        action: escalate
+        agent: ORCHESTRATOR
+        message: "Critical errors found - escalating to ORCHESTRATOR"
+
+  # ======================================================================
+  # PHASE 5: INTEGRATION
+  # ======================================================================
+  - id: integration
+    name: "Integration & Documentation"
+    description: "Register skill, update documentation, announce availability"
+    agent: TECH-WRITER
+    type: integration
+
+    activities:
+      - "Update REGISTRY.yaml (status: active)"
+      - "Set next_review date (+14 days)"
+      - "Create/update skill documentation"
+      - "Add skill to relevant agent configurations"
+      - "Update skill index/catalog"
+
+    input:
+      context_refs:
+        - ".claude/skills/{type}/{skill-name}.md"
+        - "docs/skills/validation/{skill-name}-validation-report.md"
+        - "@.claude/skills/REGISTRY.yaml"
+
+    output:
+      deliverables:
+        - ".claude/skills/REGISTRY.yaml (status: active)"
+        - "docs/skills/catalog/{skill-name}.md"
+
+    checkpoint:
+      - "REGISTRY.yaml updated with status: active"
+      - "next_review date set"
+      - "Skill documentation complete"
+      - "Skill accessible to agents"
+
+    gate:
+      pass: complete
+      fail: escalate_to_user
+
+  # ======================================================================
+  # COMPLETE
+  # ======================================================================
+  - id: complete
+    type: skill_complete
+    summary: "Skill developed, validated, and integrated"
+    actions:
+      - "Log skill creation to workflow logs"
+      - "Notify relevant agents of new skill availability"
+      - "Update skill metrics dashboard"
+
+# ======================================================================
+# QUALITY GATES
+# ======================================================================
+quality_gates:
+  research_to_design:
+    - sources_count >= 2
+    - sources_tier_valid
+    - no_duplicate_skill
+
+  design_to_implementation:
+    - skill_type_defined
+    - trigger_defined
+    - patterns_planned >= 2
+    - token_estimate <= 1500
+
+  implementation_to_validation:
+    - file_created
+    - registry_entry_added
+    - token_count <= 1500
+    - all_patterns_have_sources
+
+  validation_to_integration:
+    - verdict == VALID
+    - all_sources_accessible
+    - freshness_verified
+    - quality_standards_met
+
+  integration_to_complete:
+    - registry_status == active
+    - documentation_complete
+    - next_review_set
+
+# ======================================================================
+# ERROR HANDLING
+# ======================================================================
+on_error:
+  log_to: "@.claude/logs/workflows/skills/"
+  retry_count: 1
+  escalate_to: ORCHESTRATOR
+
+error_recovery:
+  source_not_found:
+    description: "Authoritative source cannot be found"
+    steps:
+      - "Lower confidence to LOW"
+      - "Note limitation in skill file"
+      - "Request user input for alternative sources"
+      - "Continue with available sources if minimum met"
+    action: continue_with_warning
+    agent: SKILL-CREATOR
+
+  token_limit_exceeded:
+    description: "Skill exceeds 1500 token limit"
+    steps:
+      - "Analyze skill for split opportunities"
+      - "Identify logical boundaries"
+      - "Split into 2+ smaller skills"
+      - "Update registry for each new skill"
+      - "Re-validate each skill separately"
+    action: split_and_retry
+    agent: SKILL-CREATOR
+
+  validation_failed:
+    description: "SKILL-VALIDATOR rejects skill"
+    steps:
+      - "Review validation report"
+      - "Identify specific failures"
+      - "If MINOR_UPDATE: fix and revalidate"
+      - "If MAJOR_UPDATE: return to research"
+      - "If INVALID: escalate to ORCHESTRATOR"
+    action: route_by_verdict
+    agent: SKILL-VALIDATOR
+
+  conflicting_sources:
+    description: "Multiple sources provide conflicting information"
+    steps:
+      - "Prefer Tier 1 sources (official docs)"
+      - "Note discrepancy in skill file"
+      - "Lower confidence if significant conflict"
+      - "Consider creating skill variant for different approaches"
+    action: prefer_tier1_and_note
+    agent: SKILL-CREATOR
+
+  outdated_skill_detected:
+    description: "Validation finds skill references outdated technology"
+    steps:
+      - "Check if technology still supported"
+      - "If deprecated: mark skill as DEPRECATED"
+      - "If updated: trigger MAJOR_UPDATE flow"
+      - "Update REGISTRY.yaml accordingly"
+    action: route_by_tech_status
+    agent: SKILL-VALIDATOR
+
+# ======================================================================
+# ARTIFACTS
+# ======================================================================
+artifacts:
+  research_document:
+    path: "docs/skills/research/{skill-name}-research.md"
+    created_by: research
+    description: "Research findings including sources, patterns, and domain context"
+
+  design_document:
+    path: "docs/skills/design/{skill-name}-design.md"
+    created_by: design
+    description: "Skill design including structure, boundaries, and split plan"
+
+  skill_file:
+    path: ".claude/skills/{type}/{skill-name}.md"
+    created_by: implementation
+    description: "The actual skill file following the skill template"
+
+  validation_report:
+    path: "docs/skills/validation/{skill-name}-validation-report.md"
+    created_by: validation
+    description: "SKILL-VALIDATOR's validation report with verdict"
+
+  registry_entry:
+    path: ".claude/skills/REGISTRY.yaml"
+    created_by: implementation
+    updated_by: [validation, integration]
+    description: "Skill registry entry with status, dates, and metadata"
+
+  skill_documentation:
+    path: "docs/skills/catalog/{skill-name}.md"
+    created_by: integration
+    description: "User-facing documentation for the skill"
+
+# ======================================================================
+# HANDOFF DEFINITIONS
+# ======================================================================
+handoffs:
+  research_to_design:
+    from: RESEARCH-AGENT
+    to: SKILL-CREATOR
+    payload:
+      research_file: "docs/skills/research/{skill-name}-research.md"
+      sources_count: "{N}"
+      recommended_type: "generic | domain | project"
+
+  design_to_implementation:
+    from: SKILL-CREATOR
+    to: SKILL-CREATOR
+    payload:
+      design_file: "docs/skills/design/{skill-name}-design.md"
+      skill_type: "{type}"
+      estimated_tokens: "{N}"
+
+  implementation_to_validation:
+    from: SKILL-CREATOR
+    to: SKILL-VALIDATOR
+    payload:
+      skill_created:
+        name: "{skill-name}"
+        file: ".claude/skills/{type}/{skill-name}.md"
+        tokens: "{N}"
+        confidence: "high | medium | low"
+        sources_count: "{N}"
+        request: "validate_new_skill"
+
+  validation_to_integration:
+    from: SKILL-VALIDATOR
+    to: TECH-WRITER
+    payload:
+      verdict: "VALID"
+      skill_file: ".claude/skills/{type}/{skill-name}.md"
+      validation_report: "docs/skills/validation/{skill-name}-validation-report.md"
+
+  validation_to_skill_creator:
+    from: SKILL-VALIDATOR
+    to: SKILL-CREATOR
+    condition: "verdict in [MINOR_UPDATE, MAJOR_UPDATE]"
+    payload:
+      verdict: "{verdict}"
+      fixes_needed: "[list of required changes]"
+      validation_report: "docs/skills/validation/{skill-name}-validation-report.md"

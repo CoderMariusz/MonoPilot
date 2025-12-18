@@ -1,0 +1,271 @@
+# Story 03.11a - Frontend Specification
+# Purpose: Components, types, services, UX patterns
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/wo-materials.ts"
+    content: |
+      export interface WOMaterial {
+        id: string;
+        wo_id: string;
+        product_id: string;
+        material_name: string;
+        required_qty: number;
+        consumed_qty: number;
+        reserved_qty: number;
+        uom: string;
+        sequence: number;
+        consume_whole_lp: boolean;
+        is_by_product: boolean;
+        yield_percent: number | null;
+        scrap_percent: number;
+        condition_flags: Record<string, boolean> | null;
+        bom_item_id: string | null;
+        bom_version: number | null;
+        notes: string | null;
+        created_at: string;
+        product?: {
+          id: string;
+          code: string;
+          name: string;
+          product_type: string;
+        };
+      }
+
+      export interface WOMaterialsListResponse {
+        materials: WOMaterial[];
+        total: number;
+        bom_version: number | null;
+        snapshot_at: string | null;
+      }
+
+      export interface CreateSnapshotResponse {
+        success: boolean;
+        materials_count: number;
+        message: string;
+      }
+
+      export type MaterialStatus =
+        | 'pending'      // 0% consumed
+        | 'in_progress'  // 0 < consumed < required
+        | 'complete'     // consumed >= required
+        | 'by_product';  // is_by_product = true
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/wo-materials.ts"
+    content: |
+      import { z } from 'zod';
+
+      // WO Material schema (for display/validation)
+      export const woMaterialSchema = z.object({
+        wo_id: z.string().uuid("Work Order ID is required"),
+        product_id: z.string().uuid("Product ID is required"),
+        material_name: z.string().min(1, "Material name is required").max(255),
+        required_qty: z.number()
+          .nonnegative("Required quantity must be >= 0")
+          .refine(val => {
+            const decimals = (val.toString().split('.')[1] || '').length;
+            return decimals <= 6;
+          }, "Maximum 6 decimal places allowed"),
+        consumed_qty: z.number().nonnegative().default(0),
+        reserved_qty: z.number().nonnegative().default(0),
+        uom: z.string().min(1, "Unit of measure is required"),
+        sequence: z.number().int().min(0).default(0),
+        consume_whole_lp: z.boolean().default(false),
+        is_by_product: z.boolean().default(false),
+        yield_percent: z.number().min(0).max(100).nullable().optional(),
+        scrap_percent: z.number().min(0).max(100).default(0),
+        condition_flags: z.record(z.boolean()).nullable().optional(),
+        bom_item_id: z.string().uuid().nullable().optional(),
+        bom_version: z.number().int().nullable().optional(),
+        notes: z.string().max(500).nullable().optional(),
+      });
+
+      export type WOMaterialInput = z.infer<typeof woMaterialSchema>;
+
+# Components
+components:
+  - path: "apps/frontend/components/planning/work-orders/WOMaterialsTable.tsx"
+    description: "Materials list table for WO detail page"
+    props:
+      - { name: "woId", type: "string", required: true }
+      - { name: "woStatus", type: "string", required: true }
+      - { name: "onRefresh", type: "() => void", required: false }
+    features:
+      - "Displays wo_materials in sequence order"
+      - "Shows material code, name, required_qty, uom, scrap%, consumed_qty, reserved_qty"
+      - "By-product rows with badge indicator"
+      - "Consumption progress bar (consumed_qty / required_qty)"
+      - "Loading skeleton state"
+      - "Empty state when no materials"
+
+  - path: "apps/frontend/components/planning/work-orders/WOMaterialRow.tsx"
+    description: "Single material row in materials table"
+    props:
+      - { name: "material", type: "WOMaterial", required: true }
+      - { name: "showActions", type: "boolean", required: false }
+    features:
+      - "Material code + name with product type badge"
+      - "Required quantity with UoM"
+      - "Scrap percentage display"
+      - "Consumed/Reserved quantities (read-only in MVP)"
+      - "By-product badge and yield percentage"
+
+  - path: "apps/frontend/components/planning/work-orders/RefreshSnapshotButton.tsx"
+    description: "Button to refresh BOM snapshot"
+    props:
+      - { name: "woId", type: "string", required: true }
+      - { name: "woStatus", type: "string", required: true }
+      - { name: "onSuccess", type: "() => void", required: false }
+    features:
+      - "Visible only for draft/planned WOs"
+      - "Disabled with tooltip for released WOs"
+      - "Loading state during refresh"
+      - "Success/error toast notifications"
+      - "Confirmation dialog before refresh"
+
+  - path: "apps/frontend/components/planning/work-orders/MaterialProductTypeBadge.tsx"
+    description: "Badge showing product type (RM, ING, PKG, WIP)"
+    props:
+      - { name: "type", type: "string", required: true }
+    colors:
+      RM: "bg-amber-100 text-amber-800"
+      ING: "bg-green-100 text-green-800"
+      PKG: "bg-blue-100 text-blue-800"
+      WIP: "bg-purple-100 text-purple-800"
+      FG: "bg-gray-100 text-gray-800"
+
+  - path: "apps/frontend/components/planning/work-orders/ByProductBadge.tsx"
+    description: "Badge indicating by-product item"
+    props:
+      - { name: "yieldPercent", type: "number | null", required: false }
+    features:
+      - "Shows 'By-product' label"
+      - "Shows yield percentage if provided"
+      - "Distinctive styling (different from inputs)"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/wo-materials-service.ts"
+    description: "Client-side service for WO materials API"
+    exports:
+      - name: "getWOMaterials"
+        type: "async function"
+        params: ["woId: string"]
+        returns: "Promise<WOMaterialsListResponse>"
+      - name: "refreshSnapshot"
+        type: "async function"
+        params: ["woId: string"]
+        returns: "Promise<CreateSnapshotResponse>"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-wo-materials.ts"
+    description: "React Query hook for WO materials"
+    exports:
+      - name: "useWOMaterials"
+        params: ["woId: string"]
+        returns: "UseQueryResult<WOMaterialsListResponse>"
+        config:
+          queryKey: "['wo-materials', woId]"
+          staleTime: "30 * 1000"  # 30 seconds
+          refetchOnWindowFocus: true
+
+      - name: "useRefreshSnapshot"
+        returns: "UseMutationResult<CreateSnapshotResponse, Error, string>"
+        config:
+          mutationFn: "refreshSnapshot"
+          onSuccess: "invalidate wo-materials query"
+
+# UX Wireframe Reference
+ux:
+  wireframes:
+    - id: "PLAN-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      sections: ["Materials Tab", "Materials Table"]
+      components:
+        - "Materials table with columns: #, Material, Required, Reserved, Consumed, Remaining, Status, Actions"
+        - "By-product row styling"
+        - "Refresh from BOM button"
+        - "Materials summary footer"
+
+  patterns:
+    table: "ShadCN DataTable with sorting"
+    badge: "ShadCN Badge component"
+    button: "ShadCN Button with loading state"
+    dialog: "ShadCN AlertDialog for confirmation"
+    toast: "ShadCN Toast for notifications"
+
+  states:
+    - name: "loading"
+      display: "Skeleton rows (5 rows)"
+    - name: "empty"
+      display: "No materials message with info icon"
+    - name: "error"
+      display: "Error banner with retry button"
+    - name: "success"
+      display: "Materials table with data"
+
+  responsive:
+    desktop: ">1024px - Full table with all columns"
+    tablet: "768-1024px - Condensed columns, hide scrap%"
+    mobile: "<768px - Card-based layout"
+
+# Page Integration
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/[id]/page.tsx"
+    description: "WO detail page - integrate Materials section"
+    integration:
+      location: "Materials tab content"
+      components:
+        - "WOMaterialsTable"
+        - "RefreshSnapshotButton (conditionally visible)"
+      props_from_parent:
+        - "woId from params"
+        - "woStatus from work_orders query"
+
+# Component Tree
+component_tree: |
+  WorkOrderDetailPage
+    |-- Header (WO info, status, actions)
+    |-- Tabs
+        |-- MaterialsTab (default)
+            |-- MaterialsHeader
+            |   |-- Title: "Materials Required (BOM Snapshot v{version})"
+            |   |-- RefreshSnapshotButton (if draft/planned)
+            |-- WOMaterialsTable
+            |   |-- WOMaterialRow (for each material)
+            |       |-- MaterialProductTypeBadge
+            |       |-- ByProductBadge (if is_by_product)
+            |-- MaterialsSummary
+                |-- Total materials count
+                |-- Total required qty
+                |-- Total consumed qty
+        |-- OperationsTab (03.12)
+        |-- OutputTab (Epic 04)
+        |-- HistoryTab
+
+# Accessibility
+accessibility:
+  touch_targets: "48dp minimum"
+  contrast: "4.5:1 minimum"
+  screen_reader:
+    - "Table has proper th/td structure with scope"
+    - "By-product badge announces 'By-product' label"
+    - "Refresh button announces loading state"
+  keyboard:
+    - "Tab navigates between rows and actions"
+    - "Enter activates buttons"
+    - "Escape closes confirmation dialog"
+
+# Performance
+performance:
+  targets:
+    - "Materials table renders in <500ms for 200 items"
+    - "Refresh snapshot completes in <2s"
+  strategies:
+    - "Use React Query caching (30s stale time)"
+    - "Skeleton loading state for perceived performance"
+    - "Optimistic update on refresh success"

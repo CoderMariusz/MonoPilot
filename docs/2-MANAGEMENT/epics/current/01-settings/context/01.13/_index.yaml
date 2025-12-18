@@ -1,0 +1,94 @@
+# Story 01.13 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.13"
+  name: "Tax Codes CRUD"
+  slug: "tax-codes-crud"
+  epic: "01-settings"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "fullstack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, pages, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table lookup"]
+    - story: "01.2"
+      name: "Settings Shell Navigation"
+      provides: ["navigation structure", "/settings route"]
+    - story: "01.6"
+      name: "Role Permissions"
+      provides: ["permission checks", "role-based access"]
+  blocked_by: []
+  blocks:
+    - story: "03.x"
+      name: "Suppliers (Planning)"
+      reason: "Suppliers reference default tax codes"
+    - story: "09.x"
+      name: "Finance Module"
+      reason: "Financial calculations use tax codes"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-080", "FR-SET-081", "FR-SET-082", "FR-SET-083", "FR-SET-084"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Database Schema", "API Design", "tax_codes table"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.13.tax-codes-crud.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for tax_codes table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "tax_codes table + seed Polish tax codes"
+  - type: "service"
+    count: 1
+    description: "tax-code-service.ts with CRUD + validation"
+  - type: "api"
+    count: 8
+    description: "Tax code CRUD + set-default + validate-code endpoints"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas with rate/date/code validation"
+  - type: "pages"
+    count: 1
+    description: "/settings/tax-codes list page"
+  - type: "components"
+    count: 10
+    description: "DataTable, modal, badges, filters, actions"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Single default tax code per org enforced by trigger"
+  - "Soft delete pattern (is_deleted flag) for historical data"
+  - "Code immutability when referenced by suppliers/invoices"
+  - "Date range validation: valid_to > valid_from"
+  - "Rate validation: 0.00 to 100.00 (2 decimals)"
+  - "Country code: ISO 3166-1 alpha-2 (PL, DE, GB, US)"
+  - "Status calculation: active/expired/scheduled based on dates"
+  - "Return 404 (not 403) for cross-tenant access"

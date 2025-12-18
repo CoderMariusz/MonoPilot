@@ -1,0 +1,387 @@
+# Story 05.7 - Frontend Specification
+# Purpose: Components, pages, wireframes, UX patterns
+# Agent: FRONTEND-DEV
+
+# ==========================================================================
+# UX References
+# ==========================================================================
+ux:
+  wireframes:
+    - id: "WH-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-001-warehouse-dashboard.md"
+      description: "Complete dashboard wireframe with all states"
+      components:
+        - "KPI Cards (5)"
+        - "Alert Panels (3)"
+        - "Activity Feed"
+        - "Quick Actions"
+
+  patterns:
+    kpi_cards: "ShadCN Card with icon, value, label, percentage"
+    alert_panel: "ShadCN Card with list items, badge, click navigation"
+    activity_feed: "ShadCN ScrollArea with timeline items"
+    quick_actions: "ShadCN Button group"
+
+  states:
+    - loading
+    - empty
+    - error
+    - success
+
+# ==========================================================================
+# Page Structure
+# ==========================================================================
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/page.tsx"
+    description: "Warehouse Dashboard landing page"
+    layout: |
+      +---------------------------------------------------------+
+      | Header: "Warehouse" breadcrumb + Quick Actions          |
+      +---------------------------------------------------------+
+      | KPI Cards Row (5 cards)                                 |
+      | [Total LPs] [Available] [Reserved] [Consumed] [Expiring]|
+      +---------------------------------------------------------+
+      | Alert Panels Row (3 panels)                             |
+      | [Low Stock]    [Expiring Items]    [Blocked LPs]        |
+      +---------------------------------------------------------+
+      | Activity Feed (Recent 20 operations)                    |
+      | [Timestamp] [Icon] [LP#] [User] [Description]           |
+      +---------------------------------------------------------+
+      | Last Updated: {timestamp}  [Refresh Button]             |
+      +---------------------------------------------------------+
+    features:
+      - "Auto-refresh every 60 seconds"
+      - "Manual refresh button"
+      - "Last updated timestamp"
+      - "Responsive grid layout"
+
+# ==========================================================================
+# Components
+# ==========================================================================
+components:
+  # --------------------------------------------------------------------------
+  # Main Dashboard Component
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/warehouse/dashboard/WarehouseDashboard.tsx"
+    description: "Main dashboard container with data fetching"
+    exports: ["WarehouseDashboard"]
+    props:
+      - none  # Fetches its own data
+    features:
+      - "React Query for data fetching"
+      - "Auto-refresh interval (60s)"
+      - "Manual refresh trigger"
+      - "Loading/Error/Empty states"
+    dependencies:
+      - "KPICards"
+      - "LowStockAlerts"
+      - "ExpiringLPsWidget"
+      - "BlockedLPsWidget"
+      - "ActivityFeed"
+    pattern: |
+      'use client';
+
+      import { useQuery } from '@tanstack/react-query';
+      import { useState, useEffect } from 'react';
+      import { KPICards } from './KPICards';
+      import { AlertPanels } from './AlertPanels';
+      import { ActivityFeed } from './ActivityFeed';
+      import { Button } from '@/components/ui/button';
+      import { RefreshCw } from 'lucide-react';
+
+      export function WarehouseDashboard() {
+        const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+        const { data: kpis, isLoading: kpisLoading, refetch: refetchKpis } = useQuery({
+          queryKey: ['warehouse-dashboard-kpis'],
+          queryFn: () => fetch('/api/warehouse/dashboard/kpis').then(r => r.json()),
+          refetchInterval: 60000,  // 60 seconds
+        });
+
+        const { data: alerts, isLoading: alertsLoading, refetch: refetchAlerts } = useQuery({
+          queryKey: ['warehouse-dashboard-alerts'],
+          queryFn: () => fetch('/api/warehouse/dashboard/alerts').then(r => r.json()),
+          refetchInterval: 60000,
+        });
+
+        const { data: activity, isLoading: activityLoading, refetch: refetchActivity } = useQuery({
+          queryKey: ['warehouse-dashboard-activity'],
+          queryFn: () => fetch('/api/warehouse/dashboard/activity?limit=20').then(r => r.json()),
+          refetchInterval: 60000,
+        });
+
+        const handleRefresh = async () => {
+          await Promise.all([refetchKpis(), refetchAlerts(), refetchActivity()]);
+          setLastUpdated(new Date());
+        };
+
+        // ... render logic
+      }
+
+  # --------------------------------------------------------------------------
+  # KPI Cards Component
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/warehouse/dashboard/KPICards.tsx"
+    description: "Row of 5 KPI cards"
+    exports: ["KPICards"]
+    props:
+      - name: "kpis"
+        type: "DashboardKPIs"
+        required: true
+      - name: "isLoading"
+        type: "boolean"
+        default: false
+    cards:
+      - id: "total_lps"
+        label: "Total LPs"
+        icon: "Box"
+        color: "blue"
+        format: "{value} LPs"
+
+      - id: "available_lps"
+        label: "Available LPs"
+        icon: "CheckCircle"
+        color: "green"
+        format: "{value} Available"
+        percentage: true
+
+      - id: "reserved_lps"
+        label: "Reserved LPs"
+        icon: "Lock"
+        color: "orange"
+        format: "{value} Reserved"
+        percentage: true
+
+      - id: "consumed_today"
+        label: "Consumed Today"
+        icon: "TrendingDown"
+        color: "blue"
+        format: "{value} Consumed"
+        subtitle: "Since midnight"
+
+      - id: "expiring_soon"
+        label: "Expiring Soon"
+        icon: "AlertTriangle"
+        color: "red"
+        format: "{value} Expiring"
+        subtitle: "Next 30 days"
+
+  # --------------------------------------------------------------------------
+  # Alert Panels
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/warehouse/dashboard/LowStockAlerts.tsx"
+    description: "Low stock alert panel"
+    exports: ["LowStockAlerts"]
+    props:
+      - name: "alerts"
+        type: "LowStockAlert[]"
+        required: true
+      - name: "isLoading"
+        type: "boolean"
+        default: false
+    features:
+      - "List of products below min_stock"
+      - "Shows product name, current count, min threshold"
+      - "Click navigates to inventory browser filtered by product"
+      - "Empty state: 'No low stock alerts'"
+      - "Limited to 10 items with 'View All' link"
+
+  - path: "apps/frontend/components/warehouse/dashboard/ExpiringLPsWidget.tsx"
+    description: "Expiring items alert panel"
+    exports: ["ExpiringLPsWidget"]
+    props:
+      - name: "alerts"
+        type: "ExpiringItemAlert[]"
+        required: true
+      - name: "isLoading"
+        type: "boolean"
+        default: false
+    features:
+      - "List of LPs expiring in 30 days"
+      - "Color-coded by urgency (red/orange/yellow)"
+      - "Shows LP number, product, expiry date, days until"
+      - "Click navigates to LP detail page"
+      - "Empty state: 'No items expiring soon'"
+
+  - path: "apps/frontend/components/warehouse/dashboard/BlockedLPsWidget.tsx"
+    description: "Blocked LPs alert panel"
+    exports: ["BlockedLPsWidget"]
+    props:
+      - name: "alerts"
+        type: "BlockedLPAlert[]"
+        required: true
+      - name: "isLoading"
+        type: "boolean"
+        default: false
+    features:
+      - "List of quarantine/failed QA LPs"
+      - "Shows LP number, product, QA status, reason"
+      - "Click navigates to LP detail page"
+      - "Empty state: 'No blocked LPs'"
+
+  # --------------------------------------------------------------------------
+  # Activity Feed
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/warehouse/dashboard/ActivityFeed.tsx"
+    description: "Recent operations timeline"
+    exports: ["ActivityFeed"]
+    props:
+      - name: "activities"
+        type: "ActivityItem[]"
+        required: true
+      - name: "isLoading"
+        type: "boolean"
+        default: false
+    features:
+      - "Last 20 LP operations"
+      - "Icons by operation type"
+      - "Relative timestamps"
+      - "User attribution"
+      - "Click navigates to LP detail"
+    operation_icons:
+      create: "Plus (green)"
+      consume: "ArrowDown (blue)"
+      split: "Split (orange)"
+      merge: "Merge (purple)"
+      move: "Truck (gray)"
+
+  # --------------------------------------------------------------------------
+  # Quick Actions
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/warehouse/dashboard/QuickActions.tsx"
+    description: "Quick action buttons"
+    exports: ["QuickActions"]
+    buttons:
+      - label: "Create LP"
+        variant: "default"
+        icon: "Plus"
+        href: "/warehouse/license-plates/new"
+
+      - label: "View Inventory"
+        variant: "outline"
+        icon: "Search"
+        href: "/warehouse/inventory"
+
+# ==========================================================================
+# Hooks
+# ==========================================================================
+hooks:
+  - path: "apps/frontend/lib/hooks/use-dashboard-kpis.ts"
+    description: "React Query hook for KPIs"
+    exports: ["useDashboardKPIs"]
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import type { DashboardKPIs } from '@/lib/types/warehouse-dashboard';
+
+      export function useDashboardKPIs(options?: { refetchInterval?: number }) {
+        return useQuery<DashboardKPIs>({
+          queryKey: ['warehouse-dashboard-kpis'],
+          queryFn: async () => {
+            const res = await fetch('/api/warehouse/dashboard/kpis');
+            if (!res.ok) throw new Error('Failed to fetch KPIs');
+            return res.json();
+          },
+          staleTime: 60 * 1000,  // 1 minute
+          refetchInterval: options?.refetchInterval ?? 60000,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-dashboard-alerts.ts"
+    description: "React Query hook for alerts"
+    exports: ["useDashboardAlerts"]
+
+  - path: "apps/frontend/lib/hooks/use-dashboard-activity.ts"
+    description: "React Query hook for activity feed"
+    exports: ["useDashboardActivity"]
+
+# ==========================================================================
+# Styling
+# ==========================================================================
+styling:
+  kpi_card_colors:
+    blue: "bg-blue-50 border-blue-200 text-blue-700"
+    green: "bg-green-50 border-green-200 text-green-700"
+    orange: "bg-orange-50 border-orange-200 text-orange-700"
+    red: "bg-red-50 border-red-200 text-red-700"
+    gray: "bg-gray-50 border-gray-200 text-gray-700"
+
+  expiry_colors:
+    critical: "text-red-600 bg-red-50"    # < 7 days
+    warning: "text-orange-600 bg-orange-50"  # 7-14 days
+    caution: "text-yellow-600 bg-yellow-50"  # 15-30 days
+
+  status_badges:
+    quarantine: "bg-orange-100 text-orange-800"
+    failed: "bg-red-100 text-red-800"
+
+# ==========================================================================
+# Responsive Breakpoints
+# ==========================================================================
+responsive:
+  desktop:
+    breakpoint: ">1024px"
+    kpi_grid: "grid-cols-5"
+    alert_grid: "grid-cols-3"
+    activity_position: "full-width"
+
+  tablet:
+    breakpoint: "768-1024px"
+    kpi_grid: "grid-cols-3 then grid-cols-2"
+    alert_grid: "grid-cols-2 then grid-cols-1"
+    activity_position: "full-width"
+
+  mobile:
+    breakpoint: "<768px"
+    kpi_grid: "grid-cols-1"
+    alert_grid: "grid-cols-1"
+    activity_position: "full-width"
+
+# ==========================================================================
+# Loading States
+# ==========================================================================
+loading_states:
+  kpi_skeleton:
+    description: "5 skeleton cards"
+    pattern: "Pulse animation on card background"
+
+  alert_skeleton:
+    description: "3 skeleton panels"
+    pattern: "Pulse animation on list items"
+
+  activity_skeleton:
+    description: "5 skeleton timeline items"
+    pattern: "Pulse animation on timeline entries"
+
+# ==========================================================================
+# Empty States
+# ==========================================================================
+empty_states:
+  no_lps:
+    icon: "Package"
+    title: "No License Plates Yet"
+    description: "Create your first LP by receiving goods from a Purchase Order."
+    action:
+      label: "Receive Items"
+      href: "/warehouse/receiving"
+
+  no_alerts:
+    low_stock: "No low stock alerts"
+    expiring: "No items expiring soon"
+    blocked: "No blocked LPs"
+
+  no_activity:
+    icon: "Activity"
+    title: "No Recent Activity"
+    description: "LP operations will appear here."
+
+# ==========================================================================
+# Error States
+# ==========================================================================
+error_states:
+  fetch_error:
+    icon: "AlertCircle"
+    title: "Failed to Load Dashboard"
+    description: "Unable to fetch dashboard data. Please try again."
+    action:
+      label: "Retry"
+      onClick: "refetch()"

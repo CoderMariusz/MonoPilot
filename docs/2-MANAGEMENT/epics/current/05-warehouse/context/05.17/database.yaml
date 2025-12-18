@@ -1,0 +1,279 @@
+# Story 05.17 - Database Schema
+# Purpose: Database function for atomic LP split operation
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story does NOT create new tables. It creates a stored procedure
+# that operates on existing tables from 05.1 (license_plates) and 05.2 (lp_genealogy).
+
+migrations:
+  - path: "supabase/migrations/YYYYMMDDHHMMSS_add_lp_split_function.sql"
+    type: "migration"
+    description: "Stored procedure for atomic LP split with genealogy"
+
+# Tables modified (not created)
+tables_modified:
+  - name: "license_plates"
+    operations:
+      - type: "UPDATE"
+        description: "Reduce source LP quantity by split_qty"
+        fields: ["quantity", "updated_at"]
+      - type: "INSERT"
+        description: "Create new LP with split_qty and inherited fields"
+        fields: ["all columns from source except id, lp_number, quantity, location_id, created_at"]
+
+  - name: "lp_genealogy"
+    operations:
+      - type: "INSERT"
+        description: "Create genealogy record linking source to new LP"
+        fields: ["org_id", "parent_lp_id", "child_lp_id", "operation_type", "quantity", "operation_date", "created_by"]
+
+# Dependencies required
+required_objects:
+  - name: "license_plates"
+    type: "table"
+    from_story: "05.1"
+  - name: "lp_genealogy"
+    type: "table"
+    from_story: "05.2"
+  - name: "lp_number_sequences"
+    type: "table"
+    from_story: "05.1"
+  - name: "generate_lp_number"
+    type: "function"
+    from_story: "05.1"
+  - name: "warehouse_settings"
+    type: "table"
+    from_story: "05.0"
+
+# Database Function
+functions:
+  - name: "split_license_plate"
+    description: "Atomic LP split operation - creates new LP, updates source, creates genealogy"
+    parameters:
+      - { name: "p_source_lp_id", type: "UUID", description: "ID of LP to split" }
+      - { name: "p_org_id", type: "UUID", description: "Organization ID for RLS" }
+      - { name: "p_split_qty", type: "DECIMAL(15,4)", description: "Quantity to split off" }
+      - { name: "p_new_lp_number", type: "TEXT", description: "Pre-generated LP number for new LP" }
+      - { name: "p_destination_location_id", type: "UUID", description: "Location for new LP (can be same as source)" }
+      - { name: "p_user_id", type: "UUID", description: "User performing the split" }
+    returns: "JSON"
+    language: "plpgsql"
+    security: "SECURITY DEFINER"
+    volatility: "VOLATILE"
+
+    sql: |
+      CREATE OR REPLACE FUNCTION split_license_plate(
+        p_source_lp_id UUID,
+        p_org_id UUID,
+        p_split_qty DECIMAL(15,4),
+        p_new_lp_number TEXT,
+        p_destination_location_id UUID,
+        p_user_id UUID
+      )
+      RETURNS JSON
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      AS $$
+      DECLARE
+        v_source_lp license_plates%ROWTYPE;
+        v_new_lp license_plates%ROWTYPE;
+        v_genealogy_id UUID;
+        v_dest_location_name TEXT;
+        v_source_location_name TEXT;
+      BEGIN
+        -- 1. Lock and fetch source LP
+        SELECT * INTO v_source_lp
+        FROM license_plates
+        WHERE id = p_source_lp_id
+          AND org_id = p_org_id
+        FOR UPDATE;
+
+        -- Validate LP exists
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'License Plate not found'
+            USING ERRCODE = 'P0002'; -- no_data_found
+        END IF;
+
+        -- 2. Validate LP status
+        IF v_source_lp.status != 'available' THEN
+          RAISE EXCEPTION 'LP status must be available, current: %', v_source_lp.status
+            USING ERRCODE = 'P0001'; -- raise_exception
+        END IF;
+
+        -- 3. Validate split quantity
+        IF p_split_qty <= 0 THEN
+          RAISE EXCEPTION 'Split quantity must be greater than 0'
+            USING ERRCODE = 'P0001';
+        END IF;
+
+        IF p_split_qty >= v_source_lp.quantity THEN
+          RAISE EXCEPTION 'Split quantity must be less than LP quantity (%. %)',
+            v_source_lp.quantity, v_source_lp.uom
+            USING ERRCODE = 'P0001';
+        END IF;
+
+        -- 4. Get location names for response
+        SELECT name INTO v_dest_location_name
+        FROM locations WHERE id = p_destination_location_id;
+
+        SELECT name INTO v_source_location_name
+        FROM locations WHERE id = v_source_lp.location_id;
+
+        -- 5. Create new LP (inherit from source)
+        INSERT INTO license_plates (
+          org_id,
+          lp_number,
+          product_id,
+          quantity,
+          uom,
+          location_id,
+          warehouse_id,
+          status,
+          qa_status,
+          batch_number,
+          supplier_batch_number,
+          expiry_date,
+          manufacture_date,
+          parent_lp_id,
+          source,
+          gtin,
+          created_by
+        ) VALUES (
+          p_org_id,
+          p_new_lp_number,
+          v_source_lp.product_id,
+          p_split_qty,
+          v_source_lp.uom,
+          p_destination_location_id,
+          v_source_lp.warehouse_id,
+          'available',
+          v_source_lp.qa_status,
+          v_source_lp.batch_number,
+          v_source_lp.supplier_batch_number,
+          v_source_lp.expiry_date,
+          v_source_lp.manufacture_date,
+          p_source_lp_id,
+          'split',
+          v_source_lp.gtin,
+          p_user_id
+        ) RETURNING * INTO v_new_lp;
+
+        -- 6. Update source LP quantity
+        UPDATE license_plates
+        SET quantity = quantity - p_split_qty,
+            updated_at = NOW()
+        WHERE id = p_source_lp_id;
+
+        -- 7. Create genealogy record
+        INSERT INTO lp_genealogy (
+          org_id,
+          parent_lp_id,
+          child_lp_id,
+          operation_type,
+          quantity,
+          operation_date,
+          created_by
+        ) VALUES (
+          p_org_id,
+          p_source_lp_id,
+          v_new_lp.id,
+          'split',
+          p_split_qty,
+          NOW(),
+          p_user_id
+        ) RETURNING id INTO v_genealogy_id;
+
+        -- 8. Return result
+        RETURN json_build_object(
+          'success', true,
+          'sourceLp', json_build_object(
+            'id', p_source_lp_id,
+            'lpNumber', v_source_lp.lp_number,
+            'quantity', v_source_lp.quantity - p_split_qty,
+            'location', json_build_object(
+              'id', v_source_lp.location_id,
+              'name', v_source_location_name
+            )
+          ),
+          'newLp', json_build_object(
+            'id', v_new_lp.id,
+            'lpNumber', v_new_lp.lp_number,
+            'quantity', v_new_lp.quantity,
+            'location', json_build_object(
+              'id', p_destination_location_id,
+              'name', v_dest_location_name
+            )
+          ),
+          'genealogyId', v_genealogy_id
+        );
+      END;
+      $$;
+
+# Transaction guarantees
+transaction:
+  isolation: "READ COMMITTED"
+  guarantees:
+    - "Row-level lock on source LP (FOR UPDATE) prevents concurrent splits"
+    - "All operations in single transaction - atomic rollback on any failure"
+    - "No partial updates possible - either all succeed or all fail"
+  rollback_scenarios:
+    - "Source LP not found"
+    - "Source LP status not 'available'"
+    - "Split quantity >= source quantity"
+    - "Split quantity <= 0"
+    - "Foreign key violation on location_id"
+    - "Genealogy insert failure"
+
+# Indexes used (from 05.1 and 05.2)
+indexes_leveraged:
+  - "idx_lp_org_status ON license_plates(org_id, status)"
+  - "idx_genealogy_parent ON lp_genealogy(parent_lp_id)"
+  - "idx_genealogy_child ON lp_genealogy(child_lp_id)"
+
+# Performance targets
+performance:
+  target_ms: 300
+  expected_ms: 150-250
+  notes:
+    - "Single transaction with 3 operations"
+    - "Row lock prevents contention"
+    - "Indexes ensure fast lookups"
+
+# Fields inherited by new LP
+inheritance:
+  inherited:
+    - { field: "product_id", from: "source LP" }
+    - { field: "uom", from: "source LP" }
+    - { field: "warehouse_id", from: "source LP" }
+    - { field: "qa_status", from: "source LP" }
+    - { field: "batch_number", from: "source LP" }
+    - { field: "supplier_batch_number", from: "source LP" }
+    - { field: "expiry_date", from: "source LP" }
+    - { field: "manufacture_date", from: "source LP" }
+    - { field: "gtin", from: "source LP" }
+  not_inherited:
+    - { field: "id", value: "new UUID" }
+    - { field: "lp_number", value: "auto-generated" }
+    - { field: "quantity", value: "split_qty" }
+    - { field: "location_id", value: "destination_location_id or source location" }
+    - { field: "status", value: "'available'" }
+    - { field: "source", value: "'split'" }
+    - { field: "parent_lp_id", value: "source LP id" }
+    - { field: "created_at", value: "NOW()" }
+    - { field: "updated_at", value: "NOW()" }
+    - { field: "catch_weight_kg", value: "NULL (not proportionally split)" }
+    - { field: "po_number", value: "NULL" }
+    - { field: "grn_id", value: "NULL" }
+    - { field: "asn_id", value: "NULL" }
+    - { field: "wo_id", value: "NULL" }
+    - { field: "consumed_by_wo_id", value: "NULL" }
+    - { field: "pallet_id", value: "NULL" }
+    - { field: "sscc", value: "NULL" }
+
+# Genealogy record structure
+genealogy_record:
+  parent_lp_id: "source LP (the one being split)"
+  child_lp_id: "new LP (the split-off portion)"
+  operation_type: "split"
+  quantity: "split_qty (amount that went to new LP)"
+  wo_id: "NULL (split is not a production operation)"

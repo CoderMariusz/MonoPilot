@@ -1,0 +1,127 @@
+# Story 03.10 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.10"
+  name: "WO CRUD + BOM Auto-Select"
+  slug: "wo-crud"
+  epic: "03-planning"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 5-7
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, functions, triggers
+  - api.yaml         # Endpoints, services, validation
+  - frontend.yaml    # Pages, components, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "org_id context", "RLS patterns"]
+    - story: "01.11"
+      name: "Production Lines CRUD"
+      provides: ["production_lines"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products", "product_id for WO"]
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms", "bom_items", "bom_id for WO", "BOM effective dates"]
+  soft:
+    - story: "01.10"
+      name: "Machines CRUD"
+      provides: ["machines (optional assignment)"]
+    - story: "03.16"
+      name: "Planning Settings"
+      provides: ["wo_require_bom, wo_copy_routing settings"]
+  blocked_by: []
+  blocks:
+    - story: "03.11a"
+      name: "WO Materials BOM Snapshot"
+      reason: "Requires work_orders table"
+    - story: "03.12"
+      name: "WO Operations Copy"
+      reason: "Requires work_orders table"
+    - epic: "04"
+      name: "Production Module"
+      reason: "Production execution depends on work orders"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-017", "FR-PLAN-018", "FR-PLAN-022"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Work Orders", "Database Schema", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.10.wo-crud.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-013-work-order-list.md"
+      id: "PLAN-013"
+      description: "WO list page with filters, KPI cards, status badges"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-014-work-order-create-modal.md"
+      id: "PLAN-014"
+      description: "WO create/edit modal with BOM auto-selection"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      id: "PLAN-015"
+      description: "WO detail page with tabs: Materials, Operations, Output, History"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for work_orders"
+  patterns:
+    - path: "apps/frontend/app/api/technical/products/route.ts"
+      relevance: "API route pattern with RLS"
+    - path: "apps/frontend/lib/services/product-service.ts"
+      relevance: "Service layer pattern"
+    - path: "apps/frontend/lib/validation/product.ts"
+      relevance: "Zod validation schema pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "work_orders + wo_status_history + wo_daily_sequence tables"
+  - type: "function"
+    count: 3
+    description: "generate_wo_number, get_active_bom_for_date, get_all_active_boms_for_product"
+  - type: "trigger"
+    count: 2
+    description: "wo_status_history trigger, wo_update_timestamp trigger"
+  - type: "service"
+    count: 1
+    description: "work-order-service.ts"
+  - type: "validation"
+    count: 1
+    description: "work-order.ts (Zod schemas)"
+  - type: "api"
+    count: 11
+    description: "CRUD + status actions + BOM selection endpoints"
+  - type: "page"
+    count: 3
+    description: "WO list, WO detail, WO create pages"
+  - type: "component"
+    count: 15+
+    description: "DataTable, filters, forms, badges, modals"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + E2E + RLS tests"
+
+# Technical notes
+technical_notes:
+  - "Large story - recommend implementing in phases: DB -> API -> Service -> UI"
+  - "BOM auto-selection is critical path - test thoroughly"
+  - "WO number format: WO-YYYYMMDD-NNNN with daily reset per org"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Status transitions: draft -> planned -> released (execution in Epic 04)"
+  - "bom_id and product_id become immutable after status = released"
+  - "Return 404 (not 403) for cross-tenant access"

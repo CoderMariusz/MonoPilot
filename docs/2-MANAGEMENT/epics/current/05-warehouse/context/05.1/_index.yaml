@@ -1,0 +1,157 @@
+# Story 05.1 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.1"
+  name: "License Plate Table + CRUD"
+  slug: "lp-table-crud"
+  epic: "05-warehouse"
+  phase: "Phase 0 (LP Foundation)"
+  complexity: "L"
+  estimate_days: 4
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0 (CRITICAL BLOCKER)"
+
+# CRITICAL: This story blocks Epic 04 Production
+critical_notice:
+  message: "THIS STORY IS THE CRITICAL BLOCKER FOR EPIC 04 PRODUCTION"
+  unblocking_date: "Day 4 enables Epic 04.6, 04.7"
+  blocked_stories:
+    - "04.6a-e: Material Consumption (reads/updates LP qty)"
+    - "04.7a-d: Output Registration (creates new LPs)"
+    - "04.8: Material Reservations (reserves specific LPs)"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes, seed data
+  - api.yaml         # Endpoints, service methods, Zod schemas
+  - frontend.yaml    # Pages, components, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id patterns", "RLS helpers", "auth context"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table", "warehouse_id FK"]
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations table", "location_id FK"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK"]
+  blocked_by: []
+  blocks:
+    # ALL Epic 05 stories
+    - story: "05.2"
+      name: "LP Genealogy"
+    - story: "05.3"
+      name: "LP Reservations"
+    - story: "05.4"
+      name: "FIFO/FEFO Pick Suggestions"
+    - story: "05.5"
+      name: "LP CRUD Desktop (Full)"
+    - story: "05.6"
+      name: "LP Split/Merge"
+    - story: "05.7"
+      name: "QA Status Workflow"
+    - story: "05.8"
+      name: "GRN Integration"
+    # Epic 04 Phase 1 (CRITICAL)
+    - story: "04.6a-e"
+      name: "Material Consumption"
+      critical: true
+    - story: "04.7a-d"
+      name: "Output Registration"
+      critical: true
+    - story: "04.8"
+      name: "Material Reservations"
+      critical: true
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-001", "WH-FR-002", "WH-FR-006", "WH-FR-008", "WH-FR-009", "WH-FR-010"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["Database Schema", "API Design", "License Plates"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.1.lp-table-crud.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-002-license-plates-list.md"
+      relevance: "LP list page with filters, KPIs, badges"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      relevance: "LP detail panel with tabs (Details, Genealogy, Movements, Audit)"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for license_plates table"
+  patterns:
+    - path: "apps/frontend/lib/services/warehouse-service.ts"
+      relevance: "Service pattern for warehouse CRUD"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "license_plates table + lp_number_sequences + RLS + indexes"
+  - type: "service"
+    count: 1
+    description: "license-plate-service.ts with CRUD + Epic 04 methods"
+  - type: "api"
+    count: 11
+    description: "REST endpoints for LP management"
+  - type: "validation"
+    count: 1
+    description: "license-plate.ts Zod schemas"
+  - type: "frontend"
+    count: 8
+    description: "LP list page + components (DataTable, filters, detail panel)"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + RLS + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "CRITICAL BLOCKER for Epic 04 Production - prioritize completion"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "LP number auto-generation via generate_lp_number(org_id) function"
+  - "All Epic 04 service methods must be implemented and tested"
+  - "consumeLP() validates: status=available, qa_status=passed, qty sufficient, not expired"
+  - "createOutputLP() auto-generates LP number, sets source='production', links to WO"
+  - "getAvailableLPs() supports FIFO (created_at) and FEFO (expiry_date) ordering"
+  - "Forward-compatible schema: include Phase 1-3 columns as nullable"
+
+# PRD Coverage
+prd_coverage:
+  - id: "WH-FR-001"
+    name: "LP Creation"
+    coverage: "Full"
+    notes: "Auto/manual numbering, GRN integration"
+  - id: "WH-FR-002"
+    name: "LP Tracking"
+    coverage: "Full"
+    notes: "qty, location, status, QA status, batch, expiry"
+  - id: "WH-FR-006"
+    name: "LP Split"
+    coverage: "Partial"
+    notes: "API only - UI in Story 05.6"
+  - id: "WH-FR-008"
+    name: "QA Status Management"
+    coverage: "Partial"
+    notes: "Status field + transitions - full workflow in Story 05.7"
+  - id: "WH-FR-009"
+    name: "Batch Tracking"
+    coverage: "Full"
+    notes: "batch_number, supplier_batch_number fields"
+  - id: "WH-FR-010"
+    name: "Expiry Tracking"
+    coverage: "Full"
+    notes: "expiry_date, manufacture_date fields"

@@ -1,0 +1,158 @@
+# Story 05.12 - Database Schema
+# Purpose: Tables used, updates, RLS policies
+# Agent: BACKEND-DEV (database focus)
+
+# NOTE: No new migrations required - this story uses existing tables from 05.1, 05.10, 03.8
+migrations:
+  new: []  # No new tables
+  uses:
+    - "grns (from 05.10)"
+    - "grn_items (from 05.10)"
+    - "license_plates (from 05.1)"
+    - "transfer_orders (from 03.8)"
+    - "to_lines (from 03.8)"
+    - "warehouse_settings (from 05.0)"
+
+# Tables USED (not created)
+tables_used:
+  # GRN Header - created in 05.10
+  - name: "grns"
+    description: "Goods Receipt Note header - INSERT with source_type='to'"
+    relevant_columns:
+      - { name: "source_type", value: "'to'", notes: "Set to 'to' for transfer receipts" }
+      - { name: "to_id", type: "UUID", notes: "FK to transfer_orders.id" }
+      - { name: "warehouse_id", type: "UUID", notes: "Must match TO.to_warehouse_id" }
+      - { name: "location_id", type: "UUID", notes: "Default receiving location" }
+      - { name: "status", type: "TEXT", notes: "Always 'completed' for TO receipt" }
+    operations: ["INSERT"]
+
+  # GRN Items - created in 05.10
+  - name: "grn_items"
+    description: "GRN line items - INSERT with TO line reference"
+    relevant_columns:
+      - { name: "grn_id", type: "UUID", notes: "FK to grns.id" }
+      - { name: "to_line_id", type: "UUID", notes: "FK to to_lines.id" }
+      - { name: "product_id", type: "UUID", notes: "From TO line" }
+      - { name: "received_qty", type: "DECIMAL", notes: "Quantity being received" }
+      - { name: "lp_id", type: "UUID", notes: "Created or moved LP reference" }
+      - { name: "batch_number", type: "TEXT", notes: "Optional batch" }
+      - { name: "expiry_date", type: "DATE", notes: "Optional expiry" }
+      - { name: "notes", type: "TEXT", notes: "Variance reason stored here" }
+    operations: ["INSERT"]
+
+  # License Plates - created in 05.1
+  - name: "license_plates"
+    description: "LP records - INSERT new or UPDATE existing (transit LP)"
+    relevant_columns:
+      - { name: "warehouse_id", type: "UUID", notes: "Updated to destination" }
+      - { name: "location_id", type: "UUID", notes: "Updated to receiving location" }
+      - { name: "status", type: "TEXT", notes: "Set to 'available'" }
+      - { name: "qa_status", type: "TEXT", notes: "From warehouse_settings.default_qa_status" }
+      - { name: "source", type: "TEXT", notes: "'receipt' for new LPs" }
+      - { name: "grn_id", type: "UUID", notes: "Link to GRN record" }
+    operations:
+      transit_enabled: ["UPDATE"]  # Move existing transit LP
+      transit_disabled: ["INSERT"]  # Create new LP
+
+  # Transfer Orders - created in 03.8
+  - name: "transfer_orders"
+    description: "TO header - UPDATE status after receipt"
+    relevant_columns:
+      - { name: "status", type: "TEXT", notes: "Update: shipped -> partial -> received" }
+      - { name: "to_warehouse_id", type: "UUID", notes: "Validate receipt warehouse matches" }
+    operations: ["SELECT", "UPDATE"]
+    status_values:
+      receivable: ["shipped", "partial"]
+      after_partial_receipt: "partial"
+      after_full_receipt: "received"
+
+  # TO Lines - created in 03.8
+  - name: "to_lines"
+    description: "TO line items - UPDATE received_qty"
+    relevant_columns:
+      - { name: "shipped_qty", type: "DECIMAL", notes: "Reference for variance calculation" }
+      - { name: "received_qty", type: "DECIMAL", notes: "Accumulated from all GRNs" }
+    operations: ["SELECT", "UPDATE"]
+
+  # Warehouse Settings - created in 05.0
+  - name: "warehouse_settings"
+    description: "Settings - READ for transit location, batch/expiry requirements"
+    relevant_columns:
+      - { name: "enable_transit_location", type: "BOOLEAN", notes: "Determines LP move vs create" }
+      - { name: "require_batch_on_receipt", type: "BOOLEAN", notes: "Validation flag" }
+      - { name: "require_expiry_on_receipt", type: "BOOLEAN", notes: "Validation flag" }
+      - { name: "default_qa_status", type: "TEXT", notes: "LP QA status on receipt" }
+      - { name: "auto_generate_lp_number", type: "BOOLEAN", notes: "LP number generation" }
+      - { name: "lp_number_prefix", type: "TEXT", notes: "LP number prefix" }
+    operations: ["SELECT"]
+
+# RLS Policies - existing policies apply
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  validation_notes:
+    - "All existing RLS policies from 05.1, 05.10, 03.8 apply"
+    - "TO receipt blocked if TO.org_id != user's org_id (returns 404)"
+    - "Cross-tenant TO access returns 404 (not 403) to prevent existence leak"
+    - "GRN and LP records inherit org_id from authenticated user context"
+
+# Key Business Logic (Database Level)
+business_logic:
+  to_status_update: |
+    -- After GRN completion, update TO status
+    WITH line_status AS (
+      SELECT
+        to_id,
+        SUM(quantity) AS total_qty,
+        SUM(received_qty) AS total_received
+      FROM to_lines
+      WHERE to_id = :to_id
+      GROUP BY to_id
+    )
+    UPDATE transfer_orders
+    SET status = CASE
+      WHEN ls.total_received >= ls.total_qty THEN 'received'
+      WHEN ls.total_received > 0 THEN 'partial'
+      ELSE status
+    END
+    FROM line_status ls
+    WHERE transfer_orders.id = ls.to_id;
+
+  variance_calculation: |
+    -- Calculate variance for a TO line
+    SELECT
+      tl.id AS to_line_id,
+      p.name AS product_name,
+      tl.shipped_qty,
+      :received_qty AS received_qty,
+      (:received_qty - tl.shipped_qty) AS variance_qty,
+      ROUND(((:received_qty - tl.shipped_qty) / NULLIF(tl.shipped_qty, 0)) * 100, 2) AS variance_pct
+    FROM to_lines tl
+    JOIN products p ON p.id = tl.product_id
+    WHERE tl.id = :to_line_id;
+
+  transit_lp_move: |
+    -- Move LP from transit location to destination (if transit_location enabled)
+    UPDATE license_plates
+    SET
+      location_id = :destination_location_id,
+      warehouse_id = :destination_warehouse_id,
+      updated_at = NOW()
+    WHERE id = :transit_lp_id
+      AND org_id = (SELECT org_id FROM users WHERE id = auth.uid());
+
+# Indexes used (existing from dependent stories)
+indexes_used:
+  - "idx_grns_org_status ON grns(org_id, status)"
+  - "idx_grn_items_grn ON grn_items(grn_id)"
+  - "idx_license_plates_org_status ON license_plates(org_id, status)"
+  - "idx_transfer_orders_org_status ON transfer_orders(org_id, status)"
+  - "idx_to_lines_to ON to_lines(to_id)"
+
+# Constraints respected
+constraints:
+  - "grns.source_type CHECK IN ('po', 'to', 'production', 'return', 'adjustment')"
+  - "grns.status CHECK IN ('draft', 'completed', 'cancelled')"
+  - "transfer_orders.status CHECK IN ('draft', 'planned', 'shipped', 'partial', 'received', 'closed', 'cancelled')"
+  - "license_plates.status CHECK IN ('available', 'reserved', 'consumed', 'blocked', 'expired')"

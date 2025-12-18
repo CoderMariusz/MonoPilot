@@ -1,0 +1,353 @@
+# Story 07.15 - Database Schema
+# Purpose: Views, indexes, queries, caching strategy
+# Agent: BACKEND-DEV (database focus)
+
+# No new tables needed - uses existing tables from dependencies
+
+existing_tables:
+  - name: "sales_orders"
+    from_story: "07.2"
+    columns_used: ["id", "org_id", "order_date", "status", "promised_ship_date", "customer_id"]
+
+  - name: "sales_order_lines"
+    from_story: "07.2"
+    columns_used: ["id", "sales_order_id", "product_id", "quantity_ordered", "quantity_allocated", "unit_price"]
+
+  - name: "pick_lists"
+    from_story: "07.8"
+    columns_used: ["id", "org_id", "sales_order_id", "status", "created_at", "completed_at"]
+
+  - name: "shipments"
+    from_story: "07.11"
+    columns_used: ["id", "org_id", "sales_order_id", "status", "created_at", "shipped_at", "promised_date"]
+
+  - name: "users"
+    from_story: "01.1"
+    columns_used: ["id", "org_id", "name", "email"]
+
+  - name: "organizations"
+    from_story: "01.1"
+    columns_used: ["id", "name"]
+
+  - name: "products"
+    from_story: "02.1"
+    columns_used: ["id", "name", "sku"]
+
+  - name: "allergens"
+    from_story: "02.3"
+    columns_used: ["id", "name", "code"]
+
+# Views for Dashboard Queries (Optional - database-level optimization)
+views:
+  - name: "vw_dashboard_orders_by_status"
+    description: "Pre-aggregated order counts by status"
+    columns:
+      - { name: "org_id", type: "UUID" }
+      - { name: "status", type: "TEXT" }
+      - { name: "count", type: "BIGINT" }
+      - { name: "date_from", type: "DATE" }
+      - { name: "date_to", type: "DATE" }
+    sql: |
+      SELECT
+        org_id,
+        status,
+        COUNT(*) as count,
+        DATE(order_date) as order_date
+      FROM sales_orders
+      WHERE order_date >= date_from
+        AND order_date <= date_to
+      GROUP BY org_id, status, order_date
+    rls: true
+    rls_using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "vw_dashboard_backorders"
+    description: "Pre-aggregated backorder counts and values"
+    columns:
+      - { name: "org_id", type: "UUID" }
+      - { name: "count", type: "BIGINT" }
+      - { name: "total_value", type: "NUMERIC" }
+    sql: |
+      SELECT
+        so.org_id,
+        COUNT(*) as count,
+        SUM((sol.quantity_ordered - sol.quantity_allocated) * sol.unit_price) as total_value
+      FROM sales_order_lines sol
+      JOIN sales_orders so ON sol.sales_order_id = so.id
+      WHERE sol.quantity_allocated < sol.quantity_ordered
+        AND so.status NOT IN ('cancelled', 'shipped', 'delivered')
+      GROUP BY so.org_id
+    rls: true
+    rls_using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "vw_dashboard_shipments_by_date"
+    description: "Pre-aggregated daily shipment counts"
+    columns:
+      - { name: "org_id", type: "UUID" }
+      - { name: "ship_date", type: "DATE" }
+      - { name: "count", type: "BIGINT" }
+    sql: |
+      SELECT
+        org_id,
+        DATE(shipped_at) as ship_date,
+        COUNT(*) as count
+      FROM shipments
+      WHERE shipped_at IS NOT NULL
+        AND status = 'shipped'
+      GROUP BY org_id, DATE(shipped_at)
+      ORDER BY ship_date DESC
+    rls: true
+    rls_using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Database Indexes (Performance Optimization)
+indexes:
+  # Sales Orders
+  - table: "sales_orders"
+    name: "idx_sales_orders_org_date_status"
+    columns: ["org_id", "order_date", "status"]
+    unique: false
+    rationale: "Fast dashboard KPI queries filtering by org, date range, and status"
+
+  - table: "sales_orders"
+    name: "idx_sales_orders_org_promised_date"
+    columns: ["org_id", "promised_ship_date", "status"]
+    unique: false
+    rationale: "Fast delayed shipment alert queries"
+
+  # Pick Lists
+  - table: "pick_lists"
+    name: "idx_pick_lists_org_created_status"
+    columns: ["org_id", "created_at", "status"]
+    unique: false
+    rationale: "Fast pick list KPI and overdue pick queries"
+
+  # Shipments
+  - table: "shipments"
+    name: "idx_shipments_org_shipped_date"
+    columns: ["org_id", "shipped_at", "status"]
+    unique: false
+    rationale: "Fast shipment by date and status queries"
+
+  # Sales Order Lines
+  - table: "sales_order_lines"
+    name: "idx_sales_order_lines_allocation"
+    columns: ["sales_order_id", "quantity_allocated", "quantity_ordered"]
+    unique: false
+    rationale: "Fast backorder detection queries"
+
+# Caching Strategy
+caching:
+  provider: "Redis"
+  ttl_seconds: 60
+
+  cache_keys:
+    - pattern: "dashboard:kpis:{org_id}:{date_range_hash}"
+      type: "KPI metrics"
+      ttl: "60 seconds"
+      content: |
+        {
+          orders: { total, by_status: {}, trend: {} },
+          pick_lists: { total, by_status: {}, trend: {} },
+          shipments: { total, by_status: {}, trend: {} },
+          backorders: { count, total_value }
+        }
+
+    - pattern: "dashboard:alerts:{org_id}:{date_range_hash}"
+      type: "Alert aggregations"
+      ttl: "60 seconds"
+      content: |
+        {
+          backorders: { count, items: [] },
+          delayed_shipments: { count, items: [] },
+          pending_picks_overdue: { count, items: [] },
+          allergen_conflicts: { count, items: [] }
+        }
+
+    - pattern: "dashboard:activity:{org_id}:{limit}"
+      type: "Recent activity"
+      ttl: "60 seconds"
+      content: "Array<ActivityLog>"
+
+  invalidation_strategy: "Passive TTL-based expiration (no active invalidation in Phase 1)"
+  fallback_behavior: "If Redis unavailable, query database directly"
+
+# Date Range Hash Function
+date_range_hash: |
+  function hashDateRange(dateFrom: Date, dateTo: Date): string {
+    const fromStr = dateFrom.toISOString().split('T')[0];
+    const toStr = dateTo.toISOString().split('T')[0];
+    return `${fromStr}_${toStr}`;
+  }
+  // Example: 2025-12-01_2025-12-31
+
+# SQL Queries for Dashboard
+
+dashboard_queries:
+  kpi_orders_by_status: |
+    SELECT
+      status,
+      COUNT(*) as count
+    FROM sales_orders
+    WHERE org_id = $1
+      AND order_date >= $2
+      AND order_date <= $3
+    GROUP BY status
+    ORDER BY status;
+
+  kpi_pick_lists_by_status: |
+    SELECT
+      status,
+      COUNT(*) as count
+    FROM pick_lists
+    WHERE org_id = $1
+      AND created_at >= $2
+      AND created_at <= $3
+    GROUP BY status
+    ORDER BY status;
+
+  kpi_shipments_by_status: |
+    SELECT
+      status,
+      COUNT(*) as count
+    FROM shipments
+    WHERE org_id = $1
+      AND created_at >= $2
+      AND created_at <= $3
+    GROUP BY status
+    ORDER BY status;
+
+  kpi_backorders: |
+    SELECT
+      COUNT(*) as count,
+      SUM((sol.quantity_ordered - sol.quantity_allocated) * sol.unit_price) as total_value
+    FROM sales_order_lines sol
+    JOIN sales_orders so ON sol.sales_order_id = so.id
+    WHERE so.org_id = $1
+      AND sol.quantity_allocated < sol.quantity_ordered
+      AND so.status NOT IN ('cancelled', 'shipped', 'delivered');
+
+  alert_delayed_shipments: |
+    SELECT
+      so.id,
+      so.order_number,
+      so.promised_ship_date,
+      EXTRACT(DAY FROM (CURRENT_DATE - so.promised_ship_date))::INT as days_late
+    FROM sales_orders so
+    WHERE so.org_id = $1
+      AND so.promised_ship_date < CURRENT_DATE
+      AND so.status NOT IN ('shipped', 'delivered', 'cancelled')
+    ORDER BY days_late DESC;
+
+  alert_pending_picks_overdue: |
+    SELECT
+      id,
+      pick_list_number,
+      created_at,
+      EXTRACT(HOUR FROM (NOW() - created_at))::INT as hours_pending
+    FROM pick_lists
+    WHERE org_id = $1
+      AND status = 'pending'
+      AND created_at < NOW() - INTERVAL '24 hours'
+    ORDER BY created_at ASC;
+
+  alert_backorders: |
+    SELECT
+      sol.id,
+      sol.product_id,
+      p.name as product_name,
+      (sol.quantity_ordered - sol.quantity_allocated) as qty_backordered
+    FROM sales_order_lines sol
+    JOIN sales_orders so ON sol.sales_order_id = so.id
+    JOIN products p ON sol.product_id = p.id
+    WHERE so.org_id = $1
+      AND sol.quantity_allocated < sol.quantity_ordered
+      AND so.status NOT IN ('cancelled', 'shipped', 'delivered')
+    ORDER BY sol.quantity_ordered - sol.quantity_allocated DESC;
+
+  alert_allergen_conflicts: |
+    SELECT
+      so.id,
+      so.order_number,
+      c.name as customer_name,
+      STRING_AGG(a.name, ', ') as conflicting_allergens
+    FROM sales_orders so
+    JOIN customers c ON so.customer_id = c.id
+    LEFT JOIN sales_order_lines sol ON so.id = sol.sales_order_id
+    LEFT JOIN products p ON sol.product_id = p.id
+    LEFT JOIN product_allergens pa ON p.id = pa.product_id
+    LEFT JOIN allergens a ON pa.allergen_id = a.id
+    WHERE so.org_id = $1
+      AND so.allergen_validated = false
+    GROUP BY so.id, so.order_number, c.name
+    HAVING STRING_AGG(a.name, ', ') IS NOT NULL;
+
+  chart_shipments_by_date: |
+    SELECT
+      DATE(shipped_at) as ship_date,
+      COUNT(*) as count
+    FROM shipments
+    WHERE org_id = $1
+      AND shipped_at >= $2
+      AND shipped_at <= $3
+      AND status = 'shipped'
+    GROUP BY DATE(shipped_at)
+    ORDER BY ship_date ASC;
+
+  recent_activity: |
+    SELECT
+      id,
+      activity_type as type,
+      entity_type,
+      entity_id,
+      entity_number,
+      description,
+      created_at,
+      created_by_id,
+      u.name as created_by_name
+    FROM activity_log al
+    LEFT JOIN users u ON al.created_by_id = u.id
+    WHERE al.org_id = $1
+      AND al.activity_type IN ('so_created', 'so_confirmed', 'so_shipped', 'pick_completed', 'shipment_packed')
+    ORDER BY created_at DESC
+    LIMIT $2;
+
+# Activity Log Table (if not already created)
+activity_log_table: |
+  CREATE TABLE IF NOT EXISTS activity_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    activity_type TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id UUID NOT NULL,
+    entity_number TEXT,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    created_by_id UUID NOT NULL REFERENCES users(id),
+    metadata JSONB DEFAULT '{}'::jsonb
+  );
+
+  CREATE INDEX idx_activity_log_org ON activity_log(org_id);
+  CREATE INDEX idx_activity_log_type ON activity_log(activity_type);
+  CREATE INDEX idx_activity_log_created ON activity_log(created_at DESC);
+
+# RLS Policies
+rls_policies:
+  pattern: "ADR-013 Users Table Lookup"
+
+  policies:
+    - table: "sales_orders"
+      read_existing: true
+      note: "Already has RLS from Story 07.2 - used by dashboard KPI queries"
+
+    - table: "pick_lists"
+      read_existing: true
+      note: "Already has RLS from Story 07.8 - used by dashboard KPI queries"
+
+    - table: "shipments"
+      read_existing: true
+      note: "Already has RLS from Story 07.11 - used by dashboard KPI queries"
+
+    - table: "activity_log"
+      name: "activity_log_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Org-isolated audit trail for activity feed"

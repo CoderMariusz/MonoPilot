@@ -1,0 +1,436 @@
+# Story 06.11 API Context
+# Final Inspection & Batch Release Endpoints
+# Request/response schemas, service layer, validation
+
+api:
+  endpoints:
+    - path: "/api/quality/inspections/final"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QA_INSPECTOR", "QUALITY_DIRECTOR"]
+      description: "List final inspections queue"
+      query_params:
+        - name: "status"
+          type: "string"
+          enum: ["scheduled", "in_progress", "completed"]
+          optional: true
+        - name: "result"
+          type: "string"
+          enum: ["pass", "fail", "conditional"]
+          optional: true
+        - name: "wo_id"
+          type: "uuid"
+          optional: true
+        - name: "batch_number"
+          type: "string"
+          optional: true
+        - name: "product_id"
+          type: "uuid"
+          optional: true
+        - name: "date_from"
+          type: "ISO8601"
+          optional: true
+        - name: "date_to"
+          type: "ISO8601"
+          optional: true
+        - name: "page"
+          type: "integer"
+          default: 1
+        - name: "limit"
+          type: "integer"
+          default: 10
+          max: 100
+        - name: "sort"
+          type: "string"
+          enum: ["inspection_number", "scheduled_date", "product_name", "result"]
+          default: "scheduled_date"
+        - name: "order"
+          type: "string"
+          enum: ["asc", "desc"]
+          default: "desc"
+      response:
+        status: 200
+        schema:
+          inspections: "QualityInspection[]"
+          summary:
+            scheduled: "integer"
+            in_progress: "integer"
+            completed_today: "integer"
+            pending_release: "integer"
+          pagination:
+            page: "integer"
+            limit: "integer"
+            total: "integer"
+            total_pages: "integer"
+
+    - path: "/api/quality/inspections/:id/evidence"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QA_INSPECTOR", "QUALITY_DIRECTOR"]
+      description: "Get evidence summary for final inspection"
+      response:
+        status: 200
+        schema:
+          inspection_id: "uuid"
+          wo_id: "uuid"
+          batch_number: "string"
+          in_process_inspections:
+            total: "integer"
+            passed: "integer"
+            failed: "integer"
+            conditional: "integer"
+            in_progress: "integer"
+            items: "InProcessInspectionSummary[]"
+          ccp_monitoring:
+            total_records: "integer"
+            within_limits: "integer"
+            deviations: "integer"
+            deviations_resolved: "integer"
+            items: "CCPMonitoringSummary[]"
+          operation_checkpoints:
+            total: "integer"
+            passed: "integer"
+            failed: "integer"
+            items: "CheckpointSummary[]"
+          ncrs:
+            open: "integer"
+            closed: "integer"
+            items: "NCRSummary[]"
+          overall_status: "string"
+            enum: ["ready", "review_required", "blocked"]
+          blockers: "string[]"
+          warnings: "string[]"
+
+    - path: "/api/quality/batch/:batchId/release-check"
+      method: "POST"
+      auth: true
+      roles: ["QA_MANAGER", "QA_INSPECTOR", "QUALITY_DIRECTOR"]
+      description: "Check if batch can be released (pre-release validation)"
+      request:
+        schema:
+          batch_number: "string"
+      response:
+        status: 200
+        schema:
+          batch_number: "string"
+          wo_id: "uuid"
+          product_id: "uuid"
+          product_name: "string"
+          total_quantity: "number"
+          output_lps: "integer"
+          can_release: "boolean"
+          checklist:
+            final_inspection_exists: "boolean"
+            final_inspection_passed: "boolean"
+            all_tests_passed: "boolean"
+            ccp_records_complete: "boolean"
+            ccp_records_within_limits: "boolean"
+            checkpoints_passed: "boolean"
+            no_open_ncrs: "boolean"
+          final_inspection:
+            id: "uuid"
+            inspection_number: "string"
+            status: "string"
+            result: "string | null"
+          blockers: "string[]"
+          warnings: "string[]"
+          suggested_action: "string"
+
+    - path: "/api/quality/batch/:batchId/release"
+      method: "POST"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR"]
+      description: "Approve/reject batch release"
+      request:
+        schema:
+          release_decision: "string"
+            enum: ["approved", "rejected", "conditional"]
+          checklist:
+            test_results: "boolean"
+            ccp_records: "boolean"
+            checkpoints: "boolean"
+            label_verify: "boolean"
+            spec_review: "boolean"
+            ncr_review: "boolean"
+          conditional_reason: "string"
+            optional: true
+            required_if: "release_decision == 'conditional'"
+          conditional_restrictions: "string"
+            optional: true
+            required_if: "release_decision == 'conditional'"
+          conditional_expires_at: "ISO8601"
+            optional: true
+          rejection_reason: "string"
+            optional: true
+            required_if: "release_decision == 'rejected'"
+          approval_notes: "string"
+            optional: true
+          lp_ids: "uuid[]"
+            optional: true
+          lp_decisions: "LPDecision[]"
+            optional: true
+      response:
+        status: 201
+        schema:
+          release: "BatchReleaseRecord"
+          lps_updated: "integer"
+          lps_released: "integer"
+          lps_rejected: "integer"
+          message: "string"
+
+    - path: "/api/quality/batch/:batchId/status"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QA_INSPECTOR", "QUALITY_DIRECTOR", "PRODUCTION", "SHIPPING"]
+      description: "Get batch QA status summary"
+      response:
+        status: 200
+        schema:
+          batch_number: "string"
+          wo_id: "uuid"
+          product: "ProductSummary"
+          qa_status:
+            final_inspection_status: "string | null"
+            final_inspection_result: "string | null"
+            release_status: "string"
+            released_at: "ISO8601 | null"
+            released_by: "string | null"
+          lp_summary:
+            total: "integer"
+            released: "integer"
+            pending: "integer"
+            rejected: "integer"
+            hold: "integer"
+          can_ship: "boolean"
+          restrictions: "string"
+
+    - path: "/api/quality/batch-releases"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR", "QA_INSPECTOR"]
+      description: "List batch release records"
+      query_params:
+        - name: "release_decision"
+          type: "string"
+          enum: ["pending", "approved", "rejected", "conditional"]
+          optional: true
+        - name: "product_id"
+          type: "uuid"
+          optional: true
+        - name: "date_from"
+          type: "ISO8601"
+          optional: true
+        - name: "date_to"
+          type: "ISO8601"
+          optional: true
+        - name: "page"
+          type: "integer"
+          default: 1
+        - name: "limit"
+          type: "integer"
+          default: 10
+      response:
+        status: 200
+        schema:
+          releases: "BatchReleaseRecord[]"
+          pagination: "Pagination"
+
+    - path: "/api/quality/batch-releases/:id"
+      method: "GET"
+      auth: true
+      roles: ["QA_MANAGER", "QUALITY_DIRECTOR", "QA_INSPECTOR"]
+      description: "Get release record detail"
+      response:
+        status: 200
+        schema:
+          release: "BatchReleaseRecord"
+          final_inspection: "QualityInspection | null"
+          evidence_summary: "InspectionEvidenceSummary"
+          lps: "Array<{lp: LicensePlate, release_status: string, notes: string}>"
+          audit_history: "AuditLogEntry[]"
+
+  service_layer:
+    - class_name: "BatchReleaseService"
+      methods:
+        - name: "checkReleaseReadiness"
+          signature: "static async checkReleaseReadiness(batchNumber: string): Promise<ReleaseCheckResult>"
+          description: "Check if batch meets all 7 pre-release criteria"
+          logic: |
+            1. Get WO by batch_number
+            2. Get final inspection for WO
+            3. Check 7 criteria:
+               a. Final inspection exists and passed
+               b. All test results recorded and passed
+               c. All CCP records complete and within limits
+               d. All operation checkpoints signed off
+               e. No active quality holds
+               f. Full batch traceability available
+               g. All specifications met
+            4. Aggregate blockers (fail = cannot release)
+            5. Aggregate warnings (pass but notable)
+            6. Return ReleaseCheckResult with can_release: boolean
+
+        - name: "getEvidenceSummary"
+          signature: "static async getEvidenceSummary(inspectionId: string): Promise<EvidenceSummary>"
+          description: "Aggregate all quality evidence for inspection"
+          logic: |
+            1. Get final inspection with WO reference
+            2. Query in-process inspections for WO
+            3. Query CCP monitoring records for WO
+            4. Query operation checkpoint results for WO
+            5. Query NCRs linked to WO/batch
+            6. Aggregate counts: total, passed, failed, etc.
+            7. Calculate overall_status (ready/review_required/blocked)
+            8. Return EvidenceSummary object
+
+        - name: "approveBatchRelease"
+          signature: "static async approveBatchRelease(batchNumber: string, input: BatchReleaseInput, userId: string): Promise<BatchReleaseResult>"
+          description: "Create and approve batch release (QA Manager only)"
+          logic: |
+            1. Validate release check passes (or acceptable warnings only)
+            2. Validate user has QA_MANAGER role (RLS enforces)
+            3. Generate release_number via generate_release_number()
+            4. Create batch_release_records entry
+            5. Link output LPs to release via batch_release_lps
+            6. Update LP release_status based on decision:
+               - approved → release_status='released'
+               - rejected → release_status='rejected'
+               - conditional → release_status='released' + notes
+            7. Create quality_audit_log entry
+            8. Return release result with updated LPs
+
+        - name: "submitForApproval"
+          signature: "static async submitForApproval(batchNumber: string, checklist: ReleaseChecklist, userId: string): Promise<BatchReleaseRecord>"
+          description: "Submit release for approval (Inspector workflow)"
+          logic: |
+            1. Check user has QA_INSPECTOR role
+            2. Generate release_number
+            3. Create batch_release_records with:
+               - release_decision='pending'
+               - submitted_by=userId
+               - submitted_at=NOW()
+            4. Store checklist state in record
+            5. Create audit log entry
+            6. Notify QA Managers
+            7. Return pending release record
+
+        - name: "getOutputLPs"
+          signature: "static async getOutputLPs(batchNumber: string): Promise<LicensePlate[]>"
+          description: "Get output LPs for batch"
+          logic: |
+            1. Get WO by batch_number
+            2. Query license_plates WHERE:
+               - org_id = current org
+               - wo_id = WO.id (created from this WO)
+            3. Include qa_status and release_status
+            4. Return LP array with current status
+
+        - name: "generateReleaseNumber"
+          signature: "static async generateReleaseNumber(orgId: string): Promise<string>"
+          description: "Generate next release number (REL-{YYYY}-{NNNNN})"
+          logic: |
+            - Call generate_release_number(orgId) SQL function
+            - Returns formatted string
+
+  validation:
+    - name: "releaseChecklistSchema"
+      type: "Zod"
+      schema: |
+        z.object({
+          test_results: z.boolean(),
+          ccp_records: z.boolean(),
+          checkpoints: z.boolean(),
+          label_verify: z.boolean(),
+          spec_review: z.boolean(),
+          ncr_review: z.boolean()
+        })
+
+    - name: "batchReleaseRequestSchema"
+      type: "Zod"
+      schema: |
+        z.object({
+          release_decision: z.enum(['approved', 'rejected', 'conditional']),
+          checklist: releaseChecklistSchema,
+          conditional_reason: z.string().max(500).optional(),
+          conditional_restrictions: z.string().max(1000).optional(),
+          conditional_expires_at: z.string().datetime().optional(),
+          rejection_reason: z.string().max(1000).optional(),
+          approval_notes: z.string().max(2000).optional(),
+          lp_ids: z.array(z.string().uuid()).optional(),
+          lp_decisions: z.array(lpDecisionSchema).optional()
+        }).refine(
+          (data) => {
+            if (data.release_decision === 'conditional') {
+              return data.conditional_reason && data.conditional_restrictions;
+            }
+            return true;
+          },
+          { message: 'Conditional reason and restrictions required', path: ['conditional_reason'] }
+        ).refine(
+          (data) => {
+            if (data.release_decision === 'rejected') {
+              return !!data.rejection_reason;
+            }
+            return true;
+          },
+          { message: 'Rejection reason required', path: ['rejection_reason'] }
+        ).refine(
+          (data) => {
+            if (data.release_decision === 'approved') {
+              const checklistValues = Object.values(data.checklist);
+              const trueCount = checklistValues.filter(Boolean).length;
+              return trueCount >= 4;
+            }
+            return true;
+          },
+          { message: 'At least 4 checklist items must be confirmed', path: ['checklist'] }
+        )
+
+    - name: "batchReleaseListQuerySchema"
+      type: "Zod"
+      schema: |
+        z.object({
+          release_decision: z.enum(['pending', 'approved', 'rejected', 'conditional']).optional(),
+          product_id: z.string().uuid().optional(),
+          date_from: z.string().optional(),
+          date_to: z.string().optional(),
+          page: z.coerce.number().int().positive().default(1),
+          limit: z.coerce.number().int().min(1).max(100).default(20)
+        })
+
+  error_handling:
+    - code: 400
+      message: "BATCH_RELEASE_VALIDATION_FAILED"
+      description: "Validation error in request body"
+      example: "Conditional release missing required restrictions"
+
+    - code: 403
+      message: "INSUFFICIENT_PERMISSIONS"
+      description: "User lacks QA_MANAGER role for approval"
+      example: "Only QA Manager can approve releases"
+
+    - code: 404
+      message: "BATCH_NOT_FOUND"
+      description: "Batch/WO not found (includes cross-tenant access)"
+      example: "Batch B-2025-456 not found"
+
+    - code: 409
+      message: "BATCH_RELEASE_BLOCKED"
+      description: "Release cannot proceed due to blockers"
+      example: "Final inspection failed - cannot release"
+
+    - code: 422
+      message: "RELEASE_CHECK_FAILED"
+      description: "Pre-release validation failed"
+      example: "5 of 7 pre-release checks failed"
+
+  rates_and_limits:
+    - endpoint: "/api/quality/batch/:batchId/release"
+      rate_limit: "10 requests / minute"
+      timeout: "30 seconds"
+      description: "Batch release approval is critical - allow moderate rate"
+
+    - endpoint: "/api/quality/batch-releases"
+      rate_limit: "50 requests / minute"
+      timeout: "30 seconds"
+      description: "List queries are read-only - allow higher rate"

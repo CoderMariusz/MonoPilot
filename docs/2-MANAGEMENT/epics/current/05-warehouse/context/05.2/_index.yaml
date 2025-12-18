@@ -1,0 +1,120 @@
+# Story 05.2 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.2"
+  name: "LP Genealogy (Traceability)"
+  slug: "lp-genealogy"
+  epic: "05-warehouse"
+  phase: "0"
+  complexity: "L"
+  estimate_days: 4
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, functions (recursive CTE)
+  - api.yaml         # Endpoints, service methods, validation
+  - frontend.yaml    # Components, pages, UX patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates table", "LicensePlateService"]
+      status: "ready"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id patterns", "RLS policies"]
+      status: "ready"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table"]
+      status: "ready"
+    - story: "03.10"
+      name: "Work Orders"
+      provides: ["work_orders table", "wo_id reference"]
+      status: "ready"
+  blocked_by: []
+  blocks:
+    - story: "04.7a"
+      name: "Output Registration with Genealogy"
+      critical: true
+    - story: "05.6"
+      name: "LP Split/Merge"
+      critical: false
+    - story: "05.31"
+      name: "Interactive Genealogy Tree View"
+      critical: false
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-002", "WH-FR-006", "WH-FR-007", "WH-FR-028"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["Database Tables", "lp_genealogy"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.2.lp-genealogy.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      sections: ["Genealogy Tab View"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for genealogy table"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Context file structure pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "lp_genealogy table + recursive CTE functions"
+  - type: "service"
+    count: 1
+    description: "lp-genealogy-service.ts with all CRUD and trace methods"
+  - type: "api"
+    count: 10
+    description: "Link, reverse, and trace endpoints"
+  - type: "validation"
+    count: 1
+    description: "lp-genealogy-schemas.ts with Zod schemas"
+  - type: "component"
+    count: 7
+    description: "Genealogy panel and tree visualization components"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, E2E tests for genealogy"
+
+# Technical notes
+technical_notes:
+  - "CRITICAL: This story unblocks Epic 04.7 (Output Registration with genealogy)"
+  - "Use recursive CTE for forward/backward trace queries"
+  - "Depth limit: 10 levels maximum for performance"
+  - "Cycle detection required in CTEs to prevent infinite loops"
+  - "Operation types: consume, output, split, merge"
+  - "Genealogy records are immutable - use is_reversed flag for corrections"
+  - "Epic 04 contract: linkConsumption(), linkOutput() methods"
+
+# Epic 04 Integration Contract
+epic_04_contract:
+  methods_required:
+    - name: "linkConsumption"
+      signature: "(parentLpId, childLpId, woId, quantity, operationId?) => Promise<GenealogyLink>"
+      called_by: "04.6a-e Material Consumption"
+    - name: "linkOutput"
+      signature: "(consumedLpIds[], outputLpId, woId) => Promise<GenealogyLink[]>"
+      called_by: "04.7a-d Output Registration"
+  verification:
+    - "linkConsumption creates single genealogy record"
+    - "linkOutput creates batch of genealogy records"
+    - "Both methods validate LP existence and org isolation"
+    - "Both methods complete in <200ms for single, <500ms for batch"

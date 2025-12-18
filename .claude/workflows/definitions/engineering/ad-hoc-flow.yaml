@@ -1,0 +1,254 @@
+# AD-HOC Flow (Quick Task Workflow)
+# Direct user requests, quick fixes, refactoring - maintains ALL quality gates
+#
+# Documentation: @.claude/workflows/documentation/AD-HOC-FLOW.md
+
+name: ad-hoc-flow
+description: Quick task workflow for direct requests with mandatory testing and review
+trigger: "quick_fix | refactor | small_task | direct_request"
+
+# Key difference from Story Workflow: No Epic/Story planning phase
+# Testing and Review phases are MANDATORY
+
+documentation: "@.claude/workflows/documentation/AD-HOC-FLOW.md"
+
+# Triggers
+triggers:
+  - type: direct_user_request
+    example: "Add logging to auth module"
+  - type: standalone_bug_fix
+    example: "Fix typo in error message"
+  - type: small_feature
+    example: "Add export button"
+  - type: refactoring
+    example: "Refactor database queries"
+  - type: quick_improvement
+    example: "Improve error messages"
+
+# NOT triggered when
+not_triggered_when:
+  - "Task is part of an Epic (use story-delivery)"
+  - "Task requires formal planning (use epic-workflow)"
+  - "Task is a complex bug (use bug-workflow)"
+
+phases:
+  # Phase 1: Implementation
+  - id: implementation
+    name: "Implementation"
+    mandatory: true
+    agent_selection:
+      api_database_logic: BACKEND-DEV
+      ui_components_styles: FRONTEND-DEV
+      complex_architectural: SENIOR-DEV
+      full_stack: SENIOR-DEV
+    model:
+      default: sonnet
+      complex: opus
+    activities:
+      - "Analyze user request thoroughly"
+      - "Identify affected files and components"
+      - "Plan implementation approach"
+      - "Implement the solution"
+      - "Run basic checks (compile, lint)"
+      - "Self-verify functionality"
+    output:
+      - "Implemented code changes"
+      - "List of modified files"
+      - "Brief summary of what was done"
+    gate:
+      name: "CODE_COMPLETE"
+      criteria:
+        - "Implementation matches user request"
+        - "Code compiles/runs without errors"
+        - "Basic self-testing done"
+        - "Ready for formal testing"
+      on_fail: iterate_implementation
+      on_pass: testing
+
+  # Phase 2: Testing (MANDATORY)
+  - id: testing
+    name: "Testing"
+    mandatory: true
+    critical: "This phase is NOT optional. All ad-hoc changes MUST be tested."
+    agent: TEST-WRITER
+    model: sonnet
+    duration: "30min - 2 hours"
+    activities:
+      - "Review implemented changes"
+      - "Identify test requirements"
+      - "Write new tests for changes"
+      - "Update existing tests if affected"
+      - "Run full test suite"
+      - "Document test results"
+    test_strategy:
+      new_function: "Unit tests"
+      api_change: "Integration tests"
+      bug_fix: "Regression test that reproduces bug"
+      ui_change: "Component tests"
+      refactor: "Existing tests must pass"
+    output:
+      - "Test files (new or updated)"
+      - "Test execution report"
+      - "Coverage report"
+    gate:
+      name: "TESTS_PASS"
+      criteria:
+        - "New tests written for changes"
+        - "All new tests pass"
+        - "No regression in existing tests"
+        - "Coverage maintained (not decreased)"
+        - "All critical paths covered"
+      on_fail: return_to_implementation
+      on_pass: review
+
+  # Phase 3: Review (MANDATORY)
+  - id: review
+    name: "Review"
+    mandatory: true
+    critical: "This phase is NOT optional. All ad-hoc changes MUST be reviewed."
+    agent: CODE-REVIEWER
+    model:
+      default: sonnet
+      simple: haiku
+    duration: "30min - 1 hour"
+    checklist:
+      standards_compliance:
+        - "Follows coding standards"
+        - "Consistent naming conventions"
+        - "Proper file organization"
+      pattern_compliance:
+        - "Uses established patterns (@.claude/PATTERNS.md)"
+        - "No anti-patterns introduced"
+        - "Consistent with codebase style"
+      security_check:
+        - "No hardcoded secrets"
+        - "Input validation present"
+        - "No SQL injection risks"
+        - "No XSS vulnerabilities"
+        - "Auth/authz handled properly"
+      quality_check:
+        - "Error handling present"
+        - "No code duplication"
+        - "Tests are meaningful"
+        - "No obvious bugs"
+    gate:
+      name: "REVIEW_APPROVED"
+      decision:
+        approved: completion
+        request_changes: fix
+
+  # Phase 4: Fix (Conditional)
+  - id: fix
+    name: "Fix"
+    condition: "review.decision == request_changes"
+    agent: "original_developer"
+    activities:
+      - "Review feedback from CODE-REVIEWER"
+      - "Address all Must Fix items"
+      - "Address Should Fix items"
+      - "Document changes made"
+    output:
+      - "Updated code addressing feedback"
+      - "Summary of changes made"
+    next: testing  # Always return to testing after fixes
+
+  # Phase 5: Completion
+  - id: completion
+    name: "Completion"
+    agent: ORCHESTRATOR
+    model: opus
+    duration: "5-15 minutes"
+    activities:
+      - "Verify all gates passed"
+      - "Update TASK-QUEUE.md - mark task complete"
+      - "Update PROJECT-STATE.md if needed"
+      - "Log in METRICS.md"
+      - "Inform user of completion"
+      - "Recommend next action (if any)"
+    gate:
+      name: "USER_ACKNOWLEDGED"
+      criteria:
+        - "User informed of completion"
+        - "Deliverables confirmed"
+        - "State files updated"
+        - "Next action communicated (if any)"
+
+# Quality Gates Summary
+quality_gates:
+  CODE_COMPLETE:
+    phase: 1
+    blocker: "Cannot proceed to testing"
+  TESTS_PASS:
+    phase: 2
+    blocker: "Cannot proceed to review"
+  REVIEW_APPROVED:
+    phase: 3
+    blocker: "Must fix and retest"
+  USER_ACKNOWLEDGED:
+    phase: 5
+    blocker: "Task not complete"
+
+# Error Recovery Paths
+error_recovery:
+  implementation_issues:
+    path: "Developer fixes issues -> Re-attempt Phase 1"
+
+  test_failures:
+    path: "Return to Phase 1 with specific failures -> Fix -> Return to Phase 2"
+
+  review_rejection:
+    path: "Phase 4: Fix -> Phase 2: Re-test -> Phase 3: Re-review"
+
+  multiple_cycles:
+    trigger: "More than 3 review cycles"
+    action: "Escalate to SENIOR-DEV for pair review"
+
+# CRITICAL: What Orchestrator Must NOT Do
+orchestrator_rules:
+  never_skip_phases: true
+  bad_behavior: "User request -> Developer implements -> DONE"
+  correct_behavior: |
+    User request -> Developer implements -> Test Engineer tests ->
+    Code Reviewer reviews -> (Fix if needed) -> Orchestrator completes
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: ORCHESTRATOR
+
+# Integration with other workflows
+integration:
+  complex_issue_found:
+    escalate_to: "story-delivery.yaml or bug-workflow.yaml"
+
+  part_of_larger_feature:
+    escalate_to: "epic-workflow.yaml"
+
+  architecture_change_needed:
+    action: "ARCHITECT-AGENT review first"
+
+  multiple_related_adhocs:
+    consider: "Creating an Epic"
+
+# Key differences from Story Workflow
+differences_from_story:
+  trigger: "Direct user request vs From Epic/Sprint"
+  planning: "None vs Full planning phase"
+  ux_design: "Optional/minimal vs Required for UI"
+  testing: "MANDATORY vs MANDATORY (TDD)"
+  review: "MANDATORY vs MANDATORY"
+  documentation: "Minimal vs Full"
+  estimation: "None vs Required"
+  acceptance_criteria: "Implicit (user request) vs Explicit (Given/When/Then)"
+
+# Metrics
+metrics:
+  track:
+    - task_type
+    - implementation_duration
+    - testing_duration
+    - review_duration
+    - fix_cycles
+    - total_duration
+  store_in: "@.claude/state/METRICS.md"

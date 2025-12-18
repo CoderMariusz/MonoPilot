@@ -1,0 +1,173 @@
+# Story 06.9 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.9"
+  name: "Basic NCR Creation"
+  slug: "basic-ncr-creation"
+  epic: "06-quality"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P0 (MVP)"
+  food_safety_critical: true
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data, migrations
+  - api.yaml         # Endpoints, auth, request/response schemas
+  - frontend.yaml    # Components, pages, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table lookup"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product references"]
+    - story: "05.1"
+      name: "License Plate CRUD"
+      provides: ["license_plates table", "LP references"]
+  soft_dependencies:
+    - story: "06.0"
+      name: "Quality Settings"
+      provides: ["quality_settings defaults"]
+    - story: "06.2"
+      name: "Quality Holds CRUD"
+      provides: ["Hold linkage capability"]
+    - story: "06.5"
+      name: "Incoming Inspection"
+      provides: ["Inspection linkage capability"]
+  blocked_by: []
+  blocks:
+    - story: "06.13"
+      name: "NCR Workflow"
+      reason: "Requires ncr_reports table from this story"
+    - story: "06.14-06.16"
+      name: "NCR Investigation/Root Cause/Corrective Action"
+      reason: "Extend ncr_reports table created here"
+    - story: "06.31"
+      name: "CAPA Creation"
+      reason: "Auto-create CAPA from NCR"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-009", "NCR Lifecycle (8.1-8.3)", "8. NCR Lifecycle"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["ncr_reports table", "ncr_workflow table", "Database Schema", "NCR Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.9.basic-ncr-creation.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-009-ncr-list.md"
+      name: "NCR List Page"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-009-ncr-detail.md"
+      name: "NCR Detail Page"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for ncr_reports table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "ncr_reports table + ncr_number_sequences table with auto-generation"
+  - type: "service"
+    count: 1
+    description: "ncr-service.ts with CRUD + number generation + permissions"
+  - type: "api"
+    count: 8
+    description: "List, Get, Create, Update, Delete, Submit, Close, Assign endpoints"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for create/update/close/assign/list operations"
+  - type: "pages"
+    count: 2
+    description: "/quality/ncrs list page, /quality/ncrs/[id] detail page"
+  - type: "components"
+    count: 12
+    description: "DataTable, modals, badges, filters, detail layout, actions"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Technical notes
+technical_notes:
+  - "Phase 1 scope: Basic NCR creation and listing only"
+  - "Status enum Phase 1: draft, open, closed (Phase 2 expands to full workflow)"
+  - "Severity: minor, major, critical (maps to response time SLAs)"
+  - "Detection point: incoming, in_process, final, customer, internal_audit, supplier_audit, other"
+  - "Source reference: optional polymorphic link (inspection, hold, batch, work_order, supplier, etc.)"
+  - "NCR number auto-generation: NCR-YYYY-NNNNN format with annual sequence per org"
+  - "Draft NCRs can be edited/deleted, Open/Closed are immutable (Phase 2 workflow)"
+  - "Close requires notes (min 50 chars) and QA_MANAGER role"
+  - "Assignment optional in Phase 1 (becomes ownership tracking in Phase 2)"
+  - "RLS: org_id isolation enforced at database and API level"
+  - "Audit trail: All create/update/close/assign actions logged"
+  - "FDA 21 CFR Part 11: Critical for food safety compliance"
+
+# Acceptance Criteria Summary (high-level)
+acceptance_summary:
+  - "NCR table with all required Phase 1 columns"
+  - "Auto-generated NCR numbers in NCR-YYYY-NNNNN format"
+  - "Create NCR with title, description, severity, detection_point"
+  - "Optional source reference linking (inspection, hold, LP, supplier, etc.)"
+  - "NCR list with filtering (status, severity, detection_point, date range)"
+  - "NCR detail page with read-only view"
+  - "Edit draft NCR capability"
+  - "Delete draft NCR capability"
+  - "Submit draft to open (status transition)"
+  - "Close NCR with notes (QA Manager only)"
+  - "Assign NCR to user (optional)"
+  - "Status/Severity/Detection Point badges with correct colors"
+  - "Permission enforcement (QA Inspector create, QA Manager full access)"
+  - "RLS policy enforcement for multi-tenancy"
+  - "Audit trail for all actions"
+
+# UI Components Summary
+ui_components:
+  - "NCRDataTable: List with pagination, sorting, filtering"
+  - "NCRFilters: Status, severity, detection point, date range"
+  - "NCRStatusBadge: draft (gray), open (blue), closed (green)"
+  - "NCRSeverityBadge: critical (red), major (orange), minor (yellow)"
+  - "NCRDetectionPointBadge: incoming, in_process, final, customer, etc."
+  - "NCRDetail: Header + basic info + detection + source + assignment + closure"
+  - "CreateNCRModal: Form with validation"
+  - "EditNCRModal: Edit draft NCR"
+  - "CloseNCRDialog: Closure notes requirement"
+  - "AssignNCRModal: Assign to QA user"
+  - "SubmitNCRDialog: Draft to open confirmation"
+  - "DeleteNCRDialog: Draft deletion confirmation"
+
+# Database Tables (Phase 1)
+database_summary:
+  ncr_reports:
+    - "id, org_id, ncr_number (unique per org)"
+    - "title, description, severity, status"
+    - "category (optional), detection_point, detected_date, detected_by"
+    - "source_type, source_id, source_description (optional)"
+    - "assigned_to, assigned_at (optional)"
+    - "closed_at, closed_by, closure_notes (required if status=closed)"
+    - "created_at, created_by, updated_at, updated_by"
+  ncr_number_sequences:
+    - "org_id, year, current_value (for auto-generation)"
+
+# API Endpoints (Phase 1)
+api_summary:
+  - "GET /api/quality/ncrs - List with filters"
+  - "GET /api/quality/ncrs/:id - Get detail"
+  - "POST /api/quality/ncrs - Create NCR"
+  - "PUT /api/quality/ncrs/:id - Update draft only"
+  - "DELETE /api/quality/ncrs/:id - Delete draft only"
+  - "POST /api/quality/ncrs/:id/submit - Draft to open"
+  - "POST /api/quality/ncrs/:id/close - Close with notes (QA Manager)"
+  - "POST /api/quality/ncrs/:id/assign - Assign to user"

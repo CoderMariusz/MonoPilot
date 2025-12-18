@@ -1,0 +1,156 @@
+# Story 07.10 - Database Schema
+# Purpose: Tables, RLS policies, indexes
+# Agent: BACKEND-DEV (database focus)
+# Note: No new tables created - uses existing pick_lists and pick_list_lines from Story 07.8
+
+# Table Usage (No Changes Required)
+table_usage:
+  - name: "pick_lists"
+    source: "Story 07.8"
+    columns_used:
+      - { name: "id", usage: "Pick list ID" }
+      - { name: "org_id", usage: "Tenant isolation" }
+      - { name: "pick_list_number", usage: "Display number (e.g., PL-2025-00042)" }
+      - { name: "assigned_to", usage: "Picker user ID" }
+      - { name: "status", usage: "Pick list status (assigned/in_progress/completed)" }
+      - { name: "priority", usage: "Priority badge (urgent/high/normal/low)" }
+      - { name: "created_at", usage: "Creation timestamp" }
+      - { name: "started_at", usage: "When picker started (scanner) or null" }
+      - { name: "completed_at", usage: "When all picks done" }
+    notes: "Update started_at when 'Start' button pressed in scanner"
+
+  - name: "pick_list_lines"
+    source: "Story 07.8"
+    columns_used:
+      - { name: "id", usage: "Pick line ID (primary key)" }
+      - { name: "pick_list_id", usage: "Reference to pick_lists" }
+      - { name: "product_id", usage: "Product being picked" }
+      - { name: "location_id", usage: "Warehouse location" }
+      - { name: "quantity_to_pick", usage: "Ordered quantity" }
+      - { name: "quantity_picked", usage: "Actual picked quantity (updated by scanner)" }
+      - { name: "picked_license_plate_id", usage: "Which LP was picked (from scanner)" }
+      - { name: "status", usage: "Line status (pending/picked/short)" }
+      - { name: "picked_at", usage: "Timestamp when picked (from scanner)" }
+      - { name: "picked_by", usage: "User ID of picker" }
+      - { name: "pick_sequence", usage: "Sort order for display (1, 2, 3...)" }
+      - { name: "short_pick_reason", usage: "Reason code if short pick (from 07.9)" }
+      - { name: "short_pick_notes", usage: "Optional notes on short pick (from 07.9)" }
+    notes: "Scanner updates quantity_picked, picked_at, picked_by, picked_license_plate_id, status"
+    indexes_needed:
+      - "idx_pick_list_lines_pending: (pick_list_id, status) WHERE status = 'pending'"
+      - "idx_pick_list_lines_sequence: (pick_list_id, pick_sequence)"
+
+# Existing Indexes (Verify)
+indexes:
+  - name: "idx_pick_lists_org"
+    table: "pick_lists"
+    columns: ["org_id"]
+    purpose: "Tenant filtering"
+  - name: "idx_pick_lists_assigned_to"
+    table: "pick_lists"
+    columns: ["assigned_to"]
+    purpose: "Filter picks by current user"
+  - name: "idx_pick_lists_status"
+    table: "pick_lists"
+    columns: ["status"]
+    purpose: "Find active picks"
+  - name: "idx_pick_list_lines_pending"
+    table: "pick_list_lines"
+    columns: ["pick_list_id", "status"]
+    where: "status = 'pending'"
+    purpose: "Fast lookup of unpicked lines"
+  - name: "idx_pick_list_lines_sequence"
+    table: "pick_list_lines"
+    columns: ["pick_list_id", "pick_sequence"]
+    purpose: "Display lines in pick order"
+
+# RLS Policies (Existing)
+rls_policies:
+  pattern: "Organization isolation per ADR-013"
+  notes: "Scanner endpoints must filter by org_id from auth context"
+  policies_used:
+    - table: "pick_lists"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only see pick lists for their organization"
+    - table: "pick_list_lines"
+      operation: "SELECT"
+      using: "EXISTS (SELECT 1 FROM pick_lists WHERE pick_lists.id = pick_list_lines.pick_list_id AND pick_lists.org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+      description: "Users can only see pick lines for their org's pick lists"
+
+# Business Rules
+business_rules:
+  - rule: "Pick list must have status"
+    values: ["assigned", "in_progress", "completed"]
+    enforcement: "CHECK constraint"
+    scanner_impact: "Scanner shows only assigned/in_progress picks"
+
+  - rule: "Pick line status transitions"
+    values: ["pending -> picked", "pending -> short"]
+    enforcement: "Application logic"
+    scanner_impact: "Scanner updates status on confirmation"
+
+  - rule: "quantity_picked <= quantity_to_pick"
+    enforcement: "Application validation"
+    scanner_impact: "Scanner number pad enforces max = quantity_to_pick"
+
+  - rule: "All lines must be picked or short to complete pick list"
+    enforcement: "Application logic in scanner"
+    scanner_impact: "Scanner shows completion screen only when all lines are picked/short"
+
+  - rule: "FIFO/FEFO tracking"
+    enforcement: "picked_license_plate_id records which LP was actually picked"
+    scanner_impact: "Display suggested LP, warn if different LP scanned"
+
+# Performance Considerations
+performance:
+  scanner_queries:
+    - name: "Load my picks"
+      query: "SELECT * FROM pick_lists WHERE assigned_to = $1 AND status IN ('assigned', 'in_progress') AND org_id = $2"
+      target: "<200ms"
+      index: "idx_pick_lists_assigned_to, idx_pick_lists_status"
+
+    - name: "Get next unpicked line"
+      query: "SELECT * FROM pick_list_lines WHERE pick_list_id = $1 AND status = 'pending' ORDER BY pick_sequence ASC LIMIT 1"
+      target: "<100ms"
+      index: "idx_pick_list_lines_pending, idx_pick_list_lines_sequence"
+
+    - name: "Update pick confirmation"
+      query: "UPDATE pick_list_lines SET quantity_picked, picked_at, picked_by, picked_license_plate_id, status WHERE id = $1"
+      target: "<50ms"
+      index: "Primary key"
+
+# Migration Notes
+migrations:
+  - migration_file: "supabase/migrations/062_add_pick_list_lines_indexes.sql"
+    description: "Add idx_pick_list_lines_pending and idx_pick_list_lines_sequence if not exists"
+    sql_example: |
+      CREATE INDEX IF NOT EXISTS idx_pick_list_lines_pending
+        ON pick_list_lines(pick_list_id, status)
+        WHERE status = 'pending';
+
+      CREATE INDEX IF NOT EXISTS idx_pick_list_lines_sequence
+        ON pick_list_lines(pick_list_id, pick_sequence);
+
+# Cache Strategy
+cache_strategy:
+  notes: "Scanner should cache to minimize API calls"
+  suggested_cache_keys:
+    - "pick:org:{orgId}:my-active-picks"
+      ttl: "30 seconds"
+      invalidate: "On pick completion"
+    - "pick:line:{lineId}:details"
+      ttl: "10 seconds"
+      invalidate: "On quantity update"
+    - "location:{locationId}:details"
+      ttl: "5 minutes"
+      invalidate: "Manual refresh"
+
+# Notes for AI Agent
+notes:
+  - "No new tables - reuse 07.8 schema"
+  - "07.9 already added short_pick_reason and short_pick_notes columns"
+  - "Add indexes if missing for performance"
+  - "All scanner queries must include org_id filter for RLS"
+  - "Keep queries simple and indexed for mobile performance"
+  - "Consider N+1 query prevention - batch load location/product details"

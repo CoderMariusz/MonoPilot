@@ -1,0 +1,336 @@
+# Story 07.6 - API Endpoints
+# Allergen validation, override, and customer order history
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/validate-allergens"
+    auth: true
+    roles: ["Sales Clerk", "Manager", "Admin"]
+    description: "Validate SO lines against customer allergen restrictions"
+    request:
+      body: "{}"
+      headers:
+        - "Authorization: Bearer {token}"
+        - "X-Organization-ID: {org_id}"
+    response:
+      status: "200 OK"
+      body:
+        type: "ValidateAllergensResponse"
+        schema:
+          valid: "boolean"
+          conflicts: "AllergenConflict[]"
+          customer_restrictions: "string[]"
+          validated_at: "string (ISO 8601)"
+          validated_by: "string (user name)"
+        example: |
+          {
+            "valid": false,
+            "conflicts": [
+              {
+                "line_id": "line-001",
+                "line_number": 1,
+                "product_id": "prod-123",
+                "product_code": "SKU-1234",
+                "product_name": "Peanut Brittle",
+                "allergen_id": "A05",
+                "allergen_code": "PEANUT",
+                "allergen_name": "Peanuts"
+              }
+            ],
+            "customer_restrictions": ["A05", "A07"],
+            "validated_at": "2025-12-18T14:30:00Z",
+            "validated_by": "Sarah Johnson"
+          }
+    errors:
+      - status: "404"
+        code: "SALES_ORDER_NOT_FOUND"
+        message: "Sales order not found"
+      - status: "403"
+        code: "PERMISSION_DENIED"
+        message: "You don't have permission to validate this sales order"
+      - status: "400"
+        code: "INVALID_SO_STATUS"
+        message: "Cannot validate sales order in current status"
+      - status: "500"
+        code: "VALIDATION_ERROR"
+        message: "Error during allergen validation"
+    triggers:
+      - "Automatic on SO confirmation (before status change)"
+      - "Automatic on SO line add/edit (non-blocking)"
+      - "Manual via [Validate Allergens] button"
+    side_effects:
+      - "Updates sales_orders.allergen_validated flag"
+      - "Updates sales_orders.allergen_validation_date"
+      - "Updates sales_orders.allergen_validation_user"
+      - "Creates audit_logs entry if conflicts detected"
+
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/override-allergen"
+    auth: true
+    roles: ["Manager", "Admin"]
+    description: "Manager+ override allergen block with reason capture"
+    request:
+      body:
+        type: "OverrideAllergenRequest"
+        schema:
+          reason: "string (min 20, max 500 chars)"
+          confirmed: "boolean (must be true)"
+        example: |
+          {
+            "reason": "Customer confirmed they can accept milk products for this order per phone call on 2025-12-16",
+            "confirmed": true
+          }
+      headers:
+        - "Authorization: Bearer {token}"
+        - "X-Organization-ID: {org_id}"
+        - "Content-Type: application/json"
+    response:
+      status: "200 OK"
+      body:
+        type: "OverrideAllergenResponse"
+        schema:
+          success: "boolean"
+          allergen_validated: "boolean"
+          allow_allergen_override: "boolean"
+          overridden_by: "string (user name)"
+          overridden_at: "string (ISO 8601)"
+          audit_log_id: "string (UUID)"
+        example: |
+          {
+            "success": true,
+            "allergen_validated": true,
+            "allow_allergen_override": true,
+            "overridden_by": "Sarah Johnson",
+            "overridden_at": "2025-12-18T14:35:00Z",
+            "audit_log_id": "audit-001"
+          }
+    errors:
+      - status: "400"
+        code: "INVALID_REASON"
+        message: "Reason must be between 20-500 characters"
+      - status: "400"
+        code: "UNCONFIRMED"
+        message: "Confirmed flag must be true"
+      - status: "403"
+        code: "PERMISSION_DENIED"
+        message: "Only Manager or Admin roles can override allergen blocks"
+      - status: "404"
+        code: "SALES_ORDER_NOT_FOUND"
+        message: "Sales order not found"
+      - status: "409"
+        code: "NO_CONFLICTS"
+        message: "This sales order has no allergen conflicts to override"
+    side_effects:
+      - "Updates sales_orders.allergen_validated = true"
+      - "Updates sales_orders.allow_allergen_override = true"
+      - "Updates sales_orders.allergen_override_date"
+      - "Updates sales_orders.allergen_override_user"
+      - "Updates sales_orders.allergen_override_reason"
+      - "Creates audit_logs entry with action='allergen_override'"
+      - "Unlocks SO confirmation workflow"
+    constraints:
+      - "User must have Manager or Admin role (checked via RLS)"
+      - "Reason must be 20-500 characters (validated on server)"
+      - "Only one override per SO allowed"
+
+  - method: "GET"
+    path: "/api/shipping/customers/:id/orders"
+    auth: true
+    roles: ["Sales Clerk", "Manager", "Admin"]
+    description: "Get paginated order history for customer"
+    query_params:
+      - name: "page"
+        type: "integer"
+        default: 1
+        description: "Page number (1-indexed)"
+      - name: "limit"
+        type: "integer"
+        default: 20
+        max: 100
+        description: "Orders per page"
+      - name: "status"
+        type: "string"
+        optional: true
+        description: "Filter by order status (draft, confirmed, shipped, etc.)"
+    request:
+      headers:
+        - "Authorization: Bearer {token}"
+        - "X-Organization-ID: {org_id}"
+    response:
+      status: "200 OK"
+      body:
+        type: "CustomerOrdersResponse"
+        schema:
+          orders: "CustomerOrder[]"
+          pagination:
+            page: "integer"
+            limit: "integer"
+            total: "integer"
+            total_pages: "integer"
+        example: |
+          {
+            "orders": [
+              {
+                "id": "so-001",
+                "order_number": "SO-2025-001",
+                "order_date": "2025-12-15T14:30:00Z",
+                "status": "confirmed",
+                "total_amount": 1234.56,
+                "currency": "USD",
+                "line_count": 3
+              },
+              {
+                "id": "so-002",
+                "order_number": "SO-2025-002",
+                "order_date": "2025-12-10T10:00:00Z",
+                "status": "shipped",
+                "total_amount": 567.89,
+                "currency": "USD",
+                "line_count": 2
+              }
+            ],
+            "pagination": {
+              "page": 1,
+              "limit": 20,
+              "total": 45,
+              "total_pages": 3
+            }
+          }
+    errors:
+      - status: "404"
+        code: "CUSTOMER_NOT_FOUND"
+        message: "Customer not found"
+      - status: "403"
+        code: "PERMISSION_DENIED"
+        message: "You don't have permission to view orders for this customer"
+      - status: "400"
+        code: "INVALID_PAGE"
+        message: "Page must be >= 1"
+      - status: "400"
+        code: "INVALID_LIMIT"
+        message: "Limit must be between 1-100"
+    performance:
+      response_time: "< 300ms"
+      caching: "Cache customer orders list for 5 minutes"
+    sorting:
+      - "Default: order_date DESC (newest first)"
+
+# Request/Response Models (Referenced in endpoints)
+models:
+  AllergenConflict:
+    fields:
+      line_id:
+        type: "string"
+        description: "Sales order line ID"
+      line_number:
+        type: "integer"
+        description: "Line number in order (for UI display)"
+      product_id:
+        type: "string"
+        description: "Product ID"
+      product_code:
+        type: "string"
+        description: "Product SKU/code"
+      product_name:
+        type: "string"
+        description: "Product display name"
+      allergen_id:
+        type: "string"
+        description: "Allergen ID from allergens table"
+      allergen_code:
+        type: "string"
+        description: "Allergen code (e.g., PEANUT)"
+      allergen_name:
+        type: "string"
+        description: "Allergen display name (e.g., Peanuts)"
+
+  ValidateAllergensResponse:
+    fields:
+      valid:
+        type: "boolean"
+        description: "True if no allergen conflicts detected"
+      conflicts:
+        type: "AllergenConflict[]"
+        description: "Array of allergen conflicts (empty if valid=true)"
+      customer_restrictions:
+        type: "string[]"
+        description: "Array of allergen IDs customer is restricted from"
+      validated_at:
+        type: "string (ISO 8601)"
+        description: "Validation timestamp"
+      validated_by:
+        type: "string"
+        description: "Name of user/system that performed validation"
+
+  CustomerOrder:
+    fields:
+      id:
+        type: "string (UUID)"
+        description: "Sales order ID"
+      order_number:
+        type: "string"
+        description: "Sales order number (e.g., SO-2025-001)"
+      order_date:
+        type: "string (ISO 8601)"
+        description: "Order creation date"
+      status:
+        type: "string (enum)"
+        description: "Order status: draft, confirmed, in_progress, shipped, cancelled"
+      total_amount:
+        type: "number"
+        description: "Order total amount"
+      currency:
+        type: "string (ISO 4217)"
+        description: "Currency code (USD, EUR, etc.)"
+      line_count:
+        type: "integer"
+        description: "Number of line items in order"
+
+# API Security
+security:
+  - type: "Bearer Token Authentication"
+    required_for: "All endpoints"
+    validation: "JWT token from Supabase auth"
+  - type: "Role-Based Access Control"
+    endpoints:
+      - "/validate-allergens: Sales Clerk+"
+      - "/override-allergen: Manager+"
+      - "/customers/:id/orders: Sales Clerk+"
+  - type: "Organization Isolation (RLS)"
+    enforced_at: "Database level"
+    check: "org_id = auth.org_id via RLS policies"
+  - type: "Reason Validation (Server-Side)"
+    endpoint: "/override-allergen"
+    checks:
+      - "Min length: 20 characters"
+      - "Max length: 500 characters"
+      - "No null values"
+  - type: "Audit Logging"
+    events:
+      - "All validation attempts"
+      - "All override requests (success + failure)"
+      - "All order history queries (if compliance needed)"
+
+# Rate Limiting (Future Enhancement)
+rate_limiting:
+  - endpoint: "/override-allergen"
+    limit: "10 per day per user"
+    note: "Prevent abuse of override mechanism"
+
+# Integration Points
+integration:
+  - endpoint: "/api/shipping/sales-orders/:id/validate-allergens"
+    called_by:
+      - "SO confirmation workflow"
+      - "SO line add/edit action"
+      - "Manual validation button"
+    calls_service: "AllergenValidationService.validateSalesOrderAllergens()"
+
+  - endpoint: "/api/shipping/sales-orders/:id/override-allergen"
+    called_by: "AllergenOverrideModal component"
+    calls_service: "AllergenValidationService.overrideAllergenBlock()"
+    results_in: "Audit log entry creation"
+
+  - endpoint: "/api/shipping/customers/:id/orders"
+    called_by: "CustomerOrderHistory component"
+    used_in: "Customer detail page, Order History tab"

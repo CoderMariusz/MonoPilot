@@ -1,0 +1,84 @@
+# Story 01.3 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.3"
+  name: "Onboarding Wizard Launcher"
+  slug: "onboarding-wizard-launcher"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "frontend + backend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Onboarding columns on organizations table
+  - api.yaml         # Status and skip endpoints
+  - frontend.yaml    # Wizard modal, guard, hooks
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table with org_id"
+        - "RLS policies for org isolation"
+        - "org context hook (useOrganization)"
+    - story: "01.2"
+      name: "Settings Shell Navigation"
+      provides:
+        - "settings shell layout"
+        - "route guards for authenticated routes"
+        - "modal mounting point"
+  optional: []
+  blocks:
+    - story: "01.4"
+      name: "Organization Profile Step"
+    - story: "01.14"
+      name: "Wizard Steps 2-6"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-180", "FR-SET-186", "FR-SET-187"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.3.onboarding-wizard-launcher.md"
+  patterns:
+    - "apps/frontend/components/ui/dialog.tsx"
+    - "apps/frontend/lib/hooks/use-organization.ts"
+    - "apps/frontend/app/api/settings/"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add onboarding columns to organizations"
+  - type: "api"
+    count: 2
+    description: "GET status, POST skip endpoints"
+  - type: "component"
+    count: 4
+    description: "WizardModal, Guard, SkipDialog, InProgressMessage"
+  - type: "hook"
+    count: 1
+    description: "useOnboardingStatus"
+  - type: "service"
+    count: 1
+    description: "onboarding-service.ts"
+
+# Technical notes
+technical_notes:
+  - "Wizard framework only - individual steps in 01.4 and 01.14"
+  - "State machine: NOT_STARTED -> IN_PROGRESS -> COMPLETED | SKIPPED"
+  - "Skip creates demo data (warehouse, location, product)"
+  - "Non-admin users see 'Setup in progress' message"
+  - "Progress persists across sessions"

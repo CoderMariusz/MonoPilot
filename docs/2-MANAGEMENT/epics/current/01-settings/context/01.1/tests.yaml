@@ -1,0 +1,183 @@
+# Story 01.1 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/org-context-service.test.ts"
+    type: "unit"
+    description: "Unit tests for org context resolution"
+  - path: "apps/frontend/lib/services/__tests__/permission-service.test.ts"
+    type: "unit"
+    description: "Unit tests for permission checks"
+  - path: "supabase/tests/rls-isolation.test.sql"
+    type: "integration"
+    description: "Integration tests for RLS policies"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "an authenticated request"
+    when: "the backend resolves context"
+    then: "it can derive user_id and org_id for the session"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "a user from Org B"
+    when: "they request an Org A resource by ID"
+    then: "the API returns 404 (not 403) and does not leak existence"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-03"
+    given: "user from Org B"
+    when: "requesting resource from Org A"
+    then: "response is 404 Not Found (NOT 403 Forbidden) to prevent existence leak"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-04"
+    given: "a query is executed without an explicit org_id filter"
+    when: "RLS/equivalent is applied"
+    then: "cross-tenant rows are not returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-05"
+    given: "query without explicit org_id filter"
+    when: "executed via Supabase client"
+    then: "RLS automatically filters to user's org_id"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "a user without admin privileges"
+    when: "they attempt admin-only writes (e.g., modify org profile)"
+    then: "the API rejects the request"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "test fixtures with 2 orgs"
+    when: "integration tests run"
+    then: "cross-tenant reads/writes are blocked consistently"
+    test_type: "e2e"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  org_context_service:
+    - name: "getOrgContext returns context for authenticated user"
+      setup: "Mock successful API response"
+      expected: "Returns OrgContext object with all fields"
+
+    - name: "getOrgContext returns null for unauthenticated request"
+      setup: "Mock 401 response"
+      expected: "Returns null"
+
+    - name: "getOrgContext returns null for missing user"
+      setup: "Mock 404 response"
+      expected: "Returns null"
+
+  permission_service:
+    - name: "hasPermission returns true for allowed action"
+      setup: "Context with permissions { settings: 'CRUD' }"
+      params: ["context", "settings", "R"]
+      expected: "Returns true"
+
+    - name: "hasPermission returns false for denied action"
+      setup: "Context with permissions { settings: 'R' }"
+      params: ["context", "settings", "D"]
+      expected: "Returns false"
+
+    - name: "hasPermission returns false for dash permission"
+      setup: "Context with permissions { settings: '-' }"
+      params: ["context", "settings", "R"]
+      expected: "Returns false"
+
+    - name: "hasRole returns true when user has role"
+      setup: "Context with role_code: 'admin'"
+      params: ["context", "['admin', 'owner']"]
+      expected: "Returns true"
+
+    - name: "hasRole returns false when user lacks role"
+      setup: "Context with role_code: 'viewer'"
+      params: ["context", "['admin', 'owner']"]
+      expected: "Returns false"
+
+# Integration Test Cases (RLS)
+integration_tests:
+  rls_isolation:
+    - name: "User can only read own organization"
+      setup: |
+        - Create Org A with User A
+        - Create Org B with User B
+      action: "User A queries organizations table"
+      expected: "Only Org A returned, Org B not visible"
+
+    - name: "User can only read users from own org"
+      setup: |
+        - Create Org A with User A1, User A2
+        - Create Org B with User B1
+      action: "User A1 queries users table"
+      expected: "Returns User A1, User A2; User B1 not visible"
+
+    - name: "Non-admin cannot write to organization"
+      setup: |
+        - Create Org A with Viewer user
+      action: "Viewer attempts to update organization name"
+      expected: "RLS blocks write operation"
+
+    - name: "Admin can write to organization_modules"
+      setup: |
+        - Create Org A with Admin user
+      action: "Admin enables a module"
+      expected: "Write succeeds"
+
+    - name: "Cross-tenant write blocked"
+      setup: |
+        - Create Org A with Admin A
+        - Create Org B
+      action: "Admin A attempts to update Org B"
+      expected: "RLS blocks write, returns 0 rows affected"
+
+# Definition of Done
+definition_of_done:
+  - "Cross-tenant access is blocked by policy and tests"
+  - "All new/changed endpoints use the shared org context helper"
+  - "Tests pass and failures are meaningful (no false positives)"
+  - "Unit test coverage >= 95% (security critical)"
+  - "Integration test coverage >= 80%"
+  - "404 (not 403) response verified for cross-tenant access"
+  - "RLS policies follow ADR-013 users lookup pattern"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 95
+    reason: "Security-critical code requires high coverage"
+  integration:
+    target: 80
+    reason: "RLS policies must be thoroughly tested"
+  files:
+    - "lib/services/org-context-service.ts: 95%"
+    - "lib/services/permission-service.ts: 95%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak data"
+    mitigation: "Comprehensive integration tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-02"
+    description: "Performance impact of users table lookup on every query"
+    mitigation: "PostgreSQL caches lookup efficiently, measured <1ms overhead"
+    severity: "low"
+    test_coverage: "Performance benchmark (optional)"

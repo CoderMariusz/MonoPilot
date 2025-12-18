@@ -1,0 +1,121 @@
+# Story 04.2a - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.2a"
+  name: "WO Start (Execution Begin)"
+  slug: "wo-start"
+  epic: "04-production"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # work_orders table updates, RLS
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, UI patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "permission-service"]
+    - story: "01.11"
+      name: "Production Lines CRUD"
+      provides: ["production_lines table", "line validation"]
+    - story: "03.10"
+      name: "Work Orders CRUD"
+      provides: ["work_orders table", "status enum", "WO detail page"]
+  soft:
+    - story: "03.11a"
+      name: "WO Materials"
+      provides: ["wo_materials table for availability check"]
+    - story: "04.5"
+      name: "Production Settings"
+      provides: ["production_settings table"]
+  blocked_by: []
+  blocks:
+    - story: "04.2b"
+      name: "WO Pause/Resume"
+      reason: "Requires In Progress status"
+    - story: "04.2c"
+      name: "WO Complete"
+      reason: "Requires In Progress status"
+    - story: "04.6a"
+      name: "Material Consumption (Desktop)"
+      reason: "Consumes from In Progress WOs"
+    - story: "04.7a"
+      name: "Output Registration (Desktop)"
+      reason: "Registers output for In Progress WOs"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-002"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/production.md"
+    sections: ["WO Execution Endpoints", "WO Start Flow", "Business Rules"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.2a.wo-start.md"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+    sections: ["4.1 Start WO Modal", "Section 3 Action Bar"]
+  phase_breakdown:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/PHASE-BREAKDOWN.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for work_orders"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "PATCH /work-orders/:id/start, GET /work-orders/:id/material-availability"
+  - type: "service"
+    count: 1
+    description: "production-execution-service.ts with startWorkOrder methods"
+  - type: "validation"
+    count: 1
+    description: "Zod schema for start request"
+  - type: "component"
+    count: 6
+    description: "StartWorkOrderButton, StartWorkOrderModal, MaterialAvailabilityCard, etc."
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Phase 0 scope: Status update ONLY (no LP operations)"
+  - "NO material reservations in this story (deferred to Story 04.8, Phase 1)"
+  - "Material availability check returns WARNING only, not blocking"
+  - "Line availability check is WARNING only, not blocking (operator can override)"
+  - "Status transition: Released -> In Progress"
+  - "Timestamp fields: started_at, started_by"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+  - "Use POST for action endpoint per REST conventions (state change)"
+
+# MVP Scope Clarification
+mvp_scope:
+  in_scope:
+    - "Start WO transition: Released -> In Progress"
+    - "Timestamp tracking (started_at, started_by)"
+    - "Status validation (WO must be Released)"
+    - "Line/machine assignment validation"
+    - "Material availability check (warning only)"
+    - "UI: Start WO button and confirmation modal"
+    - "Service layer with status validation"
+  out_of_scope:
+    - "Material reservations (Story 04.8)"
+    - "Auto-start operations (Story 04.3)"
+    - "OEE tracking on start (Story 04.9a)"
+    - "Scanner workflow (Phase 1)"

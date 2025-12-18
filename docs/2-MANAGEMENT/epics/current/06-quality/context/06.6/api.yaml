@@ -1,0 +1,500 @@
+# Story 06.6 - API Specification
+# Purpose: RESTful endpoints for test result recording and querying
+# Agent: BACKEND-DEV
+
+# API Endpoints
+endpoints:
+  - method: "POST"
+    path: "/api/quality/test-results"
+    description: "Create single or batch test results"
+    auth_required: true
+    roles: ["QA Inspector", "QA Manager", "Operator", "Quality Director"]
+    request_body:
+      description: "Create single test result"
+      schema:
+        type: "object"
+        properties:
+          inspection_id:
+            type: "string"
+            format: "uuid"
+            description: "Parent inspection ID"
+          parameter_id:
+            type: "string"
+            format: "uuid"
+            description: "Specification parameter ID"
+          measured_value:
+            type: "string"
+            description: "Measured value (numeric, text, or boolean)"
+          numeric_value:
+            type: "number"
+            nullable: true
+            description: "Parsed numeric value (optional, auto-calculated if numeric type)"
+          equipment_id:
+            type: "string"
+            format: "uuid"
+            nullable: true
+            description: "Equipment used (optional)"
+          calibration_date:
+            type: "string"
+            format: "date"
+            nullable: true
+            description: "Equipment calibration date (optional)"
+          notes:
+            type: "string"
+            nullable: true
+            description: "Inspector notes (max 1000 chars, required if failed)"
+          attachment_url:
+            type: "string"
+            format: "url"
+            nullable: true
+            description: "Photo/document evidence URL (optional)"
+      example: |
+        {
+          "inspection_id": "550e8400-e29b-41d4-a716-446655440000",
+          "parameter_id": "660e8400-e29b-41d4-a716-446655440001",
+          "measured_value": "14.2",
+          "equipment_id": "770e8400-e29b-41d4-a716-446655440002",
+          "notes": "Result within spec, equipment MA-001 used"
+        }
+    response:
+      status: 201
+      schema:
+        type: "object"
+        properties:
+          id:
+            type: "string"
+            format: "uuid"
+          inspection_id:
+            type: "string"
+            format: "uuid"
+          parameter_id:
+            type: "string"
+            format: "uuid"
+          measured_value:
+            type: "string"
+          numeric_value:
+            type: "number"
+            nullable: true
+          result_status:
+            type: "string"
+            enum: ["pass", "fail", "marginal"]
+          deviation_pct:
+            type: "number"
+            nullable: true
+          tested_by:
+            type: "string"
+            format: "uuid"
+          tested_at:
+            type: "string"
+            format: "date-time"
+          equipment_id:
+            type: "string"
+            format: "uuid"
+            nullable: true
+          notes:
+            type: "string"
+            nullable: true
+          created_at:
+            type: "string"
+            format: "date-time"
+      example: |
+        {
+          "id": "880e8400-e29b-41d4-a716-446655440003",
+          "inspection_id": "550e8400-e29b-41d4-a716-446655440000",
+          "parameter_id": "660e8400-e29b-41d4-a716-446655440001",
+          "measured_value": "14.2",
+          "numeric_value": 14.2,
+          "result_status": "pass",
+          "deviation_pct": null,
+          "tested_by": "111e8400-e29b-41d4-a716-446655440000",
+          "tested_at": "2025-01-15T14:23:00Z",
+          "equipment_id": "770e8400-e29b-41d4-a716-446655440002",
+          "notes": "Result within spec, equipment MA-001 used",
+          "created_at": "2025-01-15T14:23:00Z"
+        }
+    side_effects:
+      - "Auto-calculates result_status based on parameter acceptance criteria"
+      - "Extracts numeric_value if parameter_type is numeric/range"
+      - "Creates quality hold if result_status is fail (sync with Story 06.2)"
+      - "Sends email alert to QA Manager if critical parameter fails"
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Missing required fields or invalid data"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "User not authenticated"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "User lacks required role"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Inspection or parameter not found"
+
+  - method: "POST"
+    path: "/api/quality/test-results/batch"
+    description: "Create multiple test results (1-100) in single request"
+    auth_required: true
+    roles: ["QA Inspector", "QA Manager", "Quality Director"]
+    request_body:
+      description: "Batch create test results"
+      schema:
+        type: "object"
+        properties:
+          inspection_id:
+            type: "string"
+            format: "uuid"
+            description: "Parent inspection ID (shared for all results)"
+          results:
+            type: "array"
+            minItems: 1
+            maxItems: 100
+            items:
+              type: "object"
+              properties:
+                parameter_id:
+                  type: "string"
+                  format: "uuid"
+                measured_value:
+                  type: "string"
+                numeric_value:
+                  type: "number"
+                  nullable: true
+                equipment_id:
+                  type: "string"
+                  format: "uuid"
+                  nullable: true
+                calibration_date:
+                  type: "string"
+                  format: "date"
+                  nullable: true
+                notes:
+                  type: "string"
+                  nullable: true
+      example: |
+        {
+          "inspection_id": "550e8400-e29b-41d4-a716-446655440000",
+          "results": [
+            {
+              "parameter_id": "660e8400-e29b-41d4-a716-446655440001",
+              "measured_value": "14.2",
+              "equipment_id": "770e8400-e29b-41d4-a716-446655440002"
+            },
+            {
+              "parameter_id": "660e8400-e29b-41d4-a716-446655440002",
+              "measured_value": "12.8",
+              "equipment_id": "770e8400-e29b-41d4-a716-446655440003"
+            }
+          ]
+        }
+    response:
+      status: 201
+      schema:
+        type: "object"
+        properties:
+          results:
+            type: "array"
+            items:
+              type: "object"
+      example: |
+        {
+          "results": [
+            {
+              "id": "880e8400-e29b-41d4-a716-446655440003",
+              "inspection_id": "550e8400-e29b-41d4-a716-446655440000",
+              "parameter_id": "660e8400-e29b-41d4-a716-446655440001",
+              "measured_value": "14.2",
+              "result_status": "pass"
+            }
+          ]
+        }
+
+  - method: "GET"
+    path: "/api/quality/test-results/inspection/:inspectionId"
+    description: "Get all test results for an inspection with parameter details"
+    auth_required: true
+    roles: ["QA Inspector", "QA Manager", "Operator", "Quality Director"]
+    query_params:
+      - name: "page"
+        type: "integer"
+        default: 1
+        description: "Page number for pagination (default: 1)"
+      - name: "limit"
+        type: "integer"
+        default: 20
+        max: 100
+        description: "Results per page (default: 20, max: 100)"
+    response:
+      status: 200
+      schema:
+        type: "object"
+        properties:
+          results:
+            type: "array"
+            items:
+              type: "object"
+              properties:
+                id:
+                  type: "string"
+                  format: "uuid"
+                parameter:
+                  type: "object"
+                  description: "Linked parameter details"
+                  properties:
+                    id:
+                      type: "string"
+                      format: "uuid"
+                    parameter_name:
+                      type: "string"
+                    parameter_type:
+                      type: "string"
+                      enum: ["numeric", "text", "boolean", "range"]
+                    unit:
+                      type: "string"
+                    min_value:
+                      type: "number"
+                      nullable: true
+                    max_value:
+                      type: "number"
+                      nullable: true
+                    target_value:
+                      type: "string"
+                      nullable: true
+                    is_critical:
+                      type: "boolean"
+                measured_value:
+                  type: "string"
+                numeric_value:
+                  type: "number"
+                  nullable: true
+                result_status:
+                  type: "string"
+                  enum: ["pass", "fail", "marginal"]
+                deviation_pct:
+                  type: "number"
+                  nullable: true
+                tested_by:
+                  type: "string"
+                  format: "uuid"
+                tester:
+                  type: "object"
+                  properties:
+                    id:
+                      type: "string"
+                      format: "uuid"
+                    name:
+                      type: "string"
+                    email:
+                      type: "string"
+                tested_at:
+                  type: "string"
+                  format: "date-time"
+                equipment_id:
+                  type: "string"
+                  format: "uuid"
+                  nullable: true
+                equipment:
+                  type: "object"
+                  nullable: true
+                  properties:
+                    id:
+                      type: "string"
+                      format: "uuid"
+                    name:
+                      type: "string"
+                    code:
+                      type: "string"
+                notes:
+                  type: "string"
+                  nullable: true
+                created_at:
+                  type: "string"
+                  format: "date-time"
+          pagination:
+            type: "object"
+            properties:
+              page:
+                type: "integer"
+              limit:
+                type: "integer"
+              total:
+                type: "integer"
+              total_pages:
+                type: "integer"
+
+  - method: "GET"
+    path: "/api/quality/test-results/inspection/:inspectionId/summary"
+    description: "Get summary counts (pass/fail/marginal) for inspection"
+    auth_required: true
+    roles: ["QA Inspector", "QA Manager", "Quality Director"]
+    response:
+      status: 200
+      schema:
+        type: "object"
+        properties:
+          total:
+            type: "integer"
+            description: "Total number of test results"
+          pass:
+            type: "integer"
+            description: "Count of passing results"
+          fail:
+            type: "integer"
+            description: "Count of failing results"
+          marginal:
+            type: "integer"
+            description: "Count of marginal results (review needed)"
+          pass_rate:
+            type: "number"
+            description: "Percentage of passing results (0-100)"
+      example: |
+        {
+          "total": 8,
+          "pass": 6,
+          "fail": 2,
+          "marginal": 0,
+          "pass_rate": 75.0
+        }
+
+  - method: "PUT"
+    path: "/api/quality/test-results/:id"
+    description: "Update test result (limited fields, immutability enforced)"
+    auth_required: true
+    roles: ["QA Manager", "Quality Director"]
+    request_body:
+      description: "Partial update (only notes, not measured_value)"
+      schema:
+        type: "object"
+        properties:
+          notes:
+            type: "string"
+            nullable: true
+            description: "Update inspector notes only"
+    response:
+      status: 200
+      schema:
+        type: "object"
+    errors:
+      - status: 400
+        code: "IMMUTABLE_RESULT"
+        message: "Test results cannot be modified after creation"
+
+  - method: "DELETE"
+    path: "/api/quality/test-results/:id"
+    description: "Delete test result (only if inspection is not completed)"
+    auth_required: true
+    roles: ["QA Manager", "Quality Director"]
+    response:
+      status: 200
+      schema:
+        type: "object"
+        properties:
+          success:
+            type: "boolean"
+    errors:
+      - status: 400
+        code: "INSPECTION_COMPLETED"
+        message: "Cannot delete test results from completed inspections"
+
+# Service Layer Functions
+service_functions:
+  - name: "validateResult"
+    description: "Validate measured value against parameter acceptance criteria"
+    parameters:
+      - name: "measuredValue"
+        type: "string"
+      - name: "parameter"
+        type: "QualitySpecParameter"
+    returns:
+      type: "ParameterValidationResult"
+      properties:
+        result_status:
+          type: "string"
+          enum: ["pass", "fail", "marginal"]
+        deviation_pct:
+          type: "number"
+          nullable: true
+        numeric_value:
+          type: "number"
+          nullable: true
+    validation_rules:
+      boolean_type: "true/yes/1 → pass if target is true; case-insensitive"
+      text_type: "Exact match (case-insensitive) against target_value"
+      numeric_type: "Check if value within min/max range"
+      range_type: "Check if value within min/max range; detect 5% marginal zone"
+      marginal_detection: "If value within 5% of min or max limit (inside valid range), mark as marginal"
+
+  - name: "createBatch"
+    description: "Create multiple test results with batch validation"
+    parameters:
+      - name: "data"
+        type: "TestResultBatchCreate"
+      - name: "userId"
+        type: "string"
+    returns:
+      type: "TestResult[]"
+
+  - name: "getInspectionSummary"
+    description: "Get pass/fail/marginal counts for inspection"
+    parameters:
+      - name: "inspectionId"
+        type: "string"
+    returns:
+      type: "InspectionSummary"
+      properties:
+        total:
+          type: "integer"
+        pass:
+          type: "integer"
+        fail:
+          type: "integer"
+        marginal:
+          type: "integer"
+        pass_rate:
+          type: "number"
+
+# RLS Enforcement
+rls_policies:
+  - name: "Quality test results org isolation"
+    description: "Users can only access test results in their organization"
+    logic: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    applies_to: ["SELECT", "INSERT", "UPDATE", "DELETE"]
+
+# Error Handling
+error_codes:
+  - code: "VALIDATION_ERROR"
+    status: 400
+    message: "Invalid input (missing fields, format error)"
+  - code: "NOT_FOUND"
+    status: 404
+    message: "Inspection or parameter not found"
+  - code: "IMMUTABLE_RESULT"
+    status: 400
+    message: "Test results cannot be modified after creation"
+  - code: "INSPECTION_COMPLETED"
+    status: 400
+    message: "Cannot modify results from completed inspections"
+  - code: "UNAUTHORIZED"
+    status: 401
+    message: "User not authenticated or lacks role"
+  - code: "FORBIDDEN"
+    status: 403
+    message: "User not authorized to access resource"
+
+# Rate Limiting
+rate_limiting:
+  - endpoint: "POST /api/quality/test-results"
+    limit: "100 requests per minute"
+    applies_to: "authenticated users"
+  - endpoint: "GET /api/quality/test-results/inspection/:id"
+    limit: "200 requests per minute"
+    applies_to: "authenticated users"
+
+# Caching
+caching:
+  - key: "org:{orgId}:inspection:{inspectionId}:summary"
+    ttl: "30 seconds"
+    invalidation: "On test result create/update"
+  - key: "org:{orgId}:inspection:{inspectionId}:results"
+    ttl: "1 minute"
+    invalidation: "On test result create/update"

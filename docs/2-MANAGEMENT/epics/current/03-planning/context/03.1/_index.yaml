@@ -1,0 +1,127 @@
+# Story 03.1 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.1"
+  name: "Suppliers CRUD + Master Data"
+  slug: "suppliers-crud"
+  epic: "03-planning"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, validation, errors
+  - frontend.yaml    # Pages, components, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "org_id filtering"]
+    - story: "01.13"
+      name: "Tax Codes CRUD"
+      provides: ["tax_codes table", "tax_code_id FK"]
+  blocked_by: []
+  blocks:
+    - story: "03.2"
+      name: "Supplier-Products Assignment"
+    - story: "03.3"
+      name: "Purchase Order CRUD"
+    - story: "03.4"
+      name: "PO Approval Workflow"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-001", "FR-PLAN-004"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Database Schema", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.1.suppliers-crud.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-001-supplier-list.md"
+      id: "PLAN-001"
+      description: "Supplier List Page"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-002-supplier-create-edit.md"
+      id: "PLAN-002"
+      description: "Supplier Create/Edit Modal"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-003-supplier-detail.md"
+      id: "PLAN-003"
+      description: "Supplier Detail Page"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for suppliers table"
+
+# PRD Requirement Mapping
+requirements_mapping:
+  - requirement: "FR-PLAN-001"
+    description: "Supplier master data management (CRUD operations)"
+    acceptance_criteria:
+      - "AC-1: Supplier List Page with KPIs"
+      - "AC-2: Supplier Code Auto-Generation"
+      - "AC-3: Create Supplier with Required Fields"
+      - "AC-4: Supplier Field Validation"
+      - "AC-5: Edit Supplier with Code Locking"
+      - "AC-6: Filter Suppliers by Status"
+      - "AC-7: Search Suppliers"
+      - "AC-8: Deactivate Supplier (Success)"
+      - "AC-9: Block Deactivation if Open POs"
+      - "AC-10: Activate Inactive Supplier"
+      - "AC-11: Delete Supplier (Success)"
+      - "AC-12: Block Deletion if POs Exist"
+      - "AC-13: Block Deletion if Products Assigned"
+      - "AC-14: Bulk Deactivate Mixed Results"
+      - "AC-15: Export Suppliers to Excel"
+      - "AC-16: RLS Policy Enforcement"
+  - requirement: "FR-PLAN-004"
+    description: "Supplier contact information management"
+    acceptance_criteria:
+      - "AC-3: Contact fields (name, email, phone) captured"
+      - "AC-4: Email format validation"
+      - "AC-17: Supplier Detail Page Navigation"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "suppliers table with RLS policies"
+  - type: "api"
+    count: 10
+    description: "Full REST API for suppliers"
+  - type: "service"
+    count: 1
+    description: "supplier-service.ts"
+  - type: "validation"
+    count: 1
+    description: "supplier-schema.ts (Zod)"
+  - type: "page"
+    count: 2
+    description: "List page, Detail page"
+  - type: "component"
+    count: 8
+    description: "Table, KPIs, Filters, Modal, etc."
+  - type: "test"
+    count: 4
+    description: "Unit + Integration + E2E + Performance"
+
+# Technical notes
+technical_notes:
+  - "Lead time and MOQ are product-level, NOT supplier-level (per PRD)"
+  - "Code must be unique per org (UNIQUE constraint on org_id, code)"
+  - "Code immutable if supplier has any POs (check on edit)"
+  - "Cannot deactivate if open POs exist"
+  - "Cannot delete if any POs OR any products assigned"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Return 404 (not 403) for cross-tenant access attempts"
+  - "Payment terms is REQUIRED (NOT NULL in DB)"

@@ -1,0 +1,292 @@
+# Story 01.13 - Frontend Specification
+# Purpose: Components, pages, services, types
+# Agent: FRONTEND-DEV
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/tax-codes/page.tsx"
+    description: "Tax code list page with DataTable"
+    layout: "Settings shell with breadcrumbs"
+    sections:
+      - "Page header with title and 'Add Tax Code' button"
+      - "Filter bar (search, country, status)"
+      - "Tax codes DataTable"
+      - "Pagination controls"
+
+# Component Structure
+components:
+  base_path: "apps/frontend/components/settings/tax-codes"
+
+  list:
+    - name: "TaxCodesDataTable.tsx"
+      description: "Main table with sorting, filtering, pagination"
+      props:
+        - "taxCodes: TaxCode[]"
+        - "total: number"
+        - "page: number"
+        - "limit: number"
+        - "onPageChange: (page: number) => void"
+        - "onSort: (field: string, order: 'asc' | 'desc') => void"
+      columns:
+        - { key: "code", label: "Code", sortable: true, width: "15%" }
+        - { key: "name", label: "Name", sortable: true, width: "25%" }
+        - { key: "rate", label: "Rate", sortable: true, width: "10%", component: "TaxCodeRateBadge" }
+        - { key: "country_code", label: "Jurisdiction", sortable: true, width: "10%", component: "TaxCodeCountryBadge" }
+        - { key: "valid_from", label: "Valid From", sortable: true, width: "12%" }
+        - { key: "valid_to", label: "Valid To", sortable: false, width: "12%" }
+        - { key: "is_default", label: "Default", sortable: false, width: "8%", component: "DefaultBadge" }
+        - { key: "status", label: "Status", sortable: false, width: "10%", component: "TaxCodeStatusBadge" }
+        - { key: "actions", label: "Actions", sortable: false, width: "8%", component: "TaxCodeActionsMenu" }
+
+    - name: "TaxCodeRow.tsx"
+      description: "Single tax code row"
+      props:
+        - "taxCode: TaxCode"
+        - "onEdit: () => void"
+        - "onDelete: () => void"
+        - "onSetDefault: () => void"
+
+    - name: "TaxCodeFilters.tsx"
+      description: "Search and filter controls"
+      props:
+        - "onSearch: (query: string) => void"
+        - "onCountryChange: (country: string) => void"
+        - "onStatusChange: (status: TaxCodeStatus | 'all') => void"
+        - "availableCountries: string[]"
+      features:
+        - "Search input with debounce (300ms)"
+        - "Country dropdown (shows only countries with tax codes)"
+        - "Status dropdown (Active, Expired, Scheduled, All)"
+
+  badges:
+    - name: "TaxCodeRateBadge.tsx"
+      description: "Rate display with color coding"
+      props:
+        - "rate: number"
+      display: "XX.XX%"
+      colors:
+        - "0%: gray (bg-gray-100)"
+        - "1-10%: green (bg-green-100)"
+        - "11-20%: blue (bg-blue-100)"
+        - "21-100%: purple (bg-purple-100)"
+
+    - name: "TaxCodeStatusBadge.tsx"
+      description: "Status indicator badge"
+      props:
+        - "status: TaxCodeStatus"
+      variants:
+        - { status: "active", color: "bg-green-100 text-green-800", label: "Active" }
+        - { status: "expired", color: "bg-red-100 text-red-800", label: "Expired" }
+        - { status: "scheduled", color: "bg-yellow-100 text-yellow-800", label: "Scheduled" }
+
+    - name: "TaxCodeCountryBadge.tsx"
+      description: "Country code display"
+      props:
+        - "countryCode: string"
+      display: "Country code (e.g., 'PL')"
+      tooltip: "Full country name"
+
+  modals:
+    - name: "TaxCodeModal.tsx"
+      description: "Create/Edit tax code modal"
+      props:
+        - "mode: 'create' | 'edit'"
+        - "taxCode?: TaxCode"
+        - "onClose: () => void"
+        - "onSubmit: (data: CreateTaxCodeInput | UpdateTaxCodeInput) => void"
+      sections:
+        - name: "Basic Info"
+          fields:
+            - { name: "code", type: "text", required: true, readonly_edit: true, validation: "uppercase alphanumeric" }
+            - { name: "name", type: "text", required: true }
+        - name: "Rate"
+          fields:
+            - { name: "rate", type: "number", required: true, min: 0, max: 100, step: 0.01 }
+        - name: "Jurisdiction"
+          fields:
+            - { name: "country_code", type: "select", required: true, readonly_edit: true, options: "ISO countries" }
+        - name: "Validity Period"
+          fields:
+            - { name: "valid_from", type: "date", required: true }
+            - { name: "valid_to", type: "date", required: false }
+        - name: "Options"
+          fields:
+            - { name: "is_default", type: "checkbox", label: "Set as default tax code" }
+      validation:
+        - "Real-time validation on blur"
+        - "Code uniqueness check (debounced)"
+        - "Date range validation (valid_to > valid_from)"
+
+    - name: "SetDefaultConfirmDialog.tsx"
+      description: "Confirmation for default change"
+      props:
+        - "taxCode: TaxCode"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+      message: "Set {{code}} as default tax code? Current default will be unset."
+
+    - name: "DeleteConfirmDialog.tsx"
+      description: "Confirmation with reference check"
+      props:
+        - "taxCode: TaxCode"
+        - "references: { count: number; entities: string[] }"
+        - "onConfirm: () => void"
+        - "onCancel: () => void"
+      warning: "Cannot delete if references exist"
+
+  actions:
+    - name: "TaxCodeActionsMenu.tsx"
+      description: "Row actions dropdown"
+      props:
+        - "taxCode: TaxCode"
+        - "onEdit: () => void"
+        - "onSetDefault: () => void"
+        - "onDelete: () => void"
+        - "canEdit: boolean"
+        - "canDelete: boolean"
+      actions:
+        - { label: "Edit", icon: "Pencil", permission: "U" }
+        - { label: "Set as Default", icon: "Star", permission: "U", hidden_if: "is_default" }
+        - { label: "Delete", icon: "Trash", permission: "D", color: "red" }
+
+  inputs:
+    - name: "TaxCodeCountrySelect.tsx"
+      description: "Country dropdown with ISO codes"
+      props:
+        - "value: string"
+        - "onChange: (value: string) => void"
+        - "disabled?: boolean"
+      options: "ISO 3166-1 alpha-2 countries"
+      display: "{{code}} - {{name}}"
+
+    - name: "TaxCodeDateRangePicker.tsx"
+      description: "Valid from/to date inputs"
+      props:
+        - "validFrom: string"
+        - "validTo: string | null"
+        - "onChange: (from: string, to: string | null) => void"
+      validation: "validTo > validFrom"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-tax-codes.ts"
+    description: "React Query hook for tax codes"
+    exports:
+      - name: "useTaxCodes"
+        params: ["params: TaxCodeListParams"]
+        returns: "UseQueryResult<PaginatedResult<TaxCode>>"
+
+      - name: "useTaxCode"
+        params: ["id: string"]
+        returns: "UseQueryResult<TaxCode>"
+
+      - name: "useCreateTaxCode"
+        returns: "UseMutationResult<TaxCode, Error, CreateTaxCodeInput>"
+
+      - name: "useUpdateTaxCode"
+        returns: "UseMutationResult<TaxCode, Error, { id: string; data: UpdateTaxCodeInput }>"
+
+      - name: "useDeleteTaxCode"
+        returns: "UseMutationResult<void, Error, string>"
+
+      - name: "useSetDefaultTaxCode"
+        returns: "UseMutationResult<TaxCode, Error, string>"
+
+      - name: "useValidateTaxCode"
+        params: ["code: string", "countryCode: string", "excludeId?: string"]
+        returns: "UseQueryResult<{ available: boolean }>"
+        options: "{ enabled: false } for manual trigger"
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SET-021"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-021-tax-code-list.md"
+      description: "Tax code list with effective dates and expiration indicators"
+      components:
+        - "TaxCodesDataTable"
+        - "TaxCodeRow"
+        - "TaxCodeStatusBadge"
+        - "EffectiveDateDisplay"
+        - "ExpirationIndicator"
+    - id: "SET-021a"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-021a-tax-code-create-modal.md"
+      description: "Tax code create modal with date range support"
+      components:
+        - "TaxCodeCreateModal"
+        - "TaxCodeForm"
+        - "DateRangeToggle"
+        - "OverlapDetection"
+    - id: "SET-021b"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-021b-tax-code-edit-modal.md"
+      description: "Tax code edit modal with delete confirmation"
+      components:
+        - "TaxCodeEditModal"
+        - "TaxCodeForm"
+        - "DeleteConfirmDialog"
+        - "ChangeIndicator"
+
+  empty_state:
+    title: "No tax codes configured"
+    description: "Add your first tax code to start managing tax rates."
+    action: "Add Tax Code"
+
+  loading_state:
+    skeleton: "Table skeleton with 5 rows"
+
+  error_state:
+    title: "Failed to load tax codes"
+    action: "Retry"
+
+  states:
+    loading: "Skeleton table with 3 rows"
+    empty: "Empty state with 'Add Tax Code' CTA"
+    error: "Error message with retry button"
+    success: "Tax code table with effective dates visible"
+
+  toasts:
+    - event: "create_success"
+      message: "Tax code {{code}} created successfully"
+      type: "success"
+    - event: "update_success"
+      message: "Tax code {{code}} updated"
+      type: "success"
+    - event: "delete_success"
+      message: "Tax code deleted"
+      type: "success"
+    - event: "set_default_success"
+      message: "{{code}} set as default tax code"
+      type: "success"
+    - event: "validation_error"
+      message: "{{field}}: {{error}}"
+      type: "error"
+    - event: "delete_blocked"
+      message: "Cannot delete tax code referenced by {{count}} suppliers"
+      type: "error"
+
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering, search"
+    modal: "ShadCN Dialog with React Hook Form + Zod"
+    form: "Multi-step validation with date range logic"
+
+# Patterns
+patterns:
+  shadcn:
+    table: "DataTable with TanStack Table"
+    modal: "Dialog component"
+    dropdown: "DropdownMenu"
+    select: "Select component"
+    datepicker: "Calendar + Popover"
+    badge: "Badge component"
+    button: "Button component"
+
+  permissions:
+    check: |
+      const canManage = hasPermission(context, 'settings', 'U');
+      if (!canManage) {
+        // Hide 'Add Tax Code' button
+        // Hide action menus
+      }
+
+  debounce:
+    search: "300ms debounce on search input"
+    code_validation: "500ms debounce on code validation"

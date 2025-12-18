@@ -1,0 +1,315 @@
+# Story 03.16 - Frontend Specification
+# Purpose: Components, hooks, pages, UX patterns
+# Agent: FRONTEND-DEV
+
+# Page
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/page.tsx"
+    description: "Planning Dashboard - main landing page for /planning route"
+    type: "server"
+    layout: "authenticated"
+    features:
+      - "KPI cards grid (6 cards)"
+      - "Alert panel with severity grouping"
+      - "Recent activity feed (last 20 actions)"
+      - "Quick action buttons header"
+      - "Zero state for new organizations"
+
+# Components
+components:
+  # Main Dashboard Container
+  - path: "apps/frontend/components/planning/dashboard/PlanningDashboard.tsx"
+    description: "Main dashboard container orchestrating all widgets"
+    type: "client"
+    props:
+      - "initialKPIs?: DashboardKPIs"
+      - "initialAlerts?: DashboardAlertsResponse"
+      - "initialActivity?: DashboardActivityResponse"
+    state:
+      - "kpis: DashboardKPIs | null"
+      - "alerts: Alert[]"
+      - "activities: Activity[]"
+      - "isLoading: boolean"
+      - "error: Error | null"
+
+  # KPI Cards
+  - path: "apps/frontend/components/planning/dashboard/DashboardKPICards.tsx"
+    description: "Grid of 6 KPI cards"
+    type: "client"
+    props:
+      - "kpis: DashboardKPIs"
+      - "isLoading?: boolean"
+    children: ["KPICard"]
+
+  - path: "apps/frontend/components/planning/dashboard/KPICard.tsx"
+    description: "Individual KPI card with icon, value, and click navigation"
+    type: "client"
+    props:
+      - "title: string"
+      - "value: number"
+      - "icon: LucideIcon"
+      - "href: string"
+      - "description?: string"
+      - "variant?: 'default' | 'warning' | 'critical'"
+    pattern: "ShadCN Card with hover effect"
+    accessibility:
+      - "role='region'"
+      - "aria-label='KPI card: {title} - {value}'"
+      - "keyboard focusable and activatable"
+
+  # Alert Panel
+  - path: "apps/frontend/components/planning/dashboard/DashboardAlerts.tsx"
+    description: "Alert panel with severity grouping"
+    type: "client"
+    props:
+      - "alerts: Alert[]"
+      - "isLoading?: boolean"
+      - "onViewAll?: () => void"
+    children: ["AlertItem"]
+
+  - path: "apps/frontend/components/planning/dashboard/AlertItem.tsx"
+    description: "Individual alert item with severity indicator"
+    type: "client"
+    props:
+      - "alert: Alert"
+      - "onClick?: () => void"
+    pattern: "ShadCN Alert component with Badge for severity"
+    colors:
+      warning: "bg-yellow-50 border-yellow-200 text-yellow-800"
+      critical: "bg-red-50 border-red-200 text-red-800"
+
+  # Activity Feed
+  - path: "apps/frontend/components/planning/dashboard/DashboardActivity.tsx"
+    description: "Recent activity feed with entity-type icons"
+    type: "client"
+    props:
+      - "activities: Activity[]"
+      - "isLoading?: boolean"
+      - "onLoadMore?: () => void"
+    children: ["ActivityItem"]
+
+  - path: "apps/frontend/components/planning/dashboard/ActivityItem.tsx"
+    description: "Individual activity item with relative timestamp"
+    type: "client"
+    props:
+      - "activity: Activity"
+      - "onClick?: () => void"
+    pattern: "List item with icon, description, and timestamp"
+    formatting:
+      timestamp: "formatDistanceToNow from date-fns"
+
+  # Quick Actions
+  - path: "apps/frontend/components/planning/dashboard/DashboardQuickActions.tsx"
+    description: "Quick action button bar for creating PO/TO/WO"
+    type: "client"
+    props:
+      - "onCreatePO?: () => void"
+      - "onCreateTO?: () => void"
+      - "onCreateWO?: () => void"
+    pattern: "ShadCN Button group"
+
+  # Empty State
+  - path: "apps/frontend/components/planning/dashboard/DashboardEmptyState.tsx"
+    description: "Zero state UI when no data exists"
+    type: "client"
+    props:
+      - "onCreatePO?: () => void"
+      - "onCreateTO?: () => void"
+      - "onCreateWO?: () => void"
+    pattern: "ShadCN empty state with icon and CTAs"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-dashboard-kpis.ts"
+    description: "React Query hook for fetching dashboard KPIs"
+    exports:
+      - name: "useDashboardKPIs"
+        returns: "UseQueryResult<DashboardKPIs>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+
+      export function useDashboardKPIs() {
+        return useQuery<DashboardKPIs>({
+          queryKey: ['planning', 'dashboard', 'kpis'],
+          queryFn: async () => {
+            const res = await fetch('/api/planning/dashboard/kpis');
+            if (!res.ok) throw new Error('Failed to fetch KPIs');
+            return res.json();
+          },
+          staleTime: 2 * 60 * 1000, // 2 minutes
+          refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-dashboard-alerts.ts"
+    description: "React Query hook for fetching dashboard alerts"
+    exports:
+      - name: "useDashboardAlerts"
+        returns: "UseQueryResult<DashboardAlertsResponse>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+
+      export function useDashboardAlerts(limit = 10) {
+        return useQuery<DashboardAlertsResponse>({
+          queryKey: ['planning', 'dashboard', 'alerts', limit],
+          queryFn: async () => {
+            const res = await fetch(`/api/planning/dashboard/alerts?limit=${limit}`);
+            if (!res.ok) throw new Error('Failed to fetch alerts');
+            return res.json();
+          },
+          staleTime: 2 * 60 * 1000,
+          refetchInterval: 2 * 60 * 1000,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-dashboard-activity.ts"
+    description: "React Query hook for fetching dashboard activity"
+    exports:
+      - name: "useDashboardActivity"
+        returns: "UseQueryResult<DashboardActivityResponse>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+
+      export function useDashboardActivity(limit = 20) {
+        return useQuery<DashboardActivityResponse>({
+          queryKey: ['planning', 'dashboard', 'activity', limit],
+          queryFn: async () => {
+            const res = await fetch(`/api/planning/dashboard/activity?limit=${limit}`);
+            if (!res.ok) throw new Error('Failed to fetch activity');
+            return res.json();
+          },
+          staleTime: 2 * 60 * 1000,
+          refetchInterval: 2 * 60 * 1000,
+        });
+      }
+
+# UX Specifications
+ux:
+  wireframe:
+    id: "PLAN-023"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-023-planning-dashboard.md"
+    sections:
+      - "KPI Cards Grid (6 cards)"
+      - "Alert Panels"
+      - "Recent Activity Feed"
+      - "Quick Actions"
+
+  states:
+    - name: "loading"
+      description: "Skeleton cards while data loads"
+      components: ["Skeleton cards grid", "Skeleton list items"]
+
+    - name: "empty"
+      description: "No POs, TOs, or WOs exist"
+      components: ["DashboardEmptyState"]
+      message: "Get started by creating your first Purchase Order, Transfer Order, or Work Order"
+
+    - name: "error"
+      description: "Failed to load dashboard data"
+      components: ["Error alert with retry button"]
+      message: "Failed to load dashboard. Please try again."
+
+    - name: "success"
+      description: "All data loaded successfully"
+      components: ["Full dashboard with all widgets"]
+
+  layout:
+    desktop:
+      grid: "3 columns for KPI cards, then 2-column layout for alerts + activity"
+      kpi_cards: "2 rows x 3 columns"
+      alerts: "Left side (60%)"
+      activity: "Right side (40%)"
+
+    tablet:
+      grid: "2 columns for KPI cards, stacked for alerts + activity"
+      kpi_cards: "3 rows x 2 columns"
+      alerts: "Full width"
+      activity: "Full width below alerts"
+
+    mobile:
+      grid: "1 column for all"
+      kpi_cards: "6 rows x 1 column"
+      alerts: "Full width"
+      activity: "Full width below alerts"
+
+  kpi_card_config:
+    - id: "po_pending_approval"
+      title: "PO Pending Approval"
+      icon: "Clock"
+      href: "/planning/purchase-orders?approval_status=pending"
+      variant_rules:
+        warning: ">= 3"
+        critical: ">= 5"
+
+    - id: "po_this_month"
+      title: "PO This Month"
+      icon: "ShoppingCart"
+      href: "/planning/purchase-orders?created_this_month=true"
+
+    - id: "to_in_transit"
+      title: "TO In Transit"
+      icon: "Truck"
+      href: "/planning/transfer-orders?status=in_transit"
+
+    - id: "wo_scheduled_today"
+      title: "WO Scheduled Today"
+      icon: "Calendar"
+      href: "/planning/work-orders?scheduled_date=today"
+
+    - id: "wo_overdue"
+      title: "WO Overdue"
+      icon: "AlertTriangle"
+      href: "/planning/work-orders?overdue=true"
+      variant_rules:
+        warning: ">= 1"
+        critical: ">= 3"
+
+    - id: "open_orders"
+      title: "Open Orders"
+      icon: "FileText"
+      href: "/planning/purchase-orders?status=open"
+
+  quick_actions:
+    - label: "Create PO"
+      icon: "Plus"
+      href: "/planning/purchase-orders/new"
+      shortcut: "Ctrl+Shift+P"
+
+    - label: "Create TO"
+      icon: "Plus"
+      href: "/planning/transfer-orders/new"
+      shortcut: "Ctrl+Shift+T"
+
+    - label: "Create WO"
+      icon: "Plus"
+      href: "/planning/work-orders/new"
+      shortcut: "Ctrl+Shift+W"
+
+# Accessibility
+accessibility:
+  touch_targets: "48x48dp minimum"
+  contrast: "4.5:1 minimum for text"
+  screen_reader:
+    kpi_card: "KPI card: {title} - {value}. Click to view details."
+    alert: "Alert: {severity} - {description}. Click to resolve."
+    activity: "Activity: {entity_number} {action} by {user_name} {timestamp}"
+  keyboard:
+    tab: "Navigate through KPI cards, alerts, activities, quick actions"
+    enter: "Activate focused element"
+    escape: "Close any open modals"
+  aria:
+    kpi_grid: "role='region' aria-label='Key Performance Indicators'"
+    alerts: "role='region' aria-label='Alerts' aria-live='polite'"
+    activity: "role='feed' aria-label='Recent Activity'"
+
+# Performance
+performance:
+  targets:
+    initial_load: "<2000ms"
+    kpi_render: "<100ms"
+    interaction_response: "<100ms"
+  lazy_loading:
+    - "Activity items beyond first 20"
+  caching:
+    react_query_stale_time: "2 minutes"
+    react_query_refetch_interval: "2 minutes"
