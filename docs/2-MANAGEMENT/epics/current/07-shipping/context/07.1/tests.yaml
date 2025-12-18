@@ -1,0 +1,723 @@
+testing:
+  overview: |
+    Three-layer testing strategy: Unit tests for business logic, Integration tests for API routes with RLS,
+    E2E tests for complete workflows. Target 80%+ service coverage, 70%+ API coverage.
+
+  unit_tests:
+    file: "apps/frontend/__tests__/services/customer-service.test.ts"
+    framework: "Vitest"
+    coverage_target: "80%+"
+
+    test_suites:
+      create_customer:
+        description: "Customer creation with validation"
+        tests:
+          - name: "should create customer with required fields"
+            given: "Valid customer_code, name, category"
+            when: "createCustomer called"
+            then: "Returns Customer object with id, org_id, created_at"
+            expect:
+              - "customer.id is UUID"
+              - "customer.org_id matches auth context"
+              - "customer.is_active === true"
+              - "customer.created_by set to auth.user.id"
+
+          - name: "should normalize customer_code to uppercase"
+            given: "customer_code = 'acme-001'"
+            when: "createCustomer called"
+            then: "Stored as 'ACME-001' in database"
+
+          - name: "should validate customer_code format"
+            given: "customer_code = 'invalid code!' (spaces, special chars)"
+            when: "createCustomer called"
+            then: "Throws validation error: 'Invalid character in customer_code'"
+
+          - name: "should reject duplicate customer_code per org"
+            given: "Customer with code 'ACME001' exists in org"
+            when: "createCustomer with same code"
+            then: "Throws: 'Customer code already exists in organization'"
+
+          - name: "should encrypt tax_id field"
+            given: "tax_id = 'VAT123456'"
+            when: "createCustomer called"
+            then: "Database stores encrypted value"
+
+          - name: "should validate allergen IDs exist"
+            given: "allergen_restrictions = ['invalid-uuid']"
+            when: "createCustomer called"
+            then: "Throws: 'Allergen not found'"
+
+          - name: "should validate payment_terms_days range"
+            given: "payment_terms_days = 400 (> 365)"
+            when: "createCustomer called"
+            then: "Throws: 'Payment terms must be 1-365 days'"
+
+          - name: "should allow empty allergen_restrictions"
+            given: "allergen_restrictions = null"
+            when: "createCustomer called"
+            then: "Creates customer successfully"
+
+      update_customer:
+        description: "Customer updates with partial data"
+        tests:
+          - name: "should update name only"
+            given: "Customer exists, patch { name: 'New Name' }"
+            when: "updateCustomer called"
+            then: "Name updated, other fields unchanged"
+
+          - name: "should prevent customer_code change"
+            given: "Patch includes customer_code: 'NEW_CODE'"
+            when: "updateCustomer called"
+            then: "Throws: 'Cannot modify customer_code'"
+
+          - name: "should update allergen_restrictions"
+            given: "Patch { allergen_restrictions: [uuid1, uuid2] }"
+            when: "updateCustomer called"
+            then: "Array updated, validated against allergens table"
+
+          - name: "should not allow archiving customer with open orders"
+            given: "Customer has open sales order, patch { is_active: false }"
+            when: "updateCustomer called"
+            then: "Throws: 'Cannot archive customer with open orders'"
+
+          - name: "should update updated_at timestamp"
+            given: "Any update"
+            when: "updateCustomer called"
+            then: "updated_at = NOW()"
+
+      delete_customer:
+        description: "Customer archival (soft delete)"
+        tests:
+          - name: "should archive customer (is_active = false)"
+            given: "Customer with no open orders"
+            when: "deleteCustomer called"
+            then: "is_active set to false, record preserved"
+
+          - name: "should prevent delete if open orders exist"
+            given: "Customer has status='confirmed' order"
+            when: "deleteCustomer called"
+            then: "Throws: 'Cannot delete customer with open orders'"
+
+          - name: "should preserve allergen history"
+            given: "Archived customer with allergens"
+            when: "SELECT from database"
+            then: "Record still visible with is_active=false"
+
+      contacts_management:
+        description: "Contact CRUD and validation"
+        tests:
+          - name: "should create contact with name only"
+            given: "name = 'John Doe'"
+            when: "addContact called"
+            then: "Contact created with is_primary=false"
+
+          - name: "should validate email format if provided"
+            given: "email = 'invalid-email'"
+            when: "addContact called"
+            then: "Throws: 'Invalid email format'"
+
+          - name: "should prevent duplicate emails per customer"
+            given: "Contact with email 'john@acme.com' exists"
+            when: "addContact with same email"
+            then: "Throws: 'Email already exists for this customer'"
+
+          - name: "should allow null email"
+            given: "Contact without email"
+            when: "addContact called"
+            then: "Creates successfully (null stored)"
+
+          - name: "should delete contact"
+            given: "Contact exists"
+            when: "deleteContact called"
+            then: "Hard delete (cascade on customer delete)"
+
+          - name: "should set is_primary contact"
+            given: "Multiple contacts, marking one as primary"
+            when: "updateContact with is_primary=true"
+            then: "Contact marked primary (others left unchanged)"
+
+      addresses_management:
+        description: "Address CRUD and validation"
+        tests:
+          - name: "should create shipping address"
+            given: "address_type='shipping', full address fields"
+            when: "addAddress called"
+            then: "Address created, is_default=false by default"
+
+          - name: "should create billing address"
+            given: "address_type='billing'"
+            when: "addAddress called"
+            then: "Creates separate from shipping addresses"
+
+          - name: "should validate postal_code not empty"
+            given: "postal_code = ''"
+            when: "addAddress called"
+            then: "Throws: 'Postal code required'"
+
+          - name: "should parse dock_hours JSON"
+            given: "dock_hours = { mon: '08:00-17:00', tue: null, ... }"
+            when: "addAddress called"
+            then: "Stored as-is in JSONB, no transformation"
+
+          - name: "should set address as default for type"
+            given: "address_type='shipping', is_default=true"
+            when: "addAddress called"
+            then: "Other shipping addresses set is_default=false"
+
+          - name: "should update address"
+            given: "Address exists, patch { city: 'New City' }"
+            when: "updateAddress called"
+            then: "City updated, address_type unchanged"
+
+          - name: "should delete address"
+            given: "Address exists"
+            when: "deleteAddress called"
+            then: "Hard delete (no reference integrity issues)"
+
+          - name: "should require at least one address"
+            given: "Customer with one address"
+            when: "deleteAddress called on only address"
+            then: "Throws: 'Customer must have at least one address'"
+
+      allergen_validation:
+        description: "Allergen restriction logic"
+        tests:
+          - name: "should validate allergen UUIDs against allergens table"
+            given: "allergen_restrictions = [valid_uuid, invalid_uuid]"
+            when: "createCustomer called"
+            then: "Throws: 'Allergen not found' for invalid UUID"
+
+          - name: "should store allergen array as JSONB"
+            given: "allergen_restrictions = [uuid1, uuid2]"
+            when: "Query database"
+            then: "JSONB array stored, queryable"
+
+          - name: "should support max 20 allergens per customer"
+            given: "allergen_restrictions = [21 UUIDs]"
+            when: "createCustomer called"
+            then: "Throws: 'Maximum 20 allergens per customer'"
+
+          - name: "should allow empty allergen restrictions"
+            given: "allergen_restrictions = null or []"
+            when: "createCustomer called"
+            then: "Creates successfully, null stored in DB"
+
+    fixtures:
+      org_factory: |
+        Creates test organization with deterministic ID
+        Returns { id, name, timezone }
+
+      user_factory: |
+        Creates test user with org context
+        Returns { id, email, org_id, role }
+
+      customer_factory: |
+        Creates test customer with defaults
+        Returns { id, customer_code, name, category, org_id, ... }
+
+      allergen_factory: |
+        Creates test allergen (milk, peanuts, etc)
+        Returns { id, name, code }
+
+  integration_tests:
+    file: "apps/frontend/__tests__/api/shipping/customers.test.ts"
+    framework: "Vitest + Supabase test client"
+    coverage_target: "70%+"
+
+    test_suites:
+      customers_endpoint:
+        description: "POST/GET /api/shipping/customers"
+        setup: |
+          - Create test org with 2 users (user_a, user_b)
+          - Create 5 test customers in user_a's org
+          - Create 5 test customers in user_b's org
+
+        tests:
+          - name: "POST /customers: Create customer with admin user"
+            given: "Auth as sales user, valid customer payload"
+            when: "POST /api/shipping/customers"
+            then: "201 Created with customer object"
+
+          - name: "POST /customers: Return 400 on validation error"
+            given: "Missing required field (name)"
+            when: "POST /api/shipping/customers"
+            then: "400 Bad Request with error details"
+
+          - name: "POST /customers: Return 409 on duplicate code"
+            given: "Customer code already exists"
+            when: "POST /api/shipping/customers"
+            then: "409 Conflict with message 'Customer code already exists'"
+
+          - name: "POST /customers: Enforce role check"
+            given: "Auth as warehouse_picker (insufficient role)"
+            when: "POST /api/shipping/customers"
+            then: "403 Forbidden"
+
+          - name: "GET /customers: List org customers with pagination"
+            given: "Auth as user, org has 5 customers"
+            when: "GET /api/shipping/customers?page=1&limit=10"
+            then: "200 OK with { data: [customers], pagination: { total: 5, pages: 1 } }"
+
+          - name: "GET /customers: Filter by category"
+            given: "3 wholesale, 2 retail customers"
+            when: "GET /api/shipping/customers?category=wholesale"
+            then: "200 OK with 3 customers"
+
+          - name: "GET /customers: Search by customer_code"
+            given: "Customers with codes ACME001, BESTCO, TEST"
+            when: "GET /api/shipping/customers?search=acm"
+            then: "200 OK with ACME001 only (case-insensitive)"
+
+          - name: "GET /customers: RLS prevents cross-tenant access"
+            given: "Auth as user_a, request user_b's customer"
+            when: "GET /api/shipping/customers (no filter)"
+            then: "200 OK but only user_a's customers returned"
+
+          - name: "GET /customers: Pagination page 2"
+            given: "10 customers total, limit=5"
+            when: "GET /api/shipping/customers?page=2&limit=5"
+            then: "200 OK with customers 6-10"
+
+      customer_detail_endpoint:
+        description: "GET/PUT/DELETE /api/shipping/customers/:id"
+        tests:
+          - name: "GET /customers/:id: Return customer with nested contacts/addresses"
+            given: "Customer with 2 contacts, 2 addresses"
+            when: "GET /api/shipping/customers/:id"
+            then: "200 OK with customer + contacts[] + addresses[]"
+
+          - name: "GET /customers/:id: Return 404 for non-existent customer"
+            given: "UUID doesn't exist"
+            when: "GET /api/shipping/customers/:id"
+            then: "404 Not Found"
+
+          - name: "GET /customers/:id: Return 404 for cross-tenant access (not 403)"
+            given: "Auth as user_a, request user_b's customer"
+            when: "GET /api/shipping/customers/:id"
+            then: "404 Not Found (prevents existence leak)"
+
+          - name: "PUT /customers/:id: Update name"
+            given: "Auth as sales user, patch { name: 'New Name' }"
+            when: "PUT /api/shipping/customers/:id"
+            then: "200 OK with updated customer"
+
+          - name: "PUT /customers/:id: Reject customer_code change"
+            given: "Patch { customer_code: 'NEW_CODE' }"
+            when: "PUT /api/shipping/customers/:id"
+            then: "400 Bad Request or silently ignore field"
+
+          - name: "PUT /customers/:id: Prevent deactivation with open orders"
+            given: "Customer has open sales order, patch { is_active: false }"
+            when: "PUT /api/shipping/customers/:id"
+            then: "409 Conflict with message"
+
+          - name: "DELETE /customers/:id: Archive customer"
+            given: "No open orders"
+            when: "DELETE /api/shipping/customers/:id"
+            then: "200 OK, is_active set to false"
+
+          - name: "DELETE /customers/:id: Prevent if open orders"
+            given: "Customer has pending order"
+            when: "DELETE /api/shipping/customers/:id"
+            then: "409 Conflict"
+
+      contacts_endpoint:
+        description: "GET/POST/PUT/DELETE /api/shipping/customers/:id/contacts"
+        tests:
+          - name: "GET /contacts: List all contacts for customer"
+            given: "Customer with 3 contacts"
+            when: "GET /api/shipping/customers/:id/contacts"
+            then: "200 OK with array of 3 contacts"
+
+          - name: "POST /contacts: Add contact"
+            given: "Valid contact payload { name, email, phone }"
+            when: "POST /api/shipping/customers/:id/contacts"
+            then: "201 Created with contact object"
+
+          - name: "POST /contacts: Reject duplicate email"
+            given: "Contact with email 'john@acme.com' exists"
+            when: "POST /api/shipping/customers/:id/contacts with same email"
+            then: "409 Conflict"
+
+          - name: "POST /contacts: Allow null email"
+            given: "Payload { name: 'John', email: null }"
+            when: "POST /api/shipping/customers/:id/contacts"
+            then: "201 Created"
+
+          - name: "PUT /contacts/:contactId: Update contact"
+            given: "Patch { title: 'VP Sales' }"
+            when: "PUT /api/shipping/customers/:id/contacts/:contactId"
+            then: "200 OK with updated contact"
+
+          - name: "DELETE /contacts/:contactId: Remove contact"
+            given: "Contact exists"
+            when: "DELETE /api/shipping/customers/:id/contacts/:contactId"
+            then: "200 OK"
+
+      addresses_endpoint:
+        description: "GET/POST/PUT/DELETE /api/shipping/customers/:id/addresses"
+        tests:
+          - name: "GET /addresses: List all addresses"
+            given: "Customer with 2 shipping, 1 billing address"
+            when: "GET /api/shipping/customers/:id/addresses"
+            then: "200 OK with 3 addresses"
+
+          - name: "POST /addresses: Create shipping address"
+            given: "Valid address payload { address_type: 'shipping', ... }"
+            when: "POST /api/shipping/customers/:id/addresses"
+            then: "201 Created"
+
+          - name: "POST /addresses: Auto-unset other defaults"
+            given: "Customer has default shipping address, new address { is_default: true, address_type: 'shipping' }"
+            when: "POST /api/shipping/customers/:id/addresses"
+            then: "201 Created, old default set to false"
+
+          - name: "POST /addresses: Reject empty required fields"
+            given: "Missing postal_code"
+            when: "POST /api/shipping/customers/:id/addresses"
+            then: "400 Bad Request"
+
+          - name: "POST /addresses: Store dock_hours as JSONB"
+            given: "dock_hours = { mon: '08:00-17:00', tue: null }"
+            when: "POST /api/shipping/customers/:id/addresses"
+            then: "201 Created, dock_hours queryable in DB"
+
+          - name: "PUT /addresses/:addressId: Update city"
+            given: "Patch { city: 'New York' }"
+            when: "PUT /api/shipping/customers/:id/addresses/:addressId"
+            then: "200 OK"
+
+          - name: "DELETE /addresses/:addressId: Remove address"
+            given: "Customer has 2+ addresses"
+            when: "DELETE /api/shipping/customers/:id/addresses/:addressId"
+            then: "200 OK"
+
+          - name: "PUT /addresses/:addressId/set-default: Mark as default"
+            given: "Address exists"
+            when: "PUT /api/shipping/customers/:id/addresses/:addressId/set-default"
+            then: "200 OK, others of same type set is_default=false"
+
+      rls_enforcement:
+        description: "Row-level security policy enforcement"
+        setup: |
+          - Create org_a with user_a
+          - Create org_b with user_b
+          - Create customer_a in org_a, customer_b in org_b
+
+        tests:
+          - name: "RLS prevents user_a from listing org_b customers"
+            given: "Auth as user_b, table has both customers"
+            when: "SELECT * FROM customers"
+            then: "Only customer_b returned (RLS filters by org_id)"
+
+          - name: "RLS prevents cross-org INSERT"
+            given: "Auth as user_a, attempt INSERT for org_b"
+            when: "INSERT INTO customers (org_id=org_b, ...)"
+            then: "Policy violation, INSERT blocked"
+
+          - name: "RLS prevents cross-org UPDATE"
+            given: "Auth as user_a, attempt UPDATE customer_b"
+            when: "UPDATE customers SET name='...' WHERE id=customer_b_id"
+            then: "0 rows affected (policy filters out)"
+
+          - name: "RLS prevents cross-org DELETE"
+            given: "Auth as user_a, attempt DELETE customer_b"
+            when: "DELETE FROM customers WHERE id=customer_b_id"
+            then: "0 rows affected"
+
+  e2e_tests:
+    file: "apps/frontend/e2e/shipping/customers.spec.ts"
+    framework: "Playwright"
+    headless: true
+
+    test_workflows:
+      happy_path:
+        description: "Create customer -> Add contacts -> Add addresses -> Verify list"
+        steps:
+          - step: 1
+            action: "Navigate to /shipping/customers"
+            verify: "Customer list page loads, empty state shown"
+
+          - step: 2
+            action: "Click 'Create Customer' button"
+            verify: "Navigate to /shipping/customers/new"
+
+          - step: 3
+            action: "Fill form: code='TESTCORP', name='Test Corporation', category='wholesale'"
+            verify: "Form fields populated"
+
+          - step: 4
+            action: "Select allergens (milk, peanuts)"
+            verify: "Allergens shown as chips"
+
+          - step: 5
+            action: "Click Submit"
+            verify: "Customer created, navigate to detail page"
+
+          - step: 6
+            action: "Click 'Contacts' tab"
+            verify: "Empty contacts list shown"
+
+          - step: 7
+            action: "Click 'Add Contact', fill name='John Doe', email='john@test.com', title='Buyer'"
+            verify: "Modal form filled"
+
+          - step: 8
+            action: "Click Submit"
+            verify: "Contact added, appears in list"
+
+          - step: 9
+            action: "Add second contact: 'Jane Smith', 'jane@test.com'"
+            verify: "Two contacts in list"
+
+          - step: 10
+            action: "Click 'Addresses' tab"
+            verify: "Empty addresses list shown"
+
+          - step: 11
+            action: "Click 'Add Address', type=shipping, full address, dock_hours, is_default=true"
+            verify: "Modal filled"
+
+          - step: 12
+            action: "Click Submit"
+            verify: "Address added, shows as default (star icon)"
+
+          - step: 13
+            action: "Navigate back to /shipping/customers"
+            verify: "Customer 'TESTCORP' visible in list"
+
+          - step: 14
+            action: "Click customer row"
+            verify: "Navigate to detail, all data preserved"
+
+      filter_and_search:
+        description: "Search and filter customers in list"
+        setup:
+          - "Create 5 customers: 3 wholesale, 2 retail"
+
+        steps:
+          - step: 1
+            action: "Navigate to /shipping/customers"
+            verify: "5 customers shown"
+
+          - step: 2
+            action: "Type 'ACME' in search box"
+            verify: "List filters to matching customers"
+
+          - step: 3
+            action: "Select 'wholesale' from category filter"
+            verify: "Only 3 wholesale customers shown"
+
+          - step: 4
+            action: "Clear search"
+            verify: "Still showing 3 (category filter remains)"
+
+          - step: 5
+            action: "Toggle 'Active' filter off"
+            verify: "Shows active and inactive customers"
+
+      edit_customer:
+        description: "Update customer details"
+        setup:
+          - "Create customer 'ACME001'"
+
+        steps:
+          - step: 1
+            action: "Navigate to customer detail page"
+            verify: "Customer data loaded"
+
+          - step: 2
+            action: "Click Edit button"
+            verify: "Form fields become editable"
+
+          - step: 3
+            action: "Change name to 'ACME Inc'"
+            verify: "Name field updated"
+
+          - step: 4
+            action: "Add allergen restriction (peanuts)"
+            verify: "Allergen chip added"
+
+          - step: 5
+            action: "Click Submit"
+            verify: "Customer updated, form closes"
+
+          - step: 6
+            action: "Refresh page"
+            verify: "Updated name and allergens shown"
+
+      manage_addresses:
+        description: "Add, edit, delete, set default addresses"
+        setup:
+          - "Create customer with one shipping address"
+
+        steps:
+          - step: 1
+            action: "Navigate to Addresses tab"
+            verify: "One address shown, marked as default"
+
+          - step: 2
+            action: "Click 'Add Address', type=billing"
+            verify: "AddressModal opens"
+
+          - step: 3
+            action: "Fill billing address form"
+            verify: "Form populated"
+
+          - step: 4
+            action: "Click Submit"
+            verify: "Billing address added (no default indicator)"
+
+          - step: 5
+            action: "Click 'Set as Default' on billing address"
+            verify: "Star appears on billing address"
+
+          - step: 6
+            action: "Click Edit on shipping address"
+            verify: "AddressModal opens with data"
+
+          - step: 7
+            action: "Change city name"
+            verify: "Form updated"
+
+          - step: 8
+            action: "Click Submit"
+            verify: "Address updated"
+
+          - step: 9
+            action: "Click Delete on billing address"
+            verify: "Confirmation modal shown"
+
+          - step: 10
+            action: "Confirm delete"
+            verify: "Billing address removed, only shipping remains"
+
+      archive_customer:
+        description: "Archive (soft delete) customer"
+        setup:
+          - "Create customer with no orders"
+
+        steps:
+          - step: 1
+            action: "Navigate to customer detail"
+            verify: "Customer shown as active"
+
+          - step: 2
+            action: "Click Archive button"
+            verify: "Confirmation dialog shown"
+
+          - step: 3
+            action: "Confirm archive"
+            verify: "Navigate to list, customer marked inactive"
+
+          - step: 4
+            action: "Filter by 'Active' = false"
+            verify: "Archived customer visible"
+
+      pagination:
+        description: "Navigate through paginated customer list"
+        setup:
+          - "Create 75 customers (page size 50)"
+
+        steps:
+          - step: 1
+            action: "Navigate to /shipping/customers"
+            verify: "First 50 shown, pagination controls visible"
+
+          - step: 2
+            action: "Click 'Next' or page 2"
+            verify: "Customers 51-75 shown"
+
+          - step: 3
+            action: "Click 'Previous' or page 1"
+            verify: "First 50 shown again"
+
+    cross_tenant_isolation:
+      description: "Verify customer data isolation between tenants"
+      setup:
+        - "Create org_a with user_a, org_b with user_b"
+        - "Create customer_a in org_a, customer_b in org_b"
+
+      tests:
+        - name: "User_a cannot access user_b's customer detail"
+          steps:
+            - "Log in as user_b, navigate to customer_b detail, copy URL"
+            - "Log in as user_a, paste URL in browser"
+            - "Verify: 404 error page shown (not 403)"
+
+        - name: "User_a list only shows org_a customers"
+          steps:
+            - "Log in as user_a"
+            - "Navigate to /shipping/customers"
+            - "Verify: Only customer_a visible, not customer_b"
+
+        - name: "API returns 404 for cross-tenant customer.id"
+          steps:
+            - "Log in as user_a"
+            - "Call GET /api/shipping/customers/{customer_b_id}"
+            - "Verify: 404 response (not 403)"
+
+  performance_tests:
+    description: "Load and performance testing"
+    load_scenarios:
+      - scenario: "List 1000 customers with pagination"
+        expected: "< 500ms (p95)"
+
+      - scenario: "Create customer with 20 allergens"
+        expected: "< 1s"
+
+      - scenario: "Update customer with all fields"
+        expected: "< 500ms"
+
+    benchmarks:
+      customers_list_load: "< 500ms"
+      customer_detail_load: "< 300ms"
+      create_customer: "< 1000ms"
+      add_contact: "< 500ms"
+
+acceptance_checklist:
+  - "Unit tests: customer-service.ts 80%+ coverage"
+  - "Integration tests: All 8+ API endpoints covered"
+  - "E2E: Happy path workflow complete"
+  - "RLS: Cross-tenant isolation verified"
+  - "Validation: All error cases tested"
+  - "Performance: Benchmarks met"
+  - "Pagination: Page navigation works"
+  - "Search/Filter: Case-insensitive, partial match"
+  - "Allergen validation: Invalid IDs rejected"
+  - "Address dock_hours: Stored and retrieved correctly"
+  - "Soft delete: Archive sets is_active=false"
+  - "Tax ID: Encrypted at storage, transparent to API"
+  - "Error messages: Clear, actionable"
+  - "Loading states: UI shows spinner during requests"
+
+test_data_seeds:
+  organizations: |
+    - id: org-test-a
+      name: "Test Org A"
+    - id: org-test-b
+      name: "Test Org B"
+
+  users: |
+    - id: user-a, org_id: org-test-a, role: sales
+    - id: user-b, org_id: org-test-b, role: sales
+
+  allergens: |
+    - id: allergen-milk, code: milk, name: Milk
+    - id: allergen-peanuts, code: peanuts, name: Peanuts
+    - id: allergen-fish, code: fish, name: Fish
+
+  customers: |
+    - id: cust-acme-01, code: ACME001, name: ACME Corp, org: org-test-a
+    - id: cust-best-01, code: BESTCO, name: Best Company, org: org-test-a
+    - id: cust-test-01, code: TESTCO, name: Test Company, org: org-test-b
+
+notes: |
+  - All timestamps (created_at, updated_at) verified via database
+  - Cross-tenant tests must use separate browser contexts or clear auth
+  - Allergen validation requires prior database seeding
+  - Payment terms validation: must be 1-365 days
+  - Customer code: case-insensitive unique per org
+  - Soft delete: preserved for audit trail, references still valid
+  - Dock hours format validation: optional JSONB, no strict parsing
+  - Email uniqueness per customer, not global

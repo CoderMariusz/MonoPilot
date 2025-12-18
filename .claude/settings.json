@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "Allow": [
+      "*"
+    ]
+  },
+  "model": "sonnet[1m]",
+  "enableAllProjectMcpServers": true
+}

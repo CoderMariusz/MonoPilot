@@ -1,0 +1,365 @@
+# Story 07.3 - Frontend Specification
+# Purpose: Components, types, hooks, validation
+# Agent: FRONTEND-DEV
+
+# TypeScript Types to Create/Extend
+types:
+  - path: "apps/frontend/lib/types/sales-order.ts"
+    description: "Extend existing SalesOrder type with status workflow"
+    additions: |
+      export type SalesOrderStatus =
+        | 'draft'
+        | 'confirmed'
+        | 'on_hold'
+        | 'cancelled'
+        | 'allocated'
+        | 'picking'
+        | 'packing'
+        | 'shipped'
+        | 'delivered';
+
+      export interface HoldOrderRequest {
+        reason?: string;  // Optional
+      }
+
+      export interface CancelOrderRequest {
+        reason: string;  // Required, min 10 chars
+      }
+
+      export interface StatusTimelineEntry {
+        status: SalesOrderStatus;
+        timestamp: string;  // ISO 8601
+        user_name: string;
+        icon: string;
+        color: string;
+      }
+
+# Zod Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/sales-order-schema.ts"
+    description: "Extend with hold/cancel validation"
+    content: |
+      import { z } from 'zod';
+
+      export const salesOrderStatusEnum = z.enum([
+        'draft',
+        'confirmed',
+        'on_hold',
+        'cancelled',
+        'allocated',
+        'picking',
+        'packing',
+        'shipped',
+        'delivered',
+      ]);
+
+      export const holdOrderSchema = z.object({
+        reason: z.string().max(500).optional(),
+      });
+
+      export const cancelOrderSchema = z.object({
+        reason: z.string()
+          .min(10, 'Cancel reason must be at least 10 characters')
+          .max(500, 'Cancel reason must not exceed 500 characters'),
+      });
+
+# React Components
+components:
+  - path: "apps/frontend/components/shipping/sales-orders/SOStatusBadge.tsx"
+    description: "Color-coded status badge with icon for sales orders"
+    props:
+      - name: "status"
+        type: "SalesOrderStatus"
+        required: true
+        description: "The order status to display"
+      - name: "size"
+        type: "'sm' | 'md' | 'lg'"
+        required: false
+        default: "'md'"
+        description: "Badge size variant"
+      - name: "showIcon"
+        type: "boolean"
+        required: false
+        default: true
+        description: "Show status icon alongside text"
+    behavior: |
+      - Displays status name with appropriate color and icon
+      - Colors: draft=gray, confirmed=blue, on_hold=yellow, cancelled=red,
+                allocated=purple, picking=purple, packing=purple,
+                shipped=green, delivered=green
+      - Icons: draft=FileText, confirmed=CheckCircle, on_hold=PauseCircle,
+               cancelled=XCircle, allocated=Package, picking=Truck,
+               packing=Box, shipped=Truck, delivered=CheckCircle
+
+  - path: "apps/frontend/components/shipping/sales-orders/SOStatusTimeline.tsx"
+    description: "Vertical timeline showing SO status history with timestamps"
+    props:
+      - name: "salesOrderId"
+        type: "string"
+        required: true
+        description: "Sales order ID to display history for"
+      - name: "compact"
+        type: "boolean"
+        required: false
+        default: false
+        description: "Show compact view (last 3 statuses) vs full history"
+    behavior: |
+      - Fetches status history from API
+      - Displays chronological timeline (bottom to top, most recent at top)
+      - Shows: status badge, timestamp, user who changed it
+      - Highlights current status (most recent)
+      - Cancelled status shown at bottom as endpoint
+      - Loading skeleton while fetching
+      - Error toast if fetch fails
+
+  - path: "apps/frontend/components/shipping/sales-orders/HoldOrderDialog.tsx"
+    description: "Modal dialog for placing sales order on hold"
+    props:
+      - name: "orderId"
+        type: "string"
+        required: true
+        description: "Sales order ID"
+      - name: "currentStatus"
+        type: "SalesOrderStatus"
+        required: true
+        description: "Current order status (for validation)"
+      - name: "onSuccess"
+        type: "() => void"
+        required: true
+        description: "Callback after successful hold"
+      - name: "open"
+        type: "boolean"
+        required: true
+        description: "Dialog visibility state"
+      - name: "onOpenChange"
+        type: "(open: boolean) => void"
+        required: true
+        description: "Callback to change dialog state"
+    behavior: |
+      - Validates current status allows hold (draft or confirmed)
+      - Shows warning if not allowed
+      - Optional reason input (max 500 chars)
+      - Submit button disabled if not allowed
+      - Loading state while submitting
+      - Success toast on completion
+      - Error toast on failure with message
+      - Auto-refreshes SO detail on success
+
+  - path: "apps/frontend/components/shipping/sales-orders/CancelOrderDialog.tsx"
+    description: "Modal dialog for cancelling sales order with required reason"
+    props:
+      - name: "orderId"
+        type: "string"
+        required: true
+        description: "Sales order ID"
+      - name: "currentStatus"
+        type: "SalesOrderStatus"
+        required: true
+        description: "Current order status (for validation)"
+      - name: "onSuccess"
+        type: "() => void"
+        required: true
+        description: "Callback after successful cancellation"
+      - name: "open"
+        type: "boolean"
+        required: true
+        description: "Dialog visibility state"
+      - name: "onOpenChange"
+        type: "(open: boolean) => void"
+        required: true
+        description: "Callback to change dialog state"
+    behavior: |
+      - Validates current status allows cancel (draft, confirmed, on_hold, allocated)
+      - Shows error message if not allowed
+      - Required reason input (min 10, max 500 chars)
+      - Form validation with real-time feedback
+      - Submit button:
+        * Disabled if reason < 10 chars
+        * Disabled if status doesn't allow cancel
+      - Loading state while submitting
+      - Success toast on completion with message
+      - Error toast on failure
+      - Auto-refreshes SO detail on success
+      - Confirmation: "Are you sure? This action cannot be undone."
+
+# React Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-sales-order.ts"
+    description: "React Query hooks for sales order operations"
+    exports:
+      - name: "useHoldOrder"
+        returns: "UseMutationResult"
+        description: "Mutation hook for holding a sales order"
+        params:
+          - "onSuccess?: () => void"
+
+      - name: "useCancelOrder"
+        returns: "UseMutationResult"
+        description: "Mutation hook for cancelling a sales order"
+        params:
+          - "onSuccess?: () => void"
+
+      - name: "useSOStatusTimeline"
+        returns: "UseQueryResult<StatusTimelineEntry[]>"
+        description: "Query hook for fetching SO status history"
+        params:
+          - "orderId: string"
+
+# Constants
+constants:
+  - path: "apps/frontend/lib/constants/sales-order-status.ts"
+    description: "Sales order status display configuration"
+    content: |
+      export const SO_STATUS_CONFIG = {
+        draft: {
+          code: 'draft',
+          name: 'Draft',
+          description: 'Order created, awaiting confirmation',
+          color: 'gray',
+          icon: 'FileText',
+          canHold: true,
+          canCancel: true,
+          allowsAllocation: false,
+        },
+        confirmed: {
+          code: 'confirmed',
+          name: 'Confirmed',
+          description: 'Order confirmed, ready for allocation',
+          color: 'blue',
+          icon: 'CheckCircle',
+          canHold: true,
+          canCancel: true,
+          allowsAllocation: false,
+        },
+        on_hold: {
+          code: 'on_hold',
+          name: 'On Hold',
+          description: 'Order placed on hold pending review',
+          color: 'yellow',
+          icon: 'PauseCircle',
+          canHold: false,
+          canCancel: true,
+          allowsAllocation: false,
+        },
+        cancelled: {
+          code: 'cancelled',
+          name: 'Cancelled',
+          description: 'Order cancelled',
+          color: 'red',
+          icon: 'XCircle',
+          canHold: false,
+          canCancel: false,
+          allowsAllocation: false,
+        },
+        allocated: {
+          code: 'allocated',
+          name: 'Allocated',
+          description: 'Inventory allocated',
+          color: 'purple',
+          icon: 'Package',
+          canHold: false,
+          canCancel: true,
+          allowsAllocation: true,
+        },
+        picking: {
+          code: 'picking',
+          name: 'Picking',
+          description: 'Items being picked',
+          color: 'purple',
+          icon: 'Truck',
+          canHold: false,
+          canCancel: false,
+          allowsAllocation: true,
+        },
+        packing: {
+          code: 'packing',
+          name: 'Packing',
+          description: 'Items being packed',
+          color: 'purple',
+          icon: 'Box',
+          canHold: false,
+          canCancel: false,
+          allowsAllocation: true,
+        },
+        shipped: {
+          code: 'shipped',
+          name: 'Shipped',
+          description: 'Order shipped',
+          color: 'green',
+          icon: 'Truck',
+          canHold: false,
+          canCancel: false,
+          allowsAllocation: true,
+        },
+        delivered: {
+          code: 'delivered',
+          name: 'Delivered',
+          description: 'Order delivered',
+          color: 'green',
+          icon: 'CheckCircle',
+          canHold: false,
+          canCancel: false,
+          allowsAllocation: true,
+        },
+      } as const;
+
+# UX Patterns
+ux:
+  wireframes:
+    - id: "SHIP-007"
+      path: "SHIP-007-sales-order-detail.md"
+      relevance: "SO detail page with status badge and timeline"
+      components: ["SOStatusBadge", "SOStatusTimeline"]
+
+    - id: "SHIP-009"
+      path: "SHIP-009-so-confirmation-hold.md"
+      relevance: "Hold/Cancel dialog workflows"
+      components: ["HoldOrderDialog", "CancelOrderDialog"]
+
+  patterns:
+    badge: "ShadCN Badge component with custom colors per status"
+    modal: "ShadCN Dialog for hold/cancel with form validation"
+    toast: "ShadCN Toast for success/error feedback"
+    timeline: "Vertical stacked layout with icons and timestamps"
+
+  states:
+    - "loading: Skeleton for timeline, spinner for dialog submit"
+    - "empty: 'No status history' message for new orders"
+    - "error: Toast notification with API error message"
+    - "success: Toast confirmation with new status"
+    - "disabled: Buttons disabled when action not allowed"
+
+  accessibility:
+    - "Status badge uses color + icon + text"
+    - "Dialogs have proper focus management and ARIA labels"
+    - "Form validation messages are accessible and descriptive"
+    - "Keyboard navigation for form inputs and buttons"
+    - "Error messages announced to screen readers"
+
+  permissions:
+    - "Hide 'Hold Order' button if user role not in [Sales, Manager, Admin]"
+    - "Hide 'Cancel Order' button if user role not in [Manager, Admin]"
+    - "Show disabled button with tooltip if status doesn't allow action"
+
+# Integration Points
+integration:
+  so_detail_page:
+    file: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/page.tsx"
+    uses:
+      - "SOStatusBadge: Display current status"
+      - "SOStatusTimeline: Show status history"
+      - "HoldOrderDialog: Triggered by 'Hold Order' button"
+      - "CancelOrderDialog: Triggered by 'Cancel Order' button"
+
+  so_list_page:
+    file: "apps/frontend/app/(authenticated)/shipping/sales-orders/page.tsx"
+    uses:
+      - "SOStatusBadge: Display status in table"
+
+# Services to Update
+services:
+  - path: "apps/frontend/lib/services/sales-order-service.ts"
+    additions: |
+      - holdOrder(orderId: string, reason?: string): Promise<SalesOrder>
+      - cancelOrder(orderId: string, reason: string): Promise<SalesOrder>
+      - getStatusTimeline(orderId: string): Promise<StatusTimelineEntry[]>

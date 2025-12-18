@@ -114,3 +114,35 @@ hooks:
       - "useChangePassword(): UseMutationResult"
       - "usePasswordPolicy(): UseQueryResult<PasswordPolicy>"
       - "useValidatePassword(): UseMutationResult"
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SET-030"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-030-session-management.md"
+      description: "Active sessions list with device info and revoke capability"
+      components:
+        - "SessionsDataTable"
+        - "SessionRow"
+        - "DeviceIcon"
+        - "RevokeButton"
+        - "RevokeAllButton"
+    - id: "SET-031"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-031-password-security-settings.md"
+      description: "Password policy configuration and security settings"
+      components:
+        - "PasswordPolicyForm"
+        - "PasswordStrengthIndicator"
+        - "SecuritySettingsPanel"
+        - "TwoFactorToggle"
+
+  states:
+    loading: "Skeleton rows for sessions table"
+    empty: "No active sessions message"
+    error: "Error loading sessions with retry button"
+    success: "Sessions table with device info visible"
+
+  patterns:
+    table: "ShadCN DataTable for sessions"
+    form: "ShadCN Form for password policy settings"
+    confirmation: "ShadCN AlertDialog for session revocation"

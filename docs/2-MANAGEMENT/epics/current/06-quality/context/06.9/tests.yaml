@@ -1,0 +1,478 @@
+# Story 06.9 - Testing Specifications
+# Purpose: Acceptance criteria, test cases, test data
+# Agent: QA-ENGINEER (testing focus)
+
+acceptance_criteria:
+  database:
+    - criterion: "ncr_reports table exists with all required columns"
+      scenarios:
+        - "Schema inspection confirms all columns present"
+        - "UNIQUE constraint on (org_id, ncr_number)"
+        - "FK constraints on users references"
+        - "RLS policies enforce org isolation"
+        - "CHECK constraints on status, severity, detection_point"
+      priority: "MUST"
+
+    - criterion: "NCR number auto-generation works correctly"
+      scenarios:
+        - "First NCR in 2025 = NCR-2025-00001"
+        - "Second NCR = NCR-2025-00002"
+        - "Year resets sequence (first 2026 = NCR-2026-00001)"
+        - "NCR numbers unique within org but not across orgs"
+      priority: "MUST"
+
+  api:
+    - criterion: "Create NCR with required fields"
+      scenarios:
+        - "POST /api/quality/ncrs with title, description, severity, detection_point"
+        - "Returns 201 with ncr_number auto-generated"
+        - "Status defaults to 'draft'"
+        - "detected_by = authenticated user"
+        - "detected_date = now()"
+      priority: "MUST"
+
+    - criterion: "Create NCR with source reference"
+      scenarios:
+        - "Provide source_type, source_id, source_description"
+        - "NCR created with source linkage"
+        - "Source reference appears in detail view"
+      priority: "SHOULD"
+
+    - criterion: "List NCRs with filtering"
+      scenarios:
+        - "GET /api/quality/ncrs returns paginated list"
+        - "Filter by status (draft, open, closed)"
+        - "Filter by severity (critical, major, minor)"
+        - "Filter by detection_point"
+        - "Filter by date range"
+        - "Search by NCR number or title"
+        - "Sort by ncr_number, detected_date, severity, status"
+      priority: "MUST"
+
+    - criterion: "Get NCR detail with permissions"
+      scenarios:
+        - "GET /api/quality/ncrs/:id returns full NCR detail"
+        - "Returns permissions (can_edit, can_delete, can_close, can_assign)"
+        - "can_edit = true only for draft and detected_by/assigned_to"
+        - "can_delete = true only for draft and detected_by"
+        - "can_close = true only for open and QA_MANAGER role"
+      priority: "MUST"
+
+    - criterion: "Update NCR (draft only)"
+      scenarios:
+        - "PUT /api/quality/ncrs/:id with partial updates"
+        - "Can update title, description, severity, detection_point, category"
+        - "Returns 403 if status != 'draft'"
+        - "updated_at timestamp refreshed"
+      priority: "MUST"
+
+    - criterion: "Delete NCR (draft only)"
+      scenarios:
+        - "DELETE /api/quality/ncrs/:id removes from database"
+        - "Returns 204 No Content"
+        - "Returns 403 if status != 'draft'"
+      priority: "MUST"
+
+    - criterion: "Submit NCR (draft -> open)"
+      scenarios:
+        - "POST /api/quality/ncrs/:id/submit changes status to 'open'"
+        - "Immutable after submission"
+        - "Returns 403 if already open/closed"
+      priority: "MUST"
+
+    - criterion: "Close NCR (open -> closed)"
+      scenarios:
+        - "POST /api/quality/ncrs/:id/close with closure_notes"
+        - "Requires QA_MANAGER role"
+        - "Closure notes min 50 characters"
+        - "Sets closed_at = now(), closed_by = user_id"
+        - "Returns 403 if status != 'open' or not QA_MANAGER"
+      priority: "MUST"
+
+    - criterion: "Assign NCR to user"
+      scenarios:
+        - "POST /api/quality/ncrs/:id/assign with assigned_to UUID"
+        - "Updates assigned_to and assigned_at"
+        - "Can reassign to different user"
+      priority: "SHOULD"
+
+  frontend:
+    - criterion: "NCR list page loads and displays"
+      scenarios:
+        - "Page accessible at /quality/ncrs"
+        - "Stats cards display counts"
+        - "DataTable displays NCRs with all columns"
+        - "Pagination controls work"
+        - "Sort columns clickable"
+      priority: "MUST"
+
+    - criterion: "NCR list filters work"
+      scenarios:
+        - "Status filter works"
+        - "Severity filter works"
+        - "Detection point filter works"
+        - "Date range filter works"
+        - "Search debounces and filters by NCR # or title"
+        - "[Clear Filters] resets all"
+      priority: "MUST"
+
+    - criterion: "Create NCR modal opens and submits"
+      scenarios:
+        - "[+ Create NCR] button opens modal"
+        - "Form validates required fields"
+        - "[Create NCR] button disabled if invalid"
+        - "Success toast on creation"
+        - "Modal closes and NCR appears in list"
+      priority: "MUST"
+
+    - criterion: "NCR detail page displays"
+      scenarios:
+        - "Page accessible at /quality/ncrs/:id"
+        - "All NCR fields displayed read-only"
+        - "Status and severity badges visible"
+        - "Source reference clickable if linked"
+        - "Assigned to name displays"
+        - "Closure info displays if closed"
+      priority: "MUST"
+
+    - criterion: "NCR detail actions work"
+      scenarios:
+        - "[Edit] button opens edit modal (draft only)"
+        - "[Delete] button shows confirmation (draft only)"
+        - "[Submit] button changes status to open"
+        - "[Close] button shows form (open only, QA Manager)"
+        - "[Assign] button opens assign modal"
+        - "[Back to NCRs] navigates to list"
+      priority: "MUST"
+
+    - criterion: "Badges display correct colors and text"
+      scenarios:
+        - "Status badges: draft (gray), open (blue), closed (green)"
+        - "Severity badges: critical (red), major (orange), minor (yellow)"
+        - "Detection point shows icon and text"
+      priority: "MUST"
+
+  permissions:
+    - criterion: "QA Inspector can create NCRs"
+      scenarios:
+        - "User with QA_INSPECTOR role sees [+ Create NCR]"
+        - "Can create NCR successfully"
+        - "Cannot close NCR (no [Close] button)"
+      priority: "MUST"
+
+    - criterion: "QA Manager has full access"
+      scenarios:
+        - "User with QA_MANAGER role sees all actions"
+        - "Can create, edit, close, assign NCRs"
+        - "Can close NCRs (QA_MANAGER required)"
+      priority: "MUST"
+
+    - criterion: "Viewer cannot create"
+      scenarios:
+        - "User with VIEWER role does not see [+ Create NCR]"
+        - "Can view NCR list and detail"
+        - "Cannot edit, delete, close"
+      priority: "MUST"
+
+    - criterion: "Cross-tenant isolation"
+      scenarios:
+        - "User from Org A cannot see NCRs from Org B"
+        - "GET /api/quality/ncrs returns only Org A NCRs"
+        - "GET /api/quality/ncrs/:id from Org B returns 404"
+      priority: "MUST"
+
+  audit_trail:
+    - criterion: "All NCR actions logged"
+      scenarios:
+        - "NCR creation logged to quality_audit_log"
+        - "NCR update logged"
+        - "NCR delete logged"
+        - "NCR submit logged"
+        - "NCR close logged"
+        - "NCR assign logged"
+      priority: "MUST"
+
+test_cases:
+  unit_tests:
+    - path: "lib/services/__tests__/ncr-service.test.ts"
+      description: "NCRService unit tests"
+      test_suites:
+        - name: "NCRService.create()"
+          tests:
+            - "Creates NCR with correct fields"
+            - "Generates NCR number"
+            - "Sets status to draft by default"
+            - "Sets status to open if submit_immediately=true"
+            - "Captures detected_by and detected_date"
+            - "Validates required fields"
+            - "Throws error on missing title"
+            - "Throws error on short description (<20 chars)"
+
+        - name: "NCRService.update()"
+          tests:
+            - "Updates draft NCR"
+            - "Blocks update of open NCR"
+            - "Blocks update of closed NCR"
+            - "Validates updated fields"
+            - "Throws CANNOT_UPDATE error"
+
+        - name: "NCRService.delete()"
+          tests:
+            - "Deletes draft NCR"
+            - "Blocks delete of open NCR"
+            - "Blocks delete of closed NCR"
+
+        - name: "NCRService.submit()"
+          tests:
+            - "Changes status from draft to open"
+            - "Blocks submit of already open NCR"
+            - "Throws error on invalid state"
+
+        - name: "NCRService.close()"
+          tests:
+            - "Closes NCR with notes"
+            - "Sets closed_at and closed_by"
+            - "Validates closure notes length (min 50)"
+            - "Requires QA_MANAGER role"
+
+        - name: "NCRService.generateNCRNumber()"
+          tests:
+            - "Generates NCR-YYYY-NNNNN format"
+            - "Increments sequence"
+            - "Resets per year"
+            - "Unique within org"
+
+        - name: "NCRService.checkPermissions()"
+          tests:
+            - "Allows edit/delete for draft"
+            - "Blocks edit/delete for open"
+            - "Allows close for QA_MANAGER only"
+
+  integration_tests:
+    - path: "app/api/quality/ncrs/__tests__/route.test.ts"
+      description: "NCR API endpoint tests"
+      test_suites:
+        - name: "POST /api/quality/ncrs"
+          tests:
+            - "Creates NCR with valid data"
+            - "Returns 400 for missing title"
+            - "Returns 400 for short description"
+            - "Returns 400 for invalid severity"
+            - "Returns 403 for non-QA roles"
+            - "Enforces org_id from auth"
+            - "Auto-generates NCR number"
+
+        - name: "GET /api/quality/ncrs"
+          tests:
+            - "Returns paginated list"
+            - "Respects status filter"
+            - "Respects severity filter"
+            - "Respects detection_point filter"
+            - "Respects search (NCR # or title)"
+            - "Respects date range filter"
+            - "Respects sort/order parameters"
+            - "RLS: Only returns org NCRs"
+            - "Pagination: Returns correct page and limit"
+
+        - name: "GET /api/quality/ncrs/:id"
+          tests:
+            - "Returns NCR detail"
+            - "Includes permissions"
+            - "Includes source reference if linked"
+            - "Returns 404 for wrong org"
+
+        - name: "PUT /api/quality/ncrs/:id"
+          tests:
+            - "Updates draft NCR"
+            - "Returns 403 for open NCR"
+            - "Returns 403 for closed NCR"
+            - "Validates updated fields"
+
+        - name: "DELETE /api/quality/ncrs/:id"
+          tests:
+            - "Deletes draft NCR"
+            - "Returns 403 for open NCR"
+            - "Returns 204 No Content"
+
+        - name: "POST /api/quality/ncrs/:id/submit"
+          tests:
+            - "Changes status draft -> open"
+            - "Returns 403 if already open"
+            - "Cannot edit after submit"
+
+        - name: "POST /api/quality/ncrs/:id/close"
+          tests:
+            - "Closes NCR as QA_MANAGER"
+            - "Returns 403 for QA_INSPECTOR"
+            - "Validates closure notes (min 50 chars)"
+            - "Returns 403 if status != open"
+
+        - name: "POST /api/quality/ncrs/:id/assign"
+          tests:
+            - "Assigns NCR to user"
+            - "Updates assigned_at timestamp"
+            - "Can reassign"
+
+  e2e_tests:
+    - path: "e2e/quality/ncr.spec.ts"
+      description: "NCR full workflow E2E tests"
+      test_suites:
+        - name: "Complete NCR Workflow"
+          tests:
+            - "Navigate to Quality > NCRs page"
+            - "Click [+ Create NCR] button"
+            - "Fill form: title, description, severity, detection_point"
+            - "Click [Create NCR]"
+            - "NCR appears in list with status=draft"
+            - "Click NCR to view detail"
+            - "Edit draft NCR (change title)"
+            - "Submit draft (click [Submit], confirm)"
+            - "Status changes to open"
+            - "[Edit] button disappears"
+            - "Close as QA Manager (click [Close], enter notes)"
+            - "Status changes to closed"
+            - "closure_notes displayed"
+            - "Navigate back to list"
+            - "Closed NCR displayed with green badge"
+
+        - name: "Create and Delete Draft NCR"
+          tests:
+            - "Create NCR"
+            - "View detail"
+            - "Click [Delete]"
+            - "Confirm deletion"
+            - "NCR removed from list"
+
+        - name: "Assign NCR"
+          tests:
+            - "Create open NCR"
+            - "Click [Assign]"
+            - "Select user from dropdown"
+            - "Click [Assign]"
+            - "assigned_to updated"
+            - "Assigned user name displayed"
+
+        - name: "Filter and Search"
+          tests:
+            - "Go to NCR list"
+            - "Filter by status=open"
+            - "Only open NCRs displayed"
+            - "Filter by severity=critical"
+            - "Only critical NCRs displayed"
+            - "Search by NCR number"
+            - "Matching NCR displayed"
+            - "[Clear Filters] resets all"
+
+        - name: "Permissions: QA Inspector"
+          tests:
+            - "Login as QA Inspector"
+            - "[+ Create NCR] button visible"
+            - "Create NCR successfully"
+            - "[Edit] button visible on draft"
+            - "[Close] button NOT visible"
+            - "QA Manager notification on critical NCR"
+
+        - name: "Permissions: QA Manager"
+          tests:
+            - "Login as QA Manager"
+            - "Can create, edit, close NCRs"
+            - "[Close] button visible on open NCR"
+            - "Can close NCR with notes"
+
+        - name: "Source Reference"
+          tests:
+            - "Create NCR with inspection source"
+            - "source_type = 'inspection'"
+            - "source_description displays"
+            - "Click source link"
+            - "Navigates to inspection detail"
+
+test_data:
+  fixtures:
+    - name: "Draft NCR"
+      data:
+        title: "Temperature deviation during receiving"
+        description: "Refrigerated ingredients received at 8°C (spec: 0-4°C)"
+        severity: "major"
+        detection_point: "incoming"
+        status: "draft"
+        ncr_number: "NCR-2025-00001"
+
+    - name: "Open NCR"
+      data:
+        title: "Metal fragment in chocolate batch"
+        description: "Metal fragment approximately 2mm x 3mm found in finished product"
+        severity: "critical"
+        detection_point: "final"
+        status: "open"
+        ncr_number: "NCR-2025-00002"
+        assigned_to: "qa-manager-uuid"
+
+    - name: "Closed NCR"
+      data:
+        title: "Package damage customer complaint"
+        description: "Customer reported damaged package on order #1234"
+        severity: "major"
+        detection_point: "customer"
+        status: "closed"
+        ncr_number: "NCR-2025-00003"
+        closed_at: "2025-12-14T16:30:00Z"
+        closure_notes: "Issue resolved. Supplier corrected receiving temperature."
+
+# Performance Benchmarks
+performance:
+  - operation: "List NCRs (1000 records)"
+    target: "< 500ms"
+    test: "GET /api/quality/ncrs?limit=20&page=1"
+
+  - operation: "Get NCR detail"
+    target: "< 300ms"
+    test: "GET /api/quality/ncrs/:id"
+
+  - operation: "Create NCR"
+    target: "< 300ms"
+    test: "POST /api/quality/ncrs"
+
+  - operation: "Close NCR"
+    target: "< 300ms"
+    test: "POST /api/quality/ncrs/:id/close"
+
+# Test Coverage Goals
+coverage_goals:
+  unit_tests: "> 80% of NCRService"
+  integration_tests: "All 8 endpoints"
+  e2e_tests: "Main workflow (create -> submit -> close)"
+  rls_tests: "Multi-tenancy isolation verified"
+  permission_tests: "Role-based access enforced"
+
+# Accessibility Testing
+accessibility_tests:
+  - criterion: "WCAG 2.1 AA compliance"
+    tests:
+      - "Color contrast ratio >= 4.5:1"
+      - "Keyboard navigation (Tab, Enter, Escape)"
+      - "ARIA labels on form fields"
+      - "Focus visible on all interactive elements"
+      - "Modal focus trapping"
+      - "Error messages associated with fields"
+
+# Security Testing
+security_tests:
+  - criterion: "SQL Injection prevention"
+    tests:
+      - "Parameterized queries used"
+      - "User input validated and sanitized"
+
+  - criterion: "XSS prevention"
+    tests:
+      - "HTML escaped in display"
+      - "Sanitized user input"
+
+  - criterion: "CSRF protection"
+    tests:
+      - "POST/PUT/DELETE require auth token"
+
+  - criterion: "RLS enforcement"
+    tests:
+      - "Cannot access other org's NCRs"
+      - "Cannot access without auth"

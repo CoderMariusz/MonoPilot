@@ -1,0 +1,236 @@
+story: "01.2"
+name: "Settings Shell: Navigation + Role Guards"
+epic: "01-settings"
+phase: "1A"
+complexity: "S"
+decision: "REQUEST_CHANGES"
+review_date: "2025-12-17"
+review_file: "code-review-story-01-2.md"
+
+# Status Summary
+implementation_status:
+  overall_percentage: 20
+  deliverables_missing: 10  # Out of 12 required
+  tests_written: 0
+  components_created: 2  # SettingsHeader, SettingsStatsCards (but not for this story)
+
+# Critical Issues Found
+critical_issues:
+  - id: 1
+    title: "Missing Core Navigation Components"
+    severity: "CRITICAL"
+    count: 4
+    components:
+      - "SettingsLayout.tsx"
+      - "SettingsNav.tsx"
+      - "SettingsNavItem.tsx"
+      - "SettingsEmptyState.tsx"
+    impact: "Cannot render settings module shell"
+
+  - id: 2
+    title: "Missing Hooks Directory and Guard Hooks"
+    severity: "CRITICAL"
+    count: 2
+    files:
+      - "lib/hooks/useSettingsGuard.ts"
+      - "lib/hooks/useSettingsPermissions.ts"
+    impact: "Cannot implement role-based access control"
+
+  - id: 3
+    title: "Missing Navigation Service"
+    severity: "CRITICAL"
+    file: "lib/services/settings-navigation-service.ts"
+    impact: "Cannot filter navigation by role or enabled modules"
+
+  - id: 4
+    title: "Missing Settings Layout Route"
+    severity: "CRITICAL"
+    file: "app/(authenticated)/settings/layout.tsx"
+    impact: "Settings pages not properly nested"
+
+  - id: 5
+    title: "Missing Test Suite"
+    severity: "MAJOR"
+    count: 15  # Combined unit, integration, e2e test cases
+    impact: "Cannot verify implementation or detect regressions"
+
+# Acceptance Criteria Status
+acceptance_criteria:
+  AC-01:
+    status: "FAIL"
+    reason: "SettingsNav.tsx not implemented"
+  AC-02:
+    status: "FAIL"
+    reason: "useSettingsGuard.ts not implemented"
+  AC-03:
+    status: "FAIL"
+    reason: "SettingsLayout.tsx not implemented"
+  AC-04:
+    status: "FAIL"
+    reason: "No guard mechanism implemented"
+  AC-05:
+    status: "FAIL"
+    reason: "SettingsEmptyState.tsx not implemented"
+  AC-06:
+    status: "FAIL"
+    reason: "buildSettingsNavigation service not implemented"
+
+# Required Fixes (Priority Order)
+required_fixes:
+  - priority: 1
+    title: "Create SettingsLayout.tsx component"
+    file: "apps/frontend/components/settings/SettingsLayout.tsx"
+    spec_ref: "frontend.yaml lines 52-58"
+    estimated_hours: 1
+    blocking: true
+
+  - priority: 2
+    title: "Create SettingsNav.tsx component"
+    file: "apps/frontend/components/settings/SettingsNav.tsx"
+    spec_ref: "frontend.yaml lines 60-107"
+    estimated_hours: 3
+    blocking: true
+    dependencies: ["useOrgContext", "buildSettingsNavigation", "SettingsNavItem"]
+
+  - priority: 3
+    title: "Create SettingsNavItem.tsx component"
+    file: "apps/frontend/components/settings/SettingsNavItem.tsx"
+    spec_ref: "frontend.yaml lines 109-158"
+    estimated_hours: 2
+    blocking: true
+
+  - priority: 4
+    title: "Create SettingsEmptyState.tsx component"
+    file: "apps/frontend/components/settings/SettingsEmptyState.tsx"
+    spec_ref: "frontend.yaml lines 160-183"
+    estimated_hours: 1
+    blocking: true
+
+  - priority: 5
+    title: "Create hooks directory and useSettingsGuard hook"
+    file: "apps/frontend/lib/hooks/useSettingsGuard.ts"
+    spec_ref: "frontend.yaml lines 187-214"
+    estimated_hours: 2
+    blocking: true
+
+  - priority: 6
+    title: "Create useSettingsPermissions hook"
+    file: "apps/frontend/lib/hooks/useSettingsPermissions.ts"
+    spec_ref: "frontend.yaml lines 216-240"
+    estimated_hours: 1.5
+    blocking: true
+
+  - priority: 7
+    title: "Create useOrgContext client hook"
+    file: "apps/frontend/lib/hooks/useOrgContext.ts"
+    spec_ref: "frontend.yaml line 73"
+    estimated_hours: 2
+    blocking: true
+    notes: "Client-side wrapper around /api/v1/settings/context endpoint"
+
+  - priority: 8
+    title: "Create settings-navigation-service"
+    file: "apps/frontend/lib/services/settings-navigation-service.ts"
+    spec_ref: "frontend.yaml lines 73-74, tests.yaml lines 114-125"
+    estimated_hours: 2.5
+    blocking: true
+
+  - priority: 9
+    title: "Create settings route layout"
+    file: "apps/frontend/app/(authenticated)/settings/layout.tsx"
+    spec_ref: "frontend.yaml lines 31-49"
+    estimated_hours: 1.5
+    blocking: true
+
+  - priority: 10
+    title: "Create comprehensive test suite"
+    file: "apps/frontend/__tests__/01-settings/01.2.settings-shell-navigation.test.tsx"
+    spec_ref: "tests.yaml (all sections)"
+    estimated_hours: 5
+    blocking: true
+    tests_required:
+      unit: 14
+      integration: 3
+      e2e: 3
+    coverage_target: 80
+
+# Quality Assessment
+code_quality:
+  existing_components:
+    positive:
+      - "SettingsHeader.tsx - Good responsive design with mobile menu"
+      - "SettingsStatsCards.tsx - Proper loading/error states with skeleton"
+      - "permission-service.ts - Well-documented utility functions"
+      - "org-context-service.ts - Proper error handling and security"
+    negative:
+      - "Missing 80% of deliverables"
+      - "No test files created"
+      - "Incomplete component hierarchy"
+      - "Out-of-scope API call in SettingsStatsCards"
+
+security_assessment:
+  status: "INCOMPLETE"
+  findings:
+    - "RLS and multi-tenancy partially addressed"
+    - "Authentication checks in app layout OK"
+    - "Authorization: frontend guards not implemented"
+    - "No role-based navigation filtering"
+  must_verify:
+    - "Client-side guards validate role before rendering"
+    - "Unauthorized users properly redirected"
+    - "Server-side RLS backs up client-side checks"
+    - "Navigation items only shown for permitted roles"
+
+# Dependency Analysis
+dependencies:
+  depends_on:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      status: "COMPLETE"
+      provides: ["organizations table", "users table", "roles table", "getOrgContext()", "RLS policies", "GET /api/v1/settings/context"]
+
+  blocks:
+    - story: "01.3"
+      name: "Onboarding Wizard Launcher"
+    - story: "01.4"
+      name: "Organization Profile Step"
+    - story: "01.5"
+      name: "Users CRUD"
+
+# Estimated Effort to Fix
+total_estimated_hours: 21
+work_breakdown:
+  components: 7.5  # 4 components
+  hooks: 5.5       # 3 hooks
+  service: 2.5     # 1 service
+  layout: 1.5      # 1 layout
+  tests: 5         # comprehensive test suite
+
+recommended_team_size: 2
+recommended_duration: "3-4 business days"
+
+# Next Steps
+next_steps:
+  - "Return to BACKEND-DEV or FRONTEND-DEV agent"
+  - "Implement all CRITICAL fixes in priority order"
+  - "Run test suite to verify all ACs pass"
+  - "Resubmit for code review"
+  - "Once APPROVED, proceed to QA for integration testing"
+
+# Performance Notes
+performance_target: "Settings page loads within 300ms"
+performance_concerns:
+  - "SettingsStatsCards makes additional API call"
+  - "No caching/memoization in hooks"
+  - "useOrgContext would need response caching"
+recommendations:
+  - "Implement SWR or React Query for org context caching"
+  - "Combine API calls where possible"
+  - "Use React.memo on navigation components"
+  - "Lazy load stats if not critical to landing page"
+
+# Sign-Off
+reviewer: "CODE-REVIEWER"
+reviewer_model: "Claude Haiku 4.5"
+review_status: "REQUEST_CHANGES - Return to development"
+review_output_file: "code-review-story-01-2.md"

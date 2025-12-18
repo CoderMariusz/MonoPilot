@@ -1,0 +1,532 @@
+# Story 07.12 - Frontend Specification
+# Purpose: Components, hooks, types, pages, mobile-first UI
+# Agent: FRONTEND-DEV
+
+is_fullstack: true  # Both frontend and backend work
+design_pattern: "Mobile scanner-first with large touch targets and high contrast colors"
+
+# Pages to Create
+pages:
+  - path: "apps/frontend/app/(authenticated)/scanner/shipping/pack/page.tsx"
+    description: "Main scanner packing page with 6-step wizard"
+    wireframe: "SHIP-018 (full workflow)"
+    layout: "Scanner layout (mobile-first, full screen, minimal chrome)"
+    performance: "Load within 1 second"
+    features:
+      - "6-step wizard navigation"
+      - "Step progress indicator (X of 6)"
+      - "Current step content (dynamic based on step)"
+      - "Header with back button and help"
+      - "Dynamic footer buttons (Next, Previous, etc.)"
+      - "Responsive: portrait primary, landscape support"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/scanner/shipping/pack/PackingScannerWizard.tsx"
+    description: "Main wizard container orchestrating all steps"
+    props:
+      shipmentId: "string UUID (optional, for resume workflow)"
+      onComplete: "() => void"
+      onCancel: "() => void"
+    features:
+      - "Step state management (1-6)"
+      - "Data persistence across steps"
+      - "Navigation: next, previous, skip"
+      - "Progress bar visual"
+      - "Allergen banner (persistent across all steps)"
+    states:
+      - "step1: Select shipment"
+      - "step2: Box management"
+      - "step3: Scan LP"
+      - "step4: Confirm quantity"
+      - "step5: Close box"
+      - "step6: Complete"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/Step1SelectShipment.tsx"
+    description: "Step 1: Select or scan shipment to pack"
+    wireframe: "SHIP-018 Step 1"
+    props:
+      onSelect: "(shipmentId: string, shipment: Shipment) => void"
+      onCancel: "() => void"
+    features:
+      - "Pending shipments list (status: pending, packing)"
+      - "Each row: Shipment #, Customer, Lines to pack, Promise date"
+      - "Sorted by promised_ship_date ASC (soonest first)"
+      - "Scan SO barcode button (camera integration)"
+      - "Search/filter by customer or SO number"
+      - "Large list row heights (64px minimum)"
+      - "Allergen alert indicator (yellow if customer has restrictions)"
+    ui_states:
+      - "loading: Skeleton list"
+      - "empty: 'No pending shipments' message"
+      - "error: Retry button"
+      - "success: Shipment list ready"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/Step2BoxManagement.tsx"
+    description: "Step 2: Box management and status display"
+    wireframe: "SHIP-018 Step 2"
+    props:
+      shipment: "Shipment"
+      boxes: "ShipmentBox[]"
+      packProgress: "{ lines_total, lines_packed, remaining }"
+      onCreateBox: "() => void"
+      onSelectBox: "(boxId: string) => void"
+      onProceed: "() => void"
+    features:
+      - "Shipment header (SO #, Customer, Lines packed/total)"
+      - "Current box indicator (Box X of Y)"
+      - "Box contents summary (item count, weight)"
+      - "Create New Box button"
+      - "Box selector dropdown/tabs for switching boxes"
+      - "Pack progress bar/counter"
+      - "Scan Item button (proceed to step 3)"
+      - "First box auto-created if none exist"
+    ui_states:
+      - "no_boxes: Show 'Create first box' prompt"
+      - "one_box_open: Show box selector + create new option"
+      - "multiple_boxes: Show box selector with tabs"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/Step3ScanItem.tsx"
+    description: "Step 3: Scan LP barcode to add to box"
+    wireframe: "SHIP-018 Step 3"
+    props:
+      box: "ShipmentBox"
+      shipment: "Shipment"
+      onItemScanned: "(lp: LicensePlate, soLineId: string) => void"
+      onCancel: "() => void"
+    features:
+      - "Barcode scan input (auto-focused)"
+      - "Current box indicator"
+      - "Instruction text: 'Scan License Plate'"
+      - "Manual barcode entry fallback"
+      - "Success feedback: green flash, beep, vibration"
+      - "Error feedback: red flash, error beep, vibration"
+      - "Product details auto-display on scan"
+      - "Allergen warning banner (if applicable)"
+    ui_states:
+      - "idle: Input focused, ready to scan"
+      - "scanning: Input focused, waiting"
+      - "success: Product details displayed"
+      - "error: Error message, retry prompt"
+      - "allergen_warning: Yellow banner, confirmation required"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/Step4QuantityEntry.tsx"
+    description: "Step 4: Confirm quantity with number pad"
+    wireframe: "SHIP-018 Step 4"
+    props:
+      lp: "LicensePlate"
+      availableQty: "number"
+      defaultQty: "number"
+      onConfirm: "(quantity: number) => void"
+      onCancel: "() => void"
+    features:
+      - "LP product details card"
+      - "Available quantity display"
+      - "Quantity input field (large, 64px height)"
+      - "Number pad (touchpad-optimized, 48-56px buttons)"
+      - "Quick adjust buttons: +1, +10, -1, -10"
+      - "Clear and Backspace buttons"
+      - "Decimal support (for fractional quantities)"
+      - "Quantity validation: can't exceed available"
+      - "Warning highlight if exceeding available"
+    ui_states:
+      - "default: Quantity pre-filled with available"
+      - "input_active: Number pad visible"
+      - "invalid: Red border, warning message"
+      - "valid: Green border, Confirm button enabled"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/Step5CloseBox.tsx"
+    description: "Step 5: Close box with weight capture"
+    wireframe: "SHIP-018 Step 5"
+    props:
+      box: "ShipmentBox"
+      contents: "BoxContent[]"
+      boxNumber: "number"
+      onClose: "(weight?: number, dimensions?: object) => void"
+      onCreateNext: "() => void"
+      onCancel: "() => void"
+    features:
+      - "Box summary: item count, item names"
+      - "Close Box button"
+      - "Weight entry modal (optional)"
+      - "Number pad in weight mode (kg, 2 decimals)"
+      - "Dimension inputs (optional, length/width/height)"
+      - "Confirmation: 'Close Box X?'"
+      - "Option to create next box after close"
+      - "Weight validation: must be positive if entered"
+    ui_states:
+      - "summary: Box contents shown"
+      - "weight_entry: Weight modal open"
+      - "confirming: Confirmation dialog"
+      - "next_box_offer: 'Create next box?' prompt"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/Step6Complete.tsx"
+    description: "Step 6: Completion screen with success feedback"
+    wireframe: "SHIP-018 Step 6"
+    props:
+      shipment: "Shipment"
+      totalBoxes: "number"
+      totalWeight: "number"
+      onDone: "() => void"
+      onNewOrder: "() => void"
+    features:
+      - "Success animation: large green checkmark"
+      - "Success message: 'Shipment Packed Successfully'"
+      - "Shipment summary: #, total boxes, total weight"
+      - "Success chime audio (500ms)"
+      - "Success haptic vibration"
+      - "Done button (return to home)"
+      - "New Order button (step 1)"
+      - "Auto-close after 3 seconds (optional)"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/BoxSelector.tsx"
+    description: "Box dropdown/tabs for switching between open boxes"
+    props:
+      boxes: "ShipmentBox[]"
+      activeBoxId: "string"
+      onSelectBox: "(boxId: string) => void"
+      onCreateBox: "() => void"
+    features:
+      - "Dropdown or tab interface"
+      - "Shows box number and item count"
+      - "Estimated weight display"
+      - "Active box highlighted"
+      - "Create New Box action"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/AllergenWarningBanner.tsx"
+    description: "Persistent allergen warning banner"
+    props:
+      restrictions: "string[]"
+      visible: "boolean"
+      productAllergens: "string[]"
+      onDismiss: "() => void (optional)"
+    features:
+      - "Bright yellow background (#FDE047)"
+      - "ALLERGEN ALERT text (large, 24px)"
+      - "List of allergens and customer restrictions"
+      - "Alert icon"
+      - "Alert tone on display (440Hz, 400ms, 2x)"
+      - "Persistent until dismissed (or packing complete)"
+      - "Confirmation checkbox: 'I acknowledge allergen warning'"
+      - "Prominent and unavoidable"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/BoxContentsSummary.tsx"
+    description: "Current box contents summary display"
+    props:
+      contents: "BoxContent[]"
+      estimatedWeight: "number"
+      onViewDetails: "() => void"
+    features:
+      - "Item count badge (green)"
+      - "Estimated weight display"
+      - "List of items: product, qty, lot"
+      - "Real-time updates as items added"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/LPDetailsCard.tsx"
+    description: "License plate product details card"
+    props:
+      lp: "LicensePlate"
+      product: "Product"
+      allergens: "string[]"
+      customerRestrictions: "string[]"
+    features:
+      - "Product name (24px, bold)"
+      - "SKU"
+      - "Lot number"
+      - "Available quantity"
+      - "Allergen badges (if applicable)"
+      - "Allergen match indicator (yellow if conflict)"
+
+  - path: "apps/frontend/components/scanner/shipping/pack/WeightEntryModal.tsx"
+    description: "Modal for weight and dimension entry"
+    props:
+      boxNumber: "number"
+      onConfirm: "(weight?: number, length?: number, width?: number, height?: number) => void"
+      onCancel: "() => void"
+    features:
+      - "Weight input (kg, 2 decimals)"
+      - "Optional dimension inputs"
+      - "Number pad (weight mode)"
+      - "Validation: positive values only"
+      - "Warning if weight exceeds carrier limit"
+      - "Confirm and Cancel buttons"
+
+  - path: "apps/frontend/components/scanner/shared/BarcodeScannerInput.tsx"
+    description: "Large scan input field (reused from Story 07.10)"
+    props:
+      onScan: "(barcode: string) => void"
+      placeholder: "string"
+      autofocus: "boolean"
+      error: "string (optional)"
+    features:
+      - "Hardware scanner integration"
+      - "Camera fallback option"
+      - "Auto-focus for scanner readiness"
+      - "Debounce duplicate scans"
+      - "64px height minimum"
+      - "Success/error feedback"
+
+  - path: "apps/frontend/components/scanner/shared/NumberPad.tsx"
+    description: "Touch-optimized number pad (reused from Story 07.10)"
+    props:
+      value: "string"
+      onChange: "(value: string) => void"
+      mode: "'quantity' | 'weight' | 'integer'"
+      onConfirm: "() => void"
+    features:
+      - "Number buttons 0-9 (48-56px each)"
+      - "Decimal point button"
+      - "Quick adjust buttons: +1, +10, -1, -10"
+      - "Clear (C) and Backspace (<-) buttons"
+      - "Mode-specific validation"
+      - "Large, high-contrast buttons"
+
+  - path: "apps/frontend/components/scanner/shared/AudioFeedback.tsx"
+    description: "Audio feedback player (reused from Story 07.10)"
+    props:
+      type: "'success' | 'error' | 'confirm' | 'allergen'"
+      enabled: "boolean"
+    features:
+      - "Success: 880Hz, 200ms"
+      - "Error: 220Hz, 300ms"
+      - "Confirm: 660Hz+880Hz, 500ms (dual tone)"
+      - "Allergen: 440Hz, 400ms, 2x repeat"
+      - "Web Audio API"
+      - "Mute toggle support"
+
+  - path: "apps/frontend/components/scanner/shared/HapticFeedback.tsx"
+    description: "Haptic feedback utility (reused from Story 07.10)"
+    props:
+      pattern: "'success' | 'error' | 'confirm' | 'alert'"
+    features:
+      - "Success: 50ms buzz"
+      - "Error: 50ms + 50ms pause + 50ms (double buzz)"
+      - "Confirm: 100ms buzz"
+      - "Alert: 50ms + 50ms + 50ms (triple buzz for allergen)"
+      - "Navigator.vibrate() API"
+
+  - path: "apps/frontend/components/scanner/shared/SuccessAnimation.tsx"
+    description: "Green checkmark animation (reused from Story 07.10)"
+    props:
+      visible: "boolean"
+      autoDismiss: "boolean (default: true, 500ms)"
+    features:
+      - "Large checkmark (64x64px minimum)"
+      - "Green color (#22C55E)"
+      - "500ms animation"
+      - "Auto-fade after animation"
+
+  - path: "apps/frontend/components/scanner/shared/ErrorAnimation.tsx"
+    description: "Red X animation (reused from Story 07.10)"
+    props:
+      visible: "boolean"
+      autoDismiss: "boolean (default: true, 500ms)"
+    features:
+      - "Large X (64x64px minimum)"
+      - "Red color (#EF4444)"
+      - "500ms animation with shake"
+      - "Auto-fade after animation"
+
+  - path: "apps/frontend/components/scanner/shared/LoadingOverlay.tsx"
+    description: "Full-screen loading indicator"
+    props:
+      visible: "boolean"
+      message: "string (optional)"
+    features:
+      - "Semi-transparent overlay"
+      - "Spinner (48x48px)"
+      - "Optional loading message"
+      - "10s timeout with error fallback"
+
+  - path: "apps/frontend/components/scanner/shared/ScannerHeader.tsx"
+    description: "Scanner page header with back button"
+    props:
+      title: "string"
+      onBack: "() => void"
+      showHelp: "boolean (default: false)"
+    features:
+      - "Back button (48x48px)"
+      - "Title (24px, centered)"
+      - "Help button (optional)"
+      - "56dp height"
+
+  - path: "apps/frontend/components/scanner/shared/StepProgress.tsx"
+    description: "Step progress indicator for wizard"
+    props:
+      current: "number"
+      total: "number"
+      title: "string (current step name)"
+    features:
+      - "Visual progress bar"
+      - "Step counter: 'Step X of Y'"
+      - "Step name display"
+      - "40dp height"
+
+# Hooks to Create
+hooks:
+  - path: "apps/frontend/lib/hooks/use-packing-scanner.ts"
+    description: "React hook for packing scanner operations"
+    exports:
+      - name: "usePackingScanner"
+        returns: "{ addItemToBox, createBox, closeBox, getPendingShipments, lookupLP, allergenWarning, isLoading }"
+        features:
+          - "Pack item submission with validation"
+          - "Box management (create, close)"
+          - "Pending shipments query"
+          - "LP lookup with allocation check"
+          - "Allergen conflict detection"
+          - "Error handling and retries"
+
+  - path: "apps/frontend/lib/hooks/use-audio-feedback.ts"
+    description: "Hook for audio feedback (reused from 07.10)"
+    exports:
+      - name: "useAudioFeedback"
+        returns: "{ playSuccessBeep, playErrorBeep, playConfirmChime, playAllergenAlert, toggleMute }"
+
+  - path: "apps/frontend/lib/hooks/use-haptic-feedback.ts"
+    description: "Hook for haptic feedback (reused from 07.10)"
+    exports:
+      - name: "useHapticFeedback"
+        returns: "{ vibrate, setEnabled }"
+
+  - path: "apps/frontend/lib/hooks/use-barcode-scanner.ts"
+    description: "Hook for barcode scanning (reused from 07.10)"
+    exports:
+      - name: "useBarcodeScanner"
+        returns: "{ scan, error, isScanning, clear }"
+
+# Types to Create
+types:
+  - path: "apps/frontend/lib/types/packing-scanner.ts"
+    description: "TypeScript interfaces for packing scanner"
+    exports:
+      - name: "PackItemInput"
+        fields:
+          - "shipmentId: string"
+          - "boxId: string"
+          - "licensePlateId: string"
+          - "soLineId: string"
+          - "quantity: number"
+          - "notes?: string"
+
+      - name: "PackItemResult"
+        fields:
+          - "boxContent: BoxContent"
+          - "boxSummary: BoxSummary"
+          - "soLineStatus: SOLineStatus"
+          - "allergenWarning?: AllergenWarning"
+
+      - name: "BoxSummary"
+        fields:
+          - "itemCount: number"
+          - "totalWeightEst: number"
+          - "items: Array<{ productName: string; quantity: number; uom: string }>"
+
+      - name: "PendingShipmentSummary"
+        fields:
+          - "id: string"
+          - "shipmentNumber: string"
+          - "soNumber: string"
+          - "customerName: string"
+          - "status: string"
+          - "promisedShipDate: string"
+          - "linesTotal: number"
+          - "linesPacked: number"
+          - "boxesCount: number"
+          - "allergenAlert: boolean"
+
+      - name: "AllergenWarning"
+        fields:
+          - "customerRestrictions: string[]"
+          - "productAllergens: string[]"
+          - "matches: string[]"
+          - "requiresConfirmation: boolean"
+
+# UX Implementation
+ux:
+  wireframes:
+    - id: "SHIP-018"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-018-pack-scanner.md"
+      description: "6-step mobile packing scanner workflow"
+      components:
+        - "PackingScannerWizard"
+        - "Step1SelectShipment"
+        - "Step2BoxManagement"
+        - "Step3ScanItem"
+        - "Step4QuantityEntry"
+        - "Step5CloseBox"
+        - "Step6Complete"
+        - "BoxSelector"
+        - "AllergenWarningBanner"
+        - "WeightEntryModal"
+
+  patterns:
+    layout: "Mobile-first (320-480px portrait), full-screen scanner mode"
+    buttons: "Large touch targets (56px primary, 48px secondary, 64px number pad)"
+    forms: "Number pad for quantities, numeric inputs for weight/dimensions"
+    feedback: "Audio + haptic + visual (multi-modal, simultaneous)"
+    colors: "High contrast for warehouse lighting (WCAG AAA compliance)"
+    scanner: "Hardware scanner integration with camera fallback"
+
+  accessibility:
+    - "Touch targets: 64px (number pad), 56px (primary actions), 48px minimum (all interactive)"
+    - "Contrast: 7:1 (critical actions), 4.5:1 (text on background)"
+    - "Haptic: Success, error, confirm, alert patterns"
+    - "Screen reader: All elements labeled, live regions for feedback"
+    - "Keyboard: Tab navigation, Enter to submit, Esc to cancel"
+    - "Dark theme: Reduces eye strain in warehouse"
+
+  responsive:
+    - "Mobile Portrait (320-480px): Primary mode, stack all elements"
+    - "Mobile Landscape (480-800px): Side-by-side layout where possible"
+    - "Safe area: Respects device notches and rounded corners"
+    - "Orientation: Support both, maintain usability"
+
+# Permission Enforcement
+permissions:
+  view_scanner:
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+    action: "Can access packing scanner"
+    ui_effect: "Show packing scanner in navigation"
+
+  record_pack:
+    roles: ["WAREHOUSE_PACKER", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+    action: "Can record pack operations"
+    ui_effect: "Show pack buttons and forms"
+
+# Performance Targets
+performance:
+  page_load: "1s for scanner pack page"
+  shipments_list: "500ms for 100 shipments"
+  lp_lookup: "<200ms for barcode scan"
+  pack_item: "<500ms for API submission"
+  barcode_feedback: "<100ms visual/audio response"
+  box_create: "<100ms for new box"
+  allergen_check: "<100ms for conflict detection"
+
+# Error Handling
+error_messages:
+  lp_not_allocated: "License plate not allocated to this order"
+  quantity_exceeds: "Quantity (120) exceeds available (100)"
+  shipment_not_found: "Shipment not found. Scan again."
+  invalid_barcode: "Invalid barcode format"
+  network_error: "Network error. Check connection."
+  box_empty: "Box is empty. Cannot close."
+  box_closed: "Box already closed"
+
+# Testing Focus
+testing_focus:
+  - "Barcode scanning triggers LP lookup correctly"
+  - "Quantity entry validates against available qty"
+  - "Pack item submission completes in <500ms"
+  - "Box creation increments box_number correctly"
+  - "Allergen warning displays and requires confirmation"
+  - "Audio feedback plays for all actions"
+  - "Haptic feedback works on mobile devices"
+  - "Touch targets are 48px minimum across all components"
+  - "Dark theme provides WCAG AAA contrast"
+  - "Multiple boxes can be open simultaneously"
+  - "Box switcher allows rapid switching between boxes"
+  - "6-step wizard completes full packing workflow"
+  - "Success screen appears after completion"
+  - "Offline mode queues actions for sync (Phase 3)"

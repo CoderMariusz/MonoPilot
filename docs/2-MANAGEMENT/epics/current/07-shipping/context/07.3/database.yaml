@@ -1,0 +1,247 @@
+# Story 07.3 - Database Schema
+# Purpose: Enums, table updates, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_extend_sales_order_status_enum.sql"
+    type: "migration"
+    description: "Add 'on_hold' value to sales_order_status enum, create index"
+
+# PostgreSQL ENUM Type (Extension)
+enum_extensions:
+  - name: "sales_order_status"
+    description: "Sales order status types - extend existing enum from Story 07.2"
+    new_values:
+      - { code: "on_hold", position: "after confirmed", description: "Order placed on hold pending review" }
+    full_enum:
+      - "draft"
+      - "confirmed"
+      - "on_hold"
+      - "cancelled"
+      - "allocated"
+      - "picking"
+      - "packing"
+      - "shipped"
+      - "delivered"
+
+# Table Updates
+table_updates:
+  - name: "sales_orders"
+    description: "Update existing table from Story 07.2"
+    changes:
+      - description: "Status enum already exists, just adding 'on_hold' value"
+      - description: "No new columns needed - 'updated_at' already tracks change timestamp"
+      - description: "Notes column already exists - used for hold/cancel reason tracking"
+
+# Indexes
+indexes:
+  - name: "idx_sales_orders_status_updated"
+    table: "sales_orders"
+    columns: ["org_id", "status", "updated_at"]
+    description: "Composite index for status queries and date range filtering"
+    reason: "Improve performance of dashboard queries grouping by status"
+
+# RLS Policies (Existing from Story 07.2)
+rls_policies:
+  pattern: "ADR-013 Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "sales_orders"
+      name: "sales_orders_org_isolation"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Multi-tenancy: users only see their org's sales orders"
+      applies_to_story: "07.2 and extended in 07.3"
+
+# Status Transition Rules (Business Logic)
+status_transitions:
+  description: "Valid sales order status transitions with authorization requirements"
+  rules:
+    - from: "draft"
+      to: ["confirmed", "on_hold", "cancelled"]
+      hold_requirements:
+        allowed: true
+        requires_role: ["Sales", "Manager", "Admin"]
+        requires_reason: false
+        action: "PUT notes: '[HOLD - <timestamp>] <optional_reason>'"
+      cancel_requirements:
+        allowed: true
+        requires_role: ["Manager", "Admin"]
+        requires_reason: true
+        action: "PUT notes: '[CANCELLED - <timestamp>] <reason>'"
+
+    - from: "confirmed"
+      to: ["on_hold", "cancelled", "allocated"]
+      hold_requirements:
+        allowed: true
+        requires_role: ["Sales", "Manager", "Admin"]
+        requires_reason: false
+        action: "PUT notes: '[HOLD - <timestamp>] <optional_reason>'"
+      cancel_requirements:
+        allowed: true
+        requires_role: ["Manager", "Admin"]
+        requires_reason: true
+        action: "PUT notes: '[CANCELLED - <timestamp>] <reason>'"
+
+    - from: "on_hold"
+      to: ["confirmed", "cancelled"]
+      hold_requirements:
+        allowed: false
+        reason: "Already on hold"
+      cancel_requirements:
+        allowed: true
+        requires_role: ["Manager", "Admin"]
+        requires_reason: true
+        action: "PUT notes: '[CANCELLED - <timestamp>] <reason>'"
+
+    - from: "allocated"
+      to: ["cancelled"]
+      hold_requirements:
+        allowed: false
+        reason: "Allocation started - cannot hold"
+      cancel_requirements:
+        allowed: true
+        requires_role: ["Manager", "Admin"]
+        requires_reason: true
+        action: "PUT notes: '[CANCELLED - <timestamp>] <reason>'"
+
+    - from: "picking"
+      to: []
+      hold_requirements:
+        allowed: false
+        reason: "Picking in progress - cannot hold"
+      cancel_requirements:
+        allowed: false
+        reason: "Picking in progress - cannot cancel"
+
+    - from: "packing"
+      to: []
+      hold_requirements:
+        allowed: false
+        reason: "Packing in progress - cannot hold"
+      cancel_requirements:
+        allowed: false
+        reason: "Packing in progress - cannot cancel"
+
+    - from: "shipped"
+      to: []
+      hold_requirements:
+        allowed: false
+        reason: "Already shipped - cannot hold"
+      cancel_requirements:
+        allowed: false
+        reason: "Already shipped - cannot cancel"
+
+    - from: "delivered"
+      to: []
+      hold_requirements:
+        allowed: false
+        reason: "Already delivered - cannot hold"
+      cancel_requirements:
+        allowed: false
+        reason: "Already delivered - cannot cancel"
+
+# Sales Order Status Configuration
+status_config:
+  draft:
+    code: "draft"
+    name: "Draft"
+    description: "Order created, awaiting confirmation"
+    color: "gray"
+    icon: "FileText"
+    allows_hold: true
+    allows_cancel: true
+    prevents_allocation: false
+
+  confirmed:
+    code: "confirmed"
+    name: "Confirmed"
+    description: "Order confirmed, ready for allocation"
+    color: "blue"
+    icon: "CheckCircle"
+    allows_hold: true
+    allows_cancel: true
+    prevents_allocation: false
+
+  on_hold:
+    code: "on_hold"
+    name: "On Hold"
+    description: "Order placed on hold pending review"
+    color: "yellow"
+    icon: "PauseCircle"
+    allows_hold: false
+    allows_cancel: true
+    prevents_allocation: true
+
+  cancelled:
+    code: "cancelled"
+    name: "Cancelled"
+    description: "Order cancelled"
+    color: "red"
+    icon: "XCircle"
+    allows_hold: false
+    allows_cancel: false
+    prevents_allocation: true
+
+  allocated:
+    code: "allocated"
+    name: "Allocated"
+    description: "Inventory allocated"
+    color: "purple"
+    icon: "Package"
+    allows_hold: false
+    allows_cancel: true
+    prevents_allocation: true
+
+  picking:
+    code: "picking"
+    name: "Picking"
+    description: "Items being picked"
+    color: "purple"
+    icon: "Truck"
+    allows_hold: false
+    allows_cancel: false
+    prevents_allocation: true
+
+  packing:
+    code: "packing"
+    name: "Packing"
+    description: "Items being packed"
+    color: "purple"
+    icon: "Box"
+    allows_hold: false
+    allows_cancel: false
+    prevents_allocation: true
+
+  shipped:
+    code: "shipped"
+    name: "Shipped"
+    description: "Order shipped"
+    color: "green"
+    icon: "Truck"
+    allows_hold: false
+    allows_cancel: false
+    prevents_allocation: true
+
+  delivered:
+    code: "delivered"
+    name: "Delivered"
+    description: "Order delivered"
+    color: "green"
+    icon: "CheckCircle"
+    allows_hold: false
+    allows_cancel: false
+    prevents_allocation: true
+
+# Migration SQL Template
+migration_template: |
+  -- Extend sales_order_status enum with 'on_hold'
+  ALTER TYPE sales_order_status ADD VALUE IF NOT EXISTS 'on_hold' AFTER 'confirmed';
+
+  -- Create index for status queries
+  CREATE INDEX IF NOT EXISTS idx_sales_orders_status_updated
+    ON sales_orders(org_id, status, updated_at);
+
+  -- Verify enum has all expected values
+  -- SELECT enum_range(NULL::sales_order_status)::text[];

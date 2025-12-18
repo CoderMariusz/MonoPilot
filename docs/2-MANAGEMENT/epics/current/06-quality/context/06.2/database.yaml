@@ -13,7 +13,7 @@ tables:
     columns:
       - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
       - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
-      - { name: "hold_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "hold_number", type: "TEXT", constraints: "NOT NULL UNIQUE(org_id, hold_number)" }
       - { name: "reason", type: "TEXT", constraints: "NOT NULL" }
       - { name: "hold_type", type: "TEXT", constraints: "NOT NULL CHECK (hold_type IN ('qa_pending', 'investigation', 'recall', 'quarantine'))" }
       - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'released', 'disposed'))" }
@@ -37,7 +37,6 @@ tables:
       - "idx_quality_holds_org_priority ON quality_holds(org_id, priority) WHERE status = 'active'"
       - "idx_quality_holds_ncr ON quality_holds(ncr_id) WHERE ncr_id IS NOT NULL"
     constraints:
-      - "UNIQUE(org_id, hold_number)"
       - "CONSTRAINT released_fields_consistency CHECK ((status = 'released' AND released_by IS NOT NULL AND released_at IS NOT NULL) OR (status != 'released'))"
       - "CONSTRAINT disposition_on_release CHECK ((status = 'released' AND disposition IS NOT NULL) OR (status != 'released'))"
 
@@ -70,18 +69,25 @@ rls_policies:
       name: "quality_holds_org_isolation"
       operation: "ALL"
       using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "All authenticated users can read org holds"
+
     - table: "quality_holds"
       name: "quality_holds_insert"
       operation: "INSERT"
       with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "QA Inspector, Manager, Director can create holds"
+
     - table: "quality_holds"
       name: "quality_holds_update"
       operation: "UPDATE"
       using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "QA Manager, Director can update holds"
+
     - table: "quality_hold_items"
       name: "quality_hold_items_org_isolation"
       operation: "ALL"
       using: "EXISTS (SELECT 1 FROM quality_holds WHERE quality_holds.id = quality_hold_items.hold_id AND quality_holds.org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+      description: "Access hold items via parent hold org isolation"
 
 # Triggers
 triggers:
@@ -90,6 +96,8 @@ triggers:
     timing: "BEFORE INSERT"
     description: "Auto-generate hold_number as QH-YYYYMMDD-NNNN"
     function: "generate_hold_number()"
+    rationale: "Ensures unique sequential numbering per org per day"
+
   - name: "set_quality_holds_updated_at"
     table: "quality_holds"
     timing: "BEFORE UPDATE"
@@ -98,16 +106,193 @@ triggers:
 
 # LP Blocking Integration
 lp_blocking:
-  description: "CRITICAL - Updates LP qa_status when hold created/released"
-  on_hold_creation:
-    - action: "UPDATE license_plates SET qa_status = 'hold'"
-      condition: "reference_type = 'lp'"
-  on_hold_release:
-    - disposition: "release"
-      action: "UPDATE license_plates SET qa_status = 'passed'"
-    - disposition: "rework"
-      action: "UPDATE license_plates SET qa_status = 'pending'"
-    - disposition: "scrap"
-      action: "UPDATE license_plates SET qa_status = 'scrap', quantity_available = 0"
-    - disposition: "return"
-      action: "UPDATE license_plates SET qa_status = 'rejected'"
+  description: "Quality holds block LP consumption by setting qa_status = 'hold'"
+  trigger_points:
+    - "On hold creation: Update LP qa_status to 'hold' for all LP items"
+    - "On hold release: Update LP qa_status based on disposition"
+    - "At consumption time: LPValidationService checks qa_status = 'hold'"
+
+  disposition_mapping:
+    release: "qa_status = 'passed' (LP can be consumed)"
+    rework: "qa_status = 'pending' (LP pending re-inspection)"
+    scrap: "qa_status = 'scrap', quantity_available = 0 (LP destroyed)"
+    return: "qa_status = 'rejected' (LP returned to supplier)"
+
+# Field Notes
+field_notes:
+  hold_type:
+    description: "Classification of hold reason"
+    values:
+      - code: "qa_pending"
+        label: "QA Pending"
+        description: "Awaiting inspection results"
+      - code: "investigation"
+        label: "Investigation"
+        description: "Under quality investigation"
+      - code: "recall"
+        label: "Recall"
+        description: "Safety or regulatory recall"
+      - code: "quarantine"
+        label: "Quarantine"
+        description: "Isolated for review"
+
+  priority:
+    description: "Hold urgency and aging threshold"
+    values:
+      - code: "critical"
+        label: "Critical"
+        aging_threshold_hours: 24
+        description: "Immediate investigation required"
+      - code: "high"
+        label: "High"
+        aging_threshold_hours: 48
+        description: "Urgent investigation"
+      - code: "medium"
+        label: "Medium"
+        aging_threshold_hours: 72
+        description: "Standard investigation"
+      - code: "low"
+        label: "Low"
+        aging_threshold_hours: 168
+        description: "Non-urgent issue"
+
+  disposition:
+    description: "Final decision when releasing hold"
+    values:
+      - code: "release"
+        label: "Approve for Use"
+        lp_status: "passed"
+        description: "LP meets all quality criteria"
+      - code: "rework"
+        label: "Rework"
+        lp_status: "pending"
+        description: "LP requires reprocessing"
+      - code: "scrap"
+        label: "Scrap"
+        lp_status: "scrap"
+        description: "LP destroyed, quantity set to 0"
+      - code: "return"
+        label: "Return to Supplier"
+        lp_status: "rejected"
+        description: "LP returned for replacement"
+
+# Seed Data
+seed_data:
+  description: "No seed data for quality holds (created by users)"
+
+# Migration SQL Pattern
+migration_pattern: |
+  -- Quality Holds Table
+  CREATE TABLE quality_holds (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    hold_number TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    hold_type TEXT NOT NULL CHECK (hold_type IN ('qa_pending', 'investigation', 'recall', 'quarantine')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'released', 'disposed')),
+    priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    held_by UUID NOT NULL REFERENCES users(id),
+    held_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    released_by UUID REFERENCES users(id),
+    released_at TIMESTAMPTZ,
+    release_notes TEXT,
+    disposition TEXT CHECK (disposition IN ('release', 'rework', 'scrap', 'return')),
+    ncr_id UUID REFERENCES ncr_reports(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by UUID REFERENCES users(id),
+    updated_by UUID REFERENCES users(id),
+    CONSTRAINT unique_hold_number_per_org UNIQUE(org_id, hold_number),
+    CONSTRAINT released_fields_consistency CHECK (
+      (status = 'released' AND released_by IS NOT NULL AND released_at IS NOT NULL) OR
+      (status != 'released')
+    ),
+    CONSTRAINT disposition_on_release CHECK (
+      (status = 'released' AND disposition IS NOT NULL) OR
+      (status != 'released')
+    )
+  );
+
+  -- Quality Hold Items Table
+  CREATE TABLE quality_hold_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    hold_id UUID NOT NULL REFERENCES quality_holds(id) ON DELETE CASCADE,
+    reference_type TEXT NOT NULL CHECK (reference_type IN ('lp', 'wo', 'batch')),
+    reference_id UUID NOT NULL,
+    quantity_held DECIMAL(15,4),
+    uom TEXT,
+    location_id UUID REFERENCES locations(id),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT unique_hold_item_per_hold UNIQUE(hold_id, reference_type, reference_id)
+  );
+
+  -- Indexes for Performance
+  CREATE INDEX idx_quality_holds_org_status ON quality_holds(org_id, status);
+  CREATE INDEX idx_quality_holds_org_held_at ON quality_holds(org_id, held_at DESC);
+  CREATE INDEX idx_quality_holds_org_priority ON quality_holds(org_id, priority) WHERE status = 'active';
+  CREATE INDEX idx_quality_holds_ncr ON quality_holds(ncr_id) WHERE ncr_id IS NOT NULL;
+  CREATE INDEX idx_quality_hold_items_hold ON quality_hold_items(hold_id);
+  CREATE INDEX idx_quality_hold_items_reference ON quality_hold_items(reference_type, reference_id);
+
+  -- RLS Policies
+  ALTER TABLE quality_holds ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE quality_hold_items ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "quality_holds_org_isolation"
+    ON quality_holds FOR ALL
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "quality_holds_insert"
+    ON quality_holds FOR INSERT
+    WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "quality_holds_update"
+    ON quality_holds FOR UPDATE
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "quality_hold_items_org_isolation"
+    ON quality_hold_items FOR ALL
+    USING (
+      EXISTS (
+        SELECT 1 FROM quality_holds
+        WHERE quality_holds.id = quality_hold_items.hold_id
+        AND quality_holds.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    );
+
+  -- Auto-numbering Trigger
+  CREATE OR REPLACE FUNCTION generate_hold_number()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    IF NEW.hold_number IS NULL OR NEW.hold_number = '' THEN
+      NEW.hold_number := 'QH-' ||
+        TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' ||
+        LPAD(
+          (
+            SELECT COALESCE(MAX(
+              CAST(
+                SUBSTRING(hold_number FROM '[0-9]+$') AS INTEGER
+              )
+            ), 0) + 1
+            FROM quality_holds
+            WHERE org_id = NEW.org_id
+            AND hold_number LIKE 'QH-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-%'
+          )::TEXT,
+          4,
+          '0'
+        );
+    END IF;
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  CREATE TRIGGER set_hold_number
+    BEFORE INSERT ON quality_holds
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_hold_number();
+
+  CREATE TRIGGER set_quality_holds_updated_at
+    BEFORE UPDATE ON quality_holds
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

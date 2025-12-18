@@ -263,3 +263,60 @@ state_machine:
     active: ["completed", "skipped"]
     completed: []  # terminal
     skipped: []    # terminal
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SET-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-002-onboarding-organization.md"
+      description: "Wizard Step 1 - Organization Profile setup"
+      components:
+        - "OrganizationStepForm"
+        - "WizardProgress"
+        - "WizardNavigation"
+    - id: "SET-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-003-onboarding-warehouse.md"
+      description: "Wizard Step 2 - First warehouse creation"
+      components:
+        - "WarehouseStepForm"
+        - "WizardProgress"
+        - "WizardNavigation"
+    - id: "SET-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-004-onboarding-location.md"
+      description: "Wizard Step 3 - First location setup"
+      components:
+        - "LocationStepForm"
+        - "WizardProgress"
+        - "WizardNavigation"
+    - id: "SET-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-005-onboarding-product-workorder.md"
+      description: "Wizard Steps 4-5 - First product and work order"
+      components:
+        - "ProductStepForm"
+        - "WorkOrderStepForm"
+        - "WizardProgress"
+        - "WizardNavigation"
+    - id: "SET-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-006-onboarding-completion.md"
+      description: "Wizard Step 6 - Completion celebration"
+      components:
+        - "CompletionScreen"
+        - "WelcomeMessage"
+        - "NextStepsGuide"
+
+  wizard_flow:
+    total_steps: 6
+    can_skip: true
+    can_go_back: true
+    progress_saved: true
+
+  states:
+    loading: "Spinner while saving step data"
+    validation_error: "Inline error messages on form fields"
+    success: "Step completed, advance to next"
+    completion: "Confetti animation with success message"
+
+  patterns:
+    wizard: "Multi-step form with progress indicator"
+    navigation: "Next/Back/Skip buttons"
+    validation: "Real-time validation with Zod schemas"

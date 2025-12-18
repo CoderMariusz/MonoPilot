@@ -1,0 +1,233 @@
+# Story 07.4 - Database Schema
+# Purpose: Migration to add discount field to sales_order_lines
+# Agent: BACKEND-DEV (database focus)
+
+# New migration required
+requires_migration: true
+
+migrations:
+  - name: "Add discount field to sales_order_lines"
+    version: "061"
+    description: "Add JSONB discount field to support percent and fixed discounts"
+
+    changes:
+      - table: "sales_order_lines"
+        operations:
+          - type: "add_column"
+            column:
+              name: "discount"
+              type: "JSONB"
+              null: true
+              default: "NULL"
+              comment: "Discount config: {type: 'percent'|'fixed', value: decimal}"
+
+          - type: "add_column"
+            column:
+              name: "discount_type"
+              type: "TEXT"
+              null: true
+              comment: "Denormalized for easier querying: percent or fixed (can remove if pure JSONB approach used)"
+
+          - type: "add_column"
+            column:
+              name: "discount_value"
+              type: "DECIMAL(15,4)"
+              null: true
+              comment: "Denormalized for easier querying (can remove if pure JSONB approach used)"
+
+    migration_sql: |
+      -- Add discount field to sales_order_lines
+      ALTER TABLE sales_order_lines
+      ADD COLUMN discount JSONB DEFAULT NULL;
+
+      COMMENT ON COLUMN sales_order_lines.discount IS
+      'Discount configuration: {type: "percent"|"fixed", value: decimal} or NULL for no discount';
+
+      -- Example values:
+      -- NULL = no discount
+      -- {"type": "percent", "value": 10} = 10% off
+      -- {"type": "fixed", "value": 50} = 50 units off
+
+tables_modified:
+  - name: "sales_order_lines"
+    existing_columns:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        comment: "Primary key"
+
+      - name: "org_id"
+        type: "UUID NOT NULL"
+        comment: "Foreign key to organizations"
+
+      - name: "sales_order_id"
+        type: "UUID NOT NULL"
+        comment: "Foreign key to sales_orders"
+
+      - name: "line_number"
+        type: "INTEGER NOT NULL"
+        comment: "Auto-increment per order"
+
+      - name: "product_id"
+        type: "UUID NOT NULL"
+        comment: "Foreign key to products"
+
+      - name: "quantity_ordered"
+        type: "DECIMAL(15,4) NOT NULL"
+        comment: "Ordered quantity (may include decimals)"
+
+      - name: "quantity_allocated"
+        type: "DECIMAL(15,4) DEFAULT 0"
+        comment: "Allocated quantity"
+
+      - name: "quantity_picked"
+        type: "DECIMAL(15,4) DEFAULT 0"
+        comment: "Picked quantity"
+
+      - name: "quantity_packed"
+        type: "DECIMAL(15,4) DEFAULT 0"
+        comment: "Packed quantity"
+
+      - name: "quantity_shipped"
+        type: "DECIMAL(15,4) DEFAULT 0"
+        comment: "Shipped quantity"
+
+      - name: "unit_price"
+        type: "DECIMAL(15,4) NOT NULL"
+        comment: "Unit price (up to 4 decimal places)"
+
+      - name: "line_total"
+        type: "DECIMAL(15,2)"
+        comment: "Calculated: quantity * unit_price - discount, rounded to 2 decimals"
+
+      - name: "requested_lot"
+        type: "TEXT"
+        comment: "Optional specific lot request"
+
+      - name: "notes"
+        type: "TEXT"
+        comment: "Line-level notes"
+
+      - name: "created_at"
+        type: "TIMESTAMPTZ DEFAULT now()"
+        comment: "Auto timestamp"
+
+    new_columns:
+      - name: "discount"
+        type: "JSONB"
+        null: true
+        default: "NULL"
+        comment: "Discount: {type: 'percent'|'fixed', value: decimal} or NULL"
+        validation: "See validation schema below"
+
+    rls: true
+    note: "Uses RLS from 07.2 - org_id isolation"
+
+# Query patterns for pricing calculations
+query_patterns:
+  get_line_with_product:
+    description: "Get SO line with product price for calculation"
+    sql: |
+      SELECT
+        sol.id,
+        sol.quantity_ordered,
+        sol.unit_price,
+        sol.discount,
+        sol.line_total,
+        p.std_price
+      FROM sales_order_lines sol
+      JOIN products p ON sol.product_id = p.id
+      WHERE sol.id = $1 AND sol.org_id = $2
+
+  get_so_lines_for_total:
+    description: "Get all lines for SO to calculate total"
+    sql: |
+      SELECT
+        id,
+        line_total
+      FROM sales_order_lines
+      WHERE sales_order_id = $1 AND org_id = $2
+      ORDER BY line_number ASC
+
+  update_line_with_pricing:
+    description: "Update line with auto-calculated line_total"
+    sql: |
+      UPDATE sales_order_lines
+      SET
+        unit_price = $1,
+        discount = $2::jsonb,
+        line_total = $3,
+        updated_at = NOW()
+      WHERE id = $4 AND org_id = $5
+      RETURNING *
+
+  update_so_total:
+    description: "Update SO total_amount from lines"
+    sql: |
+      UPDATE sales_orders
+      SET
+        total_amount = (
+          SELECT COALESCE(SUM(line_total), 0)
+          FROM sales_order_lines
+          WHERE sales_order_id = $1
+        ),
+        updated_at = NOW()
+      WHERE id = $1 AND org_id = $2
+      RETURNING total_amount
+
+# Discount validation rules
+discount_validation:
+  schema: |
+    {
+      type: 'percent' | 'fixed',
+      value: number (>= 0)
+    }
+
+  rules:
+    - "discount can be NULL (no discount) or a valid JSONB object"
+    - "type must be one of: 'percent' or 'fixed'"
+    - "value must be >= 0 (non-negative)"
+    - "if type='percent': value must be <= 100"
+    - "if type='fixed': value should not exceed line_subtotal (but stored as-is, clamped in calculation)"
+
+  examples:
+    - "NULL - no discount"
+    - '{\"type\": \"percent\", \"value\": 10} - 10% off'
+    - '{\"type\": \"fixed\", \"value\": 50} - 50 units off'
+
+# Calculation logic (reference for service implementation)
+calculation_logic:
+  line_total: |
+    function calculateLineTotal(quantity, unitPrice, discount) {
+      let subtotal = quantity * unitPrice;
+
+      if (!discount) {
+        return round(subtotal, 2);
+      }
+
+      if (discount.type === 'percent') {
+        subtotal = subtotal * (1 - discount.value / 100);
+      } else if (discount.type === 'fixed') {
+        subtotal = Math.max(0, subtotal - discount.value);
+      }
+
+      return round(subtotal, 2);
+    }
+
+  order_total: |
+    function calculateOrderTotal(lines) {
+      const total = lines.reduce((sum, line) => sum + (line.line_total || 0), 0);
+      return round(total, 2);
+    }
+
+# Index optimization
+indexes:
+  existing:
+    - name: "idx_so_lines_order"
+      columns: ["sales_order_id"]
+      purpose: "Query lines for a specific SO"
+
+  consider_for_future:
+    - name: "idx_so_lines_discount"
+      columns: ["discount"]
+      purpose: "Query lines with discounts applied (nice-to-have)"
+      priority: "low"

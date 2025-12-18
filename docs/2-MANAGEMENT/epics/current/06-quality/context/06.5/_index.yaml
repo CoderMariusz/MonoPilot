@@ -1,0 +1,199 @@
+# Story 06.5 - Incoming Inspection Context (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 1B (Core Quality)
+
+story:
+  id: "06.5"
+  name: "Incoming Inspection"
+  slug: "incoming-inspection"
+  epic: "06-quality"
+  phase: "1B"
+  complexity: "L"
+  estimate_days: 5-7
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, triggers, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product reference for inspection"]
+    - story: "03.3"
+      name: "Purchase Orders"
+      provides: ["purchase_orders table", "po_lines", "PO data for GRN"]
+    - story: "05.1"
+      name: "License Plate Table + CRUD"
+      provides: ["license_plates table", "LP service", "LP context"]
+    - story: "05.11"
+      name: "GRN from PO"
+      provides: ["grns table", "grn_items table", "GRN completion trigger"]
+    - story: "06.0"
+      name: "Quality Settings"
+      provides: ["quality_settings table", "auto_create_inspection_on_grn setting"]
+    - story: "06.1"
+      name: "Quality Status Types"
+      provides: ["qa_status enum values", "LP QA status reference"]
+    - story: "06.3"
+      name: "Product Specifications"
+      provides: ["quality_specifications table", "quality_spec_parameters"]
+    - story: "06.4"
+      name: "Test Parameters"
+      provides: ["specification parameter schema", "test method reference"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "06.6"
+      name: "Test Results Recording"
+      reason: "Inspection created before test results can be recorded"
+    - story: "06.7"
+      name: "Sampling Plans (AQL)"
+      reason: "Sampling integration with inspections"
+    - story: "06.8"
+      name: "Scanner QA Pass/Fail"
+      reason: "Scanner integration for inspection workflow"
+    - story: "06.9"
+      name: "Basic NCR Creation"
+      reason: "Failed inspections trigger NCR creation"
+    - epic: "05"
+      name: "Warehouse Module"
+      reason: "Incoming inspection updates LP QA status"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-005", "Section 9.1 - Incoming Inspection"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["quality_inspections", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.5.incoming-inspection.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for quality_inspections table"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-001-multi-tenancy-isolation.md"
+      relevance: "Multi-tenancy isolation across all quality tables"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-005-incoming-inspection.md"
+      relevance: "Incoming inspection queue, detail page, execution wizard"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "quality_inspections table + inspection_number_sequences + triggers + RLS"
+  - type: "trigger/function"
+    count: 3
+    description: "generate_inspection_number() + create_incoming_inspection_on_grn() + update_lp_qa_status_on_inspection()"
+  - type: "service"
+    count: 1
+    description: "inspection-service.ts with list, create, assign, start, complete, cancel"
+  - type: "validation"
+    count: 3
+    description: "createInspectionSchema, assignInspectionSchema, completeInspectionSchema, etc."
+  - type: "api"
+    count: 8
+    description: "GET/POST inspections, GET detail, POST assign/start/complete, GET pending/incoming"
+  - type: "components"
+    count: 15
+    description: "DataTable, Filters, Modals, Badges, Forms, Timeline, StatusBadges"
+  - type: "page"
+    count: 3
+    description: "/quality/inspections (list), /quality/inspections/[id] (detail), /quality/inspections/new (create)"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Technical notes
+technical_notes:
+  - "Inspection types: 'incoming' (this story), in_process, final (future stories)"
+  - "Inspection status workflow: scheduled → in_progress → completed (or cancelled)"
+  - "Inspection result: pass, fail, conditional (determined on completion)"
+  - "Auto-create trigger on GRN completion (configurable via quality_settings.auto_create_inspection_on_grn)"
+  - "Inspection number format: INS-{type}-{YYYY}-{NNNNN} (e.g., INS-INC-2025-00001)"
+  - "LP QA status updated automatically on inspection completion: passed/failed/conditional"
+  - "Conditional result requires QA_MANAGER role approval"
+  - "Critical defects can auto-fail inspection if configured"
+  - "Inspection immutable once completed (is_locked = true behavior)"
+  - "Audit trail required for all state changes (quality_audit_log)"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+
+# Business Rules
+business_rules:
+  - rule: "Inspection Required for QA Release"
+    description: "LP with qa_status='pending' cannot be consumed until inspection completed"
+    enforcement: "Warehouse module checks LP.qa_status before allowing consumption"
+  - rule: "One Active Inspection per LP"
+    description: "Prevent duplicate active inspections for same LP (warn but allow override)"
+    enforcement: "API validation via hasActiveInspection() check"
+  - rule: "Inspector Assignment Required"
+    description: "Cannot start inspection without assigned inspector"
+    enforcement: "API validation - status must have inspector_id before starting"
+  - rule: "Specification Optional in MVP"
+    description: "Inspection can complete without linked specification (manual pass/fail)"
+    enforcement: "spec_id is nullable, result determination logic handles NULL spec_id"
+  - rule: "Auto-Fail on Critical Defect"
+    description: "If critical_defects > 0 and quality_settings.auto_fail_on_critical=true, result = fail"
+    enforcement: "getSuggestedResult() logic checks critical_defects"
+  - rule: "Conditional Requires Manager Approval"
+    description: "Only QA_MANAGER role can approve conditional results"
+    enforcement: "RLS policy on quality_inspections.result = 'conditional' requires role check"
+  - rule: "LP Status Update Automatic"
+    description: "Completing inspection automatically updates LP.qa_status via trigger"
+    enforcement: "Database trigger: update_lp_qa_status_on_inspection()"
+  - rule: "Audit Trail Required"
+    description: "All status changes, assignments, results logged to quality_audit_log"
+    enforcement: "Application layer creates audit_log entries on every state change"
+  - rule: "Cancel Only Scheduled"
+    description: "Only scheduled inspections can be cancelled; in_progress must complete or reset"
+    enforcement: "API validation checks status before allowing cancel"
+  - rule: "Permission Enforcement"
+    description: "QA_INSPECTOR can create/execute; QA_MANAGER can approve conditional"
+    enforcement: "RLS policies on quality_inspections with role-based INSERT/UPDATE"
+
+# Context Summary
+summary: |
+  Story 06.5 implements the incoming inspection workflow for goods received via GRN.
+
+  MVP SCOPE (This Story):
+  - quality_inspections table with type='incoming' filter
+  - Auto-create inspection on GRN completion (if setting enabled)
+  - Manual inspection creation from pending queue
+  - Inspection workflow: scheduled → in_progress → completed
+  - Inspector assignment and reassignment
+  - Test results recording per specification parameter (via story 06.6)
+  - Result determination: pass/fail/conditional
+  - LP QA status update on inspection completion
+  - Inspection queue dashboard with filters
+  - Inspection detail page with test results grid
+
+  DEFERRED (Phase 1+/Story 06.5b):
+  - Auto-create from GRN (scheduled as auto-trigger)
+  - Sampling plan integration (AQL-based)
+  - Photo attachments for visual evidence
+  - Inspection scheduling (scheduled vs actual date)
+  - Inspection templates
+  - E-signature integration (FDA 21 CFR Part 11)
+
+  KEY INTEGRATION POINTS:
+  - Triggered by GRN completion (Epic 05)
+  - Creates quality holds on failure (Quality 06.2)
+  - Can trigger NCR creation on critical failure (Quality 06.9)
+  - Uses test parameters from specifications (Quality 06.3/06.4)
+  - Updates LP QA status for consumption rules (Warehouse Epic 05)
+  - Links to CoA verification (Quality 06.11 - future)

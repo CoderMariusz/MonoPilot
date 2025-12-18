@@ -1,0 +1,415 @@
+# Story 06.9 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/quality/ncrs"
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/ncrs"
+    description: "List NCRs with filters"
+    file: "apps/frontend/app/api/quality/ncrs/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    query_params:
+      - { name: "status", type: "string", enum: ["draft", "open", "closed"], required: false }
+      - { name: "severity", type: "string", enum: ["minor", "major", "critical"], required: false }
+      - { name: "detection_point", type: "string", enum: ["incoming", "in_process", "final", "customer", "internal_audit", "supplier_audit", "other"], required: false }
+      - { name: "search", type: "string", required: false, description: "Search by NCR number or title (min 2 chars)" }
+      - { name: "date_from", type: "string", required: false, description: "ISO date format" }
+      - { name: "date_to", type: "string", required: false, description: "ISO date format" }
+      - { name: "sort_by", type: "string", enum: ["ncr_number", "detected_date", "severity", "status"], default: "detected_date" }
+      - { name: "sort_order", type: "string", enum: ["asc", "desc"], default: "desc" }
+      - { name: "page", type: "number", default: 1 }
+      - { name: "limit", type: "number", default: 20, max: 100 }
+
+    response:
+      status: 200
+      type: "PaginatedResult<NCRReport>"
+      schema:
+        ncrs: "NCRReport[]"
+        pagination: { total: "number", page: "number", limit: "number", pages: "number" }
+        stats: { draft_count: "number", open_count: "number", closed_count: "number", critical_count: "number" }
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 400, code: "INVALID_QUERY", message: "Invalid query parameters" }
+
+  - method: "GET"
+    path: "/api/quality/ncrs/:id"
+    description: "Get NCR detail"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "NCRDetailResponse"
+      schema:
+        ncr: "NCRReport"
+        source_reference: "{ type: string, id: string, display_name: string, link: string } | null"
+        permissions: "{ can_edit: boolean, can_delete: boolean, can_close: boolean, can_assign: boolean }"
+
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+
+  - method: "POST"
+    path: "/api/quality/ncrs"
+    description: "Create NCR"
+    file: "apps/frontend/app/api/quality/ncrs/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "ADMIN"]
+
+    request:
+      type: "CreateNCRRequest"
+      schema:
+        title: "string (5-200 chars)"
+        description: "string (20-2000 chars)"
+        severity: "enum: minor | major | critical"
+        detection_point: "enum: incoming | in_process | final | customer | internal_audit | supplier_audit | other"
+        category: "enum (optional): product_defect | process_deviation | documentation_error | equipment_failure | supplier_issue | customer_complaint | other"
+        source_type: "enum (optional): inspection | hold | batch | work_order | supplier | customer_complaint | audit | other"
+        source_id: "UUID (optional)"
+        source_description: "string (optional, max 500 chars)"
+        submit_immediately: "boolean (optional, default: false)"
+
+    response:
+      status: 201
+      type: "CreateNCRResponse"
+      schema:
+        ncr: "NCRReport"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed", field_errors: true }
+      - { status: 403, code: "PERMISSION_DENIED", message: "Insufficient permissions" }
+
+  - method: "PUT"
+    path: "/api/quality/ncrs/:id"
+    description: "Update NCR (draft only)"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "ADMIN"]
+
+    request:
+      type: "UpdateNCRRequest"
+      schema:
+        title: "string (5-200 chars, optional)"
+        description: "string (20-2000 chars, optional)"
+        severity: "enum (optional)"
+        detection_point: "enum (optional)"
+        category: "enum (optional)"
+
+    response:
+      status: 200
+      type: "NCRReport"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 403, code: "CANNOT_UPDATE", message: "Cannot update open/closed NCR" }
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+
+  - method: "DELETE"
+    path: "/api/quality/ncrs/:id"
+    description: "Delete NCR (draft only)"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "ADMIN"]
+
+    response:
+      status: 204
+
+    errors:
+      - { status: 403, code: "CANNOT_DELETE", message: "Cannot delete open/closed NCR" }
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+
+  - method: "POST"
+    path: "/api/quality/ncrs/:id/submit"
+    description: "Submit NCR (draft -> open)"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/submit/route.ts"
+    auth: "required"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "ADMIN"]
+
+    request: {}
+
+    response:
+      status: 200
+      type: "NCRReport"
+
+    errors:
+      - { status: 403, code: "CANNOT_SUBMIT", message: "Can only submit draft NCRs" }
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+
+  - method: "POST"
+    path: "/api/quality/ncrs/:id/close"
+    description: "Close NCR (open -> closed) - QA Manager only"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/close/route.ts"
+    auth: "required"
+    roles: ["QA_MANAGER", "ADMIN"]
+
+    request:
+      type: "CloseNCRRequest"
+      schema:
+        closure_notes: "string (50-2000 chars, required)"
+
+    response:
+      status: 200
+      type: "NCRReport"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Closure notes required (min 50 chars)" }
+      - { status: 403, code: "PERMISSION_DENIED", message: "Only QA Manager can close NCRs" }
+      - { status: 403, code: "CANNOT_CLOSE", message: "Can only close open NCRs" }
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+
+  - method: "POST"
+    path: "/api/quality/ncrs/:id/assign"
+    description: "Assign NCR to user"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/assign/route.ts"
+    auth: "required"
+    roles: ["QA_MANAGER", "ADMIN"]
+
+    request:
+      type: "AssignNCRRequest"
+      schema:
+        assigned_to: "UUID (user ID, required)"
+
+    response:
+      status: 200
+      type: "NCRReport"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Invalid user ID" }
+      - { status: 403, code: "PERMISSION_DENIED", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "NCR or user not found" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/ncr-service.ts"
+    description: "NCR business logic and database interactions"
+    exports:
+      - name: "NCRService"
+        type: "class"
+        methods:
+          - name: "list"
+            params: ["params: NCRListParams"]
+            returns: "Promise<PaginatedResult<NCRReport>>"
+            notes: ["Applies filters and RLS"]
+
+          - name: "getById"
+            params: ["id: string"]
+            returns: "Promise<NCRDetailResponse | null>"
+            notes: ["Returns permissions and source reference"]
+
+          - name: "getByNumber"
+            params: ["ncrNumber: string"]
+            returns: "Promise<NCRReport | null>"
+
+          - name: "create"
+            params: ["input: CreateNCRInput", "userId: string"]
+            returns: "Promise<NCRReport>"
+            notes: ["Auto-generates NCR number", "Sets detected_by = userId"]
+
+          - name: "update"
+            params: ["id: string", "input: UpdateNCRInput", "userId: string"]
+            returns: "Promise<NCRReport>"
+            notes: ["Draft only"]
+
+          - name: "delete"
+            params: ["id: string"]
+            returns: "Promise<void>"
+            notes: ["Draft only"]
+
+          - name: "submit"
+            params: ["id: string", "userId: string"]
+            returns: "Promise<NCRReport>"
+            notes: ["Draft -> Open transition"]
+
+          - name: "close"
+            params: ["id: string", "closureNotes: string", "userId: string"]
+            returns: "Promise<NCRReport>"
+            notes: ["Open -> Closed, requires QA_MANAGER role"]
+
+          - name: "assign"
+            params: ["id: string", "assignedToId: string", "userId: string"]
+            returns: "Promise<NCRReport>"
+
+          - name: "generateNCRNumber"
+            params: ["orgId: string"]
+            returns: "Promise<string>"
+            notes: ["NCR-YYYY-NNNNN format"]
+
+          - name: "getStats"
+            params: ["orgId: string"]
+            returns: "Promise<NCRStats>"
+            notes: ["Draft, open, closed, critical counts"]
+
+          - name: "checkPermissions"
+            params: ["ncrId: string", "userId: string"]
+            returns: "Promise<NCRPermissions>"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/ncr.ts"
+    description: "NCR TypeScript interfaces"
+    exports:
+      - name: "NCRReport"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "ncr_number: string"
+          - "title: string"
+          - "description: string"
+          - "severity: 'minor' | 'major' | 'critical'"
+          - "status: 'draft' | 'open' | 'closed'"
+          - "category?: string"
+          - "detection_point: string"
+          - "detected_date: string"
+          - "detected_by: string"
+          - "detected_by_name?: string"
+          - "source_type?: string"
+          - "source_id?: string"
+          - "source_description?: string"
+          - "assigned_to?: string"
+          - "assigned_to_name?: string"
+          - "assigned_at?: string"
+          - "closed_at?: string"
+          - "closed_by?: string"
+          - "closed_by_name?: string"
+          - "closure_notes?: string"
+          - "created_at: string"
+          - "created_by: string"
+          - "updated_at: string"
+          - "updated_by?: string"
+
+      - name: "NCRDetailResponse"
+        fields:
+          - "ncr: NCRReport"
+          - "source_reference?: { type: string; id: string; display_name: string; link: string }"
+          - "permissions: { can_edit: boolean; can_delete: boolean; can_close: boolean; can_assign: boolean }"
+
+      - name: "NCRListParams"
+        fields:
+          - "status?: 'draft' | 'open' | 'closed'"
+          - "severity?: 'minor' | 'major' | 'critical'"
+          - "detection_point?: string"
+          - "search?: string"
+          - "date_from?: string"
+          - "date_to?: string"
+          - "sort_by?: 'ncr_number' | 'detected_date' | 'severity' | 'status'"
+          - "sort_order?: 'asc' | 'desc'"
+          - "page?: number"
+          - "limit?: number"
+
+      - name: "CreateNCRInput"
+        fields:
+          - "title: string"
+          - "description: string"
+          - "severity: 'minor' | 'major' | 'critical'"
+          - "detection_point: string"
+          - "category?: string"
+          - "source_type?: string"
+          - "source_id?: string"
+          - "source_description?: string"
+          - "submit_immediately?: boolean"
+
+      - name: "UpdateNCRInput"
+        fields:
+          - "title?: string"
+          - "description?: string"
+          - "severity?: 'minor' | 'major' | 'critical'"
+          - "detection_point?: string"
+          - "category?: string"
+
+      - name: "NCRStats"
+        fields:
+          - "draft_count: number"
+          - "open_count: number"
+          - "closed_count: number"
+          - "critical_count: number"
+          - "major_count: number"
+          - "minor_count: number"
+
+      - name: "NCRPermissions"
+        fields:
+          - "can_edit: boolean"
+          - "can_delete: boolean"
+          - "can_close: boolean"
+          - "can_assign: boolean"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/ncr.ts"
+    description: "Zod schemas for NCR validation"
+    schemas:
+      - name: "createNCRSchema"
+        fields:
+          - "title: string (5-200 chars)"
+          - "description: string (20-2000 chars)"
+          - "severity: enum"
+          - "detection_point: enum"
+          - "category: enum (optional)"
+          - "source_type: enum (optional)"
+          - "source_id: uuid (optional)"
+          - "source_description: string (optional, max 500)"
+          - "submit_immediately: boolean (optional)"
+
+      - name: "updateNCRSchema"
+        fields:
+          - "title: string (5-200 chars, optional)"
+          - "description: string (20-2000 chars, optional)"
+          - "severity: enum (optional)"
+          - "detection_point: enum (optional)"
+          - "category: enum (optional)"
+
+      - name: "closeNCRSchema"
+        fields:
+          - "closure_notes: string (50-2000 chars)"
+
+      - name: "assignNCRSchema"
+        fields:
+          - "assigned_to: uuid"
+
+      - name: "ncrListQuerySchema"
+        fields:
+          - "status: enum (optional)"
+          - "severity: enum (optional)"
+          - "detection_point: enum (optional)"
+          - "search: string (optional, min 2)"
+          - "date_from: date (optional)"
+          - "date_to: date (optional)"
+          - "sort_by: enum (default: detected_date)"
+          - "sort_order: enum (default: desc)"
+          - "page: positive number (default: 1)"
+          - "limit: positive number 1-100 (default: 20)"
+
+# Error Handling
+error_codes:
+  UNAUTHORIZED:
+    status: 401
+    message: "Authentication required"
+  VALIDATION_ERROR:
+    status: 400
+    message: "Request validation failed"
+    includes_field_errors: true
+  INVALID_QUERY:
+    status: 400
+    message: "Invalid query parameters"
+  NOT_FOUND:
+    status: 404
+    message: "NCR not found"
+  PERMISSION_DENIED:
+    status: 403
+    message: "Insufficient permissions for this action"
+  CANNOT_UPDATE:
+    status: 403
+    message: "Cannot update non-draft NCR"
+  CANNOT_DELETE:
+    status: 403
+    message: "Cannot delete non-draft NCR"
+  CANNOT_SUBMIT:
+    status: 403
+    message: "Can only submit draft NCRs"
+  CANNOT_CLOSE:
+    status: 403
+    message: "Can only close open NCRs"

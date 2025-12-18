@@ -218,7 +218,7 @@ types:
 ux:
   wireframes:
     - id: "SET-008"
-      path: "docs/2-MANAGEMENT/epics/current/01-settings/context/wireframes/SET-008-user-list.md"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-008-user-list.md"
       components:
         - "UsersDataTable"
         - "UserRow"
@@ -230,7 +230,7 @@ ux:
         - "Success: User rows with pagination"
 
     - id: "SET-009"
-      path: "docs/2-MANAGEMENT/epics/current/01-settings/context/wireframes/SET-009-user-modal.md"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-009-user-modal.md"
       components:
         - "UserModal"
       mvp_scope: "Hide warehouse access section (lines 49-117)"

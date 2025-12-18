@@ -1,0 +1,191 @@
+# Story 07.9 - Pick Confirmation Desktop Context (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 1B (Core Picking)
+
+story:
+  id: "07.9"
+  name: "Pick Confirmation Desktop"
+  slug: "pick-confirmation-desktop"
+  epic: "07-shipping"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, triggers, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table", "roles"]
+    - story: "01.8"
+      name: "Warehouses"
+      provides: ["warehouses table", "warehouse context"]
+    - story: "01.9"
+      name: "Locations"
+      provides: ["locations table", "zone/aisle/bin hierarchy"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product allergens"]
+    - story: "02.3"
+      name: "Allergens"
+      provides: ["allergens table", "allergen reference data"]
+    - story: "05.1"
+      name: "License Plates"
+      provides: ["license_plates table", "LP service", "quantity_on_hand"]
+    - story: "05.3"
+      name: "LP Reservations/Allocations"
+      provides: ["inventory_allocations table", "allocation status"]
+    - story: "07.3"
+      name: "Sales Orders CRUD"
+      provides: ["sales_orders table", "SO status workflow"]
+    - story: "07.4"
+      name: "SO Lines Management"
+      provides: ["sales_order_lines table", "quantity_ordered/picked tracking"]
+    - story: "07.7"
+      name: "Inventory Allocation"
+      provides: ["inventory_allocations records", "pick suggestions"]
+      status: "HARD BLOCKER"
+    - story: "07.8"
+      name: "Pick List Generation"
+      provides: ["pick_lists table", "pick_list_lines table", "pick_sequence"]
+      status: "HARD BLOCKER"
+
+  blocked_by: []
+
+  blocks:
+    - story: "07.10"
+      name: "Pick Confirmation Scanner"
+      reason: "Desktop UI provides foundation; Scanner is mobile variant with same logic"
+    - story: "07.11"
+      name: "Packing Station"
+      reason: "Completed picks feed into packing workflow"
+    - story: "07.14"
+      name: "Shipment + Ship Confirm"
+      reason: "Completed picks enable shipment creation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.24", "FR-7.26", "FR-7.27", "FR-7.28", "FR-7.30", "Section 2.1 Picking"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["Pick Confirmation Workflow", "Status Machine", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.9.pick-confirmation-desktop.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for pick_list_lines and inventory updates"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-001-multi-tenancy-isolation.md"
+      relevance: "Multi-tenancy isolation across all pick operations"
+  wireframes:
+    - id: "SHIP-014"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-014-pick-desktop.md"
+      relevance: "Desktop pick interface, short pick modal, allergen alert modal, table layout"
+    - id: "SHIP-016"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-016-short-pick.md"
+      relevance: "Short pick confirmation modal with reason selection"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 4
+    description: "Start pick list, Confirm pick, Short pick, Complete pick list endpoints"
+  - type: "service"
+    count: 1
+    description: "PickConfirmationService with transaction logic"
+  - type: "validation"
+    count: 2
+    description: "confirmPickSchema, shortPickSchema with Zod"
+  - type: "components"
+    count: 6
+    description: "PickConfirmationHeader, PickLineCard, ShortPickModal, PickProgressBar, AllergenWarningBanner, LPBarcodeDisplay"
+  - type: "page"
+    count: 1
+    description: "/shipping/pick-lists/[id]/pick page with real-time updates"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Technical notes
+technical_notes:
+  - "Pick confirmation updates 4 tables: pick_list_lines, inventory_allocations, sales_order_lines, license_plates"
+  - "Status workflow: pending → in_progress → completed (with short pick option)"
+  - "Short pick requires reason selection (dropdown) and creates backorder signal"
+  - "Allergen validation: check customer restrictions vs product allergens, require acknowledgment if conflict"
+  - "LP barcode display: CODE128 for scanner users, human-readable fallback"
+  - "FIFO/FEFO: Pick suggestions pre-sorted by allocation; show lot/expiry in UI"
+  - "Permission: Only assigned picker or Warehouse+ roles can confirm picks"
+  - "Real-time progress: Update UI as each line is picked without page refresh"
+  - "RLS enforcement: All queries filtered by org_id to prevent cross-tenant access"
+  - "Backorder creation: If short pick results in partial SO fulfillment, create backorder signal"
+
+# Business Rules
+business_rules:
+  - rule: "Cannot Pick More Than Allocated"
+    description: "quantity_picked <= quantity_to_pick (allocated amount)"
+    enforcement: "API validation before database update"
+  - rule: "Assigned Picker Only"
+    description: "Only assigned picker or Warehouse+ role can confirm picks"
+    enforcement: "RLS policy + permission check on pick_list.assigned_to"
+  - rule: "Short Pick Requires Reason"
+    description: "Partial picks must specify reason (dropdown)"
+    enforcement: "Modal blocks confirmation until reason selected"
+  - rule: "Status Workflow Enforcement"
+    description: "pending → in_progress (start) → completed (finish)"
+    enforcement: "API validation checks current status before transition"
+  - rule: "Allergen Alert on Conflict"
+    description: "If product allergens match customer restrictions, display warning"
+    enforcement: "UI modal requires picker acknowledgment before confirming pick"
+  - rule: "All Lines Must Be Picked or Approved"
+    description: "Cannot complete pick list with pending lines"
+    enforcement: "API validation before status update to 'completed'"
+  - rule: "SO Status Update Automatic"
+    description: "Completing pick list updates SO status to 'packing' (if fully picked) or 'partial' (if short picks)"
+    enforcement: "Database update after pick_list completion"
+  - rule: "Backorder Created on Short Pick"
+    description: "If partial SO fulfillment, system creates backorder signal"
+    enforcement: "Application logic in confirmShortPick() service method"
+
+# Context Summary
+summary: |
+  Story 07.9 implements the desktop-based pick confirmation workflow for warehouse pickers.
+
+  MVP SCOPE (This Story):
+  - Desktop pick confirmation page at /shipping/pick-lists/:id/pick
+  - Start pick list workflow (status: assigned → in_progress)
+  - Confirm full pick: quantity validation, 4-table updates, real-time progress
+  - Handle short picks: reason selection (required), backorder creation
+  - Allergen warning display with acknowledgment requirement
+  - LP barcode display (CODE128 + human-readable) for hybrid scanner users
+  - Permission validation (assigned picker or Warehouse+ only)
+  - Complete pick list workflow: validate all lines picked/short, update SO status
+  - Real-time progress indicator (X of Y lines picked, percentage)
+  - RLS enforcement for multi-tenant isolation
+
+  INTEGRATION POINTS:
+  - Consumes pick lists from Story 07.8 (Pick List Generation)
+  - Reads allocations from Story 07.7 (Inventory Allocation)
+  - Reads customer allergen restrictions from Story 07.1 (Customers)
+  - Updates SO status for Story 07.11 (Packing Station) integration
+  - Creates backorder signals (future Epic 03 Planning integration)
+  - Updates LP quantity_on_hand for Warehouse Module integration
+
+  DEFERRED (Phase 1B+/Story 07.10):
+  - Scanner UI workflow (mobile-first, barcode scanning)
+  - Offline support (PWA sync)
+  - Wave picking optimization display
+  - Pick performance metrics
+  - Pick list cancellation (deferred to 07.9b or future story)

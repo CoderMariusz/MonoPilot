@@ -1,0 +1,588 @@
+# Story 07.5 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/sales-order-service.test.ts"
+    type: "unit"
+    description: "Unit tests for SalesOrderService.cloneSalesOrder and importSalesOrdersFromCSV"
+
+  - path: "apps/frontend/lib/validation/__tests__/sales-order-import.test.ts"
+    type: "unit"
+    description: "Unit tests for CSV validation schema and row validation"
+
+  - path: "apps/frontend/components/shipping/sales-orders/__tests__/CloneOrderDialog.test.tsx"
+    type: "unit"
+    description: "Unit tests for CloneOrderDialog component"
+
+  - path: "apps/frontend/components/shipping/sales-orders/__tests__/ImportOrdersDialog.test.tsx"
+    type: "unit"
+    description: "Unit tests for ImportOrdersDialog component"
+
+  - path: "apps/frontend/components/shipping/sales-orders/__tests__/ImportPreviewTable.test.tsx"
+    type: "unit"
+    description: "Unit tests for ImportPreviewTable component"
+
+  - path: "apps/frontend/app/api/shipping/sales-orders/__tests__/clone.test.ts"
+    type: "integration"
+    description: "Integration tests for clone endpoint"
+
+  - path: "apps/frontend/app/api/shipping/sales-orders/__tests__/import.test.ts"
+    type: "integration"
+    description: "Integration tests for import endpoint"
+
+  - path: "apps/frontend/e2e/shipping/clone-order.spec.ts"
+    type: "e2e"
+    description: "E2E test for clone workflow"
+
+  - path: "apps/frontend/e2e/shipping/import-orders.spec.ts"
+    type: "e2e"
+    description: "E2E test for import workflow"
+
+# Acceptance Criteria
+
+acceptance_criteria:
+  # CLONE - Happy Path
+  - id: "AC-CLONE-01"
+    title: "Clone SO - Happy Path"
+    given: "Clerk views SO detail page for SO with status draft/confirmed/shipped"
+    when: "Clone Order button clicked and confirmation accepted"
+    then: |
+      New SO created with:
+      - New order_number (auto-generated SO-YYYY-NNNNN)
+      - Status: draft
+      - Same customer_id, shipping_address_id
+      - Same lines (product, quantity, unit_price)
+      - Cleared: customer_po, promised_ship_date, required_delivery_date, confirmed_at, shipped_at
+      - Quantities reset: allocated, picked, packed, shipped = 0
+      - allergen_validated = false
+      - order_date = today
+      - notes = copied from original
+    test_type: "integration + e2e"
+    priority: "P0"
+
+  - id: "AC-CLONE-02"
+    title: "Clone SO - Redirect and Toast"
+    given: "Clone completes successfully"
+    when: "Clone API response received"
+    then: |
+      User redirected to new SO detail page
+      Toast notification displays: "Cloned from SO-2025-00123"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-CLONE-03"
+    title: "Clone SO - Line Renumbering"
+    given: "Original SO has 3 lines with line_numbers 1, 5, 10"
+    when: "Clone completes"
+    then: "Cloned SO has lines renumbered as 1, 2, 3 (sequential)"
+    test_type: "unit + integration"
+    priority: "P0"
+
+  - id: "AC-CLONE-04"
+    title: "Clone SO - RLS Isolation"
+    given: "User from org A tries to clone org B's SO by direct API call"
+    when: "Request made with org B SO id"
+    then: "404 error (RLS blocks access)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-CLONE-05"
+    title: "Clone SO - Not Found"
+    given: "SO id does not exist in org"
+    when: "Clone endpoint called"
+    then: "404 error 'Sales order not found'"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-CLONE-06"
+    title: "Clone SO - Permission Check"
+    given: "User with VIEWER role"
+    when: "SO detail page loads"
+    then: "Clone Order button is hidden"
+    test_type: "unit + e2e"
+    priority: "P1"
+
+  # IMPORT - CSV Parsing
+  - id: "AC-IMPORT-01"
+    title: "Import - CSV Parse - Happy Path"
+    given: "Clerk uploads valid CSV with 3 rows"
+    csv: |
+      customer_code,product_code,quantity,unit_price
+      ACME001,PROD-001,100,10.50
+      ACME001,PROD-002,50,25.00
+      BETA002,PROD-001,200,10.00
+    when: "File parsed"
+    then: |
+      Preview table displays 3 rows with:
+      - Row 1: ACME001, PROD-001, 100, 10.50, valid (green checkmark)
+      - Row 2: ACME001, PROD-002, 50, 25.00, valid (green checkmark)
+      - Row 3: BETA002, PROD-001, 200, 10.00, valid (green checkmark)
+    test_type: "unit + integration"
+    priority: "P0"
+
+  - id: "AC-IMPORT-02"
+    title: "Import - CSV Parse - Extended Format"
+    given: "Clerk uploads CSV with optional columns"
+    csv: |
+      customer_code,product_code,quantity,unit_price,customer_po,promised_ship_date,notes
+      ACME001,PROD-001,100,10.50,PO-12345,2025-12-20,Rush order
+      ACME001,PROD-002,50,25.00,,,
+    when: "File parsed"
+    then: |
+      Row 1 includes: customer_po=PO-12345, promised_ship_date=2025-12-20, notes=Rush order
+      Row 2 includes: customer_po=null, promised_ship_date=null, notes=null
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-IMPORT-03"
+    title: "Import - CSV Grouping by Customer"
+    given: "Upload CSV with 5 rows (3 customers)"
+    csv: |
+      customer_code,product_code,quantity,unit_price
+      ACME001,PROD-001,100,10.50
+      ACME001,PROD-002,50,25.00
+      BETA002,PROD-001,200,10.00
+      BETA002,PROD-003,75,15.00
+      GAMMA003,PROD-004,300,5.00
+    when: "Import completes"
+    then: |
+      3 SOs created:
+      - SO 1 for ACME001 with 2 lines
+      - SO 2 for BETA002 with 2 lines
+      - SO 3 for GAMMA003 with 1 line
+    test_type: "integration"
+    priority: "P0"
+
+  # IMPORT - Validation
+  - id: "AC-IMPORT-04"
+    title: "Import - Invalid Customer"
+    given: "CSV row with non-existent customer"
+    when: "File parsed"
+    then: "Row marked invalid with error 'Customer INVALID not found'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-IMPORT-05"
+    title: "Import - Invalid Product"
+    given: "CSV row with non-existent product"
+    when: "File parsed"
+    then: "Row marked invalid with error 'Product INVALID-PROD not found'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-IMPORT-06"
+    title: "Import - Invalid Quantity"
+    given: "CSV with quantity 0 or negative"
+    when: "File parsed"
+    then: "Row marked invalid with error 'Quantity must be greater than zero'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-IMPORT-07"
+    title: "Import - Invalid Unit Price"
+    given: "CSV with negative unit_price"
+    when: "File parsed"
+    then: "Row marked invalid with error 'Unit price cannot be negative'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-IMPORT-08"
+    title: "Import - Invalid Date Format"
+    given: "CSV with invalid date format for promised_ship_date"
+    when: "File parsed"
+    then: "Row marked invalid with error 'Invalid date format (use YYYY-MM-DD)'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-IMPORT-09"
+    title: "Import - Mixed Valid and Invalid Rows"
+    given: "CSV with 3 rows: row 1 invalid, row 2 valid, row 3 valid"
+    when: "File parsed and import clicked"
+    then: |
+      - Row 1 skipped (error shows in summary)
+      - SO created with 2 lines from rows 2-3
+      - Error summary shows "1 row skipped"
+    test_type: "integration"
+    priority: "P0"
+
+  # IMPORT - File Validation
+  - id: "AC-IMPORT-10"
+    title: "Import - Empty CSV"
+    given: "Clerk uploads empty CSV"
+    when: "File parsed"
+    then: "Error displays 'CSV file is empty'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-IMPORT-11"
+    title: "Import - Missing Header"
+    given: "CSV without header row (data only)"
+    when: "File parsed"
+    then: "Error displays 'CSV must have header row: customer_code, product_code, quantity'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-IMPORT-12"
+    title: "Import - Missing Columns"
+    given: "CSV with only customer_code and product_code"
+    when: "File parsed"
+    then: "Error displays 'Missing required columns: quantity'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-IMPORT-13"
+    title: "Import - Invalid File Type"
+    given: "Clerk uploads .xlsx file"
+    when: "File upload attempted"
+    then: "Error displays 'Only CSV files (.csv) are supported'"
+    test_type: "unit + e2e"
+    priority: "P1"
+
+  - id: "AC-IMPORT-14"
+    title: "Import - File Too Large"
+    given: "Clerk uploads 10 MB CSV file"
+    when: "File upload attempted"
+    then: "Error displays 'File size must be between 1 byte and 5 MB'"
+    test_type: "unit + e2e"
+    priority: "P1"
+
+  # IMPORT - Result Summary
+  - id: "AC-IMPORT-15"
+    title: "Import - Success Summary"
+    given: "Import with 3 valid rows creating 2 SOs"
+    when: "Import completes"
+    then: |
+      Success summary displays:
+      - "2 orders created"
+      - "3 lines imported"
+      - "0 errors"
+      - List of created order numbers
+      - View Orders button
+    test_type: "integration + e2e"
+    priority: "P0"
+
+  - id: "AC-IMPORT-16"
+    title: "Import - Error Summary"
+    given: "Import with 2 valid rows, 2 invalid"
+    when: "Import completes"
+    then: |
+      Summary displays:
+      - "2 orders created"
+      - "1 row skipped"
+      - Error list with row numbers and messages
+    test_type: "integration"
+    priority: "P1"
+
+  # IMPORT - RLS and Multi-Tenancy
+  - id: "AC-IMPORT-17"
+    title: "Import - Org Isolation"
+    given: "User from org A imports CSV with customer from org B"
+    when: "CSV row references org B customer_code"
+    then: "Validation error 'Customer not found' (customer not in org A scope)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-IMPORT-18"
+    title: "Import - SO Org Assignment"
+    given: "User from org A imports CSV"
+    when: "SOs created"
+    then: "All created SOs have org_id = org A"
+    test_type: "integration"
+    priority: "P0"
+
+  # IMPORT - Allergen State
+  - id: "AC-IMPORT-19"
+    title: "Import - Allergen Validation Reset"
+    given: "CSV imported creating new SOs"
+    when: "SOs saved"
+    then: "allergen_validated = false (Story 07.6 validates later)"
+    test_type: "unit"
+    priority: "P1"
+
+# Unit Test Cases
+
+unit_tests:
+  SalesOrderService:
+    cloneSalesOrder:
+      - name: "Clones SO with same customer_id and shipping_address_id"
+        setup: "Call cloneSalesOrder with valid SO id"
+        expected: "Cloned SO has same customer_id and shipping_address_id as original"
+
+      - name: "Generates new order_number"
+        setup: "Clone SO with order_number='SO-2025-00123'"
+        expected: "Cloned SO has different order_number (e.g., 'SO-2025-00456')"
+
+      - name: "Resets order_date to today"
+        setup: "Clone SO with order_date='2025-12-15'"
+        expected: "Cloned SO has order_date = today"
+
+      - name: "Clears customer_po, promised_ship_date, required_delivery_date"
+        setup: "Clone SO with these fields set"
+        expected: "Cloned SO has these fields = NULL"
+
+      - name: "Resets quantities to 0"
+        setup: "Clone SO with quantity_allocated=50, quantity_picked=25"
+        expected: "Cloned SO lines have all quantities = 0"
+
+      - name: "Renumbers lines sequentially"
+        setup: "Clone SO with lines: line_number 1, 5, 10"
+        expected: "Cloned SO has lines renumbered as 1, 2, 3"
+
+      - name: "Preserves notes"
+        setup: "Clone SO with notes='Special request'"
+        expected: "Cloned SO has notes='Special request'"
+
+      - name: "Sets allergen_validated = false"
+        setup: "Clone SO with allergen_validated=true"
+        expected: "Cloned SO has allergen_validated=false"
+
+    importSalesOrdersFromCSV:
+      - name: "Parses CSV with minimal columns"
+        setup: "Call with CSV: customer_code,product_code,quantity"
+        expected: "Rows parsed without errors"
+
+      - name: "Validates customer_code exists"
+        setup: "CSV row with non-existent customer_code"
+        expected: "Row marked invalid with error message"
+
+      - name: "Validates product_code exists"
+        setup: "CSV row with non-existent product_code"
+        expected: "Row marked invalid with error message"
+
+      - name: "Validates quantity > 0"
+        setup: "CSV row with quantity=0"
+        expected: "Row marked invalid: 'Quantity must be greater than zero'"
+
+      - name: "Groups rows by customer_code"
+        setup: "CSV with 5 rows, 3 different customers"
+        expected: "validatedRows grouped into 3 customer groups"
+
+      - name: "Continues processing after error"
+        setup: "CSV with row 1 invalid, row 2 valid"
+        expected: "Row 2 still processed, error added to errors array"
+
+  CSVValidation:
+    csvRowSchema:
+      - name: "Rejects empty customer_code"
+        input: { customer_code: "", product_code: "P1", quantity: "10" }
+        expected: "Validation fails"
+
+      - name: "Rejects empty product_code"
+        input: { customer_code: "C1", product_code: "", quantity: "10" }
+        expected: "Validation fails"
+
+      - name: "Rejects empty quantity"
+        input: { customer_code: "C1", product_code: "P1", quantity: "" }
+        expected: "Validation fails"
+
+      - name: "Rejects quantity = 0"
+        input: { customer_code: "C1", product_code: "P1", quantity: "0" }
+        expected: "Validation fails with message 'Quantity must be greater than 0'"
+
+      - name: "Rejects negative quantity"
+        input: { customer_code: "C1", product_code: "P1", quantity: "-5" }
+        expected: "Validation fails"
+
+      - name: "Rejects invalid unit_price"
+        input: { customer_code: "C1", product_code: "P1", quantity: "10", unit_price: "-5" }
+        expected: "Validation fails"
+
+      - name: "Accepts valid row"
+        input: { customer_code: "C1", product_code: "P1", quantity: "10", unit_price: "5.00" }
+        expected: "Validation passes"
+
+    csvFileSchema:
+      - name: "Rejects non-CSV file"
+        input: { file: File with type 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+        expected: "Validation fails: 'Only CSV files (.csv) are supported'"
+
+      - name: "Rejects file > 5 MB"
+        input: { file: File with size 6 * 1024 * 1024 }
+        expected: "Validation fails: 'File size must be <= 5 MB'"
+
+      - name: "Accepts valid CSV file"
+        input: { file: File with type 'text/csv' and size 100 KB }
+        expected: "Validation passes"
+
+# Integration Test Cases
+
+integration_tests:
+  - name: "Clone SO and verify all fields"
+    setup: "Create SO with lines, prices, notes"
+    action: "Call POST /api/shipping/sales-orders/:id/clone"
+    expected: |
+      - Response 200
+      - New SO id and order_number returned
+      - Cloned SO in database with correct fields
+      - All lines cloned with renumbered line_numbers
+      - Cloned SO visible in SO list
+
+  - name: "Clone SO increments sequence counter"
+    setup: "Org with next_so_sequence = 100"
+    action: "Clone SO"
+    expected: |
+      - Cloned SO has order_number ending in ...00101
+      - Org's next_so_sequence = 101
+
+  - name: "Clone fails for non-existent SO"
+    setup: "Invalid SO id"
+    action: "Call POST /api/shipping/sales-orders/:id/clone"
+    expected: "Response 404 'Sales order not found'"
+
+  - name: "Import CSV creates SOs with correct customer grouping"
+    setup: "CSV with 3 customers"
+    action: "Call POST /api/shipping/sales-orders/import with CSV file"
+    expected: |
+      - Response 200
+      - 3 SOs created in database
+      - Each SO linked to correct customer_id
+      - Lines grouped and numbered per SO
+
+  - name: "Import with partial errors creates valid SOs"
+    setup: "CSV with 2 invalid rows, 2 valid rows"
+    action: "Call POST /api/shipping/sales-orders/import"
+    expected: |
+      - Response 200
+      - 1 SO created (from 2 valid rows)
+      - errors array contains 2 items with row numbers and messages
+      - Import result shows orders_created=1, errors_count=2
+
+  - name: "Import validates customer_code against org"
+    setup: "User from org A, CSV references org B customer_code"
+    action: "Call POST /api/shipping/sales-orders/import"
+    expected: "Row marked invalid: 'Customer not found'"
+
+  - name: "Import sets allergen_validated = false"
+    setup: "CSV import creates new SO"
+    action: "Check SO in database"
+    expected: "allergen_validated = false"
+
+# E2E Test Cases
+
+e2e_tests:
+  - name: "Clone SO workflow complete"
+    setup: "User on SO detail page"
+    steps:
+      - "Click Clone Order button"
+      - "Confirm in dialog"
+      - "Wait for redirect"
+    expected: |
+      - New SO detail page loads
+      - URL shows new SO id
+      - Toast notification displays
+      - All fields match original except order_number, dates, quantities
+
+  - name: "Import CSV workflow complete"
+    setup: "User on SO list page"
+    steps:
+      - "Click Import Orders button"
+      - "Drag CSV file to dropzone"
+      - "Review preview table (should show all rows valid)"
+      - "Click Import button"
+      - "Wait for result summary"
+      - "Click View Orders"
+    expected: |
+      - Preview table shows valid rows with green checkmarks
+      - Import completes
+      - Result summary shows correct counts
+      - SO list shows newly created orders
+
+  - name: "Import CSV with errors shows details"
+    setup: "User on SO list page"
+    steps:
+      - "Click Import Orders button"
+      - "Upload CSV with 2 invalid rows"
+      - "Review preview table"
+      - "Click Import"
+      - "Check result summary"
+    expected: |
+      - Preview table shows invalid rows with red X and error messages
+      - Import creates SOs for valid rows
+      - Result summary lists errors with row numbers
+
+  - name: "Permission check hides clone button for viewers"
+    setup: "User with VIEWER role on SO detail page"
+    steps:
+      - "Load SO detail page"
+    expected: "Clone Order button is not visible"
+
+  - name: "Permission check hides import button for viewers"
+    setup: "User with VIEWER role on SO list page"
+    steps:
+      - "Load SO list page"
+    expected: "Import Orders button is not visible"
+
+# Definition of Done
+
+definition_of_done:
+  - "POST /api/shipping/sales-orders/:id/clone endpoint works and returns cloned SO"
+  - "Clone preserves customer_id, shipping_address_id, lines, unit_price, notes"
+  - "Clone resets order_number, status, dates, quantities"
+  - "Clone renumbers lines sequentially (1, 2, 3)"
+  - "Clone resets allergen_validated to false"
+  - "POST /api/shipping/sales-orders/import endpoint works"
+  - "CSV import validates customer_code, product_code, quantity, price"
+  - "CSV import groups rows by customer_code"
+  - "CSV import creates one SO per customer"
+  - "CSV import returns row-level error messages with line numbers"
+  - "Import preview table displays validation status (green/red)"
+  - "Import result summary shows success/error counts"
+  - "Clone button visible on SO detail page (all statuses)"
+  - "Clone button hidden for VIEWER role"
+  - "Import button visible on SO list page (authorized users)"
+  - "Import button hidden for VIEWER role"
+  - "CloneOrderDialog component works (confirm/cancel)"
+  - "ImportOrdersDialog component works (upload/preview/import)"
+  - "ImportPreviewTable displays rows with validation status"
+  - "ImportResultSummary shows created orders and errors"
+  - "Multi-tenant isolation verified (clone and import)"
+  - "Unit tests cover clone logic >80% coverage"
+  - "Unit tests cover CSV validation >80% coverage"
+  - "Integration tests pass for clone and import APIs"
+  - "E2E tests pass for clone and import workflows"
+
+# Coverage Requirements
+
+coverage:
+  unit:
+    target: 80
+    reason: "Clone logic, CSV parsing, validation"
+  integration:
+    target: 75
+    reason: "API endpoints, database operations"
+  e2e:
+    target: 70
+    reason: "Complete workflows"
+
+  files:
+    - "lib/services/sales-order-service.ts (clone, import methods): 85%"
+    - "lib/validation/sales-order-import.ts (schemas): 90%"
+    - "components/shipping/sales-orders/CloneOrderDialog.tsx: 80%"
+    - "components/shipping/sales-orders/ImportOrdersDialog.tsx: 80%"
+    - "components/shipping/sales-orders/ImportPreviewTable.tsx: 80%"
+    - "app/api/shipping/sales-orders/:id/clone/route.ts: 85%"
+    - "app/api/shipping/sales-orders/import/route.ts: 85%"
+
+# Output Artifacts
+
+output_artifacts:
+  - "SalesOrderService.cloneSalesOrder method"
+  - "SalesOrderService.importSalesOrdersFromCSV method"
+  - "CSV parser utility"
+  - "Order number generator utility"
+  - "POST /api/shipping/sales-orders/:id/clone endpoint"
+  - "POST /api/shipping/sales-orders/import endpoint"
+  - "CloneOrderDialog component"
+  - "ImportOrdersDialog component"
+  - "ImportPreviewTable component"
+  - "ImportResultSummary component"
+  - "useCloneSalesOrder hook"
+  - "useImportSalesOrders hook"
+  - "Clone integration on SO detail page"
+  - "Import integration on SO list page"
+  - "All unit tests passing >80% coverage"
+  - "All integration tests passing"
+  - "All E2E tests passing"
+

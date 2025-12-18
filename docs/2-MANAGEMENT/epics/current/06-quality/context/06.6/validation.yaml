@@ -1,0 +1,280 @@
+# Story 06.6 - Validation & Business Rules
+# Purpose: Zod schemas, validation logic, business rules
+# Agent: BACKEND-DEV + FRONTEND-DEV
+
+# Zod Validation Schemas
+validation_schemas:
+  - name: "testResultCreateSchema"
+    path: "apps/frontend/lib/validation/quality-test-results-schema.ts"
+    description: "Single test result creation validation"
+    schema: |
+      export const testResultCreateSchema = z.object({
+        inspection_id: z.string().uuid('Invalid inspection ID'),
+        parameter_id: z.string().uuid('Invalid parameter ID'),
+        measured_value: z.string().min(1, 'Measured value required'),
+        numeric_value: z.number().optional(),
+        equipment_id: z.string().uuid().optional(),
+        calibration_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        notes: z.string().max(1000, 'Notes too long (max 1000 chars)').optional(),
+        attachment_url: z.string().url().optional(),
+      });
+
+  - name: "testResultBatchCreateSchema"
+    description: "Batch test result creation validation"
+    schema: |
+      export const testResultBatchCreateSchema = z.object({
+        inspection_id: z.string().uuid(),
+        results: z.array(testResultCreateSchema.omit({ inspection_id: true }))
+          .min(1, 'At least one result required')
+          .max(100, 'Max 100 results per batch'),
+      });
+
+  - name: "testResultUpdateSchema"
+    description: "Test result update validation (immutable - notes only)"
+    schema: |
+      export const testResultUpdateSchema = testResultCreateSchema.partial().extend({
+        id: z.string().uuid(),
+      }).refine(
+        (data) => !data.measured_value && !data.numeric_value,
+        { message: "Cannot modify measured values after creation" }
+      );
+
+  - name: "testResultQuerySchema"
+    description: "Query filters validation"
+    schema: |
+      export const testResultQuerySchema = z.object({
+        inspection_id: z.string().uuid().optional(),
+        parameter_id: z.string().uuid().optional(),
+        result_status: z.enum(['pass', 'fail', 'marginal']).optional(),
+        tested_by: z.string().uuid().optional(),
+        from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        page: z.number().int().positive().default(1),
+        limit: z.number().int().positive().max(100).default(20),
+      });
+
+# Validation Rules
+validation_rules:
+  measured_value:
+    - rule: "Required for all test results"
+    - rule: "String type to support all parameter types"
+    - rule: "For numeric parameters: must be parseable as number"
+    - rule: "For text parameters: no length restrictions"
+    - rule: "For boolean parameters: accepts true/false, yes/no, 1/0 (case-insensitive)"
+
+  numeric_value:
+    - rule: "Optional; auto-calculated for numeric/range parameters"
+    - rule: "Extracted from measured_value during validation"
+    - rule: "Used for trending, SPC analysis, calculations"
+
+  equipment_id:
+    - rule: "Optional if parameter.equipment_required = false"
+    - rule: "Required if parameter.equipment_required = true"
+    - rule: "Must reference valid machine from machines table"
+
+  calibration_date:
+    - rule: "Optional field"
+    - rule: "Format: YYYY-MM-DD"
+    - rule: "Warning if >90 days old"
+
+  notes:
+    - rule: "Required if result_status is 'fail' or 'marginal'"
+    - rule: "Optional if result_status is 'pass'"
+    - rule: "Maximum 1000 characters"
+
+  attachment_url:
+    - rule: "Optional"
+    - rule: "Must be valid HTTPS URL"
+    - rule: "Should point to Supabase Storage"
+    - rule: "Allowed types: JPG, PNG, PDF"
+    - rule: "Max file size: 10MB"
+
+# Result Determination Rules
+result_determination:
+  boolean_parameters:
+    - rule: "Target value: true/false (user-defined)"
+    - rule: "Measured value: true, false, yes, no, 1, 0 (case-insensitive)"
+    - rule: "Pass: measured matches target"
+    - rule: "Fail: measured does NOT match target"
+    - rule: "Marginal: Not applicable for boolean"
+
+  text_parameters:
+    - rule: "Target value: exact string (e.g., 'Red', 'Fresh')"
+    - rule: "Comparison: case-insensitive exact match"
+    - rule: "Pass: measured_value.toLowerCase() === target.toLowerCase()"
+    - rule: "Fail: NOT a pass"
+    - rule: "Marginal: Not applicable for text"
+
+  numeric_parameters:
+    - rule: "min_value and max_value define specification range"
+    - rule: "Pass: min <= measured <= max AND NOT marginal"
+    - rule: "Fail: measured < min OR measured > max"
+    - rule: "Marginal: (min <= measured <= max) AND (measured within 5% of min OR max)"
+    - rule: "5% rule calculation: range = max - min; threshold = range * 0.05"
+    - rule: "Marginal zone lower: [min, min + threshold]"
+    - rule: "Marginal zone upper: [max - threshold, max]"
+
+  range_parameters:
+    - rule: "Same logic as numeric parameters"
+    - rule: "Must have both min_value and max_value defined"
+
+  single_limit_parameters:
+    - rule: "If only min_value defined: check if measured >= min"
+    - rule: "If only max_value defined: check if measured <= max"
+    - rule: "Marginal: within 5% of the single limit (5% of limit value)"
+    - rule: "Example: min=10, marginal if 10 < measured < 10.5"
+
+# Deviation Percentage Calculation
+deviation_calculation:
+  both_limits:
+    rule: |
+      range = max - min
+      if measured < min:
+        deviation_pct = ((min - measured) / range) * 100
+      elif measured > max:
+        deviation_pct = ((measured - max) / range) * 100
+      else if within marginal zone:
+        # Lower marginal: distance from lower threshold
+        if measured < min + (range * 0.05):
+          deviation_pct = ((min + threshold - measured) / range) * 100
+        # Upper marginal: distance from upper threshold
+        elif measured > max - (range * 0.05):
+          deviation_pct = ((measured - (max - threshold)) / range) * 100
+
+  single_limit_min:
+    rule: |
+      if measured < min:
+        deviation_pct = ((min - measured) / min) * 100
+      elif measured within marginal (min < measured < min + (min * 0.05)):
+        deviation_pct = ((min + threshold - measured) / min) * 100
+
+  single_limit_max:
+    rule: |
+      if measured > max:
+        deviation_pct = ((measured - max) / max) * 100
+      elif measured within marginal (max - (max * 0.05) < measured < max):
+        deviation_pct = ((measured - (max - threshold)) / max) * 100
+
+# Business Rules - Inspection Overall Result
+inspection_overall_result:
+  - rule: "All critical parameters must be 'pass' for inspection to pass"
+  - rule: "If any critical parameter is 'fail', inspection overall_result = 'fail'"
+  - rule: "If all parameters are 'pass', overall_result = 'pass'"
+  - rule: "If no fails but any marginal, overall_result = 'review'"
+  - rule: "Overall result used to auto-create quality holds"
+
+# Business Rules - Quality Hold Creation
+quality_hold_creation:
+  - rule: "Auto-create quality hold when test result is 'fail'"
+  - rule: "Hold references inspection and related LPs/batches"
+  - rule: "Hold reason: 'Failed test result: {parameter_name}'"
+  - rule: "Hold priority: 'high' if critical parameter, 'medium' otherwise"
+  - rule: "Integration: Sync with Story 06.2 quality_holds module"
+
+# Business Rules - Notifications
+notifications:
+  critical_fail:
+    - rule: "Trigger email alert to QA Manager when critical parameter fails"
+    - rule: "Subject: 'CRITICAL TEST FAILURE - {Inspection#}'"
+    - rule: "Include: Parameter name, spec range, measured value, deviation"
+    - rule: "Include: Product name, batch number, timestamp"
+    - rule: "Include: Link to inspection detail page"
+    - rule: "Integration: Future Story 06.17 (Alerts & Notifications)"
+
+  marginal_detection:
+    - rule: "Trigger email alert to Inspector + QA Manager when marginal detected"
+    - rule: "Subject: 'TEST RESULT REVIEW NEEDED - {Inspection#}'"
+    - rule: "Include: Parameter name, spec, measured value, deviation %"
+    - rule: "Note: Marginal is warning, not failure; inspection can still pass"
+
+# Data Integrity Rules
+data_integrity:
+  - rule: "measured_value is immutable after creation"
+  - rule: "result_status is auto-calculated; cannot be manually set"
+  - rule: "deviation_pct is auto-calculated; cannot be manually set"
+  - rule: "numeric_value is auto-calculated for numeric/range types"
+  - rule: "Test results cannot be edited; only notes field updatable"
+  - rule: "Test results cannot be deleted from completed inspections"
+
+# Validation Sequence (Server-Side)
+validation_sequence:
+  - step: 1
+    action: "Validate request schema (Zod)"
+    on_fail: "Return 400 Bad Request with field errors"
+
+  - step: 2
+    action: "Verify inspection exists and is in 'in_progress' status"
+    on_fail: "Return 404 Not Found or 400 Bad Request"
+
+  - step: 3
+    action: "Verify parameter exists and belongs to inspection's specification"
+    on_fail: "Return 404 Not Found"
+
+  - step: 4
+    action: "Verify user has role (QA Inspector, QA Manager, etc.)"
+    on_fail: "Return 403 Forbidden"
+
+  - step: 5
+    action: "Validate result using TestResultsService.validateResult()"
+    on_fail: "Return 400 Bad Request (result_status calculation failed)"
+
+  - step: 6
+    action: "Create test result record"
+    on_fail: "Return 500 Internal Server Error"
+
+  - step: 7
+    action: "Auto-create quality hold if result_status is 'fail'"
+    on_fail: "Log error but don't fail request"
+
+  - step: 8
+    action: "Trigger email alert if critical parameter"
+    on_fail: "Log error but don't fail request"
+
+  - step: 9
+    action: "Update inspection.overall_result"
+    on_fail: "Log error but don't fail request"
+
+  - step: 10
+    action: "Return 201 Created with result data"
+
+# Client-Side Validation (React Hook Form + Zod)
+client_validation:
+  - real_time: "Validate on blur (measured_value field)"
+  - debounce: "100ms debounce before showing validation errors"
+  - feedback: "Show result badge (pass/fail/marginal) immediately"
+  - disabled_submit: "Save button disabled if any validation error"
+  - error_display: "Red border on invalid field + error message below"
+  - auto_focus: "Focus on first invalid field on submit attempt"
+
+# Test Coverage Requirements
+test_coverage:
+  unit_tests:
+    - "testResultCreateSchema validates all field types"
+    - "testResultBatchCreateSchema rejects >100 results"
+    - "validateResult() handles boolean parameters"
+    - "validateResult() handles text parameters (case-insensitive)"
+    - "validateResult() handles numeric parameters with range"
+    - "validateResult() detects marginal results (5% rule)"
+    - "validateResult() calculates deviation_pct correctly"
+    - "validateResult() handles single limit (min only)"
+    - "validateResult() handles single limit (max only)"
+    - "getInspectionSummary() calculates pass_rate correctly"
+
+  integration_tests:
+    - "POST /api/quality/test-results creates result with auto-calculated status"
+    - "POST /api/quality/test-results/batch creates multiple results"
+    - "GET /api/quality/test-results/inspection/:id returns all results"
+    - "Failed result auto-creates quality hold"
+    - "Critical parameter fail triggers alert email"
+    - "RLS prevents access to other org's test results"
+    - "Immutability: PUT cannot change measured_value"
+    - "Cannot delete result from completed inspection"
+
+  e2e_tests:
+    - "Record test result with pass status"
+    - "Record test result with fail status"
+    - "Record test result with marginal status (5% rule)"
+    - "Auto-hold created on fail"
+    - "Equipment selector shows when applicable"
+    - "Notes required for fail/marginal"
+    - "Overall inspection result updated correctly"

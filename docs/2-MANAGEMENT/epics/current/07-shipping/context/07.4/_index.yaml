@@ -1,0 +1,91 @@
+# Story 07.4 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.4"
+  name: "SO Line Pricing + Totals Calculation"
+  slug: "so-line-pricing"
+  epic: "07-shipping"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 2
+  type: "backend + frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Migration: Add discount field to sales_order_lines
+  - api.yaml         # POST/PUT line endpoints with pricing logic
+  - frontend.yaml    # PRIMARY - SOLineForm, DiscountInput, SOTotalDisplay components
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "07.2"
+      name: "Sales Orders CRUD"
+      provides:
+        - "sales_orders table"
+        - "sales_order_lines table"
+        - "SO CRUD endpoints"
+    - story: "02.1"
+      name: "Products Module"
+      provides:
+        - "products table with std_price"
+        - "product lookup service"
+  optional: []
+  blocks:
+    - story: "07.5"
+      name: "SO Confirmation Workflow (needs validated pricing)"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["Sales Order Lines Management FR-7.10", "Pricing section"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["lines 109-127: sales_order_lines schema"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.4.so-line-pricing.md"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-007-sales-order-detail.md"
+    focus: "Pricing section, Line items table with unit_price and total columns"
+  patterns:
+    - "apps/frontend/lib/services/*-service.ts (service pattern)"
+    - "apps/frontend/lib/validation/*.ts (Zod schemas)"
+    - "apps/frontend/components/ui/form.tsx (form components)"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 1
+    description: "Migration: Add discount JSONB field to sales_order_lines"
+  - type: "service"
+    count: 1
+    description: "PricingService with calculateLineTotal, calculateOrderTotal, getProductPrice"
+  - type: "api"
+    count: 3
+    description: "Update POST/PUT/DELETE line endpoints for pricing recalculation"
+  - type: "component"
+    count: 3
+    description: "SOLineForm, DiscountInput, SOTotalDisplay"
+  - type: "validation"
+    count: 1
+    description: "sales-order-line-schema.ts with discount validation"
+  - type: "test"
+    count: 3
+    description: "Unit tests (pricing-service), Integration tests (API), E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Auto-populate unit_price from products.std_price on line add"
+  - "Line total calculation: qty * unit_price - discount (percent or fixed)"
+  - "SO total = SUM(line_total) rounded to 2 decimals"
+  - "Discount: optional JSONB {type: 'percent'|'fixed', value: decimal}"
+  - "Validation: unit_price > 0, discount >= 0, percent <= 100%"
+  - "Recalculation triggers: line add/edit/delete, qty/price/discount change"
+  - "Price override allowed only when SO status = 'draft'"
+  - "Precision: qty/price as DECIMAL(15,4), totals as DECIMAL(15,2)"

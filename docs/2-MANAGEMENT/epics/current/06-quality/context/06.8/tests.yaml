@@ -1,0 +1,448 @@
+# Story 06.8 - Testing Specification
+# Purpose: Acceptance criteria, test cases, quality gates
+# Agent: QA + BACKEND-DEV + FRONTEND-DEV
+
+acceptance_criteria:
+  - criterion: "AC-8.1: Scanner Home Display"
+    given: "User navigates to /scanner/qa/"
+    when: "Page loads"
+    then:
+      - "Dark theme displayed (slate-900 background)"
+      - "Header: 'Quality Inspection' title with user badge"
+      - "Large 'Scan LP or WO' button (96px height)"
+      - "Secondary 'View Pending Inspections' button (64px)"
+      - "Sync status indicator (online/offline/syncing)"
+      - "Last sync timestamp in footer"
+      - "Scan input auto-focused (ready for hardware scanner)"
+
+  - criterion: "AC-8.2: Scan LP to Load Inspection"
+    given: "Inspector on scanner QA home"
+    when: "Inspector scans LP barcode 'LP00000001'"
+    then:
+      - "LP lookup: GET /api/warehouse/license-plates/lookup?barcode=LP00000001"
+      - "If pending inspection: Load inspection detail"
+      - "If no inspection: Show 'No pending inspection' message"
+      - "If LP not found: Error beep + error message"
+      - "Scan response time: <500ms"
+
+  - criterion: "AC-8.3: Inspection Detail Display"
+    given: "Inspection loaded from LP scan"
+    when: "Inspection detail screen displays"
+    then:
+      - "Header: Inspection number, LP number (large 24px text)"
+      - "Product info card (64px height): name, batch, QA status badge"
+      - "QA status badge: color-coded (pending=yellow, passed=green, failed=red)"
+      - "Large touch targets: Pass button (56px), Fail button (56px)"
+      - "All touch targets >= 48px"
+
+  - criterion: "AC-8.4: Quick Pass Workflow"
+    given: "Inspector viewing inspection detail"
+    when: "Inspector taps [Quick Pass] button"
+    then:
+      - "Confirmation dialog appears"
+      - "Inspector taps [Confirm Pass]"
+      - "If online: POST /api/quality/scanner/quick-inspection with result='pass'"
+      - "Update inspection.result='pass', status='completed'"
+      - "Update license_plates.qa_status='passed'"
+      - "Success beep plays"
+      - "Success screen shows (green checkmark, 3s auto-close)"
+      - "Return to scanner home"
+
+  - criterion: "AC-8.5: Quick Fail Workflow"
+    given: "Inspector viewing inspection detail"
+    when: "Inspector taps [Quick Fail] button"
+    then:
+      - "Fail confirmation dialog appears"
+      - "Optional: Enter failure reason (notes field)"
+      - "Optional: Enter defect count (numeric)"
+      - "Inspector taps [Confirm Fail]"
+      - "If online: POST /api/quality/scanner/quick-inspection with result='fail'"
+      - "Update inspection.result='fail', status='completed'"
+      - "Update license_plates.qa_status='failed'"
+      - "Error beep plays (different tone from success)"
+      - "Fail screen shows (red X, 3s auto-close)"
+      - "Return to scanner home"
+
+  - criterion: "AC-8.6: Offline Mode Detection"
+    given: "Scanner device loses network"
+    when: "Connectivity changes to offline"
+    then:
+      - "Sync status indicator changes to 'Offline' (orange)"
+      - "Footer message: 'Working offline. Actions will sync when online.'"
+      - "Queue count badge shows: '3 actions queued'"
+      - "All actions queue to IndexedDB"
+
+  - criterion: "AC-8.7: Offline Action Queue"
+    given: "Device offline, inspector completes 3 inspections"
+    when: "Each action submitted offline"
+    then:
+      - "Action queued in IndexedDB (instantly, <100ms)"
+      - "Queue count badge updates"
+      - "Max queue size enforced: 50 actions"
+      - "If queue full: Warning 'Queue full. Connect to sync.'"
+
+  - criterion: "AC-8.8: Auto-Sync When Online"
+    given: "Device was offline with 3 queued actions"
+    when: "Network connectivity restored"
+    then:
+      - "Sync status changes to 'Syncing...'"
+      - "POST /api/quality/scanner/sync-offline with all queued actions"
+      - "API processes actions sequentially by created_at_local"
+      - "If all succeed: Clear IndexedDB queue"
+      - "Sync status: 'Synced' (green badge)"
+      - "Toast: '3 actions synced successfully'"
+      - "Success beep plays"
+      - "If some fail: Mark failures, retain for retry"
+      - "Sync status: 'Sync errors' (orange badge)"
+
+  - criterion: "AC-8.9: Audio Feedback"
+    given: "Device supports audio (enabled in settings)"
+    when: "Inspector scans valid LP barcode"
+    then:
+      - "Play success beep (440 Hz, 100ms)"
+    when: "Inspector scans invalid barcode"
+    then:
+      - "Play error beep (220 Hz, 200ms)"
+    when: "Inspection completed as pass"
+    then:
+      - "Play success chime (ascending tone)"
+    when: "Inspection completed as fail"
+    then:
+      - "Play alert tone (descending tone)"
+    note: "Audio can be muted via settings toggle (persistent)"
+
+  - criterion: "AC-8.10: Touch Target Sizes"
+    given: "Scanner UI elements rendered"
+    then:
+      - "Minimum touch target: 48x48 pixels"
+      - "Primary action buttons: 56px height"
+      - "Secondary buttons: 48px height"
+      - "List items: 64px height minimum"
+      - "Text input fields: 56px height"
+      - "Spacing between targets: minimum 8px"
+      - "Buttons use high contrast colors (WCAG AAA)"
+
+  - criterion: "AC-8.11: Permission Enforcement"
+    given: "User with VIEWER role"
+    when: "User navigates to /scanner/qa/"
+    then:
+      - "Access denied: 'Scanner access requires QA Inspector role'"
+      - "Redirect to dashboard"
+    given: "User with QA_INSPECTOR role"
+    when: "User accesses scanner QA"
+    then:
+      - "Full access to scan, inspect, pass/fail"
+
+  - criterion: "AC-8.12: Audit Trail Logging"
+    given: "Any scanner action (pass/fail/sync)"
+    when: "Action completes"
+    then:
+      - "Entry created in quality_audit_log"
+      - "Fields: entity_type='inspection', action='scanner_complete'"
+      - "Metadata includes: inspection_method='scanner', device_id, offline_queued"
+
+# Unit Tests (Services)
+unit_tests:
+  ScannerQAService:
+    - test: "lookupLPForInspection returns LP and inspection if pending"
+      given: "LP with pending inspection exists"
+      when: "lookupLPForInspection('LP00000001')"
+      then: "Returns { lp: LicensePlate, inspection: QualityInspection }"
+
+    - test: "lookupLPForInspection returns LP and null if no inspection"
+      given: "LP without inspection exists"
+      when: "lookupLPForInspection('LP00000002')"
+      then: "Returns { lp: LicensePlate, inspection: null }"
+
+    - test: "lookupLPForInspection throws error if LP not found"
+      given: "LP doesn't exist"
+      when: "lookupLPForInspection('INVALID')"
+      then: "Throws error: 'LP not found'"
+
+    - test: "quickInspection completes inspection as pass"
+      given: "Pending inspection exists"
+      when: "quickInspection({ inspection_id: '...', result: 'pass' })"
+      then:
+        - "Inspection.result = 'pass', status = 'completed'"
+        - "LP.qa_status = 'passed'"
+        - "Returns QuickInspectionResponse with success"
+
+    - test: "quickInspection completes inspection as fail with notes"
+      given: "Pending inspection exists"
+      when: "quickInspection({ inspection_id: '...', result: 'fail', result_notes: 'Color off' })"
+      then:
+        - "Inspection.result = 'fail', status = 'completed'"
+        - "LP.qa_status = 'failed'"
+        - "result_notes stored"
+
+    - test: "quickInspection prevents duplicate completion"
+      given: "Inspection already completed"
+      when: "quickInspection on completed inspection"
+      then: "Throws error: 'Inspection already completed'"
+
+    - test: "syncOfflineActions syncs 3 queued actions successfully"
+      given: "3 offline actions in queue"
+      when: "syncOfflineActions(actions)"
+      then: "Returns { success: 3, failed: 0, errors: [] }"
+
+    - test: "syncOfflineActions handles partial failures"
+      given: "2 valid, 1 invalid action"
+      when: "syncOfflineActions(actions)"
+      then: "Returns { success: 2, failed: 1, errors: [{ action_id, error }] }"
+
+    - test: "syncOfflineActions processes in chronological order"
+      given: "3 actions with timestamps 10:30, 10:35, 10:40"
+      when: "syncOfflineActions"
+      then: "Actions processed in timestamp order (oldest first)"
+
+    - test: "queueOfflineAction adds action to IndexedDB"
+      given: "IndexedDB initialized"
+      when: "queueOfflineAction({ type: 'quick_inspection', payload: {...} })"
+      then: "Action added to IndexedDB, returns promise"
+
+    - test: "queueOfflineAction enforces max queue size (50)"
+      given: "Queue already has 50 actions"
+      when: "queueOfflineAction"
+      then: "Throws error: 'Queue full'"
+
+  AudioFeedbackService:
+    - test: "playSuccessBeep plays 440 Hz tone"
+      given: "Audio service initialized"
+      when: "playSuccessBeep()"
+      then: "Audio context creates and plays beep"
+
+    - test: "playErrorBeep plays 220 Hz tone"
+      when: "playErrorBeep()"
+      then: "Audio context creates and plays error tone"
+
+    - test: "isMuted returns mute state from localStorage"
+      when: "isMuted()"
+      then: "Returns boolean from localStorage"
+
+    - test: "toggleMute saves mute state to localStorage"
+      when: "toggleMute()"
+      then: "localStorage updated, subsequent playback respects mute"
+
+  OfflineSyncService:
+    - test: "init creates IndexedDB stores"
+      when: "OfflineSyncService.init()"
+      then: "offline_queue and settings stores created"
+
+    - test: "isOnline detects online/offline status"
+      when: "navigator.onLine check"
+      then: "Returns boolean based on connectivity"
+
+    - test: "onConnectivityChange triggers on online event"
+      given: "Connection restored"
+      when: "Connectivity changes to online"
+      then: "Callback fired with online=true"
+
+    - test: "syncNow triggers bulk sync"
+      when: "syncNow()"
+      then: "POST /api/quality/scanner/sync-offline called"
+
+    - test: "getQueueCount returns queue size"
+      given: "3 actions in queue"
+      when: "getQueueCount()"
+      then: "Returns 3"
+
+# Integration Tests (API)
+integration_tests:
+  POST_quick_inspection:
+    - test: "Creates inspection with pass result"
+      given: "Valid inspection_id, result='pass'"
+      when: "POST /api/quality/scanner/quick-inspection"
+      then: "Returns 200 with updated inspection and LP status"
+
+    - test: "Updates LP QA status to passed"
+      when: "POST with result='pass'"
+      then: "license_plates.qa_status = 'passed'"
+
+    - test: "Creates inspection with fail result and notes"
+      given: "Valid inspection_id, result='fail', result_notes='Color off'"
+      when: "POST /api/quality/scanner/quick-inspection"
+      then: "Returns 200, inspection.result='fail', notes stored"
+
+    - test: "Returns 400 if inspection already completed"
+      given: "Inspection status != 'in_progress'"
+      when: "POST /api/quality/scanner/quick-inspection"
+      then: "Returns 400 with 'Inspection already completed'"
+
+    - test: "Returns 403 if user not QA Inspector"
+      given: "User has VIEWER role"
+      when: "POST /api/quality/scanner/quick-inspection"
+      then: "Returns 403 'Insufficient permissions'"
+
+    - test: "Logs audit trail with scanner metadata"
+      when: "POST successful"
+      then: "quality_audit_log entry created with inspection_method='scanner', device_id"
+
+  POST_sync_offline:
+    - test: "Syncs 3 actions successfully"
+      given: "3 valid offline actions"
+      when: "POST /api/quality/scanner/sync-offline"
+      then: "Returns 200 with { success: 3, failed: 0 }"
+
+    - test: "Returns errors for invalid actions"
+      given: "2 valid, 1 with non-existent inspection_id"
+      when: "POST /api/quality/scanner/sync-offline"
+      then: "Returns 200 with { success: 2, failed: 1, errors: [...] }"
+
+    - test: "Processes actions in timestamp order"
+      given: "3 actions with different timestamps"
+      when: "POST /api/quality/scanner/sync-offline"
+      then: "Actions processed chronologically (oldest first)"
+
+    - test: "Returns 400 if actions exceed 100"
+      given: "101 actions in request"
+      when: "POST /api/quality/scanner/sync-offline"
+      then: "Returns 400 'Maximum 100 actions per sync'"
+
+  GET_inspections_by_lp:
+    - test: "Returns inspection if pending"
+      given: "LP with pending inspection"
+      when: "GET /api/quality/inspections/by-lp/{lpId}"
+      then: "Returns 200 with inspection object"
+
+    - test: "Returns null inspection if none exists"
+      given: "LP without inspection"
+      when: "GET /api/quality/inspections/by-lp/{lpId}"
+      then: "Returns 200 with inspection=null"
+
+    - test: "Respects RLS for org isolation"
+      given: "User from different organization"
+      when: "GET /api/quality/inspections/by-lp/{other_org_lp}"
+      then: "Returns 404 (not 403, per ADR-013)"
+
+# E2E Tests (Playwright)
+e2e_tests:
+  - test: "Complete workflow: scan LP -> view inspection -> quick pass"
+    steps:
+      - "Navigate to /scanner/qa/"
+      - "Expect QA home loaded with quick actions"
+      - "Scan LP barcode (simulate hardware scanner)"
+      - "Expect inspection detail page loaded"
+      - "Expect product info card displayed"
+      - "Expect pass/fail buttons visible (56px)"
+      - "Tap 'Quick Pass' button"
+      - "Expect confirmation dialog"
+      - "Tap 'Confirm Pass'"
+      - "Expect success screen (green checkmark)"
+      - "Expect 3s auto-redirect to home"
+      - "Expect toast: 'Inspection completed'"
+
+  - test: "Offline mode: queue action -> go offline -> go online -> sync"
+    steps:
+      - "Go offline (page.context().setOffline(true))"
+      - "Navigate to /scanner/qa/"
+      - "Scan LP and submit quick pass"
+      - "Expect queue count badge shows '1 action queued'"
+      - "Expect success beep plays"
+      - "Go online (page.context().setOffline(false))"
+      - "Expect sync status changes to 'Syncing...'"
+      - "Wait for sync to complete"
+      - "Expect sync status changes to 'Synced'"
+      - "Expect queue badge disappears"
+      - "Expect toast: '1 action synced successfully'"
+
+  - test: "Touch targets are 48px minimum"
+    steps:
+      - "Navigate to /scanner/qa/"
+      - "Get bounding box of 'Quick Pass' button"
+      - "Assert height >= 48"
+      - "Assert width >= 48"
+
+  - test: "Audio feedback plays on success"
+    steps:
+      - "Navigate to /scanner/qa/"
+      - "Enable audio spy (Playwright mock audio)"
+      - "Scan LP and submit pass"
+      - "Expect success beep audio played"
+      - "Inspect audio context: frequency=440Hz"
+
+  - test: "Offline queue respects max 50 actions"
+    steps:
+      - "Go offline"
+      - "Submit 50 inspections (fill queue)"
+      - "Expect all 50 queued successfully"
+      - "Submit 51st inspection"
+      - "Expect error: 'Queue full'"
+      - "Expect no 51st action in queue"
+
+  - test: "Scanner device ID tracked in audit log"
+    steps:
+      - "Navigate to /scanner/qa/"
+      - "Submit quick pass with device_id='device-123'"
+      - "Query database for audit log entry"
+      - "Assert metadata.scanner_device_id = 'device-123'"
+
+# Performance Tests
+performance_tests:
+  - test: "Load QA home within 500ms"
+    target: "<500ms"
+    measurement: "Time to First Contentful Paint (FCP)"
+
+  - test: "Scan response (LP lookup) within 200ms"
+    target: "<200ms"
+    measurement: "GET /api/warehouse/license-plates/lookup response time"
+
+  - test: "Submit quick inspection within 1s (online)"
+    target: "<1s"
+    measurement: "POST /api/quality/scanner/quick-inspection response time"
+
+  - test: "Queue offline action within 100ms"
+    target: "<100ms"
+    measurement: "IndexedDB write time (no network)"
+
+  - test: "Offline sync (50 actions) within 10s"
+    target: "<10s"
+    measurement: "POST /api/quality/scanner/sync-offline response time"
+
+# Coverage Targets
+coverage_targets:
+  unit_tests: ">80% for services (ScannerQAService, AudioFeedbackService, OfflineSyncService)"
+  integration_tests: "100% endpoint coverage (3 endpoints)"
+  e2e_tests:
+    - "Scanner home display"
+    - "Scan LP -> quick pass/fail workflow"
+    - "Offline mode: queue -> sync"
+    - "Audio/haptic feedback"
+    - "Touch target sizes"
+  performance_tests: "All targets <specified time"
+
+# Quality Gates
+quality_gates:
+  - "All acceptance criteria passed"
+  - "Unit tests pass (>80% coverage on services)"
+  - "Integration tests pass (all 3 endpoints)"
+  - "E2E tests pass (full workflow tested)"
+  - "Performance targets met (<500ms home, <200ms scan)"
+  - "Touch targets verified (48px minimum)"
+  - "Audio feedback working (success/error beeps)"
+  - "Offline queue tested (max 50, FIFO sync)"
+  - "Audit trail logging verified"
+  - "RLS policies enforced (org isolation)"
+  - "No console errors or warnings"
+  - "Accessibility passed (WCAG AAA for buttons)"
+
+# Known Limitations (MVP)
+mvp_limitations:
+  - "No photo attachments (Phase 2)"
+  - "No voice notes (Phase 2)"
+  - "No e-signature support (Phase 3)"
+  - "No multi-language UI (Phase 3)"
+  - "No CCP monitoring (Phase 2)"
+  - "No operation checkpoints (Phase 2, FR-QA-026)"
+  - "No offline limit increase >50 (Phase 4)"
+
+# Deferred Test Scenarios
+deferred_tests:
+  - "CCP deviation alert and production stop (Phase 2)"
+  - "Operation checkpoint recording (Phase 2, FR-QA-026)"
+  - "Photo/video attachment upload (Phase 2)"
+  - "Voice note recording and playback (Phase 2)"
+  - "E-signature authentication (Phase 3)"
+  - "Multi-language form validation (Phase 3)"
+  - "Bluetooth barcode scanner integration (Phase 3)"
+  - "Geolocation tagging (Phase 3)"
+  - "Scanner analytics dashboard (Phase 4)"

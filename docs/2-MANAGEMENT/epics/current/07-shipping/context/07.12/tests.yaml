@@ -1,0 +1,654 @@
+# Story 07.12 - Test Specification
+# Purpose: Acceptance criteria, test cases, testing strategy
+# Agent: QA + BACKEND-DEV (testing focus)
+
+# Test Coverage Summary
+test_coverage:
+  unit_tests: ">80% coverage on PackingScannerService"
+  integration_tests: "All API endpoints with happy path + error cases"
+  e2e_tests: "Full 6-step packing workflow"
+  touch_target_tests: "All interactive elements >= 48px"
+  audio_tests: "Allergen alert feedback plays"
+  accessibility_tests: "WCAG AAA compliance on dark theme"
+  rls_tests: "Multi-tenancy isolation verified"
+  allergen_tests: "Warning display and logic correct"
+
+# Unit Tests
+unit_tests:
+  file: "apps/frontend/lib/services/__tests__/packing-scanner-service.test.ts"
+  test_cases:
+    - name: "addItemToBox - creates box_content record"
+      given: "Valid shipment, box, LP, SO line"
+      when: "addItemToBox called with quantity 100"
+      then: "box_content record created, SO line qty updated, returns summary"
+      assertions:
+        - "shipment_box_contents.quantity = 100"
+        - "sales_order_lines.packed_qty incremented"
+        - "Returns BoxSummary with item_count = 1"
+
+    - name: "addItemToBox - validates LP allocated"
+      given: "LP not allocated to shipment's SO"
+      when: "addItemToBox called"
+      then: "Throws error 'LP not allocated to this shipment'"
+      assertions:
+        - "box_content NOT created"
+        - "Error code = 'LP_NOT_ALLOCATED'"
+
+    - name: "addItemToBox - validates quantity <= available"
+      given: "LP available_qty = 100"
+      when: "addItemToBox called with quantity = 150"
+      then: "Throws error 'Quantity exceeds available'"
+      assertions:
+        - "box_content NOT created"
+        - "Error includes available_qty and requested_qty"
+
+    - name: "addItemToBox - updates SO line status"
+      given: "SO line with quantity_to_pack = 100"
+      when: "addItemToBox called with quantity = 100"
+      then: "SO line status updated to 'complete'"
+      assertions:
+        - "sales_order_lines.status = 'complete'"
+        - "sales_order_lines.packed_qty = 100"
+
+    - name: "addItemToBox - detects allergen conflicts"
+      given: "Box contains Product A (allergen: Milk), adding Product B (allergen: Eggs)"
+      when: "addItemToBox called, customer has allergen restriction"
+      then: "Returns allergen_warning in response"
+      assertions:
+        - "allergenWarning.matches includes both allergens"
+        - "Customer restrictions checked against product allergens"
+
+    - name: "createBox - auto-increments box_number"
+      given: "Shipment with 2 existing boxes (box_number 1, 2)"
+      when: "createBox called"
+      then: "New box created with box_number = 3"
+      assertions:
+        - "shipment_boxes.box_number = 3"
+        - "UNIQUE(shipment_id, box_number) constraint enforced"
+
+    - name: "createBox - sets status to open"
+      given: "New box creation"
+      when: "createBox called"
+      then: "Box status = 'open'"
+      assertions:
+        - "shipment_boxes.status = 'open'"
+
+    - name: "closeBox - validates box has items"
+      given: "Empty box (no box_content records)"
+      when: "closeBox called"
+      then: "Throws error 'Cannot close empty box'"
+      assertions:
+        - "box.status NOT updated"
+        - "Error code = 'EMPTY_BOX'"
+
+    - name: "closeBox - saves weight and dimensions"
+      given: "Box with 3 items"
+      when: "closeBox called with weight=25.5, length=40, width=30, height=20"
+      then: "Box record updated with all values"
+      assertions:
+        - "shipment_boxes.weight = 25.5"
+        - "shipment_boxes.length = 40"
+        - "shipment_boxes.status = 'closed'"
+
+    - name: "closeBox - validates positive weight"
+      given: "Weight = -5 (invalid)"
+      when: "closeBox called"
+      then: "Throws error 'Weight must be positive'"
+      assertions:
+        - "box.status NOT updated"
+        - "Database constraint CHECK(weight > 0 OR NULL)"
+
+    - name: "getPendingShipments - filters by status"
+      given: "Database with pending, packing, packed, shipped shipments"
+      when: "getPendingShipments called"
+      then: "Returns only status IN (pending, packing)"
+      assertions:
+        - "Packed/shipped shipments NOT returned"
+        - "Results sorted by promised_ship_date ASC"
+
+    - name: "getPendingShipments - filters by warehouse"
+      given: "User assigned to Warehouse A, shipments in both warehouses"
+      when: "getPendingShipments called with warehouseId = A"
+      then: "Returns only Warehouse A shipments"
+      assertions:
+        - "RLS policy enforced"
+        - "warehouse_id filter applied"
+
+    - name: "lookupShipment - finds by SO number"
+      given: "SO barcode 'SO-2025-00001'"
+      when: "lookupShipment called with barcode"
+      then: "Returns shipment record"
+      assertions:
+        - "shipment.sales_order_id matches SO"
+        - "Response time < 200ms"
+
+    - name: "lookupLP - validates allocation"
+      given: "LP barcode, shipment context"
+      when: "lookupLP called"
+      then: "Returns { lp, allocated: true, soLineId, availableQty }"
+      assertions:
+        - "allocated = true if LP in pick_list for this SO"
+        - "allocated = false if LP not allocated"
+        - "availableQty reflects remaining qty"
+
+    - name: "getBoxDetails - returns contents with summary"
+      given: "Box with 3 items"
+      when: "getBoxDetails called"
+      then: "Returns { box, contents: [], summary }"
+      assertions:
+        - "contents array has 3 items"
+        - "summary.item_count = 3"
+        - "summary.total_weight_est = sum of product weights"
+
+    - name: "removeItemFromBox - deletes box_content"
+      given: "Box with 2 items, remove first"
+      when: "removeItemFromBox called with content_id"
+      then: "Record deleted, SO line qty decremented"
+      assertions:
+        - "box_content record deleted"
+        - "sales_order_lines.packed_qty decremented"
+
+    - name: "checkAllergenConflict - detects matches"
+      given: "Customer restrictions: ['Milk', 'Eggs'], Product allergens: ['Milk', 'Nuts']"
+      when: "checkAllergenConflict called"
+      then: "Returns { warning: true, allergens: ['Milk', 'Eggs', 'Nuts'], matches: ['Milk'] }"
+      assertions:
+        - "Matches identified correctly"
+        - "All allergens collected"
+
+    - name: "checkAllergenConflict - no matches"
+      given: "Customer restrictions: ['Milk'], Product allergens: ['Nuts']"
+      when: "checkAllergenConflict called"
+      then: "Returns { warning: false, allergens: ['Nuts'], matches: [] }"
+
+# Integration Tests
+integration_tests:
+  file: "tests/integration/api/shipping/scanner-pack.test.ts"
+  endpoints:
+    - endpoint: "POST /api/shipping/scanner/pack"
+      tests:
+        - name: "Happy path - adds item to box"
+          given: "Valid shipment, box, LP, SO line"
+          when: "POST with valid payload"
+          then: "201 Created, box_content returned"
+          assertions:
+            - "status = 201"
+            - "response.box_content.id exists"
+            - "response.box_summary.item_count >= 1"
+
+        - name: "Validates request schema"
+          given: "Missing required fields"
+          when: "POST with incomplete payload"
+          then: "400 Bad Request"
+          assertions:
+            - "error.code = 'VALIDATION_ERROR'"
+            - "error.details includes field name"
+
+        - name: "LP not allocated returns 400"
+          given: "LP from different SO"
+          when: "POST with unallocated LP"
+          then: "400 Bad Request"
+          assertions:
+            - "error.message = 'License plate not allocated to this shipment'"
+
+        - name: "Quantity exceeds available returns 400"
+          given: "LP available_qty = 100, request qty = 150"
+          when: "POST with excess quantity"
+          then: "400 Bad Request"
+          assertions:
+            - "error includes { available_qty: 100, requested_qty: 150 }"
+
+        - name: "Shipment not found returns 404"
+          given: "Invalid shipment_id"
+          when: "POST with non-existent shipment"
+          then: "404 Not Found"
+
+        - name: "Cross-org access returns 404"
+          given: "User from Org A, shipment from Org B"
+          when: "POST attempting cross-org pack"
+          then: "404 Not Found (RLS enforced)"
+          assertions:
+            - "RLS policy blocks access"
+
+        - name: "Returns allergen warning"
+          given: "Box has allergen products, customer has restrictions"
+          when: "POST valid pack item"
+          then: "200 Created, includes allergen_warning"
+          assertions:
+            - "response.allergen_warning.matches populated"
+
+    - endpoint: "POST /api/shipping/scanner/pack/box/create"
+      tests:
+        - name: "Creates box with auto box_number"
+          given: "Shipment with 2 boxes"
+          when: "POST /box/create"
+          then: "201 Created, box_number = 3"
+          assertions:
+            - "response.box.box_number = 3"
+            - "response.box.status = 'open'"
+
+        - name: "Validates shipment exists"
+          given: "Invalid shipment_id"
+          when: "POST /box/create"
+          then: "404 Not Found"
+
+    - endpoint: "POST /api/shipping/scanner/pack/box/close"
+      tests:
+        - name: "Closes box with weight"
+          given: "Box with items, weight provided"
+          when: "POST /box/close with weight=25.5"
+          then: "200 OK, box.status = 'closed'"
+          assertions:
+            - "response.box.weight = 25.5"
+            - "response.box.status = 'closed'"
+
+        - name: "Empty box returns 400"
+          given: "Box with no contents"
+          when: "POST /box/close"
+          then: "400 Bad Request"
+          assertions:
+            - "error.message = 'Cannot close empty box'"
+
+        - name: "Invalid weight returns 400"
+          given: "weight = -10"
+          when: "POST /box/close"
+          then: "400 Bad Request"
+
+    - endpoint: "GET /api/shipping/scanner/pack/shipments"
+      tests:
+        - name: "Returns pending shipments"
+          given: "Database with 5 shipments (2 pending, 3 packed)"
+          when: "GET /shipments"
+          then: "200 OK, returns array with 2 items"
+          assertions:
+            - "response.shipments.length = 2"
+            - "response.total = 2"
+
+        - name: "Filters by warehouse"
+          given: "User assigned to Warehouse A"
+          when: "GET /shipments?warehouse_id=A"
+          then: "200 OK, only Warehouse A shipments"
+          assertions:
+            - "RLS enforced"
+
+        - name: "Supports limit parameter"
+          given: "Database with 100 shipments"
+          when: "GET /shipments?limit=25"
+          then: "200 OK, returns <= 25 items"
+
+    - endpoint: "GET /api/shipping/scanner/pack/lookup/:barcode"
+      tests:
+        - name: "Looks up shipment by SO barcode"
+          given: "Barcode = 'SO-2025-00001'"
+          when: "GET /lookup/SO-2025-00001"
+          then: "200 OK, returns shipment details"
+          assertions:
+            - "response.type = 'shipment'"
+            - "response.data.so_number matches"
+
+        - name: "Looks up LP by barcode"
+          given: "Barcode = 'LP-2025-00042'"
+          when: "GET /lookup/LP-2025-00042"
+          then: "200 OK, returns LP details"
+          assertions:
+            - "response.type = 'license_plate'"
+            - "response.data.allocated = true/false"
+
+        - name: "Barcode not found returns 404"
+          given: "Invalid barcode"
+          when: "GET /lookup/INVALID"
+          then: "404 Not Found"
+
+    - endpoint: "GET /api/shipping/scanner/pack/box/:boxId"
+      tests:
+        - name: "Returns box with contents"
+          given: "Box with 3 items"
+          when: "GET /box/uuid-box-001"
+          then: "200 OK, returns box and contents"
+          assertions:
+            - "response.box.id exists"
+            - "response.contents.length = 3"
+            - "response.summary.item_count = 3"
+
+    - endpoint: "DELETE /api/shipping/scanner/pack/box/:boxId/item/:contentId"
+      tests:
+        - name: "Removes item from box"
+          given: "Box with item"
+          when: "DELETE /box/uuid-box/item/uuid-content"
+          then: "200 OK"
+          assertions:
+            - "box_content record deleted"
+
+# E2E Tests
+e2e_tests:
+  file: "tests/e2e/shipping/scanner-pack.spec.ts"
+  browser: "Chromium (mobile emulation: iPhone 12)"
+  viewport: "390x844 (portrait)"
+
+  scenarios:
+    - name: "Full packing workflow (6 steps)"
+      steps:
+        - "Navigate to /scanner/shipping/pack"
+        - "Verify Step 1 (Select Shipment) page loads"
+        - "Click pending shipment or scan SO barcode"
+        - "Verify Step 2 (Box Management) - first box auto-created"
+        - "Verify current box indicator shows 'Box 1 of 1'"
+        - "Click 'Scan Item' button"
+        - "Verify Step 3 (Scan LP) page"
+        - "Scan or manually enter LP barcode"
+        - "Verify product details displayed"
+        - "Verify Step 4 (Quantity Entry) with number pad"
+        - "Enter/adjust quantity"
+        - "Click 'Add to Box'"
+        - "Verify success feedback (audio, visual, haptic)"
+        - "Verify returned to box management"
+        - "Repeat for multiple items"
+        - "Click 'Create New Box' button"
+        - "Verify Box 2 created"
+        - "Pack items into Box 2"
+        - "Close Box 1 by clicking 'Close Box'"
+        - "Verify Step 5 (Close Box) modal"
+        - "Enter weight 25.50 kg"
+        - "Confirm close"
+        - "Verify success feedback"
+        - "Close Box 2"
+        - "Click 'Complete Packing'"
+        - "Verify Step 6 (Success) screen"
+        - "Verify shipment status changed to 'packed'"
+        - "Wait 3 seconds or click 'Done'"
+        - "Verify redirected to scanner home"
+      assertions:
+        - "All 6 steps completed successfully"
+        - "Shipment status = 'packed'"
+        - "All boxes have weight"
+        - "Total weight calculated"
+        - "Success screen displayed"
+
+    - name: "Allergen warning and confirmation"
+      steps:
+        - "Select shipment with allergen products"
+        - "Verify yellow allergen banner displayed on Step 1"
+        - "Verify yellow banner persists through workflow"
+        - "Verify alert tone plays (440Hz, 2x)"
+        - "Verify yellow warning on Step 3 when scanning allergen product"
+        - "Verify confirmation checkbox required"
+        - "Acknowledge checkbox"
+        - "Verify can proceed to pack"
+      assertions:
+        - "Allergen banner displayed prominently"
+        - "Cannot proceed without acknowledgment"
+        - "Audio alert plays"
+
+    - name: "Number pad quantity entry"
+      steps:
+        - "Reach quantity entry step with available_qty = 100"
+        - "Verify quantity field pre-filled with 100"
+        - "Tap number pad button '5'"
+        - "Verify displayed = '5'"
+        - "Tap '+10' button"
+        - "Verify displayed = '15'"
+        - "Tap '+10' button again"
+        - "Verify displayed = '25'"
+        - "Tap '-1' button"
+        - "Verify displayed = '24'"
+        - "Verify all buttons >= 48x48 pixels"
+        - "Tap 'Add to Box'"
+        - "Verify quantity = 24 packed"
+      assertions:
+        - "Number pad works correctly"
+        - "Quick adjust buttons functional"
+        - "Final quantity accurate"
+
+    - name: "Error handling - invalid LP"
+      steps:
+        - "Reach LP scanning step"
+        - "Enter invalid LP barcode"
+        - "Verify red flash overlay"
+        - "Verify error beep plays (220Hz)"
+        - "Verify error message displayed"
+        - "Verify input remains focused for retry"
+        - "Enter valid LP"
+        - "Verify recovery to normal flow"
+      assertions:
+        - "Error feedback immediate"
+        - "Can retry scanning"
+
+    - name: "Error handling - quantity exceeds available"
+      steps:
+        - "Reach quantity entry with available_qty = 100"
+        - "Enter quantity = 150 (exceeds available)"
+        - "Verify red border on quantity field"
+        - "Verify warning message"
+        - "Verify 'Add to Box' button disabled"
+        - "Adjust quantity to 100"
+        - "Verify button re-enabled"
+      assertions:
+        - "Quantity validation enforced"
+        - "Cannot exceed available"
+
+    - name: "Touch target compliance (WCAG)"
+      steps:
+        - "Measure all interactive elements"
+        - "Number pad buttons: 48-56px"
+        - "Primary action buttons: 56px height"
+        - "Secondary buttons: 48px minimum"
+        - "Barcode input: 48px minimum"
+        - "Verify minimum spacing 8px between targets"
+      assertions:
+        - "All buttons >= 48x48 pixels"
+        - "Touch targets meet WCAG 2.1 AA standard"
+
+    - name: "High contrast accessibility"
+      steps:
+        - "Check color contrast ratios:"
+        - "  - Success green (#22C55E) on white: >= 4.5:1"
+        - "  - Error red (#EF4444) on white: >= 4.5:1"
+        - "  - Allergen yellow (#FDE047) on white: >= 4.5:1"
+        - "  - Text on dark background: >= 4.5:1"
+      assertions:
+        - "All contrasts meet WCAG AAA (7:1 for critical)"
+
+    - name: "Audio feedback - all events"
+      steps:
+        - "Start packing workflow"
+        - "Verify success tone on valid scan (880Hz, 200ms)"
+        - "Verify error tone on invalid scan (220Hz, 300ms)"
+        - "Verify confirm chime on box close (660Hz+880Hz, 500ms)"
+        - "Verify allergen alert (440Hz, 400ms, 2x)"
+        - "Navigate to settings and mute audio"
+        - "Repeat workflow"
+        - "Verify no audio when muted"
+      assertions:
+        - "All audio feedback plays correctly"
+        - "Audio mute toggle works"
+        - "Visual feedback still works when muted"
+
+    - name: "Multi-box workflow"
+      steps:
+        - "Pack items into Box 1"
+        - "Create Box 2"
+        - "Pack items into Box 2"
+        - "Use box selector to switch back to Box 1"
+        - "Verify Box 1 remains open"
+        - "Switch back to Box 2"
+        - "Close Box 2"
+        - "Close Box 1"
+        - "Verify both boxes closed"
+      assertions:
+        - "Multiple boxes open simultaneously"
+        - "Box switcher works"
+        - "Can switch between boxes"
+        - "Each box independent"
+
+# Performance Tests
+performance_tests:
+  file: "tests/performance/scanner-pack.perf.ts"
+
+  metrics:
+    - name: "Page load time"
+      target: "< 1 second"
+      measurement: "Time to First Contentful Paint"
+      test: "Navigate to /scanner/shipping/pack"
+
+    - name: "Shipments list query"
+      target: "< 500ms"
+      measurement: "Query + render time"
+      test: "Load 100 pending shipments"
+
+    - name: "LP barcode lookup"
+      target: "< 200ms"
+      measurement: "API response time"
+      test: "GET /lookup/LP-2025-00042"
+
+    - name: "Pack item submission"
+      target: "< 500ms"
+      measurement: "API response time"
+      test: "POST /scanner/pack"
+
+    - name: "Barcode feedback"
+      target: "< 100ms"
+      measurement: "Time from scan to visual/audio feedback"
+      test: "Scan barcode, measure feedback latency"
+
+    - name: "Box creation"
+      target: "< 100ms"
+      measurement: "API response time"
+      test: "POST /box/create"
+
+    - name: "Allergen check"
+      target: "< 100ms"
+      measurement: "Database query time"
+      test: "Check allergen conflicts"
+
+# Accessibility Tests
+accessibility_tests:
+  wcag_level: "WCAG 2.1 AA (AAA for dark theme)"
+
+  tests:
+    - name: "Color contrast"
+      checks:
+        - "Text contrast: >= 4.5:1 (normal text), >= 3:1 (large text)"
+        - "UI component contrast: >= 3:1 against adjacent colors"
+        - "Success/error/alert colors distinguishable without color alone"
+
+    - name: "Touch targets"
+      checks:
+        - "All buttons: >= 48x48 pixels"
+        - "Number pad: 48-56px per button"
+        - "Spacing: >= 8px between targets"
+        - "No overlapping touch targets"
+
+    - name: "Focus management"
+      checks:
+        - "Visible focus indicators"
+        - "Logical tab order"
+        - "Focus trap in modals"
+        - "Auto-focus on input fields"
+
+    - name: "Screen reader support"
+      checks:
+        - "Semantic HTML"
+        - "ARIA labels on all controls"
+        - "Live regions for status updates"
+        - "Announcements for feedback (success, error)"
+
+    - name: "Keyboard navigation"
+      checks:
+        - "Tab through all controls"
+        - "Enter to submit"
+        - "Esc to cancel/close"
+        - "Arrow keys for number pad navigation"
+
+    - name: "Dark theme compliance"
+      checks:
+        - "Contrast maintained in dark mode"
+        - "No reliance on color alone"
+        - "Text readable against backgrounds"
+
+# RLS & Security Tests
+security_tests:
+  file: "tests/security/scanner-pack-rls.test.ts"
+
+  tests:
+    - name: "Org isolation on shipments"
+      given: "User A from Org A, User B from Org B"
+      when: "User A queries GET /shipments"
+      then: "Only Org A shipments returned"
+      assertions:
+        - "RLS policy filters by org_id"
+        - "Org B shipments not visible"
+
+    - name: "Cannot pack cross-org shipment"
+      given: "User from Org A, shipment from Org B"
+      when: "POST /scanner/pack with Org B shipment"
+      then: "404 Not Found"
+      assertions:
+        - "RLS enforces isolation"
+
+    - name: "Warehouse access control"
+      given: "User assigned to Warehouse A only"
+      when: "User attempts to pack from Warehouse B"
+      then: "Shipment not visible in list"
+      assertions:
+        - "warehouse_id filter applied"
+
+    - name: "Role-based access"
+      given: "User with VIEWER role"
+      when: "Attempt POST /scanner/pack"
+      then: "403 Forbidden"
+      assertions:
+        - "Role requirement enforced"
+
+# Allergen Tests
+allergen_tests:
+  file: "tests/allergen/scanner-pack-allergens.test.ts"
+
+  tests:
+    - name: "Displays customer allergen restrictions"
+      given: "Customer with allergen_restrictions: ['Milk', 'Eggs']"
+      when: "Select shipment for this customer"
+      then: "Yellow allergen banner displayed"
+      assertions:
+        - "Banner shows 'Peanuts, Milk'"
+        - "Banner persists across all steps"
+
+    - name: "Detects product/customer allergen match"
+      given: "Product allergens: ['Milk', 'Nuts'], customer restrictions: ['Milk']"
+      when: "Pack product to box"
+      then: "Allergen warning includes match"
+      assertions:
+        - "matches: ['Milk']"
+        - "customerRestrictions and productAllergens both listed"
+
+    - name: "Requires confirmation for allergen products"
+      given: "Allergen warning displayed"
+      when: "User tries to confirm without acknowledging"
+      then: "Confirmation blocked"
+      assertions:
+        - "Checkbox required"
+        - "Cannot proceed without acknowledgment"
+
+    - name: "Plays alert tone for allergens"
+      given: "Allergen warning triggered"
+      when: "Warning displayed"
+      then: "Alert tone plays (440Hz, 400ms, 2x)"
+      assertions:
+        - "Audio feedback plays"
+
+# Definition of Done
+definition_of_done:
+  - "All unit tests passing (>80% coverage on PackingScannerService)"
+  - "All integration tests passing (happy path + errors for all endpoints)"
+  - "All E2E tests passing on mobile viewport (390x844)"
+  - "All touch targets >= 48x48 pixels (verified with measurements)"
+  - "All audio feedback plays correctly (success, error, confirm, allergen)"
+  - "All haptic feedback works on iOS/Android devices"
+  - "WCAG AAA contrast ratios verified (7:1 for critical, 4.5:1 for normal)"
+  - "Allergen warning displays and requires confirmation"
+  - "RLS policies enforce org isolation (verified with cross-org tests)"
+  - "Performance targets met: all API endpoints < 500ms"
+  - "Barcode feedback < 100ms"
+  - "Works on Zebra TC52, Honeywell CT40, and mobile phones"
+  - "Tested in bright warehouse lighting conditions"
+  - "Dark theme readable in low light"
+  - "All acceptance criteria from Story 07.12 MD passed"

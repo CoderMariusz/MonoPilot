@@ -1,0 +1,407 @@
+# Story 07.7 - Test Specifications
+# Purpose: Acceptance criteria, unit/integration/E2E test scenarios, coverage goals
+# Agent: QA/TEST
+
+acceptance_criteria:
+  ac_1:
+    title: "FIFO Allocation Order"
+    given: "Product A has 3 available LPs with created_at: 2025-01-01, 01-15, 01-20"
+    when: "SO line for 80 units with FIFO strategy is allocated"
+    then:
+      - "LP-001 (01-01) fully allocated (50 units)"
+      - "LP-002 (01-15) partially allocated (30 units)"
+      - "LP-003 (01-20) not allocated"
+
+  ac_2:
+    title: "FEFO Allocation Order"
+    given: "Product B has 3 LPs with expiry: 2025-06-01, 03-01, 04-15"
+    when: "SO line for 80 units with FEFO strategy is allocated"
+    then:
+      - "LP-102 (03-01 expiry) fully allocated (50 units) - FIRST (earliest expiry)"
+      - "LP-103 (04-15) partially allocated (30 units) - SECOND"
+      - "LP-101 (06-01) not allocated - LAST"
+
+  ac_3:
+    title: "Partial Allocation Creates Backorder"
+    given: "SO line for 100 units, only 60 units available"
+    when: "Allocation runs"
+    then:
+      - "quantity_allocated = 60"
+      - "backorder_flag = true on SO line"
+      - "backorder.created event published with qty=40"
+      - "SO status remains 'confirmed' (below 80% threshold)"
+
+  ac_4:
+    title: "Allocation Threshold"
+    given: "Org allocation_threshold_pct = 80%"
+    when: "SO with line for 100 units gets 85 units allocated"
+    then:
+      - "SO status changes to 'allocated' (85% >= 80%)"
+
+  ac_5:
+    title: "SO Status Below Threshold"
+    given: "SO line for 100 units with 75 units allocated (75%)"
+    when: "Allocation completes"
+    then:
+      - "SO status remains 'confirmed' (75% < 80%)"
+      - "Dashboard shows 'Under-allocated' alert"
+
+  ac_6:
+    title: "Manual Allocation Endpoint"
+    given: "SO in 'confirmed' status, user has Manager role"
+    when: "POST /api/shipping/sales-orders/:id/allocate called"
+    then:
+      - "Allocation runs for all lines"
+      - "inventory_allocations records created"
+      - "Allocation results returned with per-line breakdown"
+      - "Response includes undo_until timestamp (5 min from now)"
+
+  ac_7:
+    title: "Insufficient Permissions"
+    given: "User has Viewer role (no allocate permission)"
+    when: "POST /allocate endpoint called"
+    then:
+      - "403 Forbidden returned"
+      - "Message: 'Insufficient permissions'"
+
+  ac_8:
+    title: "Release Allocation"
+    given: "SO with allocations (3 LPs reserved)"
+    when: "POST /api/shipping/sales-orders/:id/release-allocation called"
+    then:
+      - "All allocation records deleted"
+      - "LP statuses reset to 'available'"
+      - "SO line quantity_allocated reset to 0"
+      - "SO status reset to 'confirmed'"
+      - "Audit entry created with reason"
+
+  ac_9:
+    title: "Undo Allocation (5-Minute Window)"
+    given: "SO allocated 2 minutes ago"
+    when: "Click [Undo] button on SO detail"
+    then:
+      - "[Undo] button visible and clickable"
+      - "Confirms 'Release allocation?'"
+      - "Allocation released successfully"
+      - "SO status → 'confirmed'"
+      - "Toast: 'Allocation undone. Inventory released.'"
+
+  ac_10:
+    title: "Undo Window Expired"
+    given: "SO allocated 6 minutes ago"
+    when: "User views SO detail"
+    then:
+      - "[Undo] button hidden or disabled"
+      - "[Release Allocation] in Actions menu still available"
+
+  ac_11:
+    title: "Exclude Expired LPs"
+    given: "Available LPs include expired (expiry_date < today)"
+    when: "Allocation query runs"
+    then:
+      - "Only LPs with expiry_date > today considered"
+      - "Expired LPs excluded from suggestions"
+
+  ac_12:
+    title: "Exclude QA-Failed LPs"
+    given: "Available LPs include qa_status='failed' or 'quarantine'"
+    when: "Allocation query runs"
+    then:
+      - "Only LPs with qa_status='passed' considered"
+      - "Failed/quarantine LPs excluded from suggestions"
+
+  ac_13:
+    title: "Concurrent Allocation Protection"
+    given: "Two users allocate different SOs for same product"
+    when: "Both SOs need 50 units, only 50 available, concurrent allocation"
+    then:
+      - "One SO gets full allocation, other gets backorder"
+      - "No duplicate allocation of same LP"
+      - "No deadlock occurs"
+      - "SELECT FOR UPDATE SKIP LOCKED prevents race condition"
+
+  ac_14:
+    title: "Partial LP Quantity Edit"
+    given: "LP-2025-0012 has 480 units available"
+    when: "User clicks qty field and changes 480 → 200"
+    then:
+      - "Inline edit accepted (or modal edit if using [Edit Qty])"
+      - "Summary recalculates automatically"
+      - "Only 200 units allocated from this LP"
+
+  ac_15:
+    title: "Manual Checkbox Override"
+    given: "Auto-allocate suggests 2 LPs for SO line"
+    when: "User unchecks one LP checkbox"
+    then:
+      - "Unchecked LP removed from allocation"
+      - "Summary recalculates with remaining LP only"
+      - "Shortfall qty increases if necessary"
+
+  ac_16:
+    title: "Freshness Indicator"
+    given: "Allocation modal loads allocation data"
+    when: "Modal opens"
+    then:
+      - "Freshness indicator shows 'Last updated: 3 seconds ago'"
+      - "[↻ Refresh] button visible"
+      - "User can click [Refresh] to fetch latest data"
+
+  ac_17:
+    title: "Stale Data Warning"
+    given: "Allocation data is 6 minutes old"
+    when: "User views modal"
+    then:
+      - "Warning shown: 'Inventory data may be outdated. [Refresh]'"
+      - "Allow allocation to proceed (user responsible)"
+
+  ac_18:
+    title: "FEFO Expiry Warning Threshold"
+    given: "Org fefo_warning_days_threshold = 7 days"
+    when: "Allocation data loaded with FEFO strategy"
+    then:
+      - "LPs with expiry_days_remaining < 7 marked yellow"
+      - "Show: '⚠ Expires in X days'"
+      - "Desktop/tablet: batch in tooltip"
+      - "Mobile: batch inline in card"
+
+  ac_19:
+    title: "Keyboard Focus Trap"
+    given: "Allocation modal open"
+    when: "User presses Tab repeatedly"
+    then:
+      - "Focus cycles only within modal"
+      - "Focus never escapes to background elements"
+      - "Escape key closes modal"
+      - "Focus returns to [Allocate] button after close"
+
+unit_tests:
+  allocation_algorithm:
+    - "Test FIFO: Allocate oldest LPs first (by created_at ASC)"
+    - "Test FEFO: Allocate soonest-expiring LPs first (by expiry_date ASC)"
+    - "Test partial allocation: qty_allocated < qty_required"
+    - "Test backorder calculation: qty_required - qty_allocated"
+    - "Test allocation threshold: fulfillment_pct >= threshold_pct"
+    - "Test product strategy lookup: Default FIFO if not specified"
+    - "Test org settings retrieval: allocation_threshold, fefo_warning_days"
+    - "Test LP filtering: status='available', qa_status='passed', qty > 0, expiry > today"
+    - "Test concurrent allocation: SELECT FOR UPDATE SKIP LOCKED prevents deadlock"
+
+  validation:
+    - "Test allocation_qty > 0"
+    - "Test allocation_qty <= available_qty"
+    - "Test product_id match in allocations"
+    - "Test SO status must be 'confirmed'"
+    - "Test LP eligibility (status, qa_status, expiry)"
+    - "Test backorder_flag set when shortfall"
+    - "Test transaction rollback on partial failure"
+    - "Test permission check: Manager+ role required"
+
+  calculations:
+    - "Test fulfillment_pct calculation"
+    - "Test allocation summary totals"
+    - "Test shortfall_qty = required - allocated"
+    - "Test expiry_days_remaining calculation"
+
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/shipping/sales-orders/:id/allocations"
+      tests:
+        - "Returns correct LP list sorted by FIFO/FEFO"
+        - "Returns allocation summary with correct totals"
+        - "Includes last_updated timestamp"
+        - "Includes fefo_warning_threshold_days"
+        - "Handles products with no available LPs (empty list)"
+        - "Handles SO with no lines (edge case)"
+
+    - name: "POST /api/shipping/sales-orders/:id/allocate"
+      tests:
+        - "Creates inventory_allocations records with correct quantities"
+        - "Updates SO status to 'allocated' when threshold met"
+        - "Creates backorder if shortfall"
+        - "Updates sales_order_lines.quantity_allocated"
+        - "Sets backorder_flag on SO line"
+        - "Returns undo_until timestamp (5 minutes after allocation)"
+        - "Prevents duplicate LP allocation (UNIQUE constraint)"
+        - "Rolls back on validation error"
+        - "Validates SO status = 'confirmed'"
+        - "Validates user permission (Manager+)"
+
+    - name: "POST /api/shipping/sales-orders/:id/release-allocation"
+      tests:
+        - "Deletes inventory_allocations records"
+        - "Resets sales_order_lines.quantity_allocated to 0"
+        - "Resets SO status to 'confirmed'"
+        - "Updates backorder_flag = false"
+        - "Logs release action with reason + timestamp"
+        - "Handles partial release (subset of allocations)"
+        - "Checks undo_window_expired (true if > 5 min)"
+
+  db_transactions:
+    - "Test SERIALIZABLE isolation on allocation transaction"
+    - "Test SELECT FOR UPDATE SKIP LOCKED prevents race conditions"
+    - "Test transaction rollback on constraint violation"
+    - "Test RLS policies: org_id filtering"
+    - "Test cascade delete: SO delete removes allocations"
+
+e2e_tests:
+  happy_path_fifo:
+    title: "FIFO Allocation Happy Path"
+    steps:
+      - "Open SO detail (SO-2025-0142)"
+      - "Click [Allocate] button"
+      - "Allocation modal opens"
+      - "Verify freshness indicator: 'Last updated: X seconds ago'"
+      - "Verify FIFO strategy selected (default)"
+      - "Click [Auto-Allocate]"
+      - "Verify LPs auto-selected by receipt_date (oldest first)"
+      - "Review allocation summary"
+      - "Click [Allocate Selected]"
+      - "SO status changes to 'allocated'"
+      - "Verify [Undo] button appears (5-min window)"
+      - "Verify inventory_allocations created in database"
+
+  happy_path_fefo:
+    title: "FEFO Allocation with Expiry Warnings"
+    steps:
+      - "Open SO detail"
+      - "Click [Allocate]"
+      - "Select FEFO strategy"
+      - "Verify FEFO threshold explanation visible (7 days default)"
+      - "Click [Auto-Allocate]"
+      - "Verify LPs selected by expiry_date (soonest first)"
+      - "Verify LPs with < 7 days expiry marked yellow"
+      - "Show: '⚠ Expires in X days'"
+      - "Click [Allocate Selected]"
+      - "Confirm allocation"
+
+  happy_path_partial:
+    title: "Partial Allocation + Backorder"
+    steps:
+      - "SO requires 1,500 units, only 950 available"
+      - "Click [Allocate]"
+      - "Auto-allocate suggests available LPs"
+      - "Shows '79.2% allocated, 250 units short'"
+      - "Option 1: Hold SO"
+      - "Option 2: Create Backorder (recommended)"
+      - "Select Backorder option"
+      - "Click [Confirm & Backorder]"
+      - "SO status = 'confirmed' (threshold not met)"
+      - "backorder_flag = true on SO line"
+      - "Backorder record created"
+
+  happy_path_partial_qty:
+    title: "Partial LP Quantity Edit"
+    steps:
+      - "Auto-allocate suggests LP with 480 units"
+      - "Click on quantity field or [Edit Qty] button"
+      - "Edit modal/inline: Change 480 → 200"
+      - "Verify summary recalculates automatically"
+      - "New total shows 200 units from this LP"
+      - "Click [Allocate Selected]"
+      - "Confirm with 200 units allocated"
+
+  happy_path_manual_override:
+    title: "Manual Override (Uncheck LP)"
+    steps:
+      - "Auto-allocate suggests 2 LPs"
+      - "Uncheck one LP checkbox"
+      - "Summary recalculates (fewer units allocated)"
+      - "Shortfall qty increases if necessary"
+      - "Click [Allocate Selected]"
+      - "Only checked LPs allocated"
+
+  happy_path_undo:
+    title: "Undo Allocation (5-Minute Window)"
+    steps:
+      - "Allocate SO successfully"
+      - "Confirm allocation completes"
+      - "[Undo] button appears in SO detail (5-min window)"
+      - "Click [Undo] button"
+      - "Confirmation: 'Release allocation?'"
+      - "Click [Release]"
+      - "SO status changes back to 'confirmed'"
+      - "Inventory freed back to available stock"
+      - "Toast: 'Allocation undone. Inventory released.'"
+
+  happy_path_explicit_release:
+    title: "Release Allocation Anytime"
+    steps:
+      - "SO has active allocation"
+      - "Click SO Actions → [Release Allocation]"
+      - "Modal opens: Reason dropdown + confirm"
+      - "Select reason: 'manual_adjustment' or 'so_cancelled'"
+      - "Click [Release]"
+      - "Inventory freed"
+      - "Audit log created with reason + timestamp"
+      - "SO status → 'confirmed'"
+
+  error_no_inventory:
+    title: "Error: No Available Inventory"
+    steps:
+      - "SO requires 300 units, 0 available"
+      - "Click [Allocate]"
+      - "Modal shows empty LP table"
+      - "Action options: [Hold Order] [Check Schedule] [Alternatives]"
+      - "Click [Hold Order]"
+      - "SO status → 'on_hold'"
+
+  error_permission_denied:
+    title: "Error: Insufficient Permissions"
+    steps:
+      - "Shipping Clerk tries to allocate (no Manager role)"
+      - "Click [Allocate]"
+      - "Error banner: 'You do not have permission'"
+      - "Show read-only allocation suggestions"
+      - "Button: [Request Permission] → Email to manager"
+
+  error_stale_data:
+    title: "Error: Stale Inventory Data"
+    steps:
+      - "Load allocation modal"
+      - "Wait 6+ minutes (data becomes stale)"
+      - "Warning: 'Inventory data may be outdated. [Refresh]'"
+      - "Click [Refresh]"
+      - "Data re-fetches, timestamp updated"
+
+  responsive_mobile:
+    title: "Responsive: Mobile Allocation"
+    steps:
+      - "Open SO on mobile (<768px)"
+      - "Allocation modal full-screen"
+      - "Freshness indicator at top"
+      - "Scroll through LPs (stacked cards)"
+      - "Batch numbers visible inline"
+      - "Toggle strategy (vertical radio buttons)"
+      - "Click [Edit Qty] → inline modal"
+      - "Click [Allocate] → confirm on mobile"
+
+  responsive_tablet:
+    title: "Responsive: Tablet Batch Numbers"
+    steps:
+      - "Open SO on tablet (768-1024px)"
+      - "LP table shows batch in tooltip (not column)"
+      - "Hover row → batch details visible"
+      - "Verify batch clickable → batch detail page"
+
+performance_tests:
+  - "Load allocation data: <500ms for SO with 10 lines"
+  - "FIFO/FEFO sort: <200ms (1,000 LPs)"
+  - "FEFO warning filter: <100ms (mark LPs < threshold)"
+  - "Auto-allocate: <300ms"
+  - "Confirm allocation: <800ms (create 3 inventory_allocations)"
+  - "Release allocation: <500ms"
+  - "Refresh allocation: <300ms"
+  - "Partial qty edit: <100ms (summary recalculation)"
+
+test_coverage_targets:
+  unit_tests: ">90%"
+  integration_tests: ">85%"
+  e2e_tests: ">80%"
+  overall: ">88%"
+
+test_files:
+  - "apps/frontend/lib/services/__tests__/allocation-service.test.ts"
+  - "apps/frontend/app/api/shipping/sales-orders/__tests__/allocation-api.test.ts"
+  - "apps/frontend/components/shipping/__tests__/AllocationModal.test.tsx"
+  - "apps/frontend/__tests__/e2e/allocation-workflow.spec.ts"

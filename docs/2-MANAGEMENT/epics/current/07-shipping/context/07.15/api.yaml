@@ -1,0 +1,410 @@
+# Story 07.15 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling, caching
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET Dashboard KPIs
+  - method: "GET"
+    path: "/api/shipping/dashboard"
+    description: "Returns all KPI metrics for dashboard with trend indicators"
+    file: "apps/frontend/app/api/shipping/dashboard/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      query_params:
+        date_from: "string (ISO date, optional) - Default: 30 days ago"
+        date_to: "string (ISO date, optional) - Default: today"
+        date_range: "string (optional) - Preset: 'today' | 'week' | 'month' | 'last_7' | 'last_30'"
+
+    response:
+      status: 200
+      type: "DashboardKPIsResponse"
+      schema:
+        orders:
+          total: "number"
+          by_status:
+            draft: "number"
+            confirmed: "number"
+            allocated: "number"
+            picking: "number"
+            packing: "number"
+            shipped: "number"
+            delivered: "number"
+          trend:
+            current: "number"
+            previous: "number"
+            percentage: "number (positive = increase)"
+            direction: "'up' | 'down' | 'neutral'"
+
+        pick_lists:
+          total: "number"
+          by_status:
+            pending: "number"
+            assigned: "number"
+            in_progress: "number"
+            completed: "number"
+          trend: "{ current, previous, percentage, direction }"
+
+        shipments:
+          total: "number"
+          by_status:
+            pending: "number"
+            packing: "number"
+            packed: "number"
+            shipped: "number"
+            delivered: "number"
+          trend: "{ current, previous, percentage, direction }"
+
+        backorders:
+          count: "number"
+          total_value: "decimal (formatted as currency)"
+
+        on_time_delivery_pct: "number (0-100)"
+        avg_pick_time_hours: "number"
+        avg_pack_time_hours: "number"
+
+        last_updated: "string (ISO 8601 timestamp)"
+
+    caching:
+      strategy: "Redis with 1 min TTL"
+      key: "dashboard:kpis:{org_id}:{date_range_hash}"
+      ttl_seconds: 60
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "Invalid date range. Max 365 days allowed"
+        when: "date_from and date_to exceed 365 days"
+
+      - status: 500
+        code: "DASHBOARD_KPI_ERROR"
+        message: "Failed to load dashboard KPIs"
+        when: "Database query timeout or error"
+
+    performance:
+      target_ms: 200
+      measurement: "With Redis cache (cache hit)"
+      fallback: "If Redis unavailable, query database (target: 500ms)"
+
+  # GET Dashboard Alerts
+  - method: "GET"
+    path: "/api/shipping/dashboard/alerts"
+    description: "Returns all active alerts with detailed items"
+    file: "apps/frontend/app/api/shipping/dashboard/alerts/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query_params:
+        date_from: "string (ISO date, optional)"
+        date_to: "string (ISO date, optional)"
+        severity: "string (optional) - 'critical' | 'warning' | 'info' | 'all'"
+
+    response:
+      status: 200
+      type: "DashboardAlertsResponse"
+      schema:
+        backorders:
+          count: "number"
+          items:
+            - so_line_id: "string (UUID)"
+              product_name: "string"
+              qty_backordered: "number"
+
+        delayed_shipments:
+          count: "number"
+          items:
+            - so_id: "string (UUID)"
+              order_number: "string"
+              promised_date: "string (ISO date)"
+              days_late: "number"
+
+        pending_picks_overdue:
+          count: "number"
+          items:
+            - pick_list_id: "string (UUID)"
+              pick_list_number: "string"
+              created_at: "string (ISO 8601)"
+              hours_pending: "number"
+
+        allergen_conflicts:
+          count: "number"
+          items:
+            - so_id: "string (UUID)"
+              order_number: "string"
+              customer_name: "string"
+              conflicting_allergens: "string[]"
+
+        alert_summary:
+          critical: "number"
+          warning: "number"
+          info: "number"
+
+    caching:
+      strategy: "Redis with 1 min TTL"
+      key: "dashboard:alerts:{org_id}:{date_range_hash}"
+      ttl_seconds: 60
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+
+      - status: 500
+        code: "DASHBOARD_ALERTS_ERROR"
+        message: "Failed to load dashboard alerts"
+
+    performance:
+      target_ms: 150
+
+  # GET Recent Activity
+  - method: "GET"
+    path: "/api/shipping/dashboard/recent-activity"
+    description: "Returns recent activity feed for dashboard"
+    file: "apps/frontend/app/api/shipping/dashboard/recent-activity/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query_params:
+        limit: "number (default: 10, max: 50)"
+        offset: "number (default: 0)"
+
+    response:
+      status: 200
+      type: "DashboardActivityResponse"
+      schema:
+        activities:
+          - id: "string (UUID)"
+            type: "'so_created' | 'so_confirmed' | 'so_shipped' | 'pick_completed' | 'shipment_packed'"
+            entity_type: "'sales_order' | 'pick_list' | 'shipment'"
+            entity_id: "string (UUID)"
+            entity_number: "string (SO-2025-00123)"
+            description: "string"
+            created_at: "string (ISO 8601)"
+            created_by:
+              id: "string (UUID)"
+              name: "string"
+            status: "'success' | 'warning' | 'error'"
+
+        pagination:
+          total: "number"
+          limit: "number"
+          offset: "number"
+
+    caching:
+      strategy: "Redis with 1 min TTL"
+      key: "dashboard:activity:{org_id}:{limit}"
+      ttl_seconds: 60
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+
+      - status: 400
+        code: "INVALID_LIMIT"
+        message: "Limit must be between 1 and 50"
+
+      - status: 500
+        code: "DASHBOARD_ACTIVITY_ERROR"
+
+    performance:
+      target_ms: 100
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/dashboard-service.ts"
+    description: "Dashboard KPI calculations, caching, trend analysis"
+    exports:
+      - name: "DashboardService"
+        type: "class"
+        methods:
+          - name: "getKPIs"
+            type: "static async"
+            params: ["orgId: string", "dateFrom: Date", "dateTo: Date"]
+            returns: "Promise<DashboardKPIs>"
+            caching: "Redis with 1min TTL"
+            description: "Fetches KPI metrics with caching and database fallback"
+
+          - name: "getAlerts"
+            type: "static async"
+            params: ["orgId: string", "dateFrom: Date", "dateTo: Date"]
+            returns: "Promise<DashboardAlerts>"
+            caching: "Redis with 1min TTL"
+
+          - name: "getRecentActivity"
+            type: "static async"
+            params: ["orgId: string", "limit?: number"]
+            returns: "Promise<Activity[]>"
+            caching: "Redis with 1min TTL"
+
+          - name: "calculateTrend"
+            type: "static"
+            params: ["current: number", "previous: number"]
+            returns: "{ percentage: number, direction: 'up' | 'down' | 'neutral' }"
+
+          - name: "generateDateRangeHash"
+            type: "static"
+            params: ["dateFrom: Date", "dateTo: Date"]
+            returns: "string"
+            example: "2025-12-01_2025-12-31"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/dashboard-types.ts"
+    description: "Dashboard TypeScript interfaces"
+    exports:
+      - "DashboardKPIs"
+      - "DashboardAlerts"
+      - "DashboardActivity"
+      - "KPICard"
+      - "AlertBadge"
+      - "ActivityItem"
+      - "TrendIndicator"
+
+# Constants
+constants:
+  - path: "apps/frontend/lib/constants/dashboard-config.ts"
+    description: "Dashboard configuration"
+    exports:
+      - name: "DASHBOARD_CACHE_TTL_SECONDS"
+        value: 60
+      - name: "CHART_COLORS"
+        value:
+          draft: "#9CA3AF"
+          confirmed: "#3B82F6"
+          allocated: "#8B5CF6"
+          picking: "#FBBF24"
+          packing: "#FB923C"
+          shipped: "#10B981"
+          delivered: "#06B6D4"
+      - name: "ALERT_COLORS"
+        value:
+          critical: "#EF4444"
+          warning: "#F59E0B"
+          info: "#3B82F6"
+      - name: "DEFAULT_DATE_RANGE"
+        value: "last_30"
+      - name: "MAX_ACTIVITY_LIMIT"
+        value: 50
+      - name: "PERFORMANCE_TARGETS_MS"
+        value:
+          dashboard_load: 500
+          kpis_api: 200
+          alerts_api: 150
+          activity_api: 100
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/dashboard-schema.ts"
+    description: "Zod validation schemas for dashboard"
+    schemas:
+      - name: "dashboardQuerySchema"
+        fields:
+          date_from: "z.string().datetime().optional()"
+          date_to: "z.string().datetime().optional()"
+        refinements:
+          - "date range must not exceed 365 days"
+
+      - name: "dateRangePresetSchema"
+        values: "'today' | 'week' | 'month' | 'last_7' | 'last_30'"
+
+      - name: "recentActivityQuerySchema"
+        fields:
+          limit: "z.number().int().min(1).max(50).default(10)"
+          offset: "z.number().int().min(0).default(0)"
+
+# Error Handling
+error_codes:
+  - code: "DASHBOARD_KPI_ERROR"
+    http: 500
+    severity: "critical"
+    message: "Failed to load KPI metrics"
+    recovery: "Retry request, check database status"
+
+  - code: "DASHBOARD_ALERTS_ERROR"
+    http: 500
+    severity: "critical"
+    message: "Failed to load alerts"
+    recovery: "Fallback to empty alerts array"
+
+  - code: "DASHBOARD_ACTIVITY_ERROR"
+    http: 500
+    severity: "warning"
+    message: "Failed to load recent activity"
+    recovery: "Fallback to empty activity array"
+
+  - code: "INVALID_DATE_RANGE"
+    http: 400
+    severity: "warning"
+    message: "Invalid date range"
+    recovery: "Use default date range (last 30 days)"
+
+  - code: "UNAUTHORIZED"
+    http: 401
+    severity: "critical"
+    message: "Unauthorized"
+    recovery: "Redirect to login"
+
+# Rate Limiting
+rate_limiting:
+  dashboard_endpoints:
+    - path: "/api/shipping/dashboard*"
+      method: "GET"
+      limit: "100 requests per minute per user"
+      response_429: |
+        {
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "Too many requests. Please try again in 30 seconds.",
+          "retry_after": 30
+        }
+
+# CORS
+cors:
+  allowed_origins:
+    - "https://app.monopilot.com"
+    - "http://localhost:3000"
+  allowed_methods: ["GET"]
+  credentials: true
+
+# Security Headers
+security_headers:
+  - name: "X-Content-Type-Options"
+    value: "nosniff"
+  - name: "X-Frame-Options"
+    value: "DENY"
+  - name: "X-XSS-Protection"
+    value: "1; mode=block"
+  - name: "Strict-Transport-Security"
+    value: "max-age=31536000"
+
+# Multi-Tenant Isolation
+multi_tenancy:
+  - all_queries: "Filtered by RLS (org_id from auth.uid())"
+  - cache_keys: "Include org_id to prevent cross-org data leakage"
+  - testing: "Verify RLS blocks cross-org access (403 Forbidden)"
+
+# Phase 2+ Features (return 501)
+phase_2_features:
+  - endpoint: "POST /api/shipping/dashboard/alerts/:alertId/resolve"
+    description: "Resolve/dismiss alert"
+    response:
+      status: 501
+      body: { error: "Alert management available in Phase 2", feature: "alert_management" }
+
+  - endpoint: "POST /api/shipping/dashboard/refresh"
+    description: "Force cache refresh"
+    response:
+      status: 501
+      body: { error: "Manual cache refresh available in Phase 2" }
+
+  - endpoint: "GET /api/shipping/dashboard/export"
+    description: "Export dashboard to PDF/Excel"
+    response:
+      status: 501
+      body: { error: "Export available in Phase 2", feature: "dashboard_export" }

@@ -1,0 +1,579 @@
+story:
+  id: "07.13"
+  name: "SSCC/BOL Labels - Pallet & Shipping Documentation"
+  epic: "07-shipping"
+  phase: "1C"
+  complexity: "M"
+  estimate_days: 4
+  priority: "P0"
+  state: "ready"
+  type: "backend + frontend"
+  description: |
+    SSCC-18 pallet label generation with GS1 compliance, BOL PDF generation with carrier info,
+    and Zebra/thermal printer integration for warehouse label printing
+
+dependencies:
+  required:
+    - story: "07.11"
+      provides: ["shipments", "shipment_boxes", "shipment_box_contents"]
+      blocking: true
+      description: "Packing provides shipment/box structure for SSCC assignment"
+    - story: "07.1"
+      provides: ["customers", "customer_contacts", "customer_addresses"]
+    - story: "07.2"
+      provides: ["customer_addresses"]
+    - epic: "01-settings"
+      provides: ["organizations", "users", "roles", "rls_policies"]
+      description: "GS1 Company Prefix config, user roles for printing"
+    - epic: "01-warehouses"
+      provides: ["locations", "warehouse_info"]
+      description: "Primary warehouse location for shipper info on BOL"
+    - epic: "02-technical"
+      provides: ["products", "allergens", "product_allergens"]
+      description: "Allergen data for packing slip warnings"
+
+provides_to:
+  - story: "07.14"
+    consumes: ["sscc_labels", "bol_pdfs", "packing_slip_pdfs"]
+    description: "Ship confirm uses SSCC-labeled shipments with BOL"
+  - story: "07.15"
+    consumes: ["sscc_generation_metrics", "label_print_success"]
+    description: "Shipping dashboard displays SSCC generation and print success rates"
+  - epic: "11-integrations"
+    consumes: ["sscc_data", "bol_carrier_info"]
+    description: "EDI ASN 856 requires SSCC and BOL data"
+
+files_to_read:
+  prd:
+    - path: "docs/1-BASELINE/product/modules/shipping.md"
+      sections: ["FR-7.38", "FR-7.39", "FR-7.40", "FR-7.41"]
+      description: "SSCC generation, BOL, label printing, packing slip FRs"
+
+  architecture:
+    - path: "docs/1-BASELINE/architecture/modules/shipping.md"
+      sections: ["Lines 189-191", "Lines 209-219", "Lines 444-447", "Lines 1035-1072"]
+      description: "SSCC algorithm, BOL structure, label generation architecture"
+
+  story:
+    - path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.13.sscc-bol-labels.md"
+      description: "Full story markdown with acceptance criteria and technical design"
+
+  wireframes:
+    - id: "SHIP-019"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-019-sscc-labels.md"
+      description: "SSCC label generation, preview, print settings, batch label queue"
+      screens:
+        - "success: Label preview with barcode, ship-to, order info, weight"
+        - "batch_labels: Table of queued labels with status, errors, print/preview actions"
+        - "loading: Progress bar 'Generating labels...'"
+        - "error: SSCC generation failed, GS1 prefix not configured"
+    - id: "SHIP-021"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-021-bill-of-lading.md"
+      description: "BOL PDF preview, email modal, print dialog"
+      screens:
+        - "success: PDF preview with Print/Email/Download buttons"
+        - "loading: Progress bar 'Generating BOL PDF...'"
+        - "empty: No BOL available, CTA to complete packing/assign carrier"
+        - "error: PDF generation timeout, missing data (no carrier, no SSCC, etc)"
+        - "email_modal: Recipient dropdown, CC, subject, message, send button"
+        - "print_dialog: Browser native print with options"
+
+  patterns:
+    - path: "docs/1-BASELINE/architecture/patterns/multi-tenancy.md"
+    - path: "docs/1-BASELINE/architecture/patterns/rls-isolation.md"
+    - path: "docs/1-BASELINE/architecture/patterns/gs1-compliance.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_add_sscc_support.sql"
+      type: "migration"
+      description: |
+        Add gs1_company_prefix to organizations
+        Add next_sscc_sequence to organizations
+        Add generate_sscc_for_org() PL/pgSQL function
+        Add calculate_gs1_check_digit() PL/pgSQL function
+        Verify UNIQUE constraint on shipment_boxes.sscc
+
+  api:
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/generate-sscc/route.ts"
+      methods: ["POST"]
+      description: "Generate SSCC for all boxes (idempotent)"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/generate-bol/route.ts"
+      methods: ["POST"]
+      description: "Generate BOL PDF with carrier info, box list, totals"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/print-labels/route.ts"
+      methods: ["POST"]
+      description: "Generate ZPL label format or PDF labels"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/print-packing-slip/route.ts"
+      methods: ["POST"]
+      description: "Generate packing slip PDF with line items, lots, allergens"
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/boxes/[boxId]/label-preview/route.ts"
+      methods: ["GET"]
+      description: "Get SSCC label preview with barcode image"
+
+  services:
+    - path: "lib/services/sscc-service.ts"
+      description: "SSCC generation, check digit calculation, validation, formatting"
+    - path: "lib/services/label-service.ts"
+      description: "ZPL generation, barcode rendering (bwip-js), label formatting"
+    - path: "lib/services/document-service.ts"
+      description: "BOL and packing slip PDF generation (pdfmake), Supabase Storage upload"
+
+  validation:
+    - path: "lib/validation/sscc-schema.ts"
+      description: "Zod schemas for SSCC generation, label printing, BOL/packing slip requests"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/page.tsx"
+      description: "Update shipment detail page to include LabelActions component"
+
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/LabelActions.tsx"
+      description: "Buttons: Generate SSCC, Print Labels, Generate BOL, Print Packing Slip"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/SSCCLabelPreview.tsx"
+      description: "Label preview with barcode image, metadata, format selector (4x6/4x8)"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/BOLPreview.tsx"
+      description: "PDF viewer with zoom controls, Print/Email/Download buttons"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/PackingSlipPreview.tsx"
+      description: "PDF viewer for packing slip with same controls as BOL"
+
+  tests:
+    - path: "lib/services/__tests__/sscc-service.test.ts"
+      description: "Unit tests for check digit calculation, SSCC validation, formatting"
+    - path: "lib/services/__tests__/label-service.test.ts"
+      description: "Unit tests for ZPL generation, barcode encoding"
+    - path: "lib/services/__tests__/document-service.test.ts"
+      description: "Unit tests for BOL/packing slip PDF generation"
+    - path: "tests/e2e/shipping/sscc-bol-workflow.spec.ts"
+      description: "E2E tests: Generate SSCC -> Print Labels -> Generate BOL workflow"
+
+database:
+  tables:
+    - name: "organizations"
+      changes:
+        - add_column: "gs1_company_prefix TEXT"
+          constraint: "CHECK (gs1_company_prefix IS NULL OR gs1_company_prefix ~ '^\\d{7,10}$')"
+          description: "7-10 digit GS1 prefix, globally unique (assigned by GS1)"
+        - add_column: "next_sscc_sequence BIGINT DEFAULT 1"
+          description: "Auto-incremented counter for SSCC serial reference per org"
+      notes: "Both columns must be configured before SSCC generation is allowed"
+
+    - name: "shipment_boxes"
+      existing_columns:
+        - "sscc TEXT UNIQUE (nullable, generated in this story)"
+        - "weight DECIMAL(10,3) (kg, required for BOL)"
+        - "length DECIMAL(10,2) (cm, required for BOL)"
+        - "width DECIMAL(10,2) (cm, required for BOL)"
+        - "height DECIMAL(10,2) (cm, required for BOL)"
+      new_indexes:
+        - "idx_shipment_boxes_sscc ON shipment_boxes(sscc) WHERE sscc IS NOT NULL"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/generate-sscc"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Generate SSCC-18 for all boxes in shipment (idempotent)"
+    request_body: |
+      {
+        "force_regenerate": false  // Optional: re-generate even if exists
+      }
+    response: |
+      {
+        "success": true,
+        "data": {
+          "generated_count": 2,
+          "skipped_count": 1,
+          "boxes": [
+            {
+              "box_id": "uuid-box-001",
+              "box_number": 1,
+              "sscc": "00614141000012345X",
+              "sscc_formatted": "00 6141 4100 0012 3456 7X"
+            }
+          ]
+        }
+      }
+    validation:
+      - "shipment_id must exist and belong to user's org"
+      - "shipment status must be 'packed'"
+      - "all boxes must have weight and dimensions"
+      - "organization must have gs1_company_prefix configured"
+    error_codes:
+      - "GS1_PREFIX_NOT_CONFIGURED: Cannot generate SSCC without GS1 Company Prefix"
+      - "MISSING_BOX_DATA: Box missing weight/dimensions"
+      - "SHIPMENT_NOT_PACKED: Shipment must be packed status"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/generate-bol"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Generate BOL PDF with carrier info, carton list, product summary"
+    request_body: |
+      {
+        "force_regenerate": false,
+        "include_product_list": true
+      }
+    response: |
+      {
+        "success": true,
+        "data": {
+          "bol_number": "BOL-2025-001234",
+          "pdf_url": "https://storage.../bol/org-id/shipment-id.pdf",
+          "generated_at": "2025-12-18T14:30:00Z",
+          "file_size_kb": 245
+        }
+      }
+    validation:
+      - "shipment status must be 'packed', 'manifested', 'shipped', or 'delivered'"
+      - "all boxes must have SSCC barcode"
+      - "all boxes must have weight and dimensions"
+      - "carrier must be assigned to shipment"
+      - "customer shipping address required"
+    error_codes:
+      - "NO_CARRIER_ASSIGNED: Carrier must be assigned before BOL generation"
+      - "MISSING_SSCC: All boxes must have SSCC before BOL generation"
+      - "MISSING_BOX_DATA: Missing weight or dimensions on box"
+      - "PDF_GENERATION_TIMEOUT: Generation took >30 seconds"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/print-labels"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Packer", "Admin"]
+    description: "Generate ZPL or PDF labels for all boxes"
+    request_body: |
+      {
+        "format": "4x6",  // 4x6" (carton) or 4x8" (pallet)
+        "output": "zpl",  // 'zpl' (Zebra) or 'pdf' (universal)
+        "box_ids": ["uuid-box-001"]  // Optional: specific boxes only
+      }
+    response: |
+      {
+        "success": true,
+        "data": {
+          "labels": [
+            {
+              "box_id": "uuid-box-001",
+              "box_number": 1,
+              "sscc": "00614141000012345X",
+              "zpl": "^XA^FO50,50^BY3^BCN,100,Y,N,N^FD00614141000012345X^FS...",
+              "pdf_url": "https://storage.../labels/shipment-id/box-001.pdf"
+            }
+          ]
+        }
+      }
+    validation:
+      - "all boxes must have SSCC"
+      - "format must be '4x6' or '4x8'"
+      - "output must be 'zpl' or 'pdf'"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/print-packing-slip"
+    auth: true
+    roles: ["Warehouse Manager", "Shipping Manager", "Admin"]
+    description: "Generate packing slip PDF with line items, lots, allergens"
+    request_body: |
+      {
+        "force_regenerate": false
+      }
+    response: |
+      {
+        "success": true,
+        "data": {
+          "pdf_url": "https://storage.../packing-slip/shipment-id.pdf",
+          "generated_at": "2025-12-18T14:30:00Z",
+          "file_size_kb": 180
+        }
+      }
+    validation:
+      - "shipment must have boxes with SSCC"
+      - "all line items must have lot numbers"
+      - "customer address required"
+
+  - method: "GET"
+    path: "/api/shipping/shipments/:id/boxes/:boxId/label-preview"
+    auth: true
+    roles: ["All authenticated"]
+    description: "Get SSCC label preview with barcode image"
+    query_params:
+      - name: "format"
+        type: "string"
+        options: ["4x6", "4x8"]
+        default: "4x6"
+    response: |
+      {
+        "success": true,
+        "data": {
+          "sscc": "00614141000012345X",
+          "sscc_formatted": "00 6141 4100 0012 3456 7X",
+          "barcode_image_base64": "iVBORw0KGgoAAAA...",
+          "label_content": {
+            "ship_to": {
+              "customer_name": "Blue Mountain Restaurant",
+              "address_line1": "789 Main Street",
+              "city_state_zip": "Denver, CO 80210"
+            },
+            "order_number": "SO-2025-00123",
+            "box_number": "1 of 2",
+            "weight": "48.5 kg",
+            "handling_instructions": "Keep Refrigerated"
+          }
+        }
+      }
+
+ux:
+  wireframes:
+    - id: "SHIP-019"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-019-sscc-labels.md"
+      description: "SSCC label generation & printing (Zebra ZPL & PDF)"
+      screens:
+        - name: "success_single"
+          title: "SSCC Label Preview"
+          description: "Desktop label preview with GS1-128 barcode, formatted SSCC, ship-to, order info"
+          components:
+            - "GS1-128 barcode image (rendered with bwip-js)"
+            - "Human-readable SSCC: 00 1234 5678 9012 3456 78"
+            - "Ship To address block"
+            - "PO # and ORDER #"
+            - "BOX X of Y identifier"
+            - "Weight in kg"
+            - "Handling instructions"
+            - "Label format selector: [4x6\"] [4x8\"]"
+            - "Scale controls: [- Scale +]"
+            - "Print button, Preview options (Desktop/ZPL)"
+
+        - name: "batch_labels"
+          title: "Batch SSCC Label Queue"
+          description: "Table of queued labels (8+) with status, errors, bulk actions"
+          components:
+            - "Batch queue table: Box #, SSCC, Customer, Weight, Contents, Status, Actions"
+            - "Status badges: Ready (green), Error (red), Retry"
+            - "Bulk buttons: [+ Add Boxes], [Generate All], [Print All (N)], [Refresh]"
+            - "Individual actions: [Print], [Preview], [Regen]"
+            - "Error display: 'ERROR: SSCC generation failed - GS1 prefix not configured'"
+            - "Batch status summary: '6 Ready | 2 Errors | 0 Printed'"
+            - "Printer selection dropdown"
+            - "Print mode options: Native ZPL vs PDF"
+
+        - name: "loading"
+          title: "Generating Labels"
+          components:
+            - "Progress bar with percentage"
+            - "Message: 'Generating SSCC labels for 8 boxes...'"
+
+        - name: "error_gs1_config"
+          title: "Configuration Error"
+          components:
+            - "Error message: 'GS1 Company Prefix not configured'"
+            - "Link to Organization Settings"
+            - "Blocks SSCC generation"
+
+        - name: "error_generation"
+          title: "SSCC Generation Failed"
+          components:
+            - "Error message with reason"
+            - "[Retry] button"
+            - "Troubleshooting info"
+
+    - id: "SHIP-021"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-021-bill-of-lading.md"
+      description: "BOL PDF generation, preview, email, print"
+      screens:
+        - name: "success_bol"
+          title: "Bill of Lading Preview"
+          description: "8.5x11 PDF preview with Print/Email/Download buttons"
+          components:
+            - "PDF preview pane (8.5x11 letter size)"
+            - "Header: BOL #, Date, Carrier, Pro #"
+            - "Shipper section: org name, address, phone, email"
+            - "Consignee section: customer name, address, contact"
+            - "Special instructions box"
+            - "Freight details table: SSCC, Weight, Dimensions, Freight Class, NMFC"
+            - "Totals: Cartons, Weight, Declared Value (with currency)"
+            - "Product summary by carton"
+            - "Signature section (shipper & carrier)"
+            - "Footer with return email, doc ID, page indicator"
+            - "Buttons: [< Back], [Print], [Email], [Download]"
+            - "Zoom controls: [50%], [75%], [100%], [125%], [150%], [Fit Width]"
+
+        - name: "email_modal"
+          title: "Email BOL to Carrier"
+          components:
+            - "To: dropdown with suggested carrier contacts"
+            - "CC: field with [+ Add Custom Contacts]"
+            - "Subject: prefilled text field"
+            - "Message: rich text editor (default template)"
+            - "Checkboxes: [x] Include PDF attachment, [x] Include carrier instructions"
+            - "Buttons: [Cancel], [Send Email]"
+
+        - name: "error_no_carrier"
+          title: "Cannot Generate BOL"
+          components:
+            - "Error icon"
+            - "Message: 'Incomplete Shipment - Missing information:'"
+            - "List of missing fields:"
+            - "  - No carrier assigned (required for Pro #)"
+            - "  - Box weights not captured"
+            - "  - SSCC barcodes not generated"
+            - "Buttons: [Assign Carrier], [Complete Packing], [Back to Shipment]"
+
+        - name: "error_pdf_timeout"
+          title: "PDF Generation Failed"
+          components:
+            - "Error message: 'PDF_GENERATION_TIMEOUT (Code 5002)'"
+            - "Message: 'BOL generation service took too long to respond'"
+            - "Buttons: [Retry], [Contact Support], [Back]"
+
+        - name: "loading"
+          title: "Generating BOL"
+          components:
+            - "Progress bar: [=============== 45% ===============]"
+            - "Message: 'Generating Bill of Lading PDF...'"
+            - "Subtext: 'Fetching shipment and carrier details... Please wait'"
+
+  patterns:
+    barcode: "GS1-128 barcode with FNC1 start character, Application Identifier (00) for SSCC"
+    label_format: "4x6\" (carton) and 4x8\" (pallet) options, auto-scale to page width"
+    pdf_generation: "pdfmake library for BOL and packing slip (lightweight, serverless)"
+    zpl_generation: "ZPL format string for Zebra printers, includes barcode, metadata, instructions"
+    barcode_library: "bwip-js for GS1-128 barcode PNG generation with FNC1 parsing"
+    storage: "Supabase Storage with org_id path prefix: /bol/{org_id}/{shipment_id}.pdf"
+    caching: "Redis cache for PDF (24h TTL), invalidate on shipment update"
+
+  states:
+    - name: "loading"
+      description: "PDF/label generating with progress indicator"
+    - name: "empty"
+      description: "No shipment or incomplete packing, CTA to complete packing/assign carrier"
+    - name: "error"
+      description: "Generation failed, PDF timeout, missing data, email failed"
+    - name: "success"
+      description: "PDF/labels ready, all buttons enabled"
+    - name: "print_dialog"
+      description: "Browser native print dialog open"
+    - name: "email_modal"
+      description: "Email modal open with recipient validation"
+
+validation_rules:
+  sscc_generation:
+    shipment_status: "must be 'packed', 'manifested', 'shipped', or 'delivered'"
+    boxes_exist: "shipment must have >= 1 box"
+    box_weight: "all boxes must have weight > 0"
+    box_dimensions: "all boxes should have length, width, height (required for BOL)"
+    gs1_prefix: "organizations.gs1_company_prefix must be 7-10 digits"
+    idempotency: "only generate SSCC for boxes with sscc = NULL"
+
+  bol_generation:
+    shipment_status: "must be 'packed', 'manifested', 'shipped', or 'delivered'"
+    carrier_required: "shipment.carrier_id must be assigned (FK to carrier_configs)"
+    all_boxes_have_sscc: "all shipment_boxes.sscc must be non-null"
+    all_boxes_have_weight: "all shipment_boxes.weight must be > 0"
+    all_boxes_have_dimensions: "all boxes should have length, width, height"
+    customer_address: "shipment.shipping_address_id must exist"
+    timeout: "PDF generation timeout after 30 seconds"
+
+  label_printing:
+    all_boxes_have_sscc: "all boxes must have SSCC barcode"
+    format_enum: "must be '4x6' or '4x8'"
+    output_enum: "must be 'zpl' or 'pdf'"
+
+  packing_slip:
+    all_boxes_have_sscc: "all boxes must have SSCC"
+    all_line_items_have_lots: "every shipment_box_contents must have lot_number"
+    customer_address: "required for shipping address"
+
+  bol_email:
+    recipient_email: "at least 1 email required, must be valid format (RFC 5322)"
+    subject: "5-200 characters"
+    message: "max 5000 characters"
+    carrier_contact_fallback: "use carrier_configs.contact_email if no primary contact"
+
+patterns:
+  rls: "org_id isolation on all shipment-related tables, Storage paths include org_id"
+  api: "REST with POST for generation, GET for preview/list, query params for options"
+  service: "class-based (SSCCService, LabelService, DocumentService) with static methods"
+  validation: "Zod schemas for all request bodies (sscc schema, label schema, bol schema)"
+  numbering: "SSCC format = Extension(1) + GS1Prefix(7-10) + Serial(6-9) + Check(1) = 18 total"
+  check_digit: "MOD 10 algorithm per GS1 specification"
+  atomicity: "SELECT FOR UPDATE on organizations.next_sscc_sequence to prevent duplicates"
+  storage: "PDFs cached in Supabase Storage, 24h TTL in Redis with manual invalidation"
+
+acceptance_checklist:
+  - "organizations table has gs1_company_prefix (7-10 digits) and next_sscc_sequence"
+  - "shipment_boxes.sscc column has UNIQUE constraint (global)"
+  - "generate_sscc_for_org() function generates valid SSCC-18 with MOD 10 check digit"
+  - "calculate_gs1_check_digit() function correctly implements MOD 10 algorithm"
+  - "validateSSCC() returns true for valid SSCC, false for invalid check digit"
+  - "formatSSCC() formats 18-digit SSCC as '00 1234 5678 9012 3456 78'"
+  - "POST /api/shipping/shipments/:id/generate-sscc is idempotent (skips existing)"
+  - "SSCC uniqueness enforced globally (across all orgs) via UNIQUE constraint"
+  - "GS1-128 barcode renders correctly with bwip-js (FNC1 start, AI 00)"
+  - "ZPL label format produces valid Zebra output (4x6 and 4x8 options)"
+  - "BOL PDF generates with all required sections (header, freight table, totals, signatures)"
+  - "Packing slip PDF includes line items, lots, BBD, allergen warnings"
+  - "PDFs stored in Supabase Storage with org_id path prefix"
+  - "SSCCLabelPreview displays barcode image, formatted SSCC, metadata, format selector"
+  - "BOLPreview renders PDF with PDF.js, zoom controls, Print/Email/Download buttons"
+  - "LabelActions component provides 4 buttons (Generate SSCC, Print Labels, BOL, Packing Slip)"
+  - "RLS policies enforce org_id isolation for document storage and access"
+  - "Email validation requires valid RFC 5322 format, at least 1 recipient"
+  - "BOL email includes carrier contact suggestion or fallback to carrier_configs.contact_email"
+  - "Label generation blocks if GS1 Company Prefix not configured (shows error with settings link)"
+  - "BOL generation blocks if carrier not assigned, all boxes lack SSCC, or weights missing"
+  - "Multi-tenant isolation verified (Org A cannot access Org B's PDFs/documents)"
+  - "Unit tests: >95% coverage for SSCC check digit calculation"
+  - "Unit tests: >90% coverage for SSCCService (generation, validation, formatting)"
+  - "Unit tests: Label service ZPL generation, barcode encoding"
+  - "Unit tests: Document service BOL/packing slip PDF structure"
+  - "E2E test: Generate SSCC -> Print Labels -> Generate BOL -> Email BOL workflow"
+  - "E2E test: Batch label generation with error handling and retry"
+  - "E2E test: BOL PDF preview, zoom, print, download workflows"
+
+output_artifacts:
+  - "Migration file: add gs1_company_prefix, next_sscc_sequence, PL/pgSQL functions"
+  - "SSCCService: generateSSCCForShipment(), calculateCheckDigit(), validateSSCC(), formatSSCC()"
+  - "LabelService: generateZPL(), generateBarcodeImage(), getLabelPreview()"
+  - "DocumentService: generateBOL(), generatePackingSlip(), storeDocument()"
+  - "5 API route handlers (generate-sscc, generate-bol, print-labels, print-packing-slip, label-preview)"
+  - "3 UI components (LabelActions, SSCCLabelPreview, BOLPreview, PackingSlipPreview)"
+  - "Zod validation schemas for SSCC, label, BOL, email operations"
+  - "Unit test files for all 3 services (>90% coverage)"
+  - "E2E test file: SSCC generation and label printing workflows"
+  - "Updated shipment detail page with label actions integration"
+
+database_notes:
+  sscc_format: "Extension(1) + GS1Prefix(7-10) + Serial(6-9) + Check(1) = 18 digits total"
+  extension_digit: "0 for carton, 9 for pallet (configurable in future)"
+  check_digit_algorithm: "MOD 10: sum odd-position digits * 3 + even-position * 1, check = (10 - (sum % 10)) % 10"
+  sequence_storage: "organizations.next_sscc_sequence incremented atomically per SSCC generation"
+  uniqueness_strategy: "GS1 prefix (globally unique per org) + org-scoped serial counter = globally unique SSCC"
+  sscc_idempotency: "generate-sscc endpoint only creates SSCC for boxes with sscc = NULL"
+  bol_numbering: "BOL-YYYY-XXXXXX (year + 6-digit sequence, per organization, immutable after generation)"
+  pdf_caching: "Redis cache with 24h TTL, invalidate on shipment update (status change, carrier change)"
+  pdf_storage: "Supabase Storage: /bol/{org_id}/{shipment_id}.pdf, /packing-slip/{org_id}/{shipment_id}.pdf"
+
+technical_notes:
+  - "SSCC generation must use SELECT FOR UPDATE to prevent concurrent duplicates"
+  - "MOD 10 check digit: position counting from RIGHT (1, 2, 3, ..., 17)"
+  - "Odd positions (from right) multiply by 3, even by 1"
+  - "GS1-128 barcode requires FNC1 start character (AI 00)"
+  - "bwip-js with text: '(00)' + SSCC and parsefnc: true for GS1 compliance"
+  - "ZPL label: ^XA...^FD...^FS format, coordinates in dots (203 DPI = ~8 dots/mm)"
+  - "Label formats: 4x6\" (813 x 1219 dots @ 203 DPI), 4x8\" (813 x 1629 dots)"
+  - "pdfmake for PDF: declarative document structure, no external dependencies"
+  - "BOL PDF dimensions: 8.5\" x 11\" (letter), 0.5\" margins, single or multi-page"
+  - "PDF.js for preview: Mozilla library, works client-side without server"
+  - "Email service: Supabase Edge Function with SendGrid or Postmark API"
+  - "Audit logging: log SSCC generation, label printing, BOL generation/email/print events"
+  - "Carrier contact fallback: query carrier_contacts with is_primary=true, fall back to carrier_configs.contact_email"
+  - "Freight class/NMFC: fetch from org settings or defaults (configurable per org)"
+  - "Declared value currency: fetch from organizations.default_currency (USD, EUR, GBP, etc)"
+
+estimated_effort: "16-20 hours (SSCC algorithm, 5 endpoints, 3 services, 4 components, label generation, BOL PDF, tests)"
+quality_target: "95%+"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-18"
+    changes: "Initial YAML context creation for Story 07.13 - SSCC/BOL Labels"
+    author: "TECH-WRITER"

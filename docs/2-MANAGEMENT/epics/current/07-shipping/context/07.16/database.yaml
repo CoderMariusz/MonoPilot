@@ -1,0 +1,230 @@
+# Story 07.16 - Database Schema
+# Purpose: Tables, RLS policies, indexes, migrations
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/xxx_create_rma_requests_and_lines_tables.sql"
+    type: "migration"
+    description: "RMA Requests and RMA Lines tables with auto-number generation"
+
+tables:
+  rma_requests:
+    description: "Return Merchandise Authorization (RMA) requests. Phase 1: CRUD + Approval. Phase 2+: Receiving/Disposition"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "rma_number", type: "TEXT", constraints: "NOT NULL" }
+
+      # Customer & Order Link
+      - { name: "customer_id", type: "UUID", constraints: "NOT NULL REFERENCES customers(id)" }
+      - { name: "sales_order_id", type: "UUID", constraints: "REFERENCES sales_orders(id)" }
+
+      # RMA Details
+      - { name: "reason_code", type: "TEXT", constraints: "NOT NULL CHECK (reason_code IN ('damaged', 'expired', 'wrong_product', 'quality_issue', 'customer_change', 'other'))" }
+      - { name: "disposition", type: "TEXT", constraints: "CHECK (disposition IN ('restock', 'scrap', 'quality_hold', 'rework'))" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "total_value", type: "DECIMAL(15,2)", constraints: "" }
+
+      # Status & Workflow
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'receiving', 'received', 'processed', 'closed'))" }
+      - { name: "approved_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "approved_by", type: "UUID", constraints: "REFERENCES users(id) ON DELETE SET NULL" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "UNIQUE(org_id, rma_number)"
+      - "idx_rma_org_status ON rma_requests(org_id, status)"
+      - "idx_rma_customer ON rma_requests(customer_id)"
+      - "idx_rma_sales_order ON rma_requests(sales_order_id)"
+      - "idx_rma_reason ON rma_requests(org_id, reason_code)"
+      - "idx_rma_created ON rma_requests(org_id, created_at DESC)"
+      - "idx_rma_approved ON rma_requests(org_id, approved_at DESC) WHERE approved_at IS NOT NULL"
+
+    constraints:
+      - "CHECK ((status = 'approved' AND approved_at IS NOT NULL AND approved_by IS NOT NULL) OR (status != 'approved' AND approved_at IS NULL AND approved_by IS NULL))"
+
+  rma_lines:
+    description: "RMA line items - products to be returned"
+    columns:
+      # Identity
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "rma_request_id", type: "UUID", constraints: "NOT NULL REFERENCES rma_requests(id) ON DELETE CASCADE" }
+
+      # Product Information
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "quantity_expected", type: "DECIMAL(15,4)", constraints: "NOT NULL CHECK (quantity_expected > 0)" }
+      - { name: "quantity_received", type: "DECIMAL(15,4)", constraints: "NOT NULL DEFAULT 0 CHECK (quantity_received >= 0)" }
+      - { name: "lot_number", type: "TEXT", constraints: "" }
+
+      # Details
+      - { name: "reason_notes", type: "TEXT", constraints: "" }
+      - { name: "disposition", type: "TEXT", constraints: "CHECK (disposition IN ('restock', 'scrap', 'quality_hold', 'rework'))" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    indexes:
+      - "idx_rma_line_request ON rma_lines(rma_request_id)"
+      - "idx_rma_line_product ON rma_lines(product_id)"
+      - "idx_rma_line_org ON rma_lines(org_id)"
+
+# Function: Generate RMA number (RMA-YYYY-NNNNN)
+function:
+  name: "generate_rma_number"
+  signature: "(p_org_id UUID) RETURNS TEXT"
+  description: "Generate next RMA number in format RMA-YYYY-NNNNN (annual sequence per org)"
+  logic: |
+    DECLARE
+      v_year INTEGER;
+      v_next_val BIGINT;
+      v_rma_number TEXT;
+    BEGIN
+      v_year := EXTRACT(YEAR FROM CURRENT_DATE);
+
+      -- Lock row for this org/year and get next sequence
+      INSERT INTO rma_number_sequences (org_id, year, current_value)
+      VALUES (p_org_id, v_year, 1)
+      ON CONFLICT (org_id, year)
+      DO UPDATE SET current_value = current_value + 1
+      RETURNING current_value INTO v_next_val;
+
+      -- Format: RMA-YYYY-NNNNN
+      v_rma_number := 'RMA-' || v_year || '-' || LPAD(v_next_val::TEXT, 5, '0');
+
+      RETURN v_rma_number;
+    END;
+
+  parameters:
+    - name: "p_org_id"
+      type: "UUID"
+      description: "Organization ID"
+
+  returns:
+    type: "TEXT"
+    example: "RMA-2025-00001"
+
+# Trigger: Auto-generate RMA number on insert
+trigger:
+  name: "trigger_set_rma_number"
+  event: "BEFORE INSERT ON rma_requests"
+  function: "set_rma_number()"
+  logic: |
+    BEGIN
+      IF NEW.rma_number IS NULL OR NEW.rma_number = '' THEN
+        NEW.rma_number := generate_rma_number(NEW.org_id);
+      END IF;
+      RETURN NEW;
+    END;
+
+# Trigger: Update updated_at timestamp
+trigger_updated_at:
+  name: "trigger_rma_requests_updated_at"
+  event: "BEFORE UPDATE ON rma_requests"
+  function: "update_updated_at_column()"
+
+# Helper table for sequence (internal use)
+rma_number_sequences:
+  description: "Sequence counter for RMA number generation per org per year"
+  columns:
+    - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+    - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+    - { name: "year", type: "INTEGER", constraints: "NOT NULL" }
+    - { name: "current_value", type: "BIGINT", constraints: "NOT NULL DEFAULT 0" }
+    - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+
+  indexes:
+    - "UNIQUE(org_id, year)"
+
+# RLS Policies
+rls_policies:
+  rma_requests:
+    - name: "rma_requests_org_isolation"
+      operation: "ALL"
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "All users can only see RMAs from their organization"
+
+  rma_lines:
+    - name: "rma_lines_org_isolation"
+      operation: "ALL"
+      expression: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "All users can only see RMA lines from their organization"
+
+# Seed Data (for testing)
+seed_data:
+  reason_codes:
+    - { code: "damaged", description: "Product damaged in transit or warehouse" }
+    - { code: "expired", description: "Product expired or best-before date passed" }
+    - { code: "wrong_product", description: "Incorrect product shipped" }
+    - { code: "quality_issue", description: "Quality defect or non-conformance" }
+    - { code: "customer_change", description: "Customer requested different product" }
+    - { code: "other", description: "Other reason (see notes)" }
+
+  disposition_codes:
+    - { code: "restock", description: "Product returned to inventory (saleable)" }
+    - { code: "scrap", description: "Product scrapped/destroyed" }
+    - { code: "quality_hold", description: "Product held for quality review" }
+    - { code: "rework", description: "Product sent for reprocessing/rework" }
+
+  disposition_defaults:
+    damaged: "scrap"
+    expired: "scrap"
+    wrong_product: "restock"
+    quality_issue: "quality_hold"
+    customer_change: "restock"
+    other: null
+
+# Validation Rules
+validation_rules:
+  rma_number:
+    - "Format: RMA-YYYY-NNNNN (auto-generated)"
+    - "Unique per organization and year"
+    - "Read-only after creation"
+
+  reason_code:
+    - "Required enum: damaged, expired, wrong_product, quality_issue, customer_change, other"
+    - "Cannot be null"
+
+  status:
+    - "Default: pending"
+    - "Workflow: pending → approved → receiving → received → processed → closed"
+    - "Can only transition forward (no rollback)"
+
+  customer_id:
+    - "Required"
+    - "Must reference existing customer in same org"
+
+  rma_lines:
+    - "At least one line required before submission"
+    - "quantity_expected must be > 0"
+    - "quantity_received must be <= quantity_expected (enforced in 07.17)"
+    - "lot_number optional but recommended for traceability"
+
+# Performance Considerations
+performance:
+  indexes_critical:
+    - "idx_rma_org_status: Fast list filtering by status"
+    - "UNIQUE(org_id, rma_number): Fast lookup by RMA number"
+    - "idx_rma_created: Fast reverse-chronological list"
+
+  expected_query_patterns:
+    - "List RMAs for org by status (very frequent)"
+    - "Get RMA detail by ID (very frequent)"
+    - "Count RMAs by status (dashboard)"
+    - "Search RMA by number or customer (moderate)"
+
+  optimization_notes:
+    - "RLS filter on org_id applied at DB level"
+    - "Pagination recommended for lists (20-50 per page)"
+    - "Avoid SELECT * in API responses"

@@ -1,0 +1,124 @@
+# Story 07.12 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.12"
+  name: "Packing Scanner - Mobile UI"
+  slug: "packing-scanner"
+  epic: "07-shipping"
+  phase: "1C"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "frontend + backend + mobile"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml          # This file - metadata, dependencies
+  - database.yaml        # No new tables (uses Story 07.11 tables)
+  - api.yaml             # 5-7 endpoints for scanner packing operations
+  - frontend.yaml        # Scanner mobile components, pages, services
+  - tests.yaml           # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "07.11"
+      name: "Packing Station + Shipment Creation"
+      provides:
+        - "shipments, shipment_boxes, shipment_box_contents tables"
+        - "Shipment service for box management"
+    - story: "07.10"
+      name: "Pick Confirmation Scanner"
+      provides:
+        - "Scanner patterns (barcode, audio/visual feedback, number pad)"
+        - "Touch-optimized UI patterns"
+        - "Mobile layout templates"
+    - story: "07.8"
+      name: "Pick List Generation"
+      provides:
+        - "Pick list data for shipment context"
+    - story: "02.3"
+      name: "Allergens Management"
+      provides:
+        - "Customer allergen restrictions"
+        - "Product allergen data"
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides:
+        - "License plates table for LP lookup"
+        - "LP service"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides:
+        - "Staging location context"
+  blocked_by: []
+  blocks:
+    - story: "07.13"
+      name: "SSCC + Labels + BOL"
+    - story: "07.14"
+      name: "Shipment + Ship Confirm"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.36", "FR-7.37", "FR-7.42", "Section 5.2"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["507-517", "630-641"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.12.packing-scanner.md"
+  wireframes:
+    - id: "SHIP-018"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-018-pack-scanner.md"
+      description: "Mobile packing scanner workflow, 6-step wizard"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-006-scanner-first-mobile-ux.md"
+      relevance: "Scanner-first design, minimal chrome, large touch targets"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policies for scanner operations"
+  patterns:
+    - "apps/frontend/app/(authenticated)/scanner/shipping/pick"
+    - "apps/frontend/components/scanner/shared"
+
+# High-level deliverables
+deliverables:
+  - type: "database"
+    count: 0
+    description: "No new tables (reuses Story 07.11 schema)"
+  - type: "api"
+    count: 7
+    description: "POST pack, POST box/create, POST box/close, GET shipments, GET lookup, GET box, DELETE box item"
+  - type: "page"
+    count: 1
+    description: "Scanner packing page (/scanner/shipping/pack)"
+  - type: "component"
+    count: 12
+    description: "Wizard, Step1-6 components, box selector, allergen banner, weight modal"
+  - type: "service"
+    count: 1
+    description: "PackingScannerService with 9 methods"
+  - type: "validation"
+    count: 5
+    description: "packItemSchema, createBoxSchema, closeBoxSchema, and query schemas"
+  - type: "test"
+    count: 3
+    description: "Unit tests for service, integration tests for API, E2E tests for workflow"
+
+# Technical notes
+technical_notes:
+  - "Mobile-first design: 320-480px portrait primary, landscape support"
+  - "Touch targets: 48px minimum, 56px for primary actions, 64px for number pad"
+  - "Barcode scanning: Hardware scanner + camera fallback"
+  - "Audio feedback: Success (880Hz, 200ms), Error (220Hz, 300ms), Confirm (660Hz+880Hz, 500ms), Allergen (440Hz, 400ms)"
+  - "Visual feedback: Green checkmark, red X, yellow allergen banner"
+  - "Haptic feedback: Short buzz (success), double buzz (error), long buzz (confirm)"
+  - "Number pad: Large touch-friendly buttons with quick adjust (+1, +10, -1, -10)"
+  - "Performance target: <500ms pack response, <200ms LP lookup, <100ms barcode feedback"
+  - "Allergen warnings: Persistent yellow banner with audio alert, confirmation required"
+  - "Box management: Auto-create first box, create additional boxes, switch between open boxes"
+  - "Offline support: Phase 3 (not this story)"
+  - "High contrast colors for warehouse lighting (WCAG AAA compliance)"
+  - "6-step wizard: Select shipment → Box management → Scan LP → Confirm qty → Close box → Complete"

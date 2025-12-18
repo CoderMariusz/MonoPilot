@@ -196,8 +196,35 @@ hooks:
         returns: "UseQueryResult<{ available: boolean }>"
         options: "{ enabled: false } for manual trigger"
 
-# UX Notes
+# UX Specification
 ux:
+  wireframes:
+    - id: "SET-021"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-021-tax-code-list.md"
+      description: "Tax code list with effective dates and expiration indicators"
+      components:
+        - "TaxCodesDataTable"
+        - "TaxCodeRow"
+        - "TaxCodeStatusBadge"
+        - "EffectiveDateDisplay"
+        - "ExpirationIndicator"
+    - id: "SET-021a"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-021a-tax-code-create-modal.md"
+      description: "Tax code create modal with date range support"
+      components:
+        - "TaxCodeCreateModal"
+        - "TaxCodeForm"
+        - "DateRangeToggle"
+        - "OverlapDetection"
+    - id: "SET-021b"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-021b-tax-code-edit-modal.md"
+      description: "Tax code edit modal with delete confirmation"
+      components:
+        - "TaxCodeEditModal"
+        - "TaxCodeForm"
+        - "DeleteConfirmDialog"
+        - "ChangeIndicator"
+
   empty_state:
     title: "No tax codes configured"
     description: "Add your first tax code to start managing tax rates."
@@ -209,6 +236,12 @@ ux:
   error_state:
     title: "Failed to load tax codes"
     action: "Retry"
+
+  states:
+    loading: "Skeleton table with 3 rows"
+    empty: "Empty state with 'Add Tax Code' CTA"
+    error: "Error message with retry button"
+    success: "Tax code table with effective dates visible"
 
   toasts:
     - event: "create_success"
@@ -229,6 +262,11 @@ ux:
     - event: "delete_blocked"
       message: "Cannot delete tax code referenced by {{count}} suppliers"
       type: "error"
+
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering, search"
+    modal: "ShadCN Dialog with React Hook Form + Zod"
+    form: "Multi-step validation with date range logic"
 
 # Patterns
 patterns:

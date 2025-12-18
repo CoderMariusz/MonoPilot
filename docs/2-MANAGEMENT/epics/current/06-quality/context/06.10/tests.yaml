@@ -1,0 +1,263 @@
+# Story 06.10 - In-Process Inspection: Tests & Acceptance Criteria
+# Generated: 2025-12-18
+
+tests:
+  acceptance_criteria:
+    ac_1:
+      title: "Auto-create inspection on WO operation completion"
+      gherkin:
+        - "Scenario: Auto-create inspection when operation completes (setting enabled)"
+        - "Given quality_settings.auto_create_inspection_on_operation = true"
+        - "And routing_operation.requires_quality_check = true"
+        - "And WO operation 'OP-001' is completed"
+        - "When wo_operation status changes to 'completed'"
+        - "Then inspection record created with:"
+        - "  - inspection_type = 'in_process'"
+        - "  - reference_type = 'wo_operation'"
+        - "  - reference_id = WO operation UUID"
+        - "  - wo_id = Work Order UUID"
+        - "  - wo_operation_id = WO operation UUID"
+        - "  - status = 'scheduled'"
+
+    ac_2:
+      title: "Manual in-process inspection creation"
+      gherkin:
+        - "Scenario: Create in-process inspection manually from queue"
+        - "Given user navigates to in-process inspection queue"
+        - "And clicks [+ New Inspection]"
+        - "When user selects: Work Order, Operation, Priority"
+        - "And clicks [Create]"
+        - "Then inspection created with status = 'scheduled'"
+        - "And inspection_number auto-generated 'INS-IPR-YYYY-NNNNN'"
+        - "And success toast 'Inspection INS-IPR-2025-00001 created'"
+
+    ac_3:
+      title: "In-process inspection queue with filters"
+      gherkin:
+        - "Scenario: In-process inspection queue loads"
+        - "Given user navigates to Quality > Inspections > In-Process"
+        - "When page loads"
+        - "Then DataTable displays inspections with columns:"
+        - "  - Inspection #, Work Order, Operation, Product, Batch"
+        - "  - Status, Priority, Inspector, Actions"
+        - "And list loads within 500ms"
+        - "And pagination available (20 per page)"
+
+    ac_4:
+      title: "Inspection detail with WO and operation context"
+      gherkin:
+        - "Scenario: View in-process inspection detail"
+        - "Given inspection INS-IPR-2025-00001 exists"
+        - "When user navigates to /quality/inspections/INS-IPR-2025-00001"
+        - "Then page displays WO and operation context"
+        - "And shows specification and test results"
+        - "And shows action buttons based on status"
+
+    ac_5:
+      title: "Start in-process inspection"
+      gherkin:
+        - "Scenario: Start inspection"
+        - "Given inspection with status = 'scheduled'"
+        - "And inspector_id = current user"
+        - "When user clicks [Start Inspection]"
+        - "Then status changes to 'in_progress'"
+        - "And started_at = now"
+
+    ac_6:
+      title: "Complete in-process inspection with production impact"
+      gherkin:
+        - "Scenario: Complete inspection with pass result"
+        - "Given inspection in_progress with tests recorded"
+        - "When user clicks [Complete Inspection]"
+        - "And confirms with result = 'pass'"
+        - "Then inspection.status = 'completed'"
+        - "And wo_operation.qa_status = 'passed'"
+        - ""
+        - "Scenario: Complete with fail - production impact"
+        - "Given inspection completed with result = 'fail'"
+        - "And quality_settings.block_next_operation_on_fail = true"
+        - "Then wo_operation.qa_status = 'failed'"
+        - "And next operation cannot start until resolved"
+
+    ac_7:
+      title: "WO operation QA status integration"
+      gherkin:
+        - "Scenario: WO operation shows QA status"
+        - "Given wo_operation has qa_status = 'passed'"
+        - "When viewing WO detail page"
+        - "Then operation row shows QA badge (green 'Passed')"
+        - ""
+        - "Scenario: Next operation blocked on QA fail"
+        - "Given wo_operation seq 2 has qa_status = 'failed'"
+        - "And quality_settings.block_next_operation_on_fail = true"
+        - "When operator attempts to start operation seq 3"
+        - "Then error 'Previous operation QA failed'"
+
+    ac_8:
+      title: "Multi-operation inspection view"
+      gherkin:
+        - "Scenario: View all inspections for a WO"
+        - "Given WO-2025-00001 has 3 operations with inspections"
+        - "When user filters by WO"
+        - "Then all 3 inspections displayed grouped by operation"
+        - "And overall WO quality summary shown"
+
+    ac_9:
+      title: "RLS policy enforcement and multi-tenancy"
+      gherkin:
+        - "Scenario: Org isolation on inspection list"
+        - "Given User A from Org A and User B from Org B"
+        - "When User A requests inspection list"
+        - "Then only Org A inspections returned"
+        - ""
+        - "Scenario: Cross-org access returns 404"
+        - "Given inspection belongs to Org B"
+        - "When User A requests inspection detail"
+        - "Then 404 Not Found returned"
+
+    ac_10:
+      title: "Performance requirements"
+      gherkin:
+        - "Scenario: In-process inspection queue performance"
+        - "Given 500 in-process inspections in organization"
+        - "When listing inspections with pagination"
+        - "Then response time < 500ms"
+
+  unit_tests:
+    service:
+      test_file: "lib/services/__tests__/in-process-inspection-service.test.ts"
+      test_class: "InProcessInspectionService"
+      test_methods:
+        - name: "createInProcess"
+          tests:
+            - "creates inspection with correct WO reference"
+            - "validates WO is in progress"
+            - "validates WO operation exists"
+            - "warns if operation has active inspection"
+            - "auto-fills product and batch from WO"
+
+        - name: "completeInProcess"
+          tests:
+            - "updates wo_operation.qa_status on pass"
+            - "updates wo_operation.qa_status on fail"
+            - "blocks next operation on fail if setting enabled"
+            - "creates NCR if requested"
+            - "sends production notification"
+
+        - name: "canStartNextOperation"
+          tests:
+            - "allows start when previous QA passed"
+            - "blocks when previous QA failed"
+            - "allows when previous QA is not_required"
+
+        - name: "getWOQualitySummary"
+          tests:
+            - "calculates correct counts"
+            - "returns overall_status pass when all pass"
+            - "returns overall_status fail when any fail"
+
+      coverage_target: "> 85%"
+
+  integration_tests:
+    api:
+      test_file: "apps/frontend/__tests__/api/quality/inspections.integration.test.ts"
+      test_methods:
+        - name: "GET /api/quality/inspections/in-process"
+          tests:
+            - "returns only in_process type inspections"
+            - "filters by WO correctly"
+            - "filters by operation correctly"
+            - "respects RLS for org isolation"
+            - "paginates correctly"
+
+        - name: "POST /api/quality/inspections (in-process)"
+          tests:
+            - "creates with WO and operation reference"
+            - "validates WO is in_progress"
+            - "generates inspection_number correctly"
+
+        - name: "POST /api/quality/inspections/:id/complete"
+          tests:
+            - "updates wo_operation.qa_status to passed"
+            - "updates wo_operation.qa_status to failed"
+            - "blocks next operation on fail"
+            - "sends production notification"
+
+      coverage_target: "> 80%"
+
+  e2e_tests:
+    workflow:
+      test_file: "apps/frontend/__tests__/e2e/quality/in-process-inspection-workflow.test.ts"
+      test_scenarios:
+        - name: "Complete workflow: create -> start -> record -> complete -> verify WO update"
+          steps:
+            - "1. Start WO and complete operation"
+            - "2. Verify inspection auto-created or create manually"
+            - "3. Assign inspector"
+            - "4. Start inspection"
+            - "5. Record test results (story 06.6)"
+            - "6. Complete with pass result"
+            - "7. Verify wo_operation.qa_status = 'passed'"
+            - "8. Verify next operation can start"
+
+        - name: "Fail inspection and verify operation blocked"
+          steps:
+            - "1. Create and start in-process inspection"
+            - "2. Record failing test result"
+            - "3. Complete with fail"
+            - "4. Verify wo_operation.qa_status = 'failed'"
+            - "5. Verify next operation blocked"
+
+        - name: "WO quality summary updates correctly"
+          steps:
+            - "1. WO with 3 operations requiring QA"
+            - "2. Complete first inspection - pass"
+            - "3. Verify summary: 1 passed, 2 pending"
+            - "4. Complete second inspection - fail"
+            - "5. Verify summary shows overall fail"
+
+        - name: "Multi-operation production workflow"
+          steps:
+            - "1. Create WO with 3 sequential operations"
+            - "2. Start WO, complete op 1"
+            - "3. Inspection auto-created for op 1"
+            - "4. Inspector completes inspection with FAIL"
+            - "5. Verify op 2 cannot start (blocked)"
+
+  test_data:
+    prerequisites:
+      - "Org with users (01.1)"
+      - "Products with specifications (02.1, 06.3, 06.4)"
+      - "Routings with operations (02.7, 02.8)"
+      - "Work orders with operations (03.10, 03.12, 04.2a, 04.3)"
+
+    fixtures:
+      - name: "WO with 3 sequential operations"
+        description: "Standard WO for testing inspection workflow"
+        operations: ["Mixing", "Cooking", "Packing"]
+        requires_qa: [true, true, false]
+
+      - name: "Product with specification"
+        description: "Product with test parameters for inspection"
+        parameters: ["Temperature", "pH", "Weight"]
+
+      - name: "Quality settings for in-process"
+        description: "Settings enabling auto-create and operation blocking"
+        auto_create: true
+        block_next_on_fail: true
+
+  test_coverage:
+    target_overall: "> 85%"
+    target_critical_paths: "> 95%"
+    critical_paths:
+      - "Auto-create inspection on operation completion"
+      - "WO operation QA status update"
+      - "Next operation blocking logic"
+      - "Production notification sending"
+      - "Result determination logic"
+
+  ci_integration:
+    run_on: "All PR commits to main, develop branches"
+    fail_on: "Coverage drops below target or critical path fails"
+    test_timeout: "60 seconds per test"
+    parallel: "Yes, up to 4 parallel test suites"

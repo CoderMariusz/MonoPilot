@@ -1,0 +1,537 @@
+# Story 07.15 - Frontend Specification
+# Purpose: Components, hooks, services, types, validation
+# Agent: FRONTEND-DEV
+
+# TypeScript Types to Create
+types:
+  - path: "apps/frontend/lib/types/dashboard-types.ts"
+    description: "Dashboard TypeScript interfaces"
+    exports:
+      - name: "DashboardKPIs"
+        type: "interface"
+        properties:
+          orders: "{ total: number, by_status: Record<string, number>, trend: TrendIndicator }"
+          pick_lists: "{ total: number, by_status: Record<string, number>, trend: TrendIndicator }"
+          shipments: "{ total: number, by_status: Record<string, number>, trend: TrendIndicator }"
+          backorders: "{ count: number, total_value: number }"
+          on_time_delivery_pct: "number"
+          avg_pick_time_hours: "number"
+          avg_pack_time_hours: "number"
+          last_updated: "Date"
+
+      - name: "TrendIndicator"
+        type: "interface"
+        properties:
+          current: "number"
+          previous: "number"
+          percentage: "number"
+          direction: "'up' | 'down' | 'neutral'"
+
+      - name: "DashboardAlerts"
+        type: "interface"
+        properties:
+          backorders: "{ count: number, items: BackorderItem[] }"
+          delayed_shipments: "{ count: number, items: DelayedShipmentItem[] }"
+          pending_picks_overdue: "{ count: number, items: OverduePickItem[] }"
+          allergen_conflicts: "{ count: number, items: AllergenConflictItem[] }"
+
+      - name: "ActivityItem"
+        type: "interface"
+        properties:
+          id: "string"
+          type: "'so_created' | 'so_confirmed' | 'so_shipped' | 'pick_completed' | 'shipment_packed'"
+          entity_type: "'sales_order' | 'pick_list' | 'shipment'"
+          entity_id: "string"
+          entity_number: "string"
+          description: "string"
+          created_at: "Date"
+          created_by: "{ id: string, name: string }"
+          status: "'success' | 'warning' | 'error'"
+
+      - name: "DateRange"
+        type: "interface"
+        properties:
+          from: "Date"
+          to: "Date"
+          preset: "'today' | 'week' | 'month' | 'last_7' | 'last_30' | 'custom'"
+
+# Zod Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/dashboard-schema.ts"
+    description: "Zod validation schemas for dashboard"
+    imports: "import { z } from 'zod';"
+    schemas:
+      - name: "dashboardQuerySchema"
+        definition: |
+          z.object({
+            date_from: z.string().datetime().optional(),
+            date_to: z.string().datetime().optional(),
+            date_range: z.enum(['today', 'week', 'month', 'last_7', 'last_30']).optional(),
+          }).refine(
+            (data) => {
+              if (data.date_from && data.date_to) {
+                const from = new Date(data.date_from);
+                const to = new Date(data.date_to);
+                const diffDays = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
+                return diffDays <= 365;
+              }
+              return true;
+            },
+            { message: "Date range cannot exceed 365 days" }
+          )
+
+      - name: "dateRangePresetSchema"
+        definition: "z.enum(['today', 'week', 'month', 'last_7', 'last_30', 'custom'])"
+
+# React Query Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-dashboard-kpis.ts"
+    description: "Fetch dashboard KPI metrics"
+    exports:
+      - name: "useDashboardKPIs"
+        params: ["dateRange?: DateRange"]
+        returns: "UseQueryResult<DashboardKPIs>"
+        features:
+          - "Automatic caching (React Query)"
+          - "Stale while revalidate pattern"
+          - "Error boundary support"
+          - "Loading skeleton support"
+
+  - path: "apps/frontend/lib/hooks/use-dashboard-alerts.ts"
+    description: "Fetch dashboard alerts"
+    exports:
+      - name: "useDashboardAlerts"
+        params: ["dateRange?: DateRange"]
+        returns: "UseQueryResult<DashboardAlerts>"
+        refetch_interval: 60000  # 1 minute
+
+  - path: "apps/frontend/lib/hooks/use-recent-activity.ts"
+    description: "Fetch recent activity feed"
+    exports:
+      - name: "useRecentActivity"
+        params: ["limit?: number", "offset?: number"]
+        returns: "UseQueryResult<ActivityItem[]>"
+        pagination: true
+
+  - path: "apps/frontend/lib/hooks/use-auto-refresh.ts"
+    description: "Auto-refresh toggle state and timer"
+    exports:
+      - name: "useAutoRefresh"
+        params: ["interval?: number"]
+        returns: |
+          {
+            isEnabled: boolean;
+            toggle: () => void;
+            nextRefreshIn: number;
+            refetch: () => void;
+          }
+        features:
+          - "Polling at 30s interval"
+          - "User activity detection to increase interval"
+          - "Manual refresh button"
+          - "Next refresh countdown"
+
+  - path: "apps/frontend/lib/hooks/use-date-range.ts"
+    description: "Date range filter state"
+    exports:
+      - name: "useDateRange"
+        returns: |
+          {
+            dateRange: DateRange;
+            setDateRange: (range: DateRange) => void;
+            preset: string;
+            setPreset: (preset: string) => void;
+          }
+
+# Components - Page
+pages:
+  - path: "apps/frontend/app/(authenticated)/shipping/dashboard/page.tsx"
+    description: "Dashboard main page (server component)"
+    type: "Server Component"
+    features:
+      - "Initial data fetch on server"
+      - "Streaming/Suspense boundaries"
+      - "Performance: <500ms load time"
+      - "Mobile responsive layout"
+    layout: |
+      <DashboardHeader />
+      <DateRangeFilter />
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardKPIs />
+        <AlertsSection />
+        <ChartsSection />
+        <RecentActivitySection />
+        <QuickActionsPanel />
+      </Suspense>
+
+# Components - Dashboard Sections
+components:
+  # KPI Section
+  - path: "apps/frontend/components/shipping/dashboard/DashboardKPIs.tsx"
+    description: "Grid of 4 KPI cards with metrics"
+    type: "Client Component"
+    props:
+      - { name: "data", type: "DashboardKPIs", required: true }
+      - { name: "isLoading", type: "boolean", required: false, default: "false" }
+    features:
+      - "4-column grid on desktop, responsive on mobile/tablet"
+      - "Card hover effects"
+      - "Loading skeleton support"
+    children:
+      - "<KPICard /> x4"
+
+  - path: "apps/frontend/components/shipping/dashboard/KPICard.tsx"
+    description: "Individual KPI card with metric, status, and trend"
+    type: "Client Component"
+    props:
+      - { name: "title", type: "string", required: true }
+      - { name: "value", type: "number | string", required: true }
+      - { name: "icon", type: "React.ReactNode", required: true }
+      - { name: "status", type: "'good' | 'warning' | 'critical'", required: true }
+      - { name: "trend", type: "TrendIndicator", required: false }
+      - { name: "breakdown", type: "Record<string, number>", required: false }
+      - { name: "action", type: "{ label: string, onClick: () => void }", required: false }
+    features:
+      - "Color-coded status indicator"
+      - "Trend arrow (up/down/neutral)"
+      - "Optional breakdown tooltip"
+      - "Click action for drill-down"
+
+  # Charts Section
+  - path: "apps/frontend/components/shipping/dashboard/OrdersByStatusChart.tsx"
+    description: "Pie chart of orders by status"
+    type: "Client Component"
+    props:
+      - { name: "data", type: "{ status: string, count: number }[]", required: true }
+      - { name: "isLoading", type: "boolean", default: "false" }
+      - { name: "onStatusClick", type: "(status: string) => void", required: false }
+    library: "Recharts"
+    features:
+      - "Interactive segments (click to drill-down)"
+      - "Hover tooltips with count and percentage"
+      - "Legend below chart"
+      - "Empty state when no data"
+      - "Color coded per status"
+
+  - path: "apps/frontend/components/shipping/dashboard/ShipmentsByDateChart.tsx"
+    description: "Line chart of shipments by date"
+    type: "Client Component"
+    props:
+      - { name: "data", type: "{ date: string, count: number }[]", required: true }
+      - { name: "isLoading", type: "boolean", default: "false" }
+      - { name: "dateRange", type: "DateRange", required: true }
+    library: "Recharts"
+    features:
+      - "Daily data points"
+      - "Hover tooltips with exact count"
+      - "Grid lines for readability"
+      - "Responsive sizing"
+      - "Empty state when no data"
+
+  # Alerts Section
+  - path: "apps/frontend/components/shipping/dashboard/AlertsSection.tsx"
+    description: "Container for all alert badges"
+    type: "Client Component"
+    props:
+      - { name: "alerts", type: "DashboardAlerts", required: true }
+      - { name: "isLoading", type: "boolean", default: "false" }
+    features:
+      - "Grid layout (1-2 columns responsive)"
+      - "Section title with count badge"
+      - "Success message when no alerts"
+      - "Loading skeleton"
+    children:
+      - "<AlertBadge /> x4"
+
+  - path: "apps/frontend/components/shipping/dashboard/AlertBadge.tsx"
+    description: "Individual alert badge with icon, count, and action"
+    type: "Client Component"
+    props:
+      - { name: "title", type: "string", required: true }
+      - { name: "count", type: "number", required: true }
+      - { name: "severity", type: "'critical' | 'warning' | 'info'", required: true }
+      - { name: "icon", type: "React.ReactNode", required: true }
+      - { name: "onClick", type: "() => void", required: true }
+      - { name: "items", type: "any[]", required: false }
+    features:
+      - "Color-coded background by severity"
+      - "Icon + count display"
+      - "Clickable to filter/navigate"
+      - "Optional expanded view of items"
+      - "Accessible tooltip with description"
+
+  # Activity Section
+  - path: "apps/frontend/components/shipping/dashboard/RecentActivityTimeline.tsx"
+    description: "Timeline of recent activities"
+    type: "Client Component"
+    props:
+      - { name: "activities", type: "ActivityItem[]", required: true }
+      - { name: "isLoading", type: "boolean", default: "false" }
+      - { name: "onLoadMore", type: "() => void", required: false }
+    features:
+      - "Reverse chronological order"
+      - "Relative timestamps (2 min ago, 1 hour ago)"
+      - "Status-colored left border"
+      - "Entity link (clickable)"
+      - "Empty state when no activities"
+      - "Load More button for pagination"
+
+  - path: "apps/frontend/components/shipping/dashboard/ActivityItem.tsx"
+    description: "Individual activity row in timeline"
+    type: "Client Component"
+    props:
+      - { name: "activity", type: "ActivityItem", required: true }
+      - { name: "onClick", type: "() => void", required: false }
+    features:
+      - "Activity type icon"
+      - "Description text"
+      - "Relative timestamp"
+      - "Entity link (clickable)"
+      - "Status color indicator"
+
+  # Quick Actions Panel
+  - path: "apps/frontend/components/shipping/dashboard/QuickActionsPanel.tsx"
+    description: "Quick action buttons for common workflows"
+    type: "Client Component"
+    props:
+      - { name: "userRole", type: "string", required: true }
+    features:
+      - "3 action buttons"
+      - "Role-based visibility (disable for VIEWER role)"
+      - "Tooltip on disabled buttons"
+      - "Navigation on click"
+    actions:
+      - { label: "Create Sales Order", href: "/shipping/sales-orders/new", roles: ["SALES", "ADMIN"] }
+      - { label: "Create Pick List", href: "/shipping/pick-lists/new", roles: ["WAREHOUSE", "ADMIN"] }
+      - { label: "View Backorders", href: "/shipping/sales-orders?filter=backorders", roles: ["*"] }
+
+  # Date Range Filter
+  - path: "apps/frontend/components/shipping/dashboard/DateRangeFilter.tsx"
+    description: "Date range selector with presets and custom picker"
+    type: "Client Component"
+    props:
+      - { name: "value", type: "DateRange", required: true }
+      - { name: "onChange", type: "(range: DateRange) => void", required: true }
+    features:
+      - "4 preset buttons (Today, Last 7, Last 30, Custom)"
+      - "Calendar picker for custom range"
+      - "Max 365 days validation"
+      - "URL params sync"
+      - "Keyboard accessible"
+    presets:
+      - { label: "Today", days: 0 }
+      - { label: "Last 7 Days", days: 7 }
+      - { label: "Last 30 Days", days: 30 }
+      - { label: "Custom", type: "picker" }
+
+  # Loading & Empty States
+  - path: "apps/frontend/components/shipping/dashboard/DashboardSkeleton.tsx"
+    description: "Loading skeleton with shimmer effect"
+    type: "Client Component"
+    features:
+      - "Skeleton loaders for KPI cards"
+      - "Skeleton loaders for charts"
+      - "Skeleton loaders for alerts"
+      - "Skeleton loaders for activity"
+      - "Shimmer animation effect"
+      - "Progress indicator (0-100%)"
+
+  - path: "apps/frontend/components/shipping/dashboard/EmptyDashboard.tsx"
+    description: "Empty state when no data in date range"
+    type: "Client Component"
+    props:
+      - { name: "dateRange", type: "DateRange", required: true }
+      - { name: "onChangeDateRange", type: "(range: DateRange) => void", required: true }
+    features:
+      - "Illustration/icon"
+      - "Friendly message"
+      - "Suggested actions"
+      - "Date range change button"
+      - "Create SO button"
+
+  # Error States
+  - path: "apps/frontend/components/shipping/dashboard/DashboardError.tsx"
+    description: "Error state with retry button"
+    type: "Client Component"
+    props:
+      - { name: "error", type: "Error", required: true }
+      - { name: "onRetry", type: "() => void", required: true }
+    features:
+      - "Error message with code"
+      - "Fallback to cached data display"
+      - "Retry button"
+      - "Support contact info"
+
+  # Header
+  - path: "apps/frontend/components/shipping/dashboard/DashboardHeader.tsx"
+    description: "Dashboard header with auto-refresh toggle"
+    type: "Client Component"
+    props:
+      - { name: "isRefreshing", type: "boolean", required: true }
+      - { name: "onManualRefresh", type: "() => void", required: true }
+      - { name: "autoRefreshEnabled", type: "boolean", required: true }
+      - { name: "onToggleAutoRefresh", type: "(enabled: boolean) => void", required: true }
+      - { name: "nextRefreshIn", type: "number", required: false }
+    features:
+      - "Title: 'Shipping Dashboard'"
+      - "Auto-refresh toggle switch"
+      - "Manual refresh button"
+      - "Next refresh countdown"
+      - "Refresh progress indicator"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/dashboard-service.ts"
+    description: "Dashboard business logic and API integration"
+    exports:
+      - name: "DashboardService"
+        type: "class"
+        methods:
+          - name: "getKPIs"
+            type: "static async"
+            params: ["orgId: string", "dateFrom: Date", "dateTo: Date"]
+            returns: "Promise<DashboardKPIs>"
+            description: "Fetch KPI metrics from API"
+
+          - name: "getAlerts"
+            type: "static async"
+            params: ["orgId: string", "dateFrom: Date", "dateTo: Date"]
+            returns: "Promise<DashboardAlerts>"
+
+          - name: "getRecentActivity"
+            type: "static async"
+            params: ["orgId: string", "limit: number"]
+            returns: "Promise<ActivityItem[]>"
+
+          - name: "calculateTrend"
+            type: "static"
+            params: ["current: number", "previous: number"]
+            returns: "TrendIndicator"
+
+          - name: "generateCacheKey"
+            type: "static"
+            params: ["type: string", "orgId: string", "dateFrom: Date", "dateTo: Date"]
+            returns: "string"
+
+# Constants
+constants:
+  - path: "apps/frontend/lib/constants/dashboard-config.ts"
+    description: "Dashboard configuration constants"
+    exports:
+      - name: "CHART_COLORS"
+        value:
+          draft: "#9CA3AF"
+          confirmed: "#3B82F6"
+          allocated: "#8B5CF6"
+          picking: "#FBBF24"
+          packing: "#FB923C"
+          shipped: "#10B981"
+          delivered: "#06B6D4"
+
+      - name: "ALERT_CONFIG"
+        value:
+          backorders: { color: "red", icon: "AlertTriangle" }
+          delayed_shipments: { color: "orange", icon: "Clock" }
+          pending_picks: { color: "yellow", icon: "Timer" }
+          allergen_conflicts: { color: "purple", icon: "AlertCircle" }
+
+      - name: "AUTO_REFRESH_INTERVAL"
+        value: 30000  # 30 seconds
+
+      - name: "DATE_PRESETS"
+        value:
+          - { label: "Today", days: 0 }
+          - { label: "Last 7 Days", days: 7 }
+          - { label: "Last 30 Days", days: 30 }
+
+# UX Reference - Wireframe Mapping
+ux:
+  wireframes:
+    - id: "SHIP-022"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-022-shipping-dashboard.md"
+      relevance: "Complete dashboard layout, KPI cards, charts, alerts, activity, quick actions"
+      components:
+        - "DashboardKPIs (section)"
+        - "OrdersByStatusChart"
+        - "ShipmentsByDateChart"
+        - "AlertsSection"
+        - "RecentActivityTimeline"
+        - "QuickActionsPanel"
+
+  responsive_design:
+    mobile:
+      breakpoint: "< 768px"
+      layout: "Single column, stacked vertically"
+      kpi_cards: "1 column (full width)"
+      charts: "Full width, scrollable"
+      alerts: "Collapsed by default, expandable"
+      quick_actions: "Sticky footer or dropdown"
+
+    tablet:
+      breakpoint: "768px - 1024px"
+      layout: "2 columns"
+      kpi_cards: "2 columns (4 cards = 2 rows)"
+      charts: "Side-by-side if space allows"
+      alerts: "2 columns"
+
+    desktop:
+      breakpoint: "> 1024px"
+      layout: "Multi-column optimal"
+      kpi_cards: "4 columns (1 row)"
+      charts: "Side-by-side"
+      alerts: "2 columns"
+      activity: "Full width below"
+
+  accessibility:
+    wcag_level: "2.1 AA"
+    features:
+      - "Color not sole indicator (icons + text)"
+      - "Focus indicators (3px blue outline)"
+      - "Skip links for main content sections"
+      - "Keyboard navigation (Tab through all elements)"
+      - "Screen reader support (aria-labels, roles)"
+      - "Reduced motion support (prefers-reduced-motion)"
+      - "Min touch target 48x48dp on mobile"
+      - "Form labels properly associated"
+      - "Semantic HTML (h1, h2, buttons, etc)"
+
+  states:
+    loading: "Skeleton loaders with shimmer + progress indicator"
+    empty: "Friendly empty state with suggested actions"
+    error: "Error message with retry button + fallback to cached data"
+    success: "Full dashboard with all data"
+
+# Performance Considerations
+performance:
+  code_splitting:
+    - "Charts library lazy-loaded (Recharts)"
+    - "Date picker lazy-loaded"
+    - "Alerts section lazy-loaded below fold"
+
+  optimization:
+    - "Memoization of expensive components"
+    - "useCallback for event handlers"
+    - "useMemo for chart data transformations"
+    - "React Query caching strategy"
+    - "Image optimization (SVG icons)"
+
+  bundle_size_target: "< 150KB gzipped"
+  performance_targets:
+    dashboard_load: "< 500ms (p95)"
+    chart_render: "< 100ms"
+    auto_refresh: "< 500ms"
+
+# Testing
+testing:
+  unit_test_framework: "Vitest"
+  integration_test_framework: "Playwright"
+  e2e_test_framework: "Playwright"
+  coverage_target: "> 80%"
+
+  test_files:
+    - "components/__tests__/DashboardKPIs.test.tsx"
+    - "components/__tests__/KPICard.test.tsx"
+    - "components/__tests__/OrdersByStatusChart.test.tsx"
+    - "hooks/__tests__/useDashboardKPIs.test.ts"
+    - "hooks/__tests__/useAutoRefresh.test.ts"
+    - "services/__tests__/dashboard-service.test.ts"

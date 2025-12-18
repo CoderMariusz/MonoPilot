@@ -1,0 +1,386 @@
+# Story 06.11 Frontend Context
+# Components, pages, types, hooks, UX patterns
+
+frontend:
+  pages:
+    - path: "apps/frontend/app/(authenticated)/quality/inspections/final/page.tsx"
+      name: "Final Inspections Queue"
+      description: "List of all final inspections with filters and status"
+      wireframes: ["QA-007-final-inspection-part1.md", "sections 1-6"]
+      features:
+        - Summary stats (scheduled, in-progress, completed, pass-rate)
+        - Search and filters (status, result, product, batch-status, date-range)
+        - DataTable with columns (inspection #, WO, product, batch, date, inspector, result, actions)
+        - Row highlighting for urgent priority
+        - Quick action buttons (Start, View, Release)
+        - Pagination
+        - Responsive (desktop, tablet, mobile)
+        - Loading, empty, and error states
+      states:
+        - Success: Table with data
+        - Loading: Skeleton loaders
+        - Empty: "No Final Inspections Found"
+        - Error: "Failed to Load Final Inspections"
+
+    - path: "apps/frontend/app/(authenticated)/quality/inspections/[id]/page.tsx"
+      name: "Final Inspection Detail & Execution"
+      description: "Execute final inspection with 6 sections"
+      wireframes: ["QA-007-final-inspection-part1.md (sections 7-14)", "QA-007-final-inspection-part2.md"]
+      features:
+        - Pre-inspection validation alert (blockers vs warnings)
+        - Header with batch info, product info, inspector info, progress indicator
+        - 6 sections (collapsible, sequential):
+          1. Product Specifications (23 parameters)
+          2. Labeling Accuracy (6 checks + barcode scan)
+          3. Package Integrity (4 checks + sampling)
+          4. Batch Traceability (genealogy tree)
+          5. CCP Review (summary of all CCPs)
+          6. Documentation & Sign-off (e-signature ready)
+        - Auto-save functionality
+        - Progress bar with section completion
+        - Result determination modal (pass/fail/conditional)
+        - Inspector notes field (required, min 20 chars)
+        - E-signature authentication
+      states:
+        - Scheduled: Pre-validation check
+        - In Progress: Section 1-6 editing
+        - Completed: Immutable display
+        - Failed: NCR prompt
+
+    - path: "apps/frontend/app/(authenticated)/quality/batch-release/page.tsx"
+      name: "Batch Release Queue"
+      description: "List of batches awaiting release approval"
+      wireframes: ["QA-010-batch-release.md (page 1)"]
+      features:
+        - Release queue table (batch, WO, product, qty, scheduled, inspection result, status)
+        - Filters (status, product, release-date, QA-manager)
+        - Search (batch #, WO #, product name)
+        - Summary stats (pending, review, blocked, average wait)
+        - Bulk action indicators
+        - Loading and error states
+        - Pagination
+        - Auto-refresh option
+      states:
+        - Success: Table with pending releases
+        - Loading: Skeleton loaders
+        - Empty: "No Batches Awaiting Release"
+        - Error: "Failed to Load Release Queue"
+
+    - path: "apps/frontend/app/(authenticated)/quality/batch-release/[id]/page.tsx"
+      name: "Batch Release Detail & Approval"
+      description: "Review and approve batch release"
+      wireframes: ["QA-010-batch-release.md (page 2)"]
+      features:
+        - Batch header (batch #, WO, product, qty, status, scheduled date)
+        - Section 1: Pre-release validation checklist (7 checks)
+          - Each check shows pass/fail status
+          - Expandable details for each check
+          - Links to source data (inspections, CCPs, checkpoints)
+        - Section 2: Traceability summary
+          - Raw materials & components
+          - Production operations timeline
+          - Storage & packaging info
+          - License plate summary
+        - Section 3: Approval & sign-off
+          - Release decision radio (approve/reject/hold)
+          - Conditional details form (if conditional selected)
+          - Rejection reason field (if reject selected)
+          - Notes/comments optional field
+          - E-signature options (biometric, PIN, email)
+        - Audit history timeline
+      states:
+        - Loading: Skeleton loaders
+        - Ready: All checks pass
+        - Review Required: Some warnings
+        - Blocked: Cannot release (show blockers)
+
+  components:
+    quality_inspections:
+      - name: "FinalInspectionDataTable"
+        path: "apps/frontend/components/quality/final-inspection/FinalInspectionDataTable.tsx"
+        props:
+          inspections: "QualityInspection[]"
+          isLoading: "boolean"
+          onRowClick: "(inspection: QualityInspection) => void"
+        description: "ShadCN DataTable for final inspections queue"
+        features:
+          - Columns: inspection #, WO, product, batch, qty, date, inspector, result, actions
+          - Sorting on inspection_number, scheduled_date, product_name, result
+          - Filtering
+          - Row highlighting (urgent priority)
+          - Quick action buttons (column)
+
+      - name: "EvidenceSummaryPanel"
+        path: "apps/frontend/components/quality/final-inspection/EvidenceSummaryPanel.tsx"
+        props:
+          inspectionId: "string"
+          evidence: "InspectionEvidenceSummary"
+          isLoading: "boolean"
+        description: "Display aggregated evidence from production"
+        features:
+          - 4 sections: in-process, CCPs, checkpoints, NCRs
+          - Count badges (total, passed, failed)
+          - Status banner (ready/review/blocked)
+          - Collapsible detail lists
+          - Links to source records
+
+      - name: "ProductSpecificationsSection"
+        path: "apps/frontend/components/quality/final-inspection/ProductSpecificationsSection.tsx"
+        props:
+          parameters: "SpecParameter[]"
+          measurements: "ParameterMeasurement[]"
+          onMeasurementChange: "(paramId: string, value: any) => void"
+          isEditable: "boolean"
+        description: "23 parameters with min/max validation"
+        features:
+          - Expandable parameter rows
+          - Critical parameter indicator (🔴)
+          - Numeric vs attribute validation
+          - Auto-pass/fail determination
+          - Failed parameter highlighting with reason
+          - Note attachment per parameter
+
+      - name: "LabelingAccuracySection"
+        path: "apps/frontend/components/quality/final-inspection/LabelingAccuracySection.tsx"
+        props:
+          checks: "LabelCheck[]"
+          onCheckChange: "(checkId: string, result: boolean) => void"
+          isEditable: "boolean"
+        description: "6 label checks with barcode scan integration"
+        features:
+          - PDF viewer for approved label artwork
+          - 6 check rows (product name, lot, expiry, allergens, nutrition, barcode)
+          - Barcode scanner trigger
+          - GS1-128 validation display
+          - Failed check highlighting
+
+      - name: "PackageIntegritySection"
+        path: "apps/frontend/components/quality/final-inspection/PackageIntegritySection.tsx"
+        props:
+          checks: "PackageCheck[]"
+          sampleSize: "number"
+          onCheckChange: "(checkId: string, result: boolean) => void"
+          isEditable: "boolean"
+        description: "4 package checks with sampling"
+        features:
+          - Seal quality check with width measurement
+          - Damage check with defect count
+          - Weight verification with statistics
+          - Dimension check with tolerance
+          - Photo attachment per check
+          - Defect rate calculation
+
+      - name: "ReleaseChecklist"
+        path: "apps/frontend/components/quality/batch-release/ReleaseChecklist.tsx"
+        props:
+          checks: "ReleaseCheck[]"
+          onCheckChange: "(checkId: string, checked: boolean) => void"
+          required: "boolean"
+        description: "Interactive 7-point pre-release checklist"
+        features:
+          - 7 check rows (final inspection, CCPs, in-process, checkpoints, holds, traceability, specs)
+          - Checkbox per item
+          - Status indicator (pass/fail)
+          - Progress bar (X of 7)
+          - Minimum validation (4 of 6 required)
+          - Expandable details with links
+
+      - name: "ReleaseApprovalModal"
+        path: "apps/frontend/components/quality/batch-release/ReleaseApprovalModal.tsx"
+        props:
+          batch: "BatchRelease"
+          onApprove: "(decision: 'approved' | 'rejected' | 'conditional', data: any) => Promise<void>"
+          isLoading: "boolean"
+        description: "Three-column approval form modal"
+        features:
+          - Left: Batch summary & evidence
+          - Center: Interactive checklist
+          - Right: Decision selection & notes
+          - Conditional details form (if conditional)
+          - Rejection reason input (if reject)
+          - E-signature options
+          - Confirmation step
+          - Loading state during submission
+
+      - name: "BatchStatusCard"
+        path: "apps/frontend/components/quality/shared/BatchStatusCard.tsx"
+        props:
+          batchStatus: "BatchStatus"
+          size: "'compact' | 'full'"
+        description: "Reusable batch status summary card"
+        features:
+          - Used on WO detail, LP detail, Shipping pages
+          - Shows: final inspection status, release status, restrictions
+          - Color-coded indicators
+          - Quick actions
+          - Minimal/full layout options
+
+    shared:
+      - name: "ReleaseStatusBadge"
+        path: "apps/frontend/components/quality/shared/ReleaseStatusBadge.tsx"
+        props:
+          status: "string"
+          variant: "'inline' | 'badge' | 'full'"
+        description: "Status badge for release_status field"
+        content: |
+          - pending: 🔵 Pending Release (gray)
+          - released: ✅ Released (green)
+          - hold: ⏸️ On Hold (yellow)
+          - rejected: ❌ Rejected (red)
+
+      - name: "EvidenceStatusIcon"
+        path: "apps/frontend/components/quality/shared/EvidenceStatusIcon.tsx"
+        props:
+          status: "'complete' | 'partial' | 'blocked'"
+          tooltip: "boolean"
+        description: "Icon indicating evidence status"
+        content: |
+          - complete: ✅ (green checkmark)
+          - partial: ⚠️ (yellow warning)
+          - blocked: ❌ (red X)
+
+  types:
+    - name: "BatchReleaseRecord"
+      file: "apps/frontend/lib/types/quality.ts"
+      fields:
+        - id: "UUID"
+        - org_id: "UUID"
+        - release_number: "string"
+        - batch_number: "string"
+        - wo_id: "UUID | null"
+        - product_id: "UUID"
+        - final_inspection_id: "UUID | null"
+        - checklist_*: "boolean (7 fields)"
+        - release_decision: "'pending' | 'approved' | 'rejected' | 'conditional'"
+        - conditional_reason: "string | null"
+        - conditional_restrictions: "string | null"
+        - conditional_expires_at: "Date | null"
+        - total_quantity: "number | null"
+        - released_quantity: "number | null"
+        - rejected_quantity: "number | null"
+        - submitted_by: "UUID | null"
+        - submitted_at: "Date | null"
+        - approved_by: "UUID | null"
+        - approved_at: "Date | null"
+        - approval_notes: "string | null"
+        - created_at: "Date"
+        - created_by: "UUID | null"
+        - updated_at: "Date"
+        - updated_by: "UUID | null"
+
+    - name: "ReleaseCheckResult"
+      file: "apps/frontend/lib/types/quality.ts"
+      fields:
+        - batch_number: "string"
+        - wo_id: "UUID"
+        - product_id: "UUID"
+        - product_name: "string"
+        - total_quantity: "number"
+        - output_lps: "number"
+        - can_release: "boolean"
+        - checklist: "object"
+        - blockers: "string[]"
+        - warnings: "string[]"
+
+    - name: "InspectionEvidenceSummary"
+      file: "apps/frontend/lib/types/quality.ts"
+      fields:
+        - inspection_id: "UUID"
+        - wo_id: "UUID"
+        - batch_number: "string"
+        - in_process_inspections: "object"
+        - ccp_monitoring: "object"
+        - operation_checkpoints: "object"
+        - ncrs: "object"
+        - overall_status: "'ready' | 'review_required' | 'blocked'"
+        - blockers: "string[]"
+        - warnings: "string[]"
+
+  hooks:
+    - name: "useFinalInspections"
+      file: "apps/frontend/lib/hooks/quality.ts"
+      signature: "(options?: UseQueryOptions) => UseQueryResult<QualityInspection[]>"
+      description: "Fetch final inspections with filters"
+      usage: |
+        const { data, isLoading, error } = useFinalInspections({
+          status: 'pending',
+          product_id: 'xxx'
+        })
+
+    - name: "useBatchReleaseCheck"
+      file: "apps/frontend/lib/hooks/quality.ts"
+      signature: "(batchNumber: string) => UseMutationResult<ReleaseCheckResult>"
+      description: "Check batch release readiness"
+      usage: |
+        const mutation = useBatchReleaseCheck()
+        await mutation.mutateAsync(batch.batch_number)
+
+    - name: "useBatchReleaseApproval"
+      file: "apps/frontend/lib/hooks/quality.ts"
+      signature: "(batchNumber: string) => UseMutationResult<BatchReleaseRecord>"
+      description: "Approve batch release"
+      usage: |
+        const mutation = useBatchReleaseApproval()
+        await mutation.mutateAsync({ release_decision: 'approved', ... })
+
+  services:
+    - name: "qualityService"
+      file: "apps/frontend/lib/services/quality-service.ts"
+      methods:
+        - name: "getFinalInspections"
+          signature: "async (params?: GetFinalInspectionsParams): Promise<QualityInspection[]>"
+        - name: "getFinalInspectionDetail"
+          signature: "async (inspectionId: string): Promise<QualityInspection>"
+        - name: "getFinalInspectionEvidence"
+          signature: "async (inspectionId: string): Promise<InspectionEvidenceSummary>"
+        - name: "checkBatchReleaseReadiness"
+          signature: "async (batchNumber: string): Promise<ReleaseCheckResult>"
+        - name: "approveBatchRelease"
+          signature: "async (batchNumber: string, data: BatchReleaseInput): Promise<BatchReleaseRecord>"
+        - name: "rejectBatchRelease"
+          signature: "async (batchNumber: string, reason: string): Promise<BatchReleaseRecord>"
+        - name: "holdBatchRelease"
+          signature: "async (batchNumber: string, reason: string): Promise<BatchReleaseRecord>"
+
+  ux_patterns:
+    - pattern: "Multi-section wizard"
+      description: "6-section final inspection with progress bar"
+      example: "QA-007 inspection execution page"
+
+    - pattern: "Evidence aggregation panel"
+      description: "Collapsible evidence from multiple sources"
+      example: "In-process inspections, CCPs, checkpoints summary"
+
+    - pattern: "Pre-validation alert system"
+      description: "Blockers (prevent action) vs warnings (informational)"
+      example: "Pre-inspection validation with expandable issue lists"
+
+    - pattern: "Multi-step approval workflow"
+      description: "Inspection completion → submission → QA Manager approval"
+      example: "Final inspection → batch release → shipment"
+
+    - pattern: "Immutable audit trail"
+      description: "Completed records show read-only with history timeline"
+      example: "Batch release detail with approval history"
+
+    - pattern: "Responsive data tables"
+      description: "Desktop (10 columns) → Tablet (7 columns) → Mobile (card layout)"
+      example: "Final inspection queue responsive design"
+
+  accessibility:
+    - wcag_level: "AA"
+    - requirements:
+        - contrast_ratio_text: "4.5:1 minimum"
+        - contrast_ratio_ui: "3:1 minimum"
+        - keyboard_navigation: "All interactive elements keyboard accessible"
+        - screen_reader: "ARIA labels, roles, live regions for dynamic content"
+        - touch_targets: "48x48dp minimum for all clickable elements"
+        - color_not_only: "Do not rely on color alone to convey information"
+
+  performance:
+    - final_inspections_queue_load: "<500ms"
+    - evidence_summary_load: "<1s"
+    - batch_release_detail_load: "<1s"
+    - approval_submission: "<2s"
+    - lp_status_update: "<500ms per LP"
+    - list_pagination: "50 records per page max"

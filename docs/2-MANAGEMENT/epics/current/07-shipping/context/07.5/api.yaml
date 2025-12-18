@@ -1,0 +1,521 @@
+# Story 07.5 - API Specification
+# Purpose: Clone and Import endpoints with full request/response contracts
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/clone"
+    file: "apps/frontend/app/api/shipping/sales-orders/[id]/clone/route.ts"
+    description: "Clone existing sales order to new draft"
+    auth: true
+    roles: ["sales", "manager", "admin", "super_admin"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "ID of SO to clone"
+          required: true
+
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+
+      body:
+        note: "POST body is empty - ID in URL param"
+        example: "{}"
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          original_order_number: "string (SO-YYYY-NNNNN)"
+          cloned_order:
+            id: "UUID"
+            order_number: "string (new SO-YYYY-NNNNN)"
+            status: "draft"
+            customer_id: "UUID"
+            customer_name: "string"
+            shipping_address_id: "UUID"
+            order_date: "ISO date (today)"
+            promised_ship_date: "null"
+            required_delivery_date: "null"
+            customer_po: "null"
+            notes: "string (preserved from original)"
+            total_amount: "number (decimal)"
+            allergen_validated: false
+            lines_count: "integer"
+            lines:
+              - id: "UUID"
+                line_number: "integer (1, 2, 3...)"
+                product_id: "UUID"
+                product_name: "string"
+                product_code: "string"
+                quantity_ordered: "number (decimal)"
+                unit_price: "number (decimal)"
+                line_total: "number (decimal)"
+            created_at: "ISO timestamp"
+
+      example:
+        success: true
+        data:
+          original_order_number: "SO-2025-00123"
+          cloned_order:
+            id: "uuid-so-456"
+            order_number: "SO-2025-00456"
+            status: "draft"
+            customer_id: "uuid-customer-1"
+            customer_name: "ACME Corp"
+            shipping_address_id: "uuid-addr-1"
+            order_date: "2025-12-18"
+            promised_ship_date: null
+            required_delivery_date: null
+            customer_po: null
+            notes: "Original special instructions"
+            total_amount: 15000.00
+            allergen_validated: false
+            lines_count: 2
+            lines:
+              - id: "uuid-line-1"
+                line_number: 1
+                product_id: "uuid-prod-1"
+                product_name: "Chocolate Cookie"
+                product_code: "PROD-001"
+                quantity_ordered: 100
+                unit_price: 50.00
+                line_total: 5000.00
+              - id: "uuid-line-2"
+                line_number: 2
+                product_id: "uuid-prod-2"
+                product_name: "Vanilla Wafer"
+                product_code: "PROD-002"
+                quantity_ordered: 50
+                unit_price: 200.00
+                line_total: 10000.00
+            created_at: "2025-12-18T10:30:00Z"
+
+    errors:
+      - status: 400
+        code: "INVALID_SO_ID"
+        message: "Invalid sales order ID format"
+        details: "ID must be a valid UUID"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Authentication required"
+        details: "No valid JWT token provided"
+
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        details: "User role does not permit cloning orders"
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Sales order not found"
+        details: "SO with ID xyz not found or does not belong to your organization"
+
+      - status: 500
+        code: "CLONE_FAILED"
+        message: "Failed to clone sales order"
+        details: "Database error: [specific error details]"
+
+    business_logic:
+      - "Fetch original SO and all lines (RLS enforces org_id match)"
+      - "Generate new SO number using org's sequence counter"
+      - "Create new SO with:"
+      - "  - New id and order_number"
+      - "  - Same customer_id, shipping_address_id"
+      - "  - order_date = today"
+      - "  - status = draft"
+      - "  - promised_ship_date = NULL"
+      - "  - required_delivery_date = NULL"
+      - "  - customer_po = NULL"
+      - "  - notes = original notes"
+      - "  - allergen_validated = false"
+      - "  - confirmed_at, shipped_at = NULL"
+      - "Create new lines with:"
+      - "  - New ids"
+      - "  - sales_order_id = new SO id"
+      - "  - line_number renumbered sequentially (1, 2, 3...)"
+      - "  - Same product_id, quantity_ordered, unit_price, notes, requested_lot"
+      - "  - All quantities reset (allocated, picked, packed, shipped = 0)"
+      - "Recalculate SO total_amount from cloned lines"
+      - "Increment org's next_so_sequence counter"
+      - "Return full cloned SO with lines"
+
+  - method: "POST"
+    path: "/api/shipping/sales-orders/import"
+    file: "apps/frontend/app/api/shipping/sales-orders/import/route.ts"
+    description: "Import sales orders from CSV file"
+    auth: true
+    roles: ["sales", "manager", "admin", "super_admin"]
+    content_type: "multipart/form-data"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "multipart/form-data"
+
+      body:
+        file:
+          type: "File (CSV)"
+          description: "CSV file with sales order rows"
+          required: true
+          max_size: "5 MB"
+          format: "CSV with header row"
+
+      csv_format:
+        minimal: |
+          customer_code,product_code,quantity,unit_price
+          ACME001,PROD-001,100,10.50
+          ACME001,PROD-002,50,25.00
+          BETA002,PROD-001,200,10.00
+
+        extended: |
+          customer_code,product_code,quantity,unit_price,customer_po,promised_ship_date,required_delivery_date,notes
+          ACME001,PROD-001,100,10.50,PO-12345,2025-12-20,2025-12-25,Rush order
+          ACME001,PROD-002,50,25.00,,,
+          BETA002,PROD-001,200,10.00
+
+        columns:
+          - name: "customer_code"
+            required: true
+            type: "string"
+            description: "Lookup key to customers.customer_code"
+          - name: "product_code"
+            required: true
+            type: "string"
+            description: "Lookup key to products.product_code"
+          - name: "quantity"
+            required: true
+            type: "number"
+            description: "Quantity to order (must be > 0)"
+          - name: "unit_price"
+            required: false
+            type: "number"
+            description: "Unit price (defaults to product.standard_price if omitted)"
+          - name: "customer_po"
+            required: false
+            type: "string"
+            description: "Customer PO number (SO-level field)"
+          - name: "promised_ship_date"
+            required: false
+            type: "string (YYYY-MM-DD)"
+            description: "Promised ship date"
+          - name: "required_delivery_date"
+            required: false
+            type: "string (YYYY-MM-DD)"
+            description: "Required delivery date"
+          - name: "notes"
+            required: false
+            type: "string"
+            description: "Notes for the order"
+
+    response:
+      status: 200
+      schema:
+        success: boolean
+        summary:
+          orders_created: "integer"
+          lines_imported: "integer"
+          rows_processed: "integer (excludes header)"
+          errors_count: "integer"
+        created_orders:
+          - id: "UUID"
+            order_number: "string (SO-YYYY-NNNNN)"
+            customer_code: "string"
+            customer_id: "UUID"
+            lines_count: "integer"
+        errors:
+          - row: "integer (1-based, excludes header)"
+            customer_code: "string (if available)"
+            product_code: "string (if available)"
+            error: "string (human-readable error message)"
+
+      example:
+        success: true
+        summary:
+          orders_created: 2
+          lines_imported: 4
+          rows_processed: 4
+          errors_count: 0
+        created_orders:
+          - id: "uuid-so-001"
+            order_number: "SO-2025-00789"
+            customer_code: "ACME001"
+            customer_id: "uuid-cust-1"
+            lines_count: 2
+          - id: "uuid-so-002"
+            order_number: "SO-2025-00790"
+            customer_code: "BETA002"
+            customer_id: "uuid-cust-2"
+            lines_count: 2
+        errors: []
+
+      example_with_errors:
+        success: true
+        summary:
+          orders_created: 2
+          lines_imported: 3
+          rows_processed: 5
+          errors_count: 2
+        created_orders:
+          - id: "uuid-so-001"
+            order_number: "SO-2025-00789"
+            customer_code: "ACME001"
+            lines_count: 2
+          - id: "uuid-so-002"
+            order_number: "SO-2025-00790"
+            customer_code: "BETA002"
+            lines_count: 1
+        errors:
+          - row: 3
+            customer_code: "GAMMA003"
+            product_code: null
+            error: "Customer 'GAMMA003' not found"
+          - row: 5
+            customer_code: "ACME001"
+            product_code: "PROD-INVALID"
+            error: "Product 'PROD-INVALID' not found"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "CSV validation failed"
+        details: "CSV file is empty"
+
+      - status: 400
+        code: "INVALID_CSV_FORMAT"
+        message: "Invalid CSV format"
+        details: "Missing required columns: customer_code, product_code, quantity"
+
+      - status: 400
+        code: "INVALID_FILE_TYPE"
+        message: "File type not supported"
+        details: "Only CSV files (.csv) are supported"
+
+      - status: 400
+        code: "FILE_TOO_LARGE"
+        message: "File exceeds maximum size"
+        details: "File size must be <= 5 MB"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Authentication required"
+
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        details: "User role does not permit importing orders"
+
+      - status: 500
+        code: "IMPORT_FAILED"
+        message: "Failed to import orders"
+        details: "Database error during import"
+
+    business_logic:
+      - "Parse CSV file (multipart form data)"
+      - "Validate header row (required: customer_code, product_code, quantity)"
+      - "For each CSV row (starting at row 2, after header):"
+      - "  - Validate customer_code exists in org (lookup customers table)"
+      - "  - Validate product_code exists in org AND is_finished_good = true"
+      - "  - Validate quantity > 0"
+      - "  - Validate unit_price >= 0 (if provided)"
+      - "  - Validate promised_ship_date format if provided (YYYY-MM-DD)"
+      - "  - If any validation fails: add to errors array with row number and error message"
+      - "  - If validation passes: add to validatedRows array"
+      - "Group validatedRows by customer_code"
+      - "For each customer_code group:"
+      - "  - Generate new SO number"
+      - "  - Create new SO with status = draft"
+      - "  - For each row in group:"
+      - "    - Create sales_order_line with line_number = sequential (1, 2, 3)"
+      - "  - Recalculate SO total_amount"
+      - "  - Increment org's next_so_sequence counter by number of SOs created"
+      - "Return summary with orders_created, lines_imported, errors"
+
+# Service Methods
+
+services:
+  sales_order_service:
+    - method: "cloneSalesOrder"
+      signature: "async cloneSalesOrder(soId: string): Promise<ClonedSalesOrderResponse>"
+      description: "Clone existing SO with all lines and calculate totals"
+      parameters:
+        - name: "soId"
+          type: "string (UUID)"
+          description: "Original SO id"
+      returns: "Cloned SO with new id, order_number, and renumbered lines"
+      throws:
+        - "Error('Sales order not found')"
+        - "Error('Failed to clone sales order')"
+      dependencies:
+        - "RLS ensures org_id match"
+        - "generateOrderNumber() for new SO number"
+        - "calculateLineTotal() for each line"
+        - "calculateOrderTotal() for SO total"
+
+    - method: "importSalesOrdersFromCSV"
+      signature: "async importSalesOrdersFromCSV(orgId: string, csvData: string): Promise<ImportResult>"
+      description: "Parse CSV and create SOs with validation"
+      parameters:
+        - name: "orgId"
+          type: "string (UUID)"
+          description: "Organization id from auth context"
+        - name: "csvData"
+          type: "string"
+          description: "CSV file contents as string"
+      returns: "Import result with created orders and error list"
+      throws:
+        - "Error('CSV is empty')"
+        - "Error('Missing required columns')"
+        - "Error('Failed to import orders')"
+      dependencies:
+        - "parseCSV() utility"
+        - "validateCSVHeader() utility"
+        - "validateCSVRow() for each row"
+        - "groupBy() utility to group by customer_code"
+        - "generateOrderNumber() for each SO"
+
+    - method: "validateCSVRow"
+      signature: "async validateCSVRow(orgId: string, row: CSVRow, rowIndex: number): Promise<ValidationResult>"
+      description: "Validate single CSV row and return normalized data or error"
+      parameters:
+        - name: "orgId"
+          type: "string (UUID)"
+        - name: "row"
+          type: "CSVRow"
+        - name: "rowIndex"
+          type: "number (1-based, for error reporting)"
+      returns: "{ valid: true, data: ValidatedRow } or { valid: false, error: string }"
+      validations:
+        - "customer_code exists in org"
+        - "product_code exists in org and is_finished_good = true"
+        - "quantity > 0"
+        - "unit_price >= 0 (if provided)"
+        - "promised_ship_date valid ISO format (if provided)"
+        - "required_delivery_date valid ISO format (if provided)"
+
+    - method: "generateOrderNumber"
+      signature: "async generateOrderNumber(orgId: string): Promise<string>"
+      description: "Generate next SO number in format SO-YYYY-NNNNN"
+      parameters:
+        - name: "orgId"
+          type: "string (UUID)"
+      returns: "SO number string (e.g., 'SO-2025-00456')"
+      logic:
+        - "Read org's next_so_sequence counter"
+        - "Increment counter by 1"
+        - "Format: SO-{current_year}-{zero-padded sequence to 5 digits}"
+        - "Update org's next_so_sequence to new value"
+        - "Return formatted SO number"
+
+# Validation Schemas
+
+validation:
+  - path: "apps/frontend/lib/validation/sales-order-import.ts"
+    description: "Zod schemas for CSV import validation"
+    schemas:
+      - name: "CSVRowSchema"
+        schema: |
+          const csvRowSchema = z.object({
+            customer_code: z.string().min(1, "Customer code is required").max(50),
+            product_code: z.string().min(1, "Product code is required").max(50),
+            quantity: z.string().refine(
+              (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
+              "Quantity must be a number greater than 0"
+            ),
+            unit_price: z.string().optional().refine(
+              (val) => !val || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0),
+              "Unit price must be a non-negative number"
+            ),
+            customer_po: z.string().max(100).optional(),
+            promised_ship_date: z.string().optional().refine(
+              (val) => !val || isValidISODate(val),
+              "Invalid date format (use YYYY-MM-DD)"
+            ),
+            required_delivery_date: z.string().optional().refine(
+              (val) => !val || isValidISODate(val),
+              "Invalid date format (use YYYY-MM-DD)"
+            ),
+            notes: z.string().max(1000).optional(),
+          });
+
+      - name: "CSVFileSchema"
+        schema: |
+          const csvFileSchema = z.object({
+            file: z.instanceof(File)
+              .refine(
+                (file) => file.type === 'text/csv' || file.name.endsWith('.csv'),
+                "Only CSV files (.csv) are supported"
+              )
+              .refine(
+                (file) => file.size > 0 && file.size <= 5 * 1024 * 1024,
+                "File size must be between 1 byte and 5 MB"
+              ),
+          });
+
+# Type Definitions
+
+types:
+  ClonedSalesOrderResponse: |
+    {
+      original_order_number: string;
+      cloned_order: {
+        id: string;
+        order_number: string;
+        status: 'draft';
+        customer_id: string;
+        customer_name: string;
+        shipping_address_id: string;
+        order_date: string;
+        promised_ship_date: null;
+        required_delivery_date: null;
+        customer_po: null;
+        notes: string;
+        total_amount: number;
+        allergen_validated: false;
+        lines_count: number;
+        lines: SalesOrderLine[];
+        created_at: string;
+      };
+    }
+
+  ImportResult: |
+    {
+      success: boolean;
+      summary: {
+        orders_created: number;
+        lines_imported: number;
+        rows_processed: number;
+        errors_count: number;
+      };
+      created_orders: {
+        id: string;
+        order_number: string;
+        customer_code: string;
+        customer_id: string;
+        lines_count: number;
+      }[];
+      errors: {
+        row: number;
+        customer_code?: string;
+        product_code?: string;
+        error: string;
+      }[];
+    }
+
+  CSVRow: |
+    {
+      customer_code: string;
+      product_code: string;
+      quantity: string;
+      unit_price?: string;
+      customer_po?: string;
+      promised_ship_date?: string;
+      required_delivery_date?: string;
+      notes?: string;
+    }
+

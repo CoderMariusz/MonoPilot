@@ -1,0 +1,615 @@
+# Story 07.16 - Tests, Acceptance Criteria & Quality
+# Purpose: Test specifications, acceptance criteria, quality gates
+# Agent: QA-ENGINEER (testing focus)
+
+acceptance_criteria:
+  ac_1_rma_list:
+    title: "AC-1: RMA List Page"
+    given: "A shipping clerk navigates to /shipping/rma"
+    when: "The page loads"
+    then:
+      - "RMA list displays within 500ms with columns: RMA Number, Customer, Status, Reason, Line Count, Created Date, Actions"
+      - "List is sorted by created date (descending by default)"
+      - "Pagination shows 20 items per page"
+      - "Create RMA button is visible and clickable"
+
+    scenarios:
+      - title: "Filter by Status"
+        given: "RMA list is displayed with 30 RMAs (various statuses)"
+        when: "Filter by status 'pending'"
+        then: "Only pending RMAs appear (within 300ms)"
+
+      - title: "Filter by Customer"
+        given: "RMA list has multiple customers"
+        when: "Filter by customer 'Acme Foods'"
+        then: "Only RMAs for that customer appear"
+
+      - title: "Search by RMA Number"
+        given: "RMA list has 50 RMAs"
+        when: "Search for 'RMA-2025-001'"
+        then: "Only matching RMAs display within 300ms"
+
+      - title: "Date Range Filter"
+        given: "RMA list with RMAs from different months"
+        when: "Filter by date range '2025-01-01 to 2025-01-31'"
+        then: "Only RMAs created in that range appear"
+
+  ac_2_create_rma:
+    title: "AC-2: RMA Creation"
+    given: "A clerk clicks 'Create RMA'"
+    when: "The create RMA form opens"
+    then:
+      - "Form displays fields: customer (required), SO link (optional), reason code (required), disposition, notes"
+      - "Add Line button allows multiple lines"
+      - "Each line requires: product, quantity_expected"
+
+    scenarios:
+      - title: "Create with Valid Data"
+        given: "Form is open"
+        when: "User enters: customer='Acme Foods', reason='damaged', 1 line (product, qty=50)"
+        then:
+          - "RMA created with status 'pending' within 1 second"
+          - "RMA number auto-generated (RMA-2025-00001 format)"
+          - "User redirected to RMA detail page"
+
+      - title: "RMA Number Generation"
+        given: "First RMA created on 2025-03-15"
+        when: "Save RMA"
+        then: "RMA number is 'RMA-2025-00001' (or next sequential)"
+
+      - title: "Multi-year Sequence"
+        given: "RMAs created in 2024 (RMA-2024-00010) and 2025"
+        when: "Create first RMA of 2025"
+        then: "RMA number is 'RMA-2025-00001' (sequence resets per year)"
+
+      - title: "Validation: No Lines"
+        given: "Customer selected but no lines added"
+        when: "Click Create"
+        then: "Error displays: 'At least one line item is required'"
+
+      - title: "Validation: Customer Required"
+        given: "Form is open"
+        when: "Try to submit without selecting customer"
+        then: "Error: 'Customer is required'"
+
+  ac_3_rma_lines:
+    title: "AC-3: RMA Lines Management"
+    given: "User is creating/editing RMA"
+    when: "Click 'Add Line'"
+    then:
+      - "Line form displays: product (required), qty_expected (required), lot_number, reason_notes"
+      - "Product field supports autocomplete search"
+
+    scenarios:
+      - title: "Add Line with Valid Data"
+        given: "Line form is open"
+        when: "Enter: product='Bread', qty=50, lot_number='LOT-2025-001'"
+        then: "Line added to table immediately"
+
+      - title: "Edit Line"
+        given: "RMA has 3 lines"
+        when: "Click Edit on a line"
+        then:
+          - "Line edit modal opens with pre-populated data"
+          - "User can modify qty, lot_number, reason_notes"
+          - "Save updates the table"
+
+      - title: "Delete Line"
+        given: "RMA has 3 lines"
+        when: "Click Delete on a line, confirm"
+        then: "Line removed from RMA"
+
+      - title: "Lock Lines After Approval"
+        given: "RMA has status 'approved'"
+        when: "User tries to edit/delete a line"
+        then: "Edit/Delete buttons disabled with tooltip: 'Cannot edit approved RMA'"
+
+      - title: "Validation: Quantity Required"
+        given: "Line form is open"
+        when: "Leave quantity_expected empty, try to add"
+        then: "Error: 'Quantity is required'"
+
+      - title: "Validation: Positive Quantity"
+        given: "Line form with qty = 0 or negative"
+        when: "Try to add"
+        then: "Error: 'Quantity must be greater than zero'"
+
+  ac_4_rma_detail:
+    title: "AC-4: RMA Detail View"
+    given: "User clicks on RMA row in list"
+    when: "Detail page loads"
+    then:
+      - "Page displays: RMA number, customer, SO link (if present), status badge"
+      - "Reason code badge, disposition badge"
+      - "Created date, created by user name"
+      - "Lines table with columns: Product, Qty Expected, Qty Received, Lot, Reason Notes, Disposition, Actions"
+      - "Notes section (if present)"
+
+    scenarios:
+      - title: "Edit Controls for Pending"
+        given: "RMA has status 'pending'"
+        when: "View detail page"
+        then:
+          - "Edit RMA button is visible"
+          - "Delete RMA button is visible"
+          - "All line edit/delete buttons are enabled"
+
+      - title: "Locked for Approved"
+        given: "RMA has status 'approved'"
+        when: "View detail page"
+        then:
+          - "Edit RMA button is hidden or disabled"
+          - "Delete RMA button is hidden or disabled"
+          - "All line buttons are disabled"
+          - "Approval info displays: 'Approved by [user] on [date/time]'"
+
+  ac_5_rma_approval:
+    title: "AC-5: RMA Approval Workflow"
+    given: "A MANAGER user views pending RMA with lines"
+    when: "Click 'Approve' button"
+    then:
+      - "Confirmation dialog displays: 'Approve this RMA? This will enable receiving workflow.'"
+
+    scenarios:
+      - title: "Successful Approval"
+        given: "Manager confirms approval"
+        when: "Approval is processed"
+        then:
+          - "RMA status changes to 'approved'"
+          - "approved_at set to current timestamp"
+          - "approved_by set to current user ID"
+          - "Toast displays: 'RMA approved successfully'"
+
+      - title: "Permission Check"
+        given: "A SALES user (non-manager) views pending RMA"
+        when: "Look at action buttons"
+        then: "Approve button is hidden (insufficient permissions)"
+
+      - title: "Status Check"
+        given: "RMA has status 'approved' or later"
+        when: "View detail page"
+        then: "Approve button is hidden (not applicable)"
+
+      - title: "Lines Required"
+        given: "RMA has no lines yet"
+        when: "Try to approve"
+        then: "Error: 'RMA must have at least one line before approval'"
+
+  ac_6_rma_edit:
+    title: "AC-6: RMA Edit Restrictions"
+    given: "RMA has status 'pending'"
+    when: "Click 'Edit RMA'"
+    then:
+      - "Edit form opens with all fields editable except RMA number"
+      - "RMA number is read-only"
+
+    scenarios:
+      - title: "Update Disposition"
+        given: "Edit form is open"
+        when: "Change disposition from 'restock' to 'scrap', click Save"
+        then: "Updated disposition displays immediately"
+
+      - title: "Lock Non-Pending"
+        given: "RMA has status 'approved' or later"
+        when: "Try to click Edit"
+        then: "Edit button is hidden/disabled"
+
+      - title: "Prevent Edit if Received"
+        given: "RMA has lines with quantity_received > 0"
+        when: "Try to edit RMA"
+        then: "Error: 'Cannot edit RMA with received quantities'"
+
+  ac_7_rma_delete:
+    title: "AC-7: RMA Deletion"
+    given: "RMA has status 'pending'"
+    when: "Click 'Delete RMA'"
+    then:
+      - "Confirmation dialog: 'Delete this RMA? This action cannot be undone.'"
+
+    scenarios:
+      - title: "Confirm Delete"
+        given: "Confirmation dialog is shown"
+        when: "User confirms"
+        then:
+          - "RMA and all its lines deleted (cascade)"
+          - "List refreshes, RMA no longer visible"
+          - "Toast: 'RMA deleted'"
+
+      - title: "Prevent Delete Non-Pending"
+        given: "RMA has status 'approved' or later"
+        when: "Try to delete"
+        then: "Delete button disabled with tooltip: 'Cannot delete approved or in-progress RMA'"
+
+  ac_8_rma_close:
+    title: "AC-8: RMA Close (Final Status)"
+    given: "RMA is in appropriate status (future: received or processed)"
+    when: "Manager clicks 'Close RMA' (future implementation)"
+    then:
+      - "Status transitions to 'closed'"
+      - "Audit trail updated"
+
+  ac_9_disposition_defaults:
+    title: "AC-9: Disposition Auto-Suggestion"
+    given: "User creates RMA"
+    when: "Reason code is selected"
+    then:
+      - "For 'damaged' → suggest 'scrap'"
+      - "For 'expired' → suggest 'scrap'"
+      - "For 'wrong_product' → suggest 'restock'"
+      - "For 'quality_issue' → suggest 'quality_hold'"
+      - "For 'customer_change' → suggest 'restock'"
+      - "For 'other' → no default (user selects)"
+
+  ac_10_multitenant:
+    title: "AC-10: Multi-Tenant Isolation (RLS)"
+    given: "Two organizations (Org A, Org B) each have RMA-2025-00001"
+    when: "User from Org A queries RMAs"
+    then: "Only Org A's RMA-2025-00001 returned (RLS enforced)"
+
+    scenarios:
+      - title: "Direct API Access Prevention"
+        given: "User from Org A knows Org B's RMA ID"
+        when: "Try to access via direct API call"
+        then: "404 error returned (RLS blocks cross-org access)"
+
+      - title: "Automatic org_id Assignment"
+        given: "User from Org A creates RMA"
+        when: "RMA is saved"
+        then: "org_id automatically set to Org A (from auth context)"
+
+  ac_11_audit_trail:
+    title: "AC-11: Audit Trail Logging"
+    given: "RMA is created/modified"
+    when: "Any action (create, update, approve, close)"
+    then:
+      - "Audit log entry created with: action, user_id, timestamp, old_value, new_value"
+      - "Trail is immutable and queryable (future)"
+
+# Test Specifications
+
+unit_tests:
+  rma_service:
+    path: "apps/frontend/lib/services/__tests__/rma-service.test.ts"
+    test_cases:
+      - title: "createRMA: Generates correct RMA number"
+        setup: "Mock org with no prior RMAs"
+        action: "Call createRMA"
+        assert: "Returns RMA with number RMA-2025-00001"
+
+      - title: "createRMA: Increments sequence"
+        setup: "Org has existing RMA-2025-00001"
+        action: "Create another RMA"
+        assert: "New RMA has number RMA-2025-00002"
+
+      - title: "createRMA: Resets sequence per year"
+        setup: "Year changes from 2024 to 2025"
+        action: "Create RMA in 2025"
+        assert: "Number is RMA-2025-00001 (not RMA-2025-00011)"
+
+      - title: "suggestDisposition: damaged → scrap"
+        action: "Call suggestDisposition('damaged')"
+        assert: "Returns 'scrap'"
+
+      - title: "suggestDisposition: wrong_product → restock"
+        action: "Call suggestDisposition('wrong_product')"
+        assert: "Returns 'restock'"
+
+      - title: "approveRMA: Updates status and timestamps"
+        setup: "Pending RMA with 1+ lines"
+        action: "Call approveRMA"
+        assert:
+          - "status → 'approved'"
+          - "approved_at is set"
+          - "approved_by is set to current user"
+
+      - title: "approveRMA: Blocks non-manager"
+        setup: "Current user has SALES role"
+        action: "Call approveRMA"
+        assert: "Throws FORBIDDEN error"
+
+      - title: "approveRMA: Blocks pending without lines"
+        setup: "Pending RMA with 0 lines"
+        action: "Call approveRMA"
+        assert: "Throws validation error"
+
+      - title: "deleteRMA: Cascades to lines"
+        setup: "Pending RMA with 2 lines"
+        action: "Call deleteRMA"
+        assert:
+          - "RMA deleted from database"
+          - "Both lines deleted (ON DELETE CASCADE)"
+
+  rma_validation:
+    path: "apps/frontend/lib/validation/__tests__/rma-schema.test.ts"
+    test_cases:
+      - title: "createRMASchema: Accepts valid RMA"
+        data:
+          customer_id: "uuid-1"
+          reason_code: "damaged"
+          lines: [{ product_id: "uuid-prod-1", quantity_expected: 10 }]
+        assert: "Validation passes"
+
+      - title: "createRMASchema: Requires customer"
+        data:
+          reason_code: "damaged"
+          lines: [{ product_id: "uuid-1", quantity_expected: 10 }]
+        assert: "Validation fails: 'customer_id is required'"
+
+      - title: "createRMASchema: Requires at least 1 line"
+        data:
+          customer_id: "uuid-1"
+          reason_code: "damaged"
+          lines: []
+        assert: "Validation fails: 'At least one line required'"
+
+      - title: "rmaLineSchema: Positive quantity required"
+        data:
+          product_id: "uuid-1"
+          quantity_expected: -5
+        assert: "Validation fails: 'Quantity must be positive'"
+
+integration_tests:
+  rma_api:
+    path: "apps/frontend/app/api/shipping/rma/__tests__/rma.integration.test.ts"
+    test_cases:
+      - title: "POST /api/shipping/rma: Create RMA"
+        method: "POST"
+        endpoint: "/api/shipping/rma"
+        payload:
+          customer_id: "uuid-customer"
+          reason_code: "damaged"
+          disposition: "scrap"
+          lines:
+            - product_id: "uuid-product"
+              quantity_expected: 50
+        expected_response:
+          status: 201
+          body:
+            rma:
+              rma_number: "RMA-2025-00001"
+              status: "pending"
+
+      - title: "GET /api/shipping/rma: List RMAs"
+        method: "GET"
+        endpoint: "/api/shipping/rma?status=pending&limit=20"
+        expected_response:
+          status: 200
+          body:
+            rmas: "array of RMA items"
+            pagination: "{ total, page, limit, pages }"
+
+      - title: "GET /api/shipping/rma/:id: Get RMA detail"
+        method: "GET"
+        endpoint: "/api/shipping/rma/uuid-rma-1"
+        expected_response:
+          status: 200
+          body:
+            rma: "full RMA object"
+            lines: "array with products"
+            permissions: "user action permissions"
+
+      - title: "PUT /api/shipping/rma/:id: Update pending RMA"
+        method: "PUT"
+        endpoint: "/api/shipping/rma/uuid-rma-1"
+        payload:
+          reason_code: "expired"
+          disposition: "scrap"
+        preconditions:
+          status: "pending"
+        expected_response:
+          status: 200
+          body: "updated RMA object"
+
+      - title: "PUT /api/shipping/rma/:id: Block update non-pending"
+        method: "PUT"
+        endpoint: "/api/shipping/rma/uuid-rma-1"
+        preconditions:
+          status: "approved"
+        expected_response:
+          status: 400
+          body:
+            error: "INVALID_STATUS"
+            message: "Cannot edit non-pending RMA"
+
+      - title: "DELETE /api/shipping/rma/:id: Delete pending RMA"
+        method: "DELETE"
+        endpoint: "/api/shipping/rma/uuid-rma-1"
+        preconditions:
+          status: "pending"
+        expected_response:
+          status: 204
+
+      - title: "POST /api/shipping/rma/:id/approve: Approve RMA"
+        method: "POST"
+        endpoint: "/api/shipping/rma/uuid-rma-1/approve"
+        payload:
+          confirmation: true
+        preconditions:
+          status: "pending"
+          user_role: "MANAGER"
+          has_lines: true
+        expected_response:
+          status: 200
+          body:
+            rma:
+              status: "approved"
+              approved_at: "ISO-8601 timestamp"
+              approved_by_id: "current user UUID"
+
+      - title: "POST /api/shipping/rma/:id/lines: Add line"
+        method: "POST"
+        endpoint: "/api/shipping/rma/uuid-rma-1/lines"
+        payload:
+          product_id: "uuid-product"
+          quantity_expected: 25
+          lot_number: "LOT-123"
+        expected_response:
+          status: 201
+          body: "RMA line with product info"
+
+e2e_tests:
+  path: "apps/frontend/e2e/shipping/rma.spec.ts"
+  test_cases:
+    - title: "Happy Path: Create RMA → List → Detail → Approve"
+      steps:
+        1: "Navigate to /shipping/rma"
+        2: "Click 'Create RMA'"
+        3: "Select customer 'Acme Foods'"
+        4: "Select reason 'damaged'"
+        5: "Add line: product 'Bread', qty 50"
+        6: "Click 'Create RMA'"
+        7: "Verify RMA created with RMA-YYYY-NNNNN number"
+        8: "Verify on detail page with pending status"
+        9: "Click 'Approve' button"
+        10: "Confirm approval dialog"
+        11: "Verify status changed to 'approved'"
+        12: "Verify approval info displayed"
+
+    - title: "Edit Pending RMA"
+      steps:
+        1: "Navigate to pending RMA detail"
+        2: "Click 'Edit RMA'"
+        3: "Change reason from 'damaged' to 'expired'"
+        4: "Change disposition to 'scrap'"
+        5: "Click 'Save'"
+        6: "Verify updates display immediately"
+        7: "Verify edit buttons still available (pending status)"
+
+    - title: "Delete Pending RMA"
+      steps:
+        1: "Navigate to pending RMA detail"
+        2: "Click 'Delete RMA'"
+        3: "Confirm deletion dialog"
+        4: "Verify redirected to RMA list"
+        5: "Verify RMA no longer in list"
+
+    - title: "Multi-Tenant Isolation"
+      steps:
+        1: "As Org A user, create RMA-A"
+        2: "As Org B user, create RMA-B (also RMA-2025-00001)"
+        3: "As Org A, list RMAs - verify only RMA-A visible"
+        4: "As Org B, list RMAs - verify only RMA-B visible"
+        5: "Verify each org has independent sequence"
+
+# Test Data & Fixtures
+test_data:
+  customers:
+    acme_foods:
+      name: "Acme Foods Inc."
+      email: "contact@acmefoods.com"
+      category: "wholesale"
+    best_foods:
+      name: "Best Foods Wholesale"
+      email: "orders@bestfoods.com"
+
+  products:
+    bread:
+      name: "Whole Wheat Bread"
+      sku: "BREAD-001"
+      price: 5.00
+    basil:
+      name: "Fresh Basil"
+      sku: "BASIL-001"
+      price: 3.50
+
+  sales_orders:
+    so_001:
+      customer: "acme_foods"
+      status: "delivered"
+      total: 500.00
+
+# Quality Gates (Definition of Done)
+quality_gates:
+  database:
+    - "[ ] rma_requests table created with all required columns"
+    - "[ ] rma_lines table created with cascade delete"
+    - "[ ] RLS policies enabled and tested"
+    - "[ ] Auto-number generation function works (RMA-YYYY-NNNNN)"
+    - "[ ] Indexes created for query performance"
+    - "[ ] Migration tested (up/down)"
+
+  api:
+    - "[ ] All 8 endpoints functional"
+    - "[ ] Request/response schemas match spec"
+    - "[ ] Authentication required on all endpoints"
+    - "[ ] Role-based access control enforced"
+    - "[ ] Error responses formatted correctly"
+    - "[ ] Rate limiting applied"
+    - "[ ] Input validation with Zod"
+    - "[ ] Pagination working (default 20, max 100)"
+
+  frontend:
+    - "[ ] RMA list page loads in < 500ms"
+    - "[ ] RMA detail page loads in < 300ms"
+    - "[ ] DataTable renders 20 items without lag"
+    - "[ ] Filters work correctly"
+    - "[ ] Create RMA form validates input"
+    - "[ ] RMA lines CRUD works (add/edit/delete)"
+    - "[ ] Approval button triggers dialog"
+    - "[ ] Status badges display correct colors"
+    - "[ ] Reason/Disposition badges render correctly"
+    - "[ ] Pending RMA allows edit/delete"
+    - "[ ] Approved RMA blocks edit/delete"
+    - "[ ] Toast notifications display on success/error"
+    - "[ ] Loading states show spinners"
+    - "[ ] Responsive on mobile/tablet/desktop"
+
+  tests:
+    - "[ ] Unit tests: 80%+ service coverage"
+    - "[ ] Integration tests: All 8 API endpoints"
+    - "[ ] E2E tests: Happy path (create → list → detail → approve)"
+    - "[ ] E2E tests: RMA number generation (sequence, year reset)"
+    - "[ ] E2E tests: Multi-tenant isolation"
+    - "[ ] E2E tests: Permission checks (MANAGER+ approval)"
+    - "[ ] All tests passing"
+    - "[ ] No console errors or warnings"
+
+  security:
+    - "[ ] RLS policies enforced in database"
+    - "[ ] org_id filter applied in all API queries"
+    - "[ ] Cross-org access prevented (404 on unauthorized)"
+    - "[ ] Role checks prevent unauthorized actions"
+    - "[ ] No sensitive data in API responses"
+    - "[ ] Input sanitized (no injection vulnerabilities)"
+
+  performance:
+    - "[ ] List response time < 500ms (20 items)"
+    - "[ ] Detail response time < 300ms"
+    - "[ ] Create response time < 1s"
+    - "[ ] Approval response time < 500ms"
+    - "[ ] Database queries optimized (indexes used)"
+    - "[ ] No N+1 queries"
+
+  documentation:
+    - "[ ] Story context files complete (5 files)"
+    - "[ ] API endpoint docs match spec"
+    - "[ ] Component docs with props & usage"
+    - "[ ] Type definitions documented"
+    - "[ ] README with setup instructions"
+
+# Success Criteria
+success_criteria:
+  functional:
+    - "RMA CRUD operations work end-to-end"
+    - "Auto-number generation produces correct format"
+    - "RMA lines CRUD works correctly"
+    - "Approval workflow transitions status correctly"
+    - "RLS enforces multi-tenant isolation"
+    - "Edit/delete restrictions enforce pending-only rule"
+
+  performance:
+    - "All response times meet targets"
+    - "List page renders quickly with pagination"
+    - "No UI lag or jank"
+
+  quality:
+    - "All acceptance criteria pass"
+    - "All test suites pass (unit, integration, E2E)"
+    - "Code coverage > 80% for services"
+    - "No critical bugs or security issues"
+
+  user_experience:
+    - "Forms validate with clear error messages"
+    - "Status badges are color-coded and recognizable"
+    - "Approval workflow is clear and intuitive"
+    - "RMA number auto-generation is transparent to user"

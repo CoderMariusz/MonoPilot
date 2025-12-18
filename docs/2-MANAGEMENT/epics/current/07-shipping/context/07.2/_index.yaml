@@ -1,0 +1,112 @@
+# Story 07.2 - Index File (Entry Point)
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.2"
+  name: "Sales Orders Core CRUD"
+  slug: "sales-orders-core-crud"
+  epic: "07-shipping"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data, migrations
+  - api.yaml         # Endpoints, auth, errors, services, types
+  - frontend.yaml    # Components, pages, hooks, UX specification
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "07.1"
+      name: "Customers CRUD"
+      provides: ["customers table", "customer_addresses table", "customer lookup"]
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table lookup"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product lookup", "pricing"]
+  blocked_by: []
+  blocks:
+    - story: "07.5"
+      name: "SO Hold/Cancel/Clone (Phase 1B)"
+      reason: "Depends on SO CRUD foundation"
+    - story: "07.6"
+      name: "Allergen Validation (Phase 1A)"
+      reason: "Validates against SO products"
+    - story: "07.7"
+      name: "Inventory Allocation (Phase 1B)"
+      reason: "Allocates from confirmed SO"
+    - story: "07.8"
+      name: "Pick List Generation (Phase 1C)"
+      reason: "Generates from allocated SO"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.9 to FR-7.18 (Sales Orders)", "3. Database Schema (sales_orders, sales_order_lines)"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["Database Schema (sales_orders, sales_order_lines, inventory_allocations)", "API Design (Sales Order Endpoints)"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.2.sales-orders-core.md"
+  wireframes:
+    - id: "SHIP-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-005-sales-order-list.md"
+      name: "Sales Order List"
+    - id: "SHIP-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-006-sales-order-create.md"
+      name: "Sales Order Create"
+    - id: "SHIP-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-007-sales-order-detail.md"
+      name: "Sales Order Detail"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for sales_orders and sales_order_lines tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "sales_orders + sales_order_lines tables with RLS, indexes, triggers"
+  - type: "service"
+    count: 2
+    description: "sales-order-service.ts + sales-order-line-service.ts"
+  - type: "api"
+    count: 7
+    description: "GET/POST/PUT/DELETE SO, POST confirm, POST/PUT/DELETE lines"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas with SO/line validation (qty > 0, dates, totals)"
+  - type: "pages"
+    count: 2
+    description: "/shipping/sales-orders list + /shipping/sales-orders/:id detail"
+  - type: "components"
+    count: 15
+    description: "DataTable, forms, modals, wizards, status badges, timeline"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests (happy path, allocations, validations)"
+
+# Technical notes
+technical_notes:
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Auto-generate SO number: SO-YYYY-NNNNN with org-scoped sequence (organizations.next_so_sequence)"
+  - "Line numbers auto-increment per SO (1, 2, 3...) - not renumbered on delete"
+  - "Cascade delete: deleting sales_order deletes all sales_order_lines ON DELETE CASCADE"
+  - "Only draft orders editable; confirmed orders locked"
+  - "Only draft orders can be deleted; confirmed+ orders require allocation release"
+  - "Totals calculated on save: line_total = qty * unit_price, so_total = SUM(line_totals)"
+  - "Confirmed status triggers allocation workflow (Story 07.7), not in MVP"
+  - "Return 404 (not 403) for cross-tenant access via RLS"
+  - "Inventory warnings (SHIP-006) are informational, not blocking"
+  - "Multi-step wizard for SO creation: customer → address → lines → review"
+  - "Status workflow (MVP): draft → confirmed (allocation/picking/etc are future)"

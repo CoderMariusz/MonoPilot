@@ -1,0 +1,498 @@
+# Story 06.5 - Frontend Specification
+# Purpose: Components, pages, types, hooks, UX implementation
+# Agent: FRONTEND-DEV (UI focus)
+
+is_backend_focused: false
+is_fullstack: true
+ux_reference: "docs/3-ARCHITECTURE/ux/wireframes/QA-005-incoming-inspection.md"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/inspection.ts"
+    exports:
+      - name: "InspectionType"
+        type: "union"
+        values: ["'incoming'", "'in_process'", "'final'"]
+
+      - name: "InspectionStatus"
+        type: "union"
+        values: ["'scheduled'", "'in_progress'", "'completed'", "'cancelled'"]
+
+      - name: "InspectionPriority"
+        type: "union"
+        values: ["'low'", "'normal'", "'high'", "'urgent'"]
+
+      - name: "InspectionResult"
+        type: "union"
+        values: ["'pass'", "'fail'", "'conditional'"]
+
+      - name: "QualityInspection"
+        type: "interface"
+        fields:
+          - { name: "id", type: "string" }
+          - { name: "org_id", type: "string" }
+          - { name: "inspection_number", type: "string" }
+          - { name: "inspection_type", type: "InspectionType" }
+          - { name: "status", type: "InspectionStatus" }
+          - { name: "result", type: "InspectionResult | null" }
+          - { name: "priority", type: "InspectionPriority" }
+          - { name: "product_id", type: "string" }
+          - { name: "product_code", type: "string" }
+          - { name: "product_name", type: "string" }
+          - { name: "lp_id", type: "string | null" }
+          - { name: "lp_number", type: "string | null" }
+          - { name: "grn_id", type: "string | null" }
+          - { name: "po_id", type: "string | null" }
+          - { name: "supplier_name", type: "string | null" }
+          - { name: "batch_number", type: "string | null" }
+          - { name: "inspector_id", type: "string | null" }
+          - { name: "inspector_name", type: "string | null" }
+          - { name: "assigned_at", type: "string | null" }
+          - { name: "scheduled_date", type: "string | null" }
+          - { name: "started_at", type: "string | null" }
+          - { name: "completed_at", type: "string | null" }
+          - { name: "defects_found", type: "number" }
+          - { name: "major_defects", type: "number" }
+          - { name: "minor_defects", type: "number" }
+          - { name: "critical_defects", type: "number" }
+          - { name: "created_at", type: "string" }
+
+      - name: "InspectionDetail"
+        type: "interface"
+        extends: "QualityInspection"
+        fields:
+          - { name: "test_results", type: "TestResult[]" }
+          - { name: "test_result_summary", type: "TestResultSummary" }
+          - { name: "can_complete", type: "boolean" }
+          - { name: "suggested_result", type: "InspectionResult | null" }
+
+      - name: "TestResultSummary"
+        type: "interface"
+        fields:
+          - { name: "total_parameters", type: "number" }
+          - { name: "tested_count", type: "number" }
+          - { name: "passed_count", type: "number" }
+          - { name: "failed_count", type: "number" }
+          - { name: "untested_count", type: "number" }
+
+      - name: "CreateInspectionInput"
+        type: "interface"
+        fields:
+          - { name: "product_id", type: "string" }
+          - { name: "lp_id", type: "string | null" }
+          - { name: "grn_id", type: "string | null" }
+          - { name: "po_id", type: "string | null" }
+          - { name: "spec_id", type: "string | null" }
+          - { name: "batch_number", type: "string | null" }
+          - { name: "lot_size", type: "number | null" }
+          - { name: "priority", type: "InspectionPriority" }
+          - { name: "scheduled_date", type: "string | null" }
+          - { name: "inspector_id", type: "string | null" }
+          - { name: "notes", type: "string | null" }
+
+      - name: "InspectionListParams"
+        type: "interface"
+        fields:
+          - { name: "inspection_type", type: "InspectionType | null" }
+          - { name: "status", type: "InspectionStatus | null" }
+          - { name: "priority", type: "InspectionPriority | null" }
+          - { name: "inspector_id", type: "string | null" }
+          - { name: "product_id", type: "string | null" }
+          - { name: "lp_id", type: "string | null" }
+          - { name: "grn_id", type: "string | null" }
+          - { name: "po_id", type: "string | null" }
+          - { name: "date_from", type: "string | null" }
+          - { name: "date_to", type: "string | null" }
+          - { name: "search", type: "string | null" }
+          - { name: "sort_by", type: "string" }
+          - { name: "sort_order", type: "'asc' | 'desc'" }
+          - { name: "page", type: "number" }
+          - { name: "limit", type: "number" }
+
+# React Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-inspections.ts"
+    description: "React Query hook for inspection list"
+    exports:
+      - name: "useInspections"
+        params: ["params: InspectionListParams"]
+        returns: "UseQueryResult<PaginatedResult<QualityInspection>>"
+        description: "Fetch inspection list with filters and pagination"
+
+      - name: "useInspectionDetail"
+        params: ["id: string"]
+        returns: "UseQueryResult<InspectionDetail>"
+        description: "Fetch inspection detail with test results"
+
+      - name: "usePendingInspections"
+        params: ["type?: InspectionType"]
+        returns: "UseQueryResult<{ inspections: QualityInspection[]; counts: any }>"
+        description: "Fetch pending inspections (scheduled + in_progress)"
+
+      - name: "useCreateInspection"
+        returns: "UseMutationResult<QualityInspection, Error, CreateInspectionInput>"
+        description: "Create new inspection mutation"
+
+      - name: "useAssignInspection"
+        returns: "UseMutationResult<QualityInspection, Error, { id: string; inspector_id: string }>"
+        description: "Assign inspector to inspection"
+
+      - name: "useStartInspection"
+        returns: "UseMutationResult<QualityInspection, Error, string>"
+        description: "Start inspection (scheduled → in_progress)"
+
+      - name: "useCompleteInspection"
+        returns: "UseMutationResult<any, Error, { id: string; data: CompleteInspectionInput }>"
+        description: "Complete inspection with result"
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/quality/inspections/page.tsx"
+    description: "Inspections list page (main entry point)"
+    features:
+      - "Summary cards: Pending, In Progress, Completed Today, Failed (Week)"
+      - "Search bar with real-time filtering (inspection#, PO#, material)"
+      - "Filter panel: status, priority, supplier, date range"
+      - "DataTable with columns: Inspection#, PO#, Supplier, Material, Status, Priority, Inspector, Actions"
+      - "Pagination: 20 per page, up to 100 max"
+      - "Row actions: Start, View, Assign, Delete (based on status)"
+      - "Empty state: 'No incoming inspections found' with create CTA"
+      - "Loading skeleton"
+      - "Error state with retry"
+
+  - path: "apps/frontend/app/(authenticated)/quality/inspections/[id]/page.tsx"
+    description: "Inspection detail page (execution page)"
+    features:
+      - "Header: Back button, inspection number, status badge, priority badge"
+      - "Left panel: PO info, Material info, Inspection info"
+      - "Center panel: Execution wizard (4 steps with progress bar)"
+      - "Right panel: Timeline, Assignment, Spec link"
+      - "Step 1: Inspection Overview (read-only)"
+      - "Step 2: Visual Inspection (form with package integrity, temp, qty, labels)"
+      - "Step 3: Test Parameters (parameter grid with measured values)"
+      - "Step 4: CoA Validation (upload, compare, variance check)"
+      - "Result determination modal (pass/fail/conditional)"
+      - "Conditional details form (reason, restrictions, expiry)"
+      - "Save draft, Previous, Next navigation"
+      - "Complete Inspection button"
+
+  - path: "apps/frontend/app/(authenticated)/quality/inspections/new/page.tsx"
+    description: "Create inspection page or modal"
+    features:
+      - "Modal or full page form"
+      - "PO selection dropdown"
+      - "Line items checklist (materials to inspect)"
+      - "Scheduled date picker"
+      - "Inspector assignment dropdown"
+      - "Priority selection (radio buttons)"
+      - "Notes text area"
+      - "Form validation with error messages"
+      - "Create button, Cancel button"
+
+# Components
+components:
+  - path: "apps/frontend/components/quality/inspections/InspectionDataTable.tsx"
+    description: "ShadCN DataTable for inspection list"
+    props:
+      - { name: "inspections", type: "QualityInspection[]" }
+      - { name: "isLoading", type: "boolean" }
+      - { name: "pagination", type: "PaginationInfo" }
+      - { name: "onPageChange", type: "(page: number) => void" }
+      - { name: "onRowClick", type: "(inspection: QualityInspection) => void" }
+    features:
+      - "Sortable columns"
+      - "Row selection (multi-select for future bulk actions)"
+      - "Row hover actions: Start, View, Assign, More menu"
+      - "Status and priority badges"
+      - "Responsive design"
+
+  - path: "apps/frontend/components/quality/inspections/InspectionFilters.tsx"
+    description: "Filter panel for inspection list"
+    props:
+      - { name: "params", type: "InspectionListParams" }
+      - { name: "onParamsChange", type: "(params: InspectionListParams) => void" }
+    features:
+      - "Status filter dropdown"
+      - "Priority filter dropdown"
+      - "Supplier filter dropdown"
+      - "Date range picker"
+      - "Clear all filters button"
+      - "Export CSV button"
+
+  - path: "apps/frontend/components/quality/inspections/InspectionStatusBadge.tsx"
+    description: "Status badge component"
+    props:
+      - { name: "status", type: "InspectionStatus" }
+    colors:
+      - { status: "scheduled", color: "bg-yellow-100 text-yellow-800" }
+      - { status: "in_progress", color: "bg-blue-100 text-blue-800" }
+      - { status: "completed", color: "bg-green-100 text-green-800" }
+      - { status: "cancelled", color: "bg-gray-100 text-gray-800" }
+
+  - path: "apps/frontend/components/quality/inspections/InspectionPriorityBadge.tsx"
+    description: "Priority badge component"
+    props:
+      - { name: "priority", type: "InspectionPriority" }
+    colors:
+      - { priority: "low", color: "bg-gray-100 text-gray-800" }
+      - { priority: "normal", color: "bg-blue-100 text-blue-800" }
+      - { priority: "high", color: "bg-orange-100 text-orange-800" }
+      - { priority: "urgent", color: "bg-red-100 text-red-800" }
+
+  - path: "apps/frontend/components/quality/inspections/InspectionResultBadge.tsx"
+    description: "Result badge component (pass/fail/conditional)"
+    props:
+      - { name: "result", type: "InspectionResult | null" }
+    colors:
+      - { result: "pass", icon: "CheckCircle2", color: "bg-green-100 text-green-800" }
+      - { result: "fail", icon: "XCircle", color: "bg-red-100 text-red-800" }
+      - { result: "conditional", icon: "AlertCircle", color: "bg-yellow-100 text-yellow-800" }
+
+  - path: "apps/frontend/components/quality/inspections/CreateInspectionModal.tsx"
+    description: "Modal for creating new inspection"
+    props:
+      - { name: "open", type: "boolean" }
+      - { name: "onOpenChange", type: "(open: boolean) => void" }
+      - { name: "onSuccess", type: "(inspection: QualityInspection) => void" }
+    features:
+      - "PO dropdown with search"
+      - "Line items multi-select"
+      - "Scheduled date picker"
+      - "Inspector assignment dropdown"
+      - "Priority selection"
+      - "Notes textarea"
+      - "Validation feedback"
+
+  - path: "apps/frontend/components/quality/inspections/AssignInspectorModal.tsx"
+    description: "Modal for assigning inspector"
+    props:
+      - { name: "open", type: "boolean" }
+      - { name: "onOpenChange", type: "(open: boolean) => void" }
+      - { name: "inspectionId", type: "string" }
+      - { name: "onSuccess", type: "(inspection: QualityInspection) => void" }
+    features:
+      - "Inspector list dropdown"
+      - "Search/filter by name"
+      - "Assign button"
+
+  - path: "apps/frontend/components/quality/inspections/InspectionDetail.tsx"
+    description: "Main detail view container (3-column layout)"
+    props:
+      - { name: "inspectionId", type: "string" }
+    sections:
+      - "Header with status and actions"
+      - "Left column: PO info, Material info, Inspection info, Timeline"
+      - "Center column: Execution wizard steps"
+      - "Right column: Assignment, Spec link, Test summary"
+
+  - path: "apps/frontend/components/quality/inspections/InspectionWizard.tsx"
+    description: "4-step execution wizard"
+    props:
+      - { name: "inspection", type: "InspectionDetail" }
+      - { name: "onComplete", type: "(result: InspectionResult) => void" }
+    steps:
+      - "Step 1: Inspection Overview (read-only)"
+      - "Step 2: Visual Inspection (form)"
+      - "Step 3: Test Parameters (grid)"
+      - "Step 4: CoA Validation (upload + compare)"
+
+  - path: "apps/frontend/components/quality/inspections/VisualInspectionForm.tsx"
+    description: "Visual inspection step form"
+    props:
+      - { name: "data", type: "object" }
+      - { name: "onChange", type: "(data: object) => void" }
+    fields:
+      - "Package integrity (radio buttons)"
+      - "Seal integrity (radio buttons)"
+      - "Leakage check (radio buttons)"
+      - "Cleanliness (radio buttons)"
+      - "Product name match (checkbox)"
+      - "Lot number (text input)"
+      - "Expiry date (date picker)"
+      - "Allergen info (checkbox)"
+      - "Receipt temperature (number input)"
+      - "Temp equipment (dropdown)"
+      - "Received quantity (number input)"
+      - "Visual notes (textarea)"
+
+  - path: "apps/frontend/components/quality/inspections/TestParametersGrid.tsx"
+    description: "Test parameters recording grid"
+    props:
+      - { name: "specification", type: "Specification" }
+      - { name: "results", type: "TestResult[]" }
+      - { name: "onChange", type: "(results: TestResult[]) => void" }
+    features:
+      - "Parameter name, spec range, measured value inputs"
+      - "Auto-calculate result (pass/fail) on blur"
+      - "Equipment selector dropdown"
+      - "Notes per parameter"
+      - "Result badge per row"
+      - "Overall summary at bottom"
+
+  - path: "apps/frontend/components/quality/inspections/CoAValidationForm.tsx"
+    description: "CoA upload and validation form"
+    props:
+      - { name: "data", type: "object" }
+      - { name: "onChange", type: "(data: object) => void" }
+    features:
+      - "File upload (drag and drop)"
+      - "CoA metadata inputs (number, issue date, issued by, lab accreditation)"
+      - "Variance tolerance display"
+      - "Parameter comparison table (CoA vs measured)"
+      - "Variance indicators"
+      - "Overall validation result"
+
+  - path: "apps/frontend/components/quality/inspections/CompleteInspectionModal.tsx"
+    description: "Modal for completing inspection with result"
+    props:
+      - { name: "inspection", type: "InspectionDetail" }
+      - { name: "onComplete", type: "(result: InspectionResult, notes: string) => void" }
+    features:
+      - "Test results summary at top"
+      - "Suggested result with explanation"
+      - "Result selector (pass/fail/conditional)"
+      - "Result notes textarea"
+      - "Conditional fields (appear when conditional selected)"
+      - "Defect counts inputs"
+      - "NCR creation checkbox"
+      - "Confirm button with loading state"
+
+  - path: "apps/frontend/components/quality/inspections/ConditionalDetailsForm.tsx"
+    description: "Form for conditional approval details"
+    props:
+      - { name: "data", type: "object" }
+      - { name: "onChange", type: "(data: object) => void" }
+    fields:
+      - "Conditional reason (textarea)"
+      - "Usage restrictions (textarea)"
+      - "Expires at (datetime picker)"
+      - "Approved by (auto-filled user)"
+
+  - path: "apps/frontend/components/quality/inspections/InspectionSummaryCards.tsx"
+    description: "Summary cards at top of list page"
+    props:
+      - { name: "pending", type: "number" }
+      - { name: "inProgress", type: "number" }
+      - { name: "completedToday", type: "number" }
+      - { name: "failedWeek", type: "number" }
+    cards:
+      - "Pending: count + [View All] link"
+      - "In Progress: count + [View All] link"
+      - "Completed Today: count + [View All] link"
+      - "Failed (Week): count + [View All] link"
+
+  - path: "apps/frontend/components/quality/inspections/InspectionTimeline.tsx"
+    description: "Timeline of inspection status changes"
+    props:
+      - { name: "inspection", type: "QualityInspection" }
+    events:
+      - "Created: {date} by {user}"
+      - "Started: {date} by {user}"
+      - "Assigned: {date} to {inspector}"
+      - "Completed: {date} by {user} - Result: {result}"
+
+  - path: "apps/frontend/components/quality/inspections/InspectionActions.tsx"
+    description: "Action buttons based on status"
+    props:
+      - { name: "inspection", type: "QualityInspection" }
+      - { name: "onStart", type: "() => void" }
+      - { name: "onAssign", type: "() => void" }
+      - { name: "onComplete", type: "() => void" }
+      - { name: "onCancel", type: "() => void" }
+
+# UX States and Patterns
+ux_states:
+  inspections_list:
+    - state: "loading"
+      description: "Skeleton cards and table rows"
+      duration: "while fetching data"
+
+    - state: "empty"
+      description: "No inspections found illustration, create CTA"
+      trigger: "when total = 0"
+
+    - state: "error"
+      description: "Error message with retry button"
+      trigger: "on fetch failure"
+
+    - state: "success"
+      description: "DataTable with inspections, filters, pagination"
+      trigger: "data loaded"
+
+  inspection_detail:
+    - state: "loading"
+      description: "Skeleton for detail sections, wizard steps"
+
+    - state: "success"
+      description: "Full detail view with wizard and test grid"
+
+    - state: "saving"
+      description: "Save draft button shows spinner"
+
+    - state: "error"
+      description: "Validation errors shown inline"
+
+  test_grid:
+    - state: "untested"
+      description: "Input field empty, no status"
+
+    - state: "testing"
+      description: "Input focused, ready for value entry"
+
+    - state: "pass"
+      description: "Green badge, calculated result"
+
+    - state: "fail"
+      description: "Red badge, calculated result"
+
+    - state: "review"
+      description: "Yellow badge, borderline value"
+
+# Color and Badge System
+badges:
+  status:
+    scheduled: "yellow"
+    in_progress: "blue"
+    completed: "green"
+    cancelled: "gray"
+
+  priority:
+    low: "gray"
+    normal: "blue"
+    high: "orange"
+    urgent: "red"
+
+  result:
+    pass: "green"
+    fail: "red"
+    conditional: "yellow"
+
+# Responsive Breakpoints
+responsive:
+  desktop: ">1024px"
+  tablet: "768-1024px"
+  mobile: "<768px"
+
+  layouts:
+    - breakpoint: "desktop"
+      description: "3-column layout: detail + wizard + timeline"
+      components: ["Full table", "Side-by-side summary cards", "4-step wizard"]
+
+    - breakpoint: "tablet"
+      description: "2-column layout: content + timeline sidebar"
+      components: ["Card layout for inspections", "2x2 summary cards", "Stepped form"]
+
+    - breakpoint: "mobile"
+      description: "Single column, stacked sections"
+      components: ["Card layout", "Stacked summary cards", "Single-column form", "Collapsible sections"]
+
+# Mobile Optimizations
+mobile_features:
+  - "Scanner integration: Barcode scan to select PO or material"
+  - "Camera: Take photos of package damage, labels"
+  - "Voice input: For measured values (accessibility)"
+  - "Offline support: Cache inspections, queue saves for sync"
+  - "Touch gestures: Swipe to navigate between wizard steps"
+  - "Large touch targets: 48x48dp minimum for all buttons"
+  - "Numeric keyboard: For temperature/quantity inputs"
+  - "GPS location: Auto-capture receipt location"

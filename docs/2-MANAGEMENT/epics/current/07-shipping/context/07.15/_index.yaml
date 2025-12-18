@@ -1,0 +1,190 @@
+# Story 07.15 - Shipping Dashboard + KPIs
+# Generated: 2025-12-18
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "07.15"
+  name: "Shipping Dashboard + KPIs"
+  slug: "shipping-dashboard"
+  epic: "07-shipping"
+  phase: "1D"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, views, indexes, seed data
+  - api.yaml         # Endpoints, auth, caching strategy
+  - frontend.yaml    # Components, services, hooks, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "RLS patterns"]
+    - story: "07.2"
+      name: "Sales Orders CRUD"
+      provides: ["sales_orders table", "SO status workflow"]
+    - story: "07.3"
+      name: "SO Status Workflow"
+      provides: ["status validation", "status counts"]
+    - story: "07.8"
+      name: "Pick List Generation"
+      provides: ["pick_lists table", "pick list data"]
+    - story: "07.11"
+      name: "Packing + Shipment Creation"
+      provides: ["shipments table", "shipment metrics"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product data"]
+    - story: "02.3"
+      name: "Allergens Management"
+      provides: ["allergens table", "allergen validation"]
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["license_plates table", "inventory allocation"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "07.16"
+      name: "Orders by Status Report"
+    - story: "07.17"
+      name: "Shipping Analytics"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/shipping.md"
+    sections: ["FR-7.66", "FR-7.67"]
+
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/07-shipping/07.15.shipping-dashboard.md"
+
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-022-shipping-dashboard.md"
+      relevance: "Complete dashboard layout, KPI cards, charts, alerts, activity feed"
+
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/shipping.md"
+    sections: ["Dashboard Architecture", "Performance Targets"]
+
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for dashboard queries"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 3
+    description: "GET /api/shipping/dashboard (KPIs), GET /api/shipping/dashboard/alerts, GET /api/shipping/dashboard/recent-activity"
+
+  - type: "service"
+    count: 1
+    description: "dashboard-service.ts with caching logic, KPI calculations, trend analysis"
+
+  - type: "frontend_page"
+    count: 1
+    description: "/shipping/dashboard page with responsive layout"
+
+  - type: "components"
+    count: 9
+    description: "DashboardKPIs, KPICard, OrdersByStatusChart, ShipmentsByDateChart, AlertsSection, AlertBadge, RecentActivityTimeline, ActivityItem, QuickActionsPanel, DateRangeFilter, DashboardSkeleton, EmptyDashboard"
+
+  - type: "hooks"
+    count: 4
+    description: "useDashboardKPIs, useDashboardAlerts, useRecentActivity, useAutoRefresh"
+
+  - type: "validation"
+    count: 1
+    description: "dashboard-validation.ts (Zod schemas)"
+
+  - type: "types"
+    count: 1
+    description: "dashboard-types.ts (TypeScript interfaces)"
+
+  - type: "test"
+    count: 3
+    description: "Unit tests (>80% coverage), Integration tests, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Dashboard is primary landing page for /shipping module"
+  - "Redis caching with 1-minute TTL for all dashboard data"
+  - "Real-time updates via polling (30s interval), not WebSockets"
+  - "4 KPI cards: Orders, Pick Lists, Shipments, Backorders"
+  - "2 charts: Orders by Status (pie), Shipments by Date (line)"
+  - "4 alert types: Backorders, Delayed Shipments, Pending Picks >24h, Allergen Conflicts"
+  - "Recent activity limited to last 10 events, paginated"
+  - "Performance target: <500ms dashboard load (p95)"
+  - "Cache key format: dashboard:{type}:{org_id}:{date_range_hash}"
+  - "Date range filter: Today, Last 7 days, Last 30 days, Custom range"
+  - "Recharts library for charts (pie + line chart)"
+  - "Multi-tenant isolation via RLS on all dashboard queries"
+  - "Responsive design: Mobile (1 col), Tablet (2 col), Desktop (4 col)"
+  - "Auto-refresh toggle + manual refresh button"
+  - "Skeleton loaders during data fetch"
+  - "Error states with fallback to cached data"
+  - "Empty states when no data in date range"
+
+# Key metrics to track
+key_metrics:
+  - name: "Orders KPI"
+    calculation: "Count of sales_orders grouped by status for date range"
+    trend: "Compare current period to previous equal period"
+
+  - name: "Pick Lists KPI"
+    calculation: "Count of pick_lists grouped by status for date range"
+    trend: "Compare current period to previous equal period"
+
+  - name: "Shipments KPI"
+    calculation: "Count of shipments grouped by status for date range"
+    trend: "Compare current period to previous equal period"
+
+  - name: "Backorders"
+    calculation: "Count of sales_order_lines where qty_allocated < qty_ordered"
+    value_calculation: "SUM of (qty_backordered * unit_price)"
+
+  - name: "Orders by Status Chart"
+    calculation: "Count of sales_orders grouped by status (pie chart)"
+    values: ["Draft", "Confirmed", "Allocated", "Picking", "Packing", "Shipped", "Delivered"]
+
+  - name: "Shipments by Date Chart"
+    calculation: "Count of shipments by DATE(shipped_at) (line chart)"
+    granularity: "Daily aggregation for date range"
+
+# Alert definitions
+alerts:
+  - name: "Backorders"
+    type: "critical"
+    icon: "AlertTriangle"
+    color: "red"
+    calculation: "Count of SO lines where qty_allocated < qty_ordered"
+    action: "Navigate to /shipping/sales-orders?filter=backorders"
+
+  - name: "Delayed Shipments"
+    type: "warning"
+    icon: "Clock"
+    color: "orange"
+    calculation: "Count of orders where promised_ship_date < TODAY AND status != shipped"
+    action: "Navigate to /shipping/sales-orders?filter=delayed"
+
+  - name: "Pending Picks >24h"
+    type: "warning"
+    icon: "Timer"
+    color: "yellow"
+    calculation: "Count of pick_lists where status = pending AND created_at < NOW() - 24h"
+    action: "Navigate to /shipping/pick-lists?status=pending&overdue=true"
+
+  - name: "Allergen Conflicts"
+    type: "warning"
+    icon: "AlertCircle"
+    color: "purple"
+    calculation: "Count of orders where allergen_validated = false"
+    action: "Navigate to /shipping/sales-orders?filter=allergen_conflicts"

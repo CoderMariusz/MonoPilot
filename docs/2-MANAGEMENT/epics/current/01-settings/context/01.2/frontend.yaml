@@ -241,33 +241,52 @@ hooks:
 
 # UX Specification
 ux:
+  wireframes:
+    - id: "COMP-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/COMP-001-settings-navigation-sidebar.md"
+      description: "Settings navigation sidebar component specification"
+      components:
+        - "SettingsNav"
+        - "SettingsNavItem"
+        - "SettingsNavSkeleton"
+    - id: "COMP-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/COMP-002-settings-empty-state.md"
+      description: "Settings empty/coming soon state component"
+      components:
+        - "SettingsEmptyState"
+    - id: "COMP-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/COMP-003-settings-layout.md"
+      description: "Settings shell layout component specification"
+      components:
+        - "SettingsLayout"
+
   navigation_sections:
     - section: "Organization"
       items:
-        - { name: "Organization Profile", path: "/settings/organization", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-007" }
+        - { name: "Organization Profile", path: "/settings/organization", roles: ["SUPER_ADMIN", "ADMIN"] }
     - section: "Users & Roles"
       items:
-        - { name: "Users", path: "/settings/users", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-008" }
-        - { name: "Roles & Permissions", path: "/settings/roles", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-011" }
-        - { name: "Invitations", path: "/settings/invitations", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-010" }
+        - { name: "Users", path: "/settings/users", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Roles & Permissions", path: "/settings/roles", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Invitations", path: "/settings/invitations", roles: ["SUPER_ADMIN", "ADMIN"] }
     - section: "Infrastructure"
       items:
-        - { name: "Warehouses", path: "/settings/warehouses", roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"], wireframe: "SET-012" }
-        - { name: "Machines", path: "/settings/machines", roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"], wireframe: "SET-016" }
-        - { name: "Production Lines", path: "/settings/production-lines", roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"], wireframe: "SET-018" }
+        - { name: "Warehouses", path: "/settings/warehouses", roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"] }
+        - { name: "Machines", path: "/settings/machines", roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"] }
+        - { name: "Production Lines", path: "/settings/production-lines", roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"] }
     - section: "Master Data"
       items:
-        - { name: "Allergens", path: "/settings/allergens", roles: ["SUPER_ADMIN", "ADMIN", "QUALITY_MANAGER"], wireframe: "SET-020" }
-        - { name: "Tax Codes", path: "/settings/tax-codes", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-021" }
+        - { name: "Allergens", path: "/settings/allergens", roles: ["SUPER_ADMIN", "ADMIN", "QUALITY_MANAGER"] }
+        - { name: "Tax Codes", path: "/settings/tax-codes", roles: ["SUPER_ADMIN", "ADMIN"] }
     - section: "Integrations"
       items:
-        - { name: "API Keys", path: "/settings/api-keys", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-023" }
-        - { name: "Webhooks", path: "/settings/webhooks", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-024" }
+        - { name: "API Keys", path: "/settings/api-keys", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Webhooks", path: "/settings/webhooks", roles: ["SUPER_ADMIN", "ADMIN"] }
     - section: "System"
       items:
-        - { name: "Modules", path: "/settings/modules", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-022" }
-        - { name: "Security", path: "/settings/security", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-026" }
-        - { name: "Audit Logs", path: "/settings/audit-logs", roles: ["SUPER_ADMIN", "ADMIN"], wireframe: "SET-025" }
+        - { name: "Modules", path: "/settings/modules", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Security", path: "/settings/security", roles: ["SUPER_ADMIN", "ADMIN"] }
+        - { name: "Audit Logs", path: "/settings/audit-logs", roles: ["SUPER_ADMIN", "ADMIN"] }
 
   patterns:
     layout: "ShadCN sidebar layout with collapsible sections"

@@ -1,0 +1,336 @@
+components:
+  title: "Story 07.14 - Frontend Components Specification"
+  last_updated: "2025-12-18"
+
+component_list:
+  ShipmentActions:
+    path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/ShipmentActions.tsx"
+    description: "Action buttons for shipment workflow (Manifest, Ship, Mark Delivered, View Tracking)"
+    responsibility: "Render action buttons with status-based enabling/disabling and permission checks"
+    props:
+      shipment:
+        type: "Shipment"
+        description: "Shipment object with status, timestamps, user info"
+      onManifest:
+        type: "(shipmentId: string) => Promise<void>"
+        description: "Callback when Manifest button clicked"
+      onShip:
+        type: "(shipmentId: string) => Promise<void>"
+        description: "Callback when Ship button clicked"
+      onMarkDelivered:
+        type: "(shipmentId: string) => Promise<void>"
+        description: "Callback when Mark Delivered button clicked"
+      onViewTracking:
+        type: "(shipmentId: string) => void"
+        description: "Callback when View Tracking button clicked (opens dialog)"
+      userRole:
+        type: "Role"
+        enum: ["Admin", "Manager", "Warehouse", "Picker", "Viewer"]
+        description: "Current user's role for permission checks"
+      isLoading:
+        type: "boolean"
+        description: "Show loading state on buttons"
+    state:
+      manifestDisabled: "shipment.status !== 'packed'"
+      shipDisabled: "shipment.status !== 'manifested' && shipment.status !== 'packed'"
+      deliveredDisabled: "shipment.status !== 'shipped' OR userRole NOT IN ['Manager', 'Admin']"
+      trackingDisabled: "shipment.status NOT IN ['shipped', 'delivered']"
+    renders:
+      - "Button: Manifest Shipment (variant: outline, disabled based on state)"
+      - "Button: Ship Shipment (variant: destructive for prominence, disabled based on state)"
+      - "Button: Mark Delivered (variant: outline, hidden if user not Manager+)"
+      - "Button: View Tracking (variant: outline, disabled if not shipped)"
+    interaction:
+      manifest_click: "Calls onManifest, then opens confirmation toast"
+      ship_click: "Calls onShip → Opens ShipConfirmDialog (irreversible warning)"
+      delivered_click: "Calls onMarkDelivered, then opens confirmation toast"
+      tracking_click: "Calls onViewTracking → Opens TrackingDialog"
+    accessibility:
+      tooltip: "Each button has aria-label with current state (e.g., 'Manifest Shipment - Disabled: waiting for SSCC validation')"
+      disabled_state: "aria-disabled=true when button disabled"
+      keyboard: "Tab navigation, Enter to activate"
+    responsive:
+      desktop: "Horizontal button row in header"
+      tablet: "Horizontal button row, smaller spacing"
+      mobile: "Vertical button stack or dropdown menu"
+    error_handling: "If action fails, show error toast with retry option"
+
+  ShipConfirmDialog:
+    path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/ShipConfirmDialog.tsx"
+    description: "Confirmation dialog for irreversible ship action with warning"
+    responsibility: "Display warning dialog and get explicit user confirmation"
+    props:
+      isOpen:
+        type: "boolean"
+        description: "Control dialog visibility"
+      onClose:
+        type: "() => void"
+        description: "Callback to close dialog without confirming"
+      onConfirm:
+        type: "() => Promise<void>"
+        description: "Callback to execute ship action"
+      shipment:
+        type: "Shipment"
+        description: "Shipment being shipped"
+      isLoading:
+        type: "boolean"
+        description: "Show loading state during ship request"
+    content:
+      title: "Confirm Shipment"
+      message: |
+        "Ship {SHIPMENT_NUMBER} to {CUSTOMER_NAME}?
+
+        This action is IRREVERSIBLE and will:
+        ✓ Mark shipment as shipped
+        ✓ Consume all {LP_COUNT} license plates
+        ✓ Update sales order SO-{SO_NUMBER} to shipped
+        ✓ Reserve inventory cannot be undone
+
+        Click [Ship] to confirm or [Cancel] to go back."
+      sections:
+        - header: "Shipment Details"
+          data: ["Shipment: {number}", "Customer: {name}", "Boxes: {count}", "Total Weight: {kg} kg"]
+        - header: "Inventory Impact"
+          data: ["License Plates: {count} will be marked as shipped", "Sales Order: Will move to 'shipped' status"]
+    buttons:
+      - label: "Cancel"
+        variant: "outline"
+        onClick: "onClose()"
+        autofocus: true
+        disabled_if: "isLoading"
+      - label: "Ship Shipment"
+        variant: "destructive"
+        onClick: "onConfirm()"
+        disabled_if: "!confirm_checkbox_checked OR isLoading"
+        loading_text: "Shipping..."
+    checkbox:
+      label: "I understand this action is irreversible"
+      required: true
+      default: false
+      help_text: "You must acknowledge the irreversibility before shipping"
+    error_handling:
+      - "If onConfirm() throws error: Show error message in dialog"
+      - "Keep dialog open, show [Retry] button"
+      - "Log error for debugging"
+    accessibility:
+      role: "alertdialog"
+      aria_label: "Confirm irreversible shipment action"
+      focus_trap: "Tab cycles within dialog, return focus to Ship button on close"
+      escape: "Escape key closes dialog (Cancel)"
+
+  TrackingDialog:
+    path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/TrackingDialog.tsx"
+    description: "Modal dialog displaying tracking information and timeline"
+    responsibility: "Fetch and display tracking info in modal with clean layout"
+    props:
+      isOpen:
+        type: "boolean"
+        description: "Control dialog visibility"
+      onClose:
+        type: "() => void"
+        description: "Callback to close dialog"
+      shipmentId:
+        type: "string"
+        description: "Shipment ID to fetch tracking for"
+    data_fetching:
+      endpoint: "GET /api/shipping/shipments/:id/tracking"
+      loading_state: "Show spinner with 'Loading tracking info...'"
+      error_state: "Show error message with [Retry] button"
+    content:
+      header: "Shipment Tracking"
+      sections:
+        - title: "Carrier Information"
+          fields:
+            - label: "Carrier"
+              value: "shipment.carrier (e.g., 'DHL')"
+            - label: "Tracking Number"
+              value: "shipment.tracking_number (e.g., '1234567890')"
+            - label: "Track Online"
+              value: "[Link to external tracking URL]"
+              link_target: "_blank"
+        - title: "Shipment Timeline"
+          component: "TrackingTimeline (child component)"
+    buttons:
+      - label: "Track Online"
+        variant: "outline"
+        onClick: "Open external_url in new tab"
+        disabled_if: "No tracking_number"
+        icon: "ExternalLink"
+      - label: "Close"
+        variant: "outline"
+        onClick: "onClose()"
+    responsive:
+      desktop: "650px wide modal, centered on screen"
+      tablet: "90vw wide, max 600px"
+      mobile: "Full screen modal, bottom sheet animation"
+    accessibility:
+      role: "dialog"
+      aria_label: "Shipment tracking information"
+      focus_trap: "Tab cycles within modal"
+      escape: "Escape key closes dialog"
+
+  TrackingTimeline:
+    path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/TrackingTimeline.tsx"
+    description: "Vertical timeline showing shipment status progression with dates and user names"
+    responsibility: "Render timeline visual with status badges, timestamps, and user info"
+    props:
+      timeline:
+        type: "TrackingTimeline"
+        description: |
+          {
+            packed_at: ISO8601 or null,
+            packed_by: string or null,
+            manifested_at: ISO8601 or null,
+            manifested_by: string or null,
+            shipped_at: ISO8601 or null,
+            shipped_by: string or null,
+            delivered_at: ISO8601 or null,
+            delivered_by: string or null
+          }
+      currentStatus:
+        type: "string"
+        enum: ["pending", "packing", "packed", "manifested", "shipped", "delivered"]
+        description: "Current shipment status for highlighting active step"
+    timeline_steps:
+      - status: "Packed"
+        icon: "Box"
+        color: "blue"
+        shows_when: "packed_at !== null"
+        content: |
+          "Packed: {DATE} {TIME}
+          by {packed_by}"
+      - status: "Manifested"
+        icon: "FileText"
+        color: "purple"
+        shows_when: "manifested_at !== null"
+        content: |
+          "Manifested: {DATE} {TIME}
+          (SSCC validated)"
+      - status: "Shipped"
+        icon: "Truck"
+        color: "green"
+        shows_when: "shipped_at !== null"
+        content: |
+          "Shipped: {DATE} {TIME}
+          by {shipped_by}"
+      - status: "Delivered"
+        icon: "CheckCircle"
+        color: "darkgreen"
+        shows_when: "delivered_at !== null"
+        content: |
+          "Delivered: {DATE} {TIME}
+          by {delivered_by}"
+    future_steps:
+      - status: "In Transit"
+        icon: "MapPin"
+        color: "gray"
+        shows_when: "shipped_at !== null AND delivered_at === null"
+        content: "In transit with carrier"
+    visual:
+      active_step: "Bold title, larger badge, highlighted color"
+      future_steps: "Grayed out, faded text"
+      past_steps: "Checkmark or completion icon"
+      connector_line: "Vertical line between steps, color matches step"
+      step_height: "~100px per step"
+    responsive:
+      desktop: "Full timeline with all text visible"
+      tablet: "Condensed spacing, abbreviated user names if needed"
+      mobile: "Vertical stack, smaller badges, stacked text"
+    accessibility:
+      role: "region"
+      aria_label: "Shipment status timeline"
+      each_step:
+        role: "listitem"
+        aria_label: "Status: {status}, Date: {date}, User: {user}"
+
+component_integration:
+  shipment_detail_page:
+    path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/page.tsx"
+    integrates:
+      - "ShipmentActions (render in page header or detail section)"
+      - "ShipConfirmDialog (conditional render based on state)"
+      - "TrackingDialog (conditional render based on state)"
+    state_management: |
+      - showTrackingDialog: boolean (toggle by View Tracking button)
+      - showShipConfirm: boolean (toggle by Ship button)
+      - isShipping: boolean (loading state)
+      - error: string | null (error message)
+    event_flow: |
+      1. User clicks Ship button
+      2. ShipmentActions calls onShip() callback
+      3. Page shows ShipConfirmDialog
+      4. User confirms dialog
+      5. Page calls POST /api/shipping/shipments/:id/ship
+      6. On success: Refresh shipment data, show success toast, close dialog
+      7. On error: Show error message in dialog with retry option
+
+data_flow:
+  fetch_shipment:
+    endpoint: "GET /api/shipping/shipments/:id"
+    use_for: ["Page initial load", "Refresh after status changes"]
+    cache: "Revalidate on ship/manifest/delivered actions"
+  manifest_action:
+    endpoint: "POST /api/shipping/shipments/:id/manifest"
+    success_handling: "Refresh shipment, show 'Shipment manifested' toast"
+    error_handling: "Show error toast with specific SSCC count"
+  ship_action:
+    endpoint: "POST /api/shipping/shipments/:id/ship"
+    request_body: "{ confirm: true }"
+    success_handling: "Refresh shipment, show 'Shipment shipped' toast, disable Ship button"
+    error_handling: "Show error in dialog with retry option"
+  delivered_action:
+    endpoint: "POST /api/shipping/shipments/:id/mark-delivered"
+    success_handling: "Refresh shipment, show 'Shipment marked as delivered' toast"
+    error_handling: "Show error toast (permission denied or other)"
+  tracking_fetch:
+    endpoint: "GET /api/shipping/shipments/:id/tracking"
+    use_in: "TrackingDialog component"
+    cache: "Fetch fresh on dialog open"
+
+validation:
+  manifest_button_state: |
+    enabled = shipment.status === 'packed' AND userHasRole(['Warehouse', 'Manager', 'Admin'])
+  ship_button_state: |
+    enabled = shipment.status IN ['manifested', 'packed'] AND userHasRole(['Warehouse', 'Manager', 'Admin'])
+  delivered_button_state: |
+    enabled = shipment.status === 'shipped' AND userHasRole(['Manager', 'Admin']) AND NOT loading
+  tracking_button_state: |
+    enabled = shipment.status IN ['shipped', 'delivered']
+
+error_scenarios:
+  manifest_fails_sscc:
+    display: "Error toast: 'Cannot manifest: 2 boxes missing SSCC'"
+    action: "Show button to navigate to packing page"
+  ship_not_manifested:
+    display: "Error in ShipConfirmDialog: 'Shipment must be manifested first'"
+    action: "Close dialog, show error toast, highlight Manifest button"
+  ship_transaction_fails:
+    display: "Error in ShipConfirmDialog: 'Failed to ship. Please retry.'"
+    action: "Keep dialog open, show [Retry] button"
+  permission_denied_delivered:
+    display: "Error toast: 'You lack permission to mark shipment as delivered'"
+    action: "Hide Mark Delivered button for non-managers"
+  tracking_fetch_error:
+    display: "Error in TrackingDialog: 'Failed to load tracking information'"
+    action: "Show [Retry] button, allow retry"
+
+testing:
+  unit_tests:
+    - "ShipmentActions: All buttons render with correct disabled state"
+    - "ShipmentActions: Manifest button enabled only for 'packed' status"
+    - "ShipmentActions: Ship button hidden for Warehouse users (destructive action)"
+    - "ShipConfirmDialog: Confirmation required via checkbox"
+    - "ShipConfirmDialog: Escape key closes dialog"
+    - "TrackingTimeline: Renders all completed steps"
+    - "TrackingTimeline: Future steps shown as pending"
+  integration_tests:
+    - "Full workflow: Manifest → confirm → Ship → confirm → Delivered"
+    - "Permission test: Picker cannot see delivered button"
+    - "Error handling: Manifest fails, shows specific error"
+    - "Error handling: Ship fails, allows retry"
+    - "Tracking: Opens dialog, fetches tracking, displays timeline"
+  e2e_tests:
+    - "User clicks Manifest, shipment manifested"
+    - "User clicks Ship, sees confirmation dialog, confirms, shipment shipped"
+    - "User clicks View Tracking, sees timeline with dates/users"
+    - "Non-manager user cannot see Mark Delivered button"

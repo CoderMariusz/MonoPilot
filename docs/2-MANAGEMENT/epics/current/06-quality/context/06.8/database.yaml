@@ -1,0 +1,111 @@
+# Story 06.8 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# New table for offline scanner queue
+new_tables:
+  - name: "scanner_offline_queue"
+    description: "Offline scanner actions (local IndexedDB mirrored to DB after sync)"
+    columns:
+      - { name: "id", type: "UUID PRIMARY KEY DEFAULT gen_random_uuid()", usage: "Unique action ID" }
+      - { name: "org_id", type: "UUID NOT NULL REFERENCES organizations(id)", usage: "Tenant isolation" }
+      - { name: "user_id", type: "UUID NOT NULL REFERENCES users(id)", usage: "Inspector who queued action" }
+      - { name: "action_type", type: "TEXT NOT NULL CHECK (action_type IN ('quick_inspection', 'test_result', 'qa_status_update'))", usage: "Type of QA action" }
+      - { name: "action_payload", type: "JSONB NOT NULL", usage: "JSON payload of the action (inspection data, test results, etc.)" }
+      - { name: "device_id", type: "TEXT", usage: "Device identifier for analytics" }
+      - { name: "created_at_local", type: "TIMESTAMPTZ NOT NULL", usage: "Timestamp when action was created on device (may differ from synced_at)" }
+      - { name: "synced_at", type: "TIMESTAMPTZ DEFAULT now()", usage: "Server sync timestamp" }
+      - { name: "sync_status", type: "TEXT DEFAULT 'synced' CHECK (sync_status IN ('synced', 'failed', 'duplicate'))", usage: "Sync outcome" }
+      - { name: "error_message", type: "TEXT", usage: "Error details if sync failed" }
+      - { name: "created_at", type: "TIMESTAMPTZ DEFAULT now()", usage: "Record creation timestamp" }
+    indexes:
+      - "idx_scanner_queue_org ON scanner_offline_queue(org_id)"
+      - "idx_scanner_queue_user ON scanner_offline_queue(user_id)"
+      - "idx_scanner_queue_sync_status ON scanner_offline_queue(sync_status)"
+      - "idx_scanner_queue_created ON scanner_offline_queue(created_at)"
+    rls_enabled: true
+    rls_policies:
+      - name: "scanner_queue_org_isolation"
+        operation: "ALL"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        description: "Users can only see their own organization's queue"
+    comments:
+      table: "Offline scanner actions synced to server"
+      action_payload: "JSON payload of the action (inspection data, test results, etc.)"
+      created_at_local: "Timestamp when action was created on device (may differ from synced_at)"
+
+# Table extension: quality_inspections
+table_extensions:
+  - name: "quality_inspections"
+    source: "Story 06.5"
+    new_columns:
+      - { name: "inspection_method", type: "TEXT DEFAULT 'desktop' CHECK (inspection_method IN ('desktop', 'scanner'))", usage: "How inspection was performed" }
+      - { name: "scanner_device_id", type: "TEXT", usage: "Device ID for scanner inspections (for analytics)" }
+      - { name: "scanner_location", type: "TEXT", usage: "Optional GPS coordinates for inspection location" }
+      - { name: "inspection_duration_seconds", type: "INTEGER", usage: "Time to complete inspection" }
+    new_indexes:
+      - "idx_inspections_method ON quality_inspections(org_id, inspection_method)"
+    comments:
+      inspection_method: "How inspection was performed (desktop or scanner)"
+      scanner_device_id: "Device ID for scanner inspections (for analytics)"
+      scanner_location: "Optional GPS coordinates for inspection location"
+      inspection_duration_seconds: "Time from start to complete (for performance tracking)"
+
+# RLS Policies
+rls_policies:
+  pattern: "Organization isolation per ADR-013"
+  policies_used:
+    - table: "scanner_offline_queue"
+      name: "scanner_queue_org_isolation"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only see their own organization's offline queue"
+
+# Business Rules
+business_rules:
+  - rule: "Offline queue limit"
+    constraint: "Max 50 actions per device"
+    enforcement: "Application-level check before INSERT"
+    error: "Offline queue full (50). Connect to sync."
+
+  - rule: "Sync status tracking"
+    constraint: "Track success/failure/duplicates"
+    enforcement: "Database column sync_status"
+    error: "Sync failed - check error_message"
+
+  - rule: "Device ID tracking"
+    constraint: "Device ID optional but recommended"
+    enforcement: "Application-provided device_id"
+    note: "Helps debug offline issues"
+
+  - rule: "Timestamp ordering"
+    constraint: "Actions processed by created_at_local"
+    enforcement: "Order by in sync endpoint"
+    note: "Ensures FIFO sync order"
+
+  - rule: "Duplicate detection"
+    constraint: "Check inspection not already completed"
+    enforcement: "Application-level during sync"
+    error: "Inspection already completed"
+
+# Data Migrations
+migrations:
+  - migration_file: "supabase/migrations/060_create_scanner_offline_queue.sql"
+    description: "Create scanner_offline_queue table with RLS"
+
+  - migration_file: "supabase/migrations/061_add_scanner_metadata_to_inspections.sql"
+    description: "Add scanner metadata columns to quality_inspections"
+
+# Phase 1B Preview
+phase_1b_changes:
+  note: "Future enhancements deferred to Phase 2+"
+  potential_columns:
+    - name: "offline_sync_retries"
+      type: "INTEGER DEFAULT 0"
+      description: "Track retry attempts for failed syncs"
+    - name: "media_attachment_ids"
+      type: "UUID[]"
+      description: "Photos/voice notes queued for upload"
+    - name: "has_media"
+      type: "BOOLEAN DEFAULT false"
+      description: "Flag for media attachment"

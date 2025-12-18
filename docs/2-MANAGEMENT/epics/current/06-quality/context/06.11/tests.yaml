@@ -1,0 +1,441 @@
+# Story 06.11 Tests Context
+# Acceptance criteria, unit tests, integration tests, E2E scenarios
+
+tests:
+  acceptance_criteria:
+    AC_1:
+      title: "Final Inspection Auto-Creation on WO Completion"
+      scenario: "Auto-create final inspection when WO completes"
+      given:
+        - "quality_settings.require_final_inspection = true"
+        - "Work Order WO-2025-001 exists with status = 'in_progress'"
+        - "WO has product 'Bread Loaf' with batch_number = 'BATCH-001'"
+      when:
+        - "WO status changes to 'completed'"
+      then:
+        - "Final inspection record created with inspection_type='final'"
+        - "inspection.reference_type='wo', reference_id=WO.id"
+        - "inspection.batch_number='BATCH-001'"
+        - "inspection.status='scheduled', priority='high'"
+        - "inspection_number format 'INS-FIN-YYYY-NNNNN' generated"
+        - "spec_id populated if active spec exists for product"
+
+    AC_2:
+      title: "Final Inspection Queue Display"
+      scenario: "Final inspection queue loads with all states"
+      given:
+        - "User navigates to Quality > Inspections > Final"
+        - "Multiple final inspections exist (scheduled, in_progress, completed)"
+      when:
+        - "Page loads"
+      then:
+        - "DataTable displays final inspections"
+        - "Columns: inspection #, WO, product, batch, qty, date, inspector, result, actions"
+        - "List loads within 500ms"
+        - "Default filter shows pending (scheduled + in_progress)"
+        - "Responsive across desktop, tablet, mobile"
+
+    AC_3:
+      title: "Evidence Aggregation"
+      scenario: "View evidence summary before starting final inspection"
+      given:
+        - "Final inspection for WO-2025-001 exists"
+        - "WO had 3 in-process inspections (all passed)"
+        - "WO had 5 CCP monitoring records (all within limits)"
+        - "WO had 10 operation checkpoints (all passed)"
+      when:
+        - "User clicks [View Evidence] on final inspection"
+      then:
+        - "Evidence summary panel displays"
+        - "Shows: in-process count (3, all passed), CCPs (5, all OK), checkpoints (10, all passed)"
+        - "Overall evidence status badge shows 'Ready' (green)"
+        - "No blockers, no warnings"
+
+    AC_4:
+      title: "Pre-Inspection Validation"
+      scenario: "Block inspection start if prerequisites not met"
+      given:
+        - "Final inspection with status = 'scheduled'"
+        - "1 in-process inspection still in_progress"
+        - "1 CCP record out of spec (corrective action taken)"
+      when:
+        - "User clicks [Start Inspection]"
+      then:
+        - "Pre-validation alert modal displayed"
+        - "Shows warnings: '1 in-process inspection pending', '1 CCP deviation'"
+        - "Evidence status badge shows 'Review Required' (yellow)"
+        - "User can choose [Override] (QA Manager only) or [Cancel]"
+
+    AC_5:
+      title: "Complete Final Inspection - Pass"
+      scenario: "Complete inspection with all tests passed"
+      given:
+        - "Final inspection in_progress"
+        - "All 6 sections filled with passing results"
+      when:
+        - "User clicks [Complete Inspection]"
+        - "Result determination modal shows suggested result: PASS"
+        - "User confirms result = 'pass'"
+      then:
+        - "inspection.status = 'completed'"
+        - "inspection.result = 'pass'"
+        - "Success toast: 'Final inspection completed - PASS'"
+        - "[Proceed to Batch Release] button appears"
+
+    AC_6:
+      title: "Complete Final Inspection - Fail"
+      scenario: "Complete inspection with failing test"
+      given:
+        - "Final inspection in_progress"
+        - "2 test results status = 'fail'"
+      when:
+        - "User clicks [Complete Inspection]"
+        - "Suggested result = 'FAIL'"
+        - "User confirms result = 'fail'"
+      then:
+        - "inspection.result = 'fail'"
+        - "Prompt: 'Create NCR for failed final inspection?'"
+        - "Batch release blocked"
+        - "Quality hold created automatically"
+
+    AC_7:
+      title: "Release Check API"
+      scenario: "Check batch release readiness"
+      given:
+        - "Batch BATCH-001 with completed final inspection (pass)"
+      when:
+        - "Calling POST /api/quality/batch/BATCH-001/release-check"
+      then:
+        - "Response includes can_release=true"
+        - "All 7 checklist items true"
+        - "No blockers, no warnings"
+
+    AC_8:
+      title: "Batch Release Approval - Happy Path"
+      scenario: "Approve batch release"
+      given:
+        - "Batch BATCH-001 passes release check"
+        - "User has QA_MANAGER role"
+      when:
+        - "User navigates to batch release page"
+        - "Reviews evidence summary"
+        - "Checks all 7 release checklist items"
+        - "Clicks [Approve Release]"
+      then:
+        - "batch_release_records created with release_decision='approved'"
+        - "All output LPs updated: release_status='released'"
+        - "LP.released_by = current user"
+        - "LP.released_at = now()"
+        - "Success toast: 'Batch BATCH-001 released for shipping'"
+
+    AC_9:
+      title: "Batch Release - Conditional"
+      scenario: "Approve conditional batch release"
+      given:
+        - "Batch BATCH-001 has conditional final inspection"
+        - "User has QA_MANAGER role"
+      when:
+        - "User selects release_decision = 'conditional'"
+        - "Fills conditional details: reason, restrictions, expiry"
+        - "Clicks [Approve Conditional Release]"
+      then:
+        - "batch_release_records.release_decision = 'conditional'"
+        - "Conditional fields populated"
+        - "LPs updated with release_status='released'"
+        - "LP.release_notes contains restriction info"
+
+    AC_10:
+      title: "Batch Release - Rejection"
+      scenario: "Reject batch release"
+      given:
+        - "Batch BATCH-001 has failed final inspection"
+        - "User has QA_MANAGER role"
+      when:
+        - "User selects release_decision = 'rejected'"
+        - "Enters rejection reason"
+        - "Clicks [Reject Release]"
+      then:
+        - "batch_release_records.release_decision = 'rejected'"
+        - "All output LPs updated: release_status='rejected'"
+        - "LPs blocked from shipping"
+
+    AC_11:
+      title: "Permission Enforcement"
+      scenario: "QA Inspector cannot approve release"
+      given:
+        - "User has QA_INSPECTOR role (not QA_MANAGER)"
+      when:
+        - "User views batch release page"
+      then:
+        - "Checklist visible but [Approve Release] button disabled"
+        - "Tooltip: 'QA Manager approval required'"
+        - "[Submit for Approval] button shown instead"
+
+    AC_12:
+      title: "LP Release Status Gates Shipping"
+      scenario: "Released LP can be shipped"
+      given:
+        - "LP00000001 has release_status = 'released'"
+      when:
+        - "Shipping module queries available inventory"
+      then:
+        - "LP00000001 included in available LPs"
+        - "LP can be allocated to sales order"
+
+    AC_13:
+      title: "Final Inspection Detail Page"
+      scenario: "View final inspection detail"
+      given:
+        - "Final inspection INS-FIN-2025-00001 exists"
+      when:
+        - "User navigates to /quality/inspections/INS-FIN-2025-00001"
+      then:
+        - "Page displays tabs: Overview, Test Results, Evidence, Release"
+        - "Evidence tab shows in-process inspections, CCPs, checkpoints, NCRs"
+
+    AC_14:
+      title: "Audit Trail"
+      scenario: "All release actions logged"
+      given:
+        - "Batch release approval completed"
+      when:
+        - "Approval completes"
+      then:
+        - "quality_audit_log entry created"
+        - "Fields: entity_type='batch_release', action='approve', user_id, timestamp"
+
+  unit_tests:
+    BatchReleaseService:
+      - test: "checkReleaseReadiness returns can_release=true when all 7 checks pass"
+        expects:
+          - "can_release = true"
+          - "All 7 checklist items = true"
+          - "blockers.length = 0"
+
+      - test: "checkReleaseReadiness returns blockers when final inspection failed"
+        expects:
+          - "can_release = false"
+          - "blockers includes 'Final inspection failed'"
+
+      - test: "checkReleaseReadiness blocks when open NCRs exist"
+        expects:
+          - "can_release = false"
+          - "blockers includes 'Open NCRs linked to batch'"
+
+      - test: "getEvidenceSummary aggregates in-process inspections correctly"
+        expects:
+          - "in_process_inspections.total = N"
+          - "in_process_inspections.passed = X"
+          - "items array populated with inspection summaries"
+
+      - test: "approveBatchRelease creates release record with all fields"
+        expects:
+          - "batch_release_records entry created"
+          - "release_number generated (REL-YYYY-NNNNN)"
+          - "release_decision = 'approved'"
+          - "approved_by = userId"
+          - "approved_at = timestamp"
+
+      - test: "approveBatchRelease updates LP release_status"
+        expects:
+          - "All output LPs have release_status='released'"
+          - "LP.released_by = approver"
+          - "LP.released_at = timestamp"
+
+      - test: "approveBatchRelease requires QA_MANAGER role"
+        expects:
+          - "Throws 403 if user doesn't have QA_MANAGER role"
+
+      - test: "submitForApproval creates pending release record"
+        expects:
+          - "release_decision = 'pending'"
+          - "submitted_by = userId"
+          - "LP status NOT changed"
+
+  integration_tests:
+    api_endpoints:
+      - test: "GET /api/quality/inspections/final returns filtered list"
+        setup:
+          - "Create multiple final inspections with different statuses"
+        request: "GET /api/quality/inspections/final?status=pending&page=1&limit=10"
+        expects:
+          - "Status 200"
+          - "Inspections array populated"
+          - "Summary stats included"
+          - "Pagination correct"
+
+      - test: "POST /api/quality/batch/:batchId/release-check validates checklist"
+        setup:
+          - "Create final inspection (pass)"
+          - "Create batch with all CCPs, checkpoints"
+        request: "POST /api/quality/batch/BATCH-001/release-check"
+        expects:
+          - "Status 200"
+          - "can_release = true"
+          - "All 7 checklist items true"
+          - "No blockers"
+
+      - test: "POST /api/quality/batch/:batchId/release approves release"
+        setup:
+          - "Create release-ready batch"
+        request: |
+          POST /api/quality/batch/BATCH-001/release
+          {
+            "release_decision": "approved",
+            "checklist": { test_results: true, ccp_records: true, ... }
+          }
+        expects:
+          - "Status 201"
+          - "BatchReleaseRecord created"
+          - "All LPs updated"
+          - "Audit log entry created"
+
+      - test: "POST /api/quality/batch/:batchId/release requires 4/6 checklist minimum"
+        request: |
+          POST /api/quality/batch/BATCH-001/release
+          {
+            "release_decision": "approved",
+            "checklist": { test_results: true, ccp_records: true, checkpoints: false, ... } // 3 true
+          }
+        expects:
+          - "Status 400"
+          - "Error: 'At least 4 checklist items must be confirmed'"
+
+      - test: "RLS enforces org isolation on batch_release_records"
+        setup:
+          - "Create release in org-1"
+          - "Login as org-2 user"
+        request: "GET /api/quality/batch-releases (org-2)"
+        expects:
+          - "Status 200"
+          - "Release from org-1 NOT in list"
+
+  e2e_tests:
+    workflows:
+      - test: "Complete workflow: WO completion → Final inspection → Release"
+        steps:
+          - step: 1
+            action: "Complete WO (triggers final inspection)"
+            expect: "Final inspection auto-created with status='scheduled'"
+          - step: 2
+            action: "Start final inspection"
+            expect: "Status changes to 'in_progress', pre-validation passes"
+          - step: 3
+            action: "Record test results (all pass)"
+            expect: "All 6 sections completed"
+          - step: 4
+            action: "Complete inspection with result='pass'"
+            expect: "inspection.status='completed', result='pass'"
+          - step: 5
+            action: "Navigate to batch release"
+            expect: "Batch appears in release queue"
+          - step: 6
+            action: "Check release readiness"
+            expect: "can_release=true, all 7 checks pass"
+          - step: 7
+            action: "Approve release"
+            expect: "batch_release_records created, LPs updated to 'released'"
+          - step: 8
+            action: "Verify LP status"
+            expect: "LP.release_status='released', available for shipping"
+
+      - test: "Failed inspection blocks release"
+        steps:
+          - step: 1
+            action: "Complete WO"
+            expect: "Final inspection auto-created"
+          - step: 2
+            action: "Record failing test result"
+            expect: "Parameter shows failed state"
+          - step: 3
+            action: "Complete inspection with result='fail'"
+            expect: "inspection.result='fail', quality hold created"
+          - step: 4
+            action: "Attempt batch release"
+            expect: "Release check returns can_release=false"
+          - step: 5
+            action: "Verify LP status"
+            expect: "LP.release_status='pending', not available for shipping"
+
+      - test: "Conditional release with restrictions"
+        steps:
+          - step: 1
+            action: "Complete inspection with result='conditional'"
+            expect: "inspection.result='conditional'"
+          - step: 2
+            action: "Approve conditional release"
+            expect: "release_decision='conditional', restrictions stored"
+          - step: 3
+            action: "Verify LP status"
+            expect: "LP.release_status='released', LP.release_notes has restrictions"
+          - step: 4
+            action: "Check Shipping module"
+            expect: "Restriction warning displayed during allocation"
+
+      - test: "QA Inspector submits, QA Manager approves"
+        setup:
+          - "Login as QA Inspector"
+        steps:
+          - step: 1
+            action: "Complete final inspection"
+            expect: "inspection.status='completed', result='pass'"
+          - step: 2
+            action: "Click [Submit for Approval]"
+            expect: "Pending release record created, LP status NOT changed"
+          - step: 3
+            action: "Logout, login as QA Manager"
+            expect: "Release appears in manager's queue"
+          - step: 4
+            action: "Click [Approve]"
+            expect: "Release approved, LPs updated to 'released'"
+
+  test_coverage:
+    unit_tests:
+      target: ">80%"
+      focus_areas:
+        - "BatchReleaseService methods"
+        - "Release check logic (7 criteria)"
+        - "Release approval workflow"
+        - "LP status updates"
+
+    integration_tests:
+      target: ">90%"
+      focus_areas:
+        - "All API endpoints"
+        - "RLS enforcement"
+        - "Database triggers"
+        - "Cross-table updates"
+
+    e2e_tests:
+      scenarios:
+        - "Happy path (pass → approved)"
+        - "Failure path (fail → blocked)"
+        - "Conditional path (conditional → approved with restrictions)"
+        - "Multi-role workflow (inspector → manager)"
+        - "Permission enforcement (inspector cannot approve)"
+
+  performance_tests:
+    - test: "Final inspection queue loads <500ms"
+      dataset: "500 final inspections"
+      expects: "<500ms"
+
+    - test: "Evidence summary loads <1s"
+      dataset: "50 related records (in-process, CCPs, checkpoints)"
+      expects: "<1 second"
+
+    - test: "Batch release approval completes <2s"
+      dataset: "20 output LPs"
+      expects: "<2 seconds"
+
+    - test: "LP updates complete <500ms per LP"
+      dataset: "2400 LPs (batch)"
+      expects: "<500ms total"
+
+  regression_tests:
+    - "Release number generation uses correct format (REL-YYYY-NNNNN)"
+    - "LP release_status correctly gates shipping inventory queries"
+    - "Audit trail captures all approval decisions"
+    - "RLS prevents cross-org release viewing"
+    - "Release decision is immutable after approval"
+    - "Conditional restrictions persist to Shipping module"
+    - "E-signature fields ready for Phase 3 integration"

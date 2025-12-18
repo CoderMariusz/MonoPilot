@@ -1,0 +1,327 @@
+# Story 07.10 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/shipping/scanner/pick"
+    description: "Confirm a pick via scanner (optimized for mobile: single request, includes next line preview)"
+    file: "apps/frontend/app/api/shipping/scanner/pick/route.ts"
+    auth: "required"
+    roles: ["PICKER", "SUPERVISOR", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        pick_line_id: "string UUID (required)"
+        scanned_lp_barcode: "string (required, barcode of scanned LP)"
+        quantity_picked: "number (required, positive integer)"
+        short_pick: "boolean (required, true if insufficient qty)"
+        short_pick_reason: "string optional (required if short_pick=true, enum: 'insufficient_inventory', 'product_not_found', 'product_damaged', 'location_empty', 'other')"
+        short_pick_notes: "string optional (max 500 chars)"
+      example: |
+        {
+          "pick_line_id": "uuid-line-6",
+          "scanned_lp_barcode": "LP-2025-00042",
+          "quantity_picked": 24,
+          "short_pick": false
+        }
+        // OR short pick
+        {
+          "pick_line_id": "uuid-line-7",
+          "scanned_lp_barcode": "LP-2025-00055",
+          "quantity_picked": 18,
+          "short_pick": true,
+          "short_pick_reason": "insufficient_inventory",
+          "short_pick_notes": "Found 18 cases, rest missing"
+        }
+
+    response:
+      status: 200
+      type: "ScannerPickResponse"
+      schema:
+        success: "boolean (true if pick confirmed)"
+        pick_line_status: "string enum: 'picked' | 'short'"
+        next_line: "PickLinePreview | null (null if pick list complete)"
+        progress: "{ total_lines: number, picked_lines: number, short_lines: number }"
+        pick_list_complete: "boolean"
+      example: |
+        {
+          "success": true,
+          "pick_line_status": "picked",
+          "next_line": {
+            "id": "uuid-line-7",
+            "pick_sequence": 4,
+            "location_path": "CHILLED / A-04-08",
+            "product_name": "Yogurt Strawberry",
+            "quantity_to_pick": 12,
+            "expected_lp": "LP-2025-00055"
+          },
+          "progress": {
+            "total_lines": 12,
+            "picked_lines": 4,
+            "short_lines": 0
+          },
+          "pick_list_complete": false
+        }
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+        when: "Zod schema validation fails"
+      - status: 400
+        code: "LP_MISMATCH"
+        message: "Wrong LP - Expected LP-2025-00042"
+        when: "Scanned LP does not match expected LP and no acceptable alternate"
+      - status: 400
+        code: "QUANTITY_EXCEEDS_AVAILABLE"
+        message: "Quantity exceeds available (max 60)"
+        when: "quantity_picked > license_plate.on_hand_quantity"
+      - status: 400
+        code: "SHORT_PICK_REASON_REQUIRED"
+        message: "Short pick reason required when short_pick=true"
+        when: "short_pick=true but reason not provided"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Pick line not found"
+        when: "Pick line ID doesn't exist or belongs to different org"
+      - status: 409
+        code: "LINE_ALREADY_PICKED"
+        message: "Line already picked"
+        when: "Line status not 'pending'"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User not PICKER role or higher"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+  - method: "GET"
+    path: "/api/shipping/scanner/lookup/lp/:barcode"
+    description: "Quick LP lookup for scanner validation (fast query, < 100ms)"
+    file: "apps/frontend/app/api/shipping/scanner/lookup/lp/[barcode]/route.ts"
+    auth: "required"
+    roles: ["PICKER", "SUPERVISOR", "WAREHOUSE_MANAGER", "SUPER_ADMIN", "VIEWER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        barcode: "string (license plate barcode/number)"
+
+    response:
+      status: 200
+      type: "LPLookupResponse"
+      schema:
+        lp_number: "string"
+        product_id: "string UUID"
+        product_name: "string"
+        product_sku: "string"
+        lot_number: "string"
+        best_before_date: "string | null (ISO date)"
+        on_hand_quantity: "number"
+        location_id: "string UUID"
+        location_path: "string (zone / aisle-shelf-position format)"
+        allergens: "string[] (allergen names)"
+        qa_status: "string enum: 'pending' | 'passed' | 'failed' | 'hold'"
+      example: |
+        {
+          "lp_number": "LP-2025-00042",
+          "product_id": "uuid-prod-chocolate",
+          "product_name": "Chocolate Milk 1L",
+          "product_sku": "CHO-MILK-1L",
+          "lot_number": "A2025-003",
+          "best_before_date": "2025-06-15",
+          "on_hand_quantity": 48,
+          "location_id": "uuid-loc-a0312",
+          "location_path": "CHILLED / A-03-12",
+          "allergens": ["Milk"],
+          "qa_status": "passed"
+        }
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "LP not found"
+        when: "Barcode doesn't match any license plate"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User not authorized"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+    performance:
+      target: "<100ms"
+      notes: "LP lookup should be cached if called multiple times"
+
+  - method: "GET"
+    path: "/api/shipping/scanner/suggest-pick/:lineId"
+    description: "Get suggested LP for pick line (FIFO/FEFO compliance)"
+    file: "apps/frontend/app/api/shipping/scanner/suggest-pick/[lineId]/route.ts"
+    auth: "required"
+    roles: ["PICKER", "SUPERVISOR", "WAREHOUSE_MANAGER", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        lineId: "string UUID (pick line ID)"
+
+    response:
+      status: 200
+      type: "PickSuggestionResponse"
+      schema:
+        suggested_lp: "string (LP number of oldest/earliest expiry)"
+        suggested_lp_id: "string UUID"
+        alternate_lps: "Array<{ lp_number: string, lp_id: string, mfg_date: string, bbd_date: string | null }>"
+        fifo_warning: "boolean (true if picking non-oldest lot)"
+        fefo_warning: "boolean (true if picking non-earliest expiry)"
+      example: |
+        {
+          "suggested_lp": "LP-2025-00040",
+          "suggested_lp_id": "uuid-lp-00040",
+          "alternate_lps": [
+            {
+              "lp_number": "LP-2025-00040",
+              "lp_id": "uuid-lp-00040",
+              "mfg_date": "2025-10-20",
+              "bbd_date": "2026-04-20"
+            },
+            {
+              "lp_number": "LP-2025-00042",
+              "lp_id": "uuid-lp-00042",
+              "mfg_date": "2025-11-15",
+              "bbd_date": "2026-05-15"
+            }
+          ],
+          "fifo_warning": false,
+          "fefo_warning": false
+        }
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Pick line not found"
+        when: "Line ID doesn't exist"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User not authorized"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+    performance:
+      target: "<100ms"
+      notes: "Should be called at start of pick to inform picker of FIFO/FEFO"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/scanner-pick-service.ts"
+    description: "Scanner pick operations (confirmation, LP lookup, suggestion)"
+    exports:
+      - name: "ScannerPickService"
+        type: "class"
+        methods:
+          - name: "confirmPick"
+            params:
+              - "input: ScannerPickInput"
+            returns: "Promise<ScannerPickResponse>"
+            description: "Confirm pick with LP validation and auto-advance"
+            implementation_notes: |
+              1. Validate LP matches expected (or acceptable alternate)
+              2. Update pick_list_lines (quantity_picked, status, picked_at, picked_by, picked_license_plate_id)
+              3. If short_pick, create backorder (call backorder service from 07.7)
+              4. Check if pick list complete (all lines picked or short)
+              5. Return next line preview for auto-advance
+
+          - name: "lookupLP"
+            params:
+              - "barcode: string"
+            returns: "Promise<LPLookupResult>"
+            description: "Fast LP lookup for scanner validation"
+            implementation_notes: |
+              1. Query license_plates by lp_number or barcode
+              2. Join product details
+              3. Join location details
+              4. Return minimal response for scanner speed
+              5. Filter by org_id (RLS)
+
+          - name: "suggestPick"
+            params:
+              - "lineId: string"
+            returns: "Promise<PickSuggestion>"
+            description: "Get suggested LP based on FIFO/FEFO"
+            implementation_notes: |
+              1. Get pick line details (product_id, required qty)
+              2. Query available LPs for product in location
+              3. Sort by FIFO (mfg_date ASC) or FEFO (bbd_date ASC)
+              4. Return suggested LP + alternates
+              5. Flag FIFO/FEFO violations if picking non-compliant LP
+
+          - name: "startPickList"
+            params:
+              - "pickListId: string"
+            returns: "Promise<void>"
+            description: "Update pick list status to in_progress"
+            implementation_notes: "Update status='in_progress', started_at=now()"
+
+          - name: "completePickList"
+            params:
+              - "pickListId: string"
+            returns: "Promise<PickListSummary>"
+            description: "Mark pick list as complete when all lines picked/short"
+            implementation_notes: |
+              1. Verify all lines are picked or short
+              2. Update status='completed', completed_at=now()
+              3. Calculate summary (total qty, duration, items/hr)
+              4. Return summary for celebration screen
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/scanner-pick-schema.ts"
+    description: "Zod validation schemas for scanner pick operations"
+    schemas:
+      - name: "scannerPickSchema"
+        type: "z.object"
+        fields:
+          pick_line_id: "z.string().uuid('Invalid pick line ID')"
+          scanned_lp_barcode: "z.string().min(1, 'LP barcode required')"
+          quantity_picked: "z.number().positive('Quantity must be > 0')"
+          short_pick: "z.boolean()"
+          short_pick_reason: "z.enum(['insufficient_inventory', 'product_not_found', 'product_damaged', 'location_empty', 'other']).optional()"
+          short_pick_notes: "z.string().max(500).optional()"
+        refinement: |
+          (data) => !data.short_pick || data.short_pick_reason,
+          { message: 'Short pick reason required when short_pick is true' }
+
+      - name: "lpLookupSchema"
+        type: "z.object"
+        fields:
+          barcode: "z.string().min(1, 'Barcode required')"
+
+      - name: "pickSuggestionSchema"
+        type: "z.object"
+        fields:
+          lineId: "z.string().uuid('Invalid line ID')"
+
+# Implementation Notes
+implementation_notes:
+  lp_lookup_performance: "Should complete in <100ms (indexed query: license_plates(lp_number))"
+  pick_confirmation: "Should complete in <200ms (single update + next line query)"
+  fifo_fefo_check: "Should complete in <100ms (indexed location_id + product_id)"
+  response_optimization: "Include next_line preview in pick confirmation response to reduce API calls"
+  barcode_formats: "Support both LP number format (LP-2025-XXXXX) and raw barcode scan"
+  offline_support: "Phase 2 deferred - scanner will queue operations locally (Story 07.30)"
+  duplicate_prevention: "Implement debounce on barcode scan (ignore scans within 2s)"
+  error_logging: "Log all validation errors with barcode + line_id for analytics"
+  audit_trail: "Record picked_by, picked_at, scanned_lp for full traceability"

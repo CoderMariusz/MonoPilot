@@ -130,13 +130,17 @@ hooks:
 # UX
 ux:
   wireframes:
-    - id: "SET-TBD"
-      description: "Allergen List page (pending wireframe)"
+    - id: "SET-020"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-020-allergen-list.md"
+      description: "Allergen list page with multi-language support (read-only)"
       components:
-        - "DataTable with Code, Icon, Name (localized), Name EN, Name PL columns"
-        - "Search input (searches code and all language name fields)"
-        - "Read-only info banner"
-        - "Allergen detail panel/modal on row click"
+        - "AllergensDataTable"
+        - "AllergenRow"
+        - "AllergenIcon"
+        - "AllergenBadge"
+        - "AllergenDetailPanel"
+        - "AllergenLanguageTooltip"
+        - "AllergenReadOnlyBanner"
 
   states:
     loading: "Skeleton rows (3) with shimmer animation"

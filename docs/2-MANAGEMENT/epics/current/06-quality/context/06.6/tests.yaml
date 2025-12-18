@@ -1,0 +1,447 @@
+# Story 06.6 - Test Specifications
+# Purpose: Unit tests, integration tests, E2E tests, acceptance criteria
+# Agent: QA-ENGINEER
+
+# Acceptance Criteria
+acceptance_criteria:
+  must_have:
+    - criterion: "AC-001: quality_test_results table created with RLS policies"
+      description: "Table exists with org_id isolation, 10+ indexed columns"
+      status: "required"
+
+    - criterion: "AC-002: Test result validation for all parameter types"
+      description: "Numeric, text, boolean parameters validated correctly"
+      status: "required"
+
+    - criterion: "AC-003: Marginal detection (5% rule) working correctly"
+      description: "Marginal zone calculated as ±5% of range for numeric parameters"
+      status: "required"
+
+    - criterion: "AC-004: Pass/Fail/Marginal status auto-calculated"
+      description: "No manual status entry; determined by comparison logic"
+      status: "required"
+
+    - criterion: "AC-005: API endpoints functional (POST, GET, PUT, DELETE)"
+      description: "All 4 endpoints tested with success and error cases"
+      status: "required"
+
+    - criterion: "AC-006: TestResultsForm component renders with parameter selection"
+      description: "Form loads, template selector works, parameters display"
+      status: "required"
+
+    - criterion: "AC-007: TestResultsTable displays results with badges"
+      description: "Table shows pass/fail/marginal badges with correct colors"
+      status: "required"
+
+    - criterion: "AC-008: TestResultsSummary shows pass rate and counts"
+      description: "Summary card displays total, pass, fail, marginal, pass_rate %"
+      status: "required"
+
+    - criterion: "AC-009: Equipment tracking optional but supported"
+      description: "Equipment selector shown when applicable; optional or required"
+      status: "required"
+
+    - criterion: "AC-010: Quality hold auto-created on fail"
+      description: "Failed result triggers quality hold creation (integration with 06.2)"
+      status: "required"
+
+  should_have:
+    - criterion: "AC-011: Photo attachment support"
+      description: "attachment_url field stored; optional for all results"
+      status: "important"
+
+    - criterion: "AC-012: Email alert on critical parameter failure"
+      description: "QA Manager notified of critical parameter failures"
+      status: "important"
+
+    - criterion: "AC-013: Batch result creation (1-100 per request)"
+      description: "Support bulk result entry for efficiency"
+      status: "important"
+
+    - criterion: "AC-014: Result immutability (audit trail)"
+      description: "Test results cannot be edited; only notes updatable"
+      status: "important"
+
+  nice_to_have:
+    - criterion: "AC-015: NCR auto-creation from failed results"
+      description: "Optional checkbox to create NCR on save (future enhancement)"
+      status: "future"
+
+    - criterion: "AC-016: Equipment calibration warnings"
+      description: "Warn if equipment calibration date >90 days old"
+      status: "future"
+
+# Unit Tests
+unit_tests:
+  test_file: "apps/frontend/lib/services/__tests__/test-results-service.test.ts"
+  test_suite:
+    - name: "TestResultsService.validateResult()"
+      tests:
+        - name: "Boolean parameter - should pass with matching value"
+          given: "parameter_type='boolean', target='true', measured='true'"
+          when: "validateResult() called"
+          then: "result_status='pass'"
+          coverage: "Boolean pass case"
+
+        - name: "Boolean parameter - should fail with non-matching value"
+          given: "parameter_type='boolean', target='true', measured='false'"
+          when: "validateResult() called"
+          then: "result_status='fail'"
+          coverage: "Boolean fail case"
+
+        - name: "Boolean parameter - should handle yes/no values (case-insensitive)"
+          given: "parameter_type='boolean', target='true', measured='YES'"
+          when: "validateResult() called"
+          then: "result_status='pass'"
+          coverage: "Boolean case-insensitive"
+
+        - name: "Text parameter - should pass with exact match (case-insensitive)"
+          given: "parameter_type='text', target='Red', measured='red'"
+          when: "validateResult() called"
+          then: "result_status='pass'"
+          coverage: "Text exact match"
+
+        - name: "Text parameter - should fail with non-matching value"
+          given: "parameter_type='text', target='Red', measured='Blue'"
+          when: "validateResult() called"
+          then: "result_status='fail'"
+          coverage: "Text mismatch"
+
+        - name: "Numeric parameter - should pass when within range"
+          given: "parameter_type='numeric', min=10, max=20, measured=15"
+          when: "validateResult() called"
+          then: "result_status='pass', numeric_value=15, deviation_pct=null"
+          coverage: "Numeric pass"
+
+        - name: "Numeric parameter - should fail when below min"
+          given: "parameter_type='numeric', min=10, max=20, measured=8"
+          when: "validateResult() called"
+          then: "result_status='fail', deviation_pct>0"
+          coverage: "Numeric below min"
+
+        - name: "Numeric parameter - should fail when above max"
+          given: "parameter_type='numeric', min=10, max=20, measured=22"
+          when: "validateResult() called"
+          then: "result_status='fail', deviation_pct>0"
+          coverage: "Numeric above max"
+
+        - name: "Numeric parameter - should detect marginal (lower zone, 5% rule)"
+          given: "parameter_type='numeric', min=10, max=20, measured=10.3"
+          when: "validateResult() called"
+          then: "result_status='marginal', deviation_pct between 0-5"
+          coverage: "Numeric marginal lower"
+
+        - name: "Numeric parameter - should detect marginal (upper zone, 5% rule)"
+          given: "parameter_type='numeric', min=10, max=20, measured=19.7"
+          when: "validateResult() called"
+          then: "result_status='marginal', deviation_pct between 0-5"
+          coverage: "Numeric marginal upper"
+
+        - name: "Numeric parameter - should calculate deviation_pct correctly for fail"
+          given: "parameter_type='numeric', min=10, max=20, measured=8"
+          when: "validateResult() called"
+          then: "deviation_pct = ((10-8)/(20-10))*100 = 20"
+          coverage: "Deviation calculation"
+
+        - name: "Single limit (min only) - should pass if >= min"
+          given: "parameter_type='numeric', min=5, max=null, measured=6"
+          when: "validateResult() called"
+          then: "result_status='pass'"
+          coverage: "Single limit min"
+
+        - name: "Single limit (min only) - should fail if < min"
+          given: "parameter_type='numeric', min=5, max=null, measured=3"
+          when: "validateResult() called"
+          then: "result_status='fail'"
+          coverage: "Single limit min fail"
+
+        - name: "Single limit (max only) - should pass if <= max"
+          given: "parameter_type='numeric', min=null, max=15, measured=14"
+          when: "validateResult() called"
+          then: "result_status='pass'"
+          coverage: "Single limit max"
+
+        - name: "Invalid numeric value - should fail"
+          given: "parameter_type='numeric', min=10, max=20, measured='abc'"
+          when: "validateResult() called"
+          then: "result_status='fail'"
+          coverage: "Invalid numeric"
+
+    - name: "Zod Schema Validation"
+      tests:
+        - name: "testResultCreateSchema - accepts valid input"
+          given: "All required fields present and valid"
+          when: "testResultCreateSchema.parse(data)"
+          then: "Returns validated object"
+          coverage: "Schema valid"
+
+        - name: "testResultCreateSchema - rejects missing inspection_id"
+          given: "inspection_id omitted"
+          when: "testResultCreateSchema.parse(data)"
+          then: "Throws ZodError with 'Invalid inspection ID'"
+          coverage: "Schema validation"
+
+        - name: "testResultBatchCreateSchema - accepts 1-100 results"
+          given: "results array with 50 items"
+          when: "testResultBatchCreateSchema.parse(data)"
+          then: "Returns validated object"
+          coverage: "Batch validation"
+
+        - name: "testResultBatchCreateSchema - rejects >100 results"
+          given: "results array with 101 items"
+          when: "testResultBatchCreateSchema.parse(data)"
+          then: "Throws ZodError with 'Max 100 results per batch'"
+          coverage: "Batch max limit"
+
+        - name: "testResultCreateSchema - rejects invalid notes (>1000 chars)"
+          given: "notes with 1001 characters"
+          when: "testResultCreateSchema.parse(data)"
+          then: "Throws ZodError with 'Notes too long'"
+          coverage: "Notes length validation"
+
+    - name: "getInspectionSummary()"
+      tests:
+        - name: "Should calculate correct pass_rate"
+          given: "Inspection with 8 results: 6 pass, 2 fail"
+          when: "getInspectionSummary() called"
+          then: "pass_rate = 75.0"
+          coverage: "Summary calculation"
+
+        - name: "Should handle 0 results"
+          given: "Inspection with 0 results"
+          when: "getInspectionSummary() called"
+          then: "pass_rate = 0"
+          coverage: "Summary edge case"
+
+# Integration Tests
+integration_tests:
+  test_file: "apps/frontend/app/api/quality/test-results/__tests__/route.test.ts"
+  test_suite:
+    - name: "POST /api/quality/test-results"
+      tests:
+        - name: "Should create single test result with auto-calculated status"
+          given: "Valid test result request for numeric parameter"
+          when: "POST /api/quality/test-results"
+          then: "Returns 201 with result_status='pass', numeric_value populated"
+          coverage: "Happy path"
+
+        - name: "Should trigger quality hold on fail"
+          given: "Test result fails (measured outside spec)"
+          when: "POST /api/quality/test-results"
+          then: "Returns 201 AND quality hold created automatically"
+          coverage: "Integration: quality holds"
+
+        - name: "Should send alert on critical parameter fail"
+          given: "Critical parameter fails"
+          when: "POST /api/quality/test-results"
+          then: "Returns 201 AND email notification sent to QA Manager"
+          coverage: "Integration: notifications"
+
+        - name: "Should reject invalid inspection_id"
+          given: "Non-existent inspection_id"
+          when: "POST /api/quality/test-results"
+          then: "Returns 404 Not Found"
+          coverage: "Error handling"
+
+        - name: "Should enforce RLS (org isolation)"
+          given: "Authenticated user from Org A"
+          when: "POST /api/quality/test-results with Org B inspection_id"
+          then: "Returns 403 Forbidden (RLS policy blocks)"
+          coverage: "Security: RLS"
+
+        - name: "Should reject unauthorized user"
+          given: "User with role 'Operator' (cannot create test results)"
+          when: "POST /api/quality/test-results"
+          then: "Returns 403 Forbidden"
+          coverage: "Security: roles"
+
+    - name: "POST /api/quality/test-results/batch"
+      tests:
+        - name: "Should create batch of 50 results"
+          given: "Valid batch request with 50 results"
+          when: "POST /api/quality/test-results/batch"
+          then: "Returns 201 with array of 50 results"
+          coverage: "Batch creation"
+
+        - name: "Should reject batch with >100 results"
+          given: "Batch request with 101 results"
+          when: "POST /api/quality/test-results/batch"
+          then: "Returns 400 Bad Request"
+          coverage: "Batch max limit"
+
+        - name: "Should validate all results"
+          given: "Batch with 1 invalid parameter_id"
+          when: "POST /api/quality/test-results/batch"
+          then: "Returns 400 Bad Request (transaction rolled back)"
+          coverage: "Batch validation"
+
+    - name: "GET /api/quality/test-results/inspection/:id"
+      tests:
+        - name: "Should return all results for inspection"
+          given: "Inspection with 8 test results"
+          when: "GET /api/quality/test-results/inspection/:id"
+          then: "Returns 200 with array of 8 results with relations"
+          coverage: "Query results"
+
+        - name: "Should include related parameter details"
+          given: "Inspection ID with results"
+          when: "GET /api/quality/test-results/inspection/:id"
+          then: "Returns results with parameter object (name, spec, type, etc)"
+          coverage: "Relation loading"
+
+        - name: "Should support pagination"
+          given: "Inspection with 50 results"
+          when: "GET /api/quality/test-results/inspection/:id?page=2&limit=20"
+          then: "Returns results 21-40 with pagination metadata"
+          coverage: "Pagination"
+
+        - name: "Should enforce RLS"
+          given: "User from Org A querying Org B inspection"
+          when: "GET /api/quality/test-results/inspection/:id"
+          then: "Returns 404 Not Found (RLS policy)"
+          coverage: "Security: RLS"
+
+    - name: "GET /api/quality/test-results/inspection/:id/summary"
+      tests:
+        - name: "Should calculate summary correctly"
+          given: "Inspection with 10 results: 6 pass, 3 fail, 1 marginal"
+          when: "GET /api/quality/test-results/inspection/:id/summary"
+          then: "Returns {total:10, pass:6, fail:3, marginal:1, pass_rate:60.0}"
+          coverage: "Summary calculation"
+
+    - name: "PUT /api/quality/test-results/:id"
+      tests:
+        - name: "Should NOT allow editing measured_value"
+          given: "PUT request with new measured_value"
+          when: "PUT /api/quality/test-results/:id"
+          then: "Returns 400 Bad Request with 'immutable' message"
+          coverage: "Immutability"
+
+        - name: "Should allow editing notes"
+          given: "PUT request with new notes"
+          when: "PUT /api/quality/test-results/:id"
+          then: "Returns 200 with updated notes"
+          coverage: "Notes update allowed"
+
+    - name: "DELETE /api/quality/test-results/:id"
+      tests:
+        - name: "Should delete result from in-progress inspection"
+          given: "Test result from scheduled/in-progress inspection"
+          when: "DELETE /api/quality/test-results/:id"
+          then: "Returns 200 success"
+          coverage: "Delete allowed"
+
+        - name: "Should block delete from completed inspection"
+          given: "Test result from completed inspection"
+          when: "DELETE /api/quality/test-results/:id"
+          then: "Returns 400 INSPECTION_COMPLETED"
+          coverage: "Delete blocked"
+
+# E2E Tests
+e2e_tests:
+  test_file: "apps/frontend/__tests__/e2e/quality/test-results.spec.ts"
+  test_suite:
+    - name: "Test Results Recording Flow"
+      tests:
+        - name: "Record test result with pass status"
+          given: "QA Inspector navigates to incoming inspection"
+          when: "1. Selects test template\n2. Enters measured value (14.2 for 13-15 range)\n3. Clicks Save"
+          then: |
+            1. Result shows ✓ Pass badge
+            2. Equipment selector visible if applicable
+            3. Notes optional
+            4. Page shows 'Results saved' toast
+            5. Overall inspection result updated to 'pass'
+          coverage: "Happy path: pass"
+
+        - name: "Record test result with fail status"
+          given: "QA Inspector records out-of-spec result"
+          when: "1. Enters measured value (10.8 for 11.5-13.5 range)\n2. Clicks Save"
+          then: |
+            1. Result shows ✗ Fail badge (red)
+            2. Notes field becomes required
+            3. Deviation % displayed (e.g., '5.2% below minimum')
+            4. Alert panel shows disposition options
+            5. Quality hold auto-created
+            6. Overall inspection result updated to 'fail'
+          coverage: "Happy path: fail"
+
+        - name: "Record test result with marginal status"
+          given: "QA Inspector records marginal result (5% rule)"
+          when: "1. Enters measured value (10.3 for 10-20 range)\n2. Clicks Save"
+          then: |
+            1. Result shows ⚠ Review badge (yellow)
+            2. Deviation % displayed (e.g., 'Within 5% of minimum')
+            3. Notes field becomes required
+            4. Alert panel shows review message
+            5. Overall inspection result updated to 'review'
+          coverage: "Happy path: marginal"
+
+        - name: "Equipment tracking - required equipment not selected"
+          given: "Parameter requires equipment (e.g., Moisture Analyzer)"
+          when: "1. Enters measured value\n2. Tries to save without selecting equipment"
+          then: |
+            1. Equipment field shows red border
+            2. Error message: 'Equipment selection required'
+            3. Save button disabled
+          coverage: "Validation: required equipment"
+
+        - name: "Batch result entry - multiple parameters"
+          given: "Test template with 8 parameters loaded"
+          when: "1. Enters values for all 8 parameters\n2. Clicks Save"
+          then: |
+            1. All results saved in batch
+            2. Results table shows all 8 rows with badges
+            3. Summary shows totals (e.g., 6 pass, 2 fail)
+            4. Overall result calculated correctly
+          coverage: "Batch entry"
+
+        - name: "Mobile result recording - single parameter per screen"
+          given: "QA Inspector on mobile device (375px)"
+          when: "1. Swipes through 8 parameters\n2. Enters value on each screen\n3. Swipes to next parameter"
+          then: |
+            1. One parameter card per screen
+            2. Large touch targets (48x48dp)
+            3. Numeric keyboard appears for numeric inputs
+            4. Result badge shows after entry on each parameter
+            5. Save button appears at end
+          coverage: "Mobile UX"
+
+# Performance Tests
+performance_tests:
+  test_file: "apps/frontend/__tests__/performance/test-results.perf.ts"
+  tests:
+    - name: "Load test results in <500ms"
+      goal: "GET /api/quality/test-results/inspection/:id completes in <500ms"
+      load: "1000 results per inspection"
+      measurement: "React Query hook with caching"
+
+    - name: "Auto-calculate pass/fail on blur <100ms"
+      goal: "Validation and result display instant to user"
+      load: "Numeric calculation with 20-param range"
+      measurement: "Debounced 100ms"
+
+    - name: "Batch create 100 results in <5s"
+      goal: "POST /api/quality/test-results/batch completes in <5 seconds"
+      load: "100 results with validation"
+      measurement: "Server-side execution time"
+
+# Test Data Setup
+test_data:
+  fixture_file: "apps/frontend/__tests__/fixtures/test-results.fixtures.ts"
+  fixtures:
+    - name: "inspectionWithResults"
+      description: "Complete inspection with 8 test results (pass/fail/marginal)"
+      related_data:
+        - "quality_inspections record"
+        - "quality_spec_parameters (8 records)"
+        - "quality_test_results (8 records with mixed statuses)"
+        - "machines record (equipment)"
+        - "users record (inspector)"
+
+# Coverage Requirements
+coverage:
+  unit_tests: ">80% coverage of TestResultsService"
+  integration_tests: ">80% coverage of API routes"
+  e2e_tests: "All 5 acceptance criteria tested"
+  overall: ">85% code coverage"

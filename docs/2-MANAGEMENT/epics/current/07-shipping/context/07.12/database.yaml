@@ -1,0 +1,209 @@
+# Story 07.12 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# No new tables in this story
+# All tables provided by Story 07.11:
+#   - shipments (shipment_number, status, total_weight, total_boxes, packed_at, packed_by)
+#   - shipment_boxes (box_number, weight, dimensions, status, sscc)
+#   - shipment_box_contents (license_plate_id, lot_number, quantity)
+
+existing_tables:
+  shipments:
+    source: "Story 07.11"
+    columns_used:
+      - "id: UUID - Shipment identifier"
+      - "org_id: UUID - Tenant isolation"
+      - "shipment_number: TEXT - SH-YYYY-NNNNN format"
+      - "sales_order_id: UUID - Associated SO"
+      - "customer_id: UUID - Customer for allergies"
+      - "status: TEXT - pending, packing, packed"
+      - "total_weight: DECIMAL - kg, sum of boxes"
+      - "total_boxes: INTEGER - count of closed boxes"
+      - "packed_at: TIMESTAMPTZ - completion timestamp"
+      - "packed_by: UUID - User who packed"
+    rls_policy: "shipments_org_isolation"
+
+  shipment_boxes:
+    source: "Story 07.11"
+    columns_used:
+      - "id: UUID - Box identifier"
+      - "org_id: UUID - Tenant isolation"
+      - "shipment_id: UUID - Parent shipment"
+      - "box_number: INTEGER - Sequential per shipment"
+      - "weight: DECIMAL - kg, optional at creation"
+      - "length, width, height: DECIMAL - cm, optional"
+      - "tracking_number: TEXT - Optional individual tracking"
+      - "status: TEXT - open, closed (from FR-7.37)"
+      - "created_at: TIMESTAMPTZ - Box creation time"
+    rls_policy: "shipment_boxes_org_isolation"
+    notes: "Status column added in this story to track open/closed state"
+
+  shipment_box_contents:
+    source: "Story 07.11"
+    columns_used:
+      - "id: UUID - Content record identifier"
+      - "org_id: UUID - Tenant isolation"
+      - "shipment_box_id: UUID - Parent box"
+      - "sales_order_line_id: UUID - SO line reference"
+      - "product_id: UUID - Product for allergen lookup"
+      - "license_plate_id: UUID - Packed LP"
+      - "lot_number: TEXT - Traceability"
+      - "quantity: DECIMAL - Packed quantity"
+      - "created_at: TIMESTAMPTZ - Pack timestamp"
+    rls_policy: "shipment_box_contents_org_isolation"
+
+# Table extensions
+table_extensions:
+  shipment_boxes:
+    new_columns:
+      - name: "status"
+        type: "TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed'))"
+        usage: "Track box state (open for packing, closed when complete)"
+        required_in_story: true
+        notes: "Allows switching between multiple open boxes during packing"
+
+# Queries (not new tables)
+database_queries:
+  get_pending_shipments:
+    description: "Get packable shipments (status IN pending, packing)"
+    table: "shipments"
+    filter:
+      - "org_id = user.org_id"
+      - "status IN ('pending', 'packing')"
+    order: "promised_ship_date ASC"
+    index_used: "idx_shipments_org_status"
+
+  get_available_lps:
+    description: "Get unpacked LPs for shipment"
+    table: "pick_list_lines JOIN license_plates"
+    filter:
+      - "pick_list.sales_order_id = shipment.sales_order_id"
+      - "pick_list_lines.status = 'picked'"
+      - "NOT EXISTS (shipment_box_contents where lp_id = picked_lp_id)"
+    notes: "Performance: <500ms for 100 LPs"
+
+  get_box_contents:
+    description: "Get items packed in box with product details"
+    table: "shipment_box_contents JOIN products"
+    filter:
+      - "shipment_box_id = :boxId"
+    order: "created_at ASC"
+    notes: "Used to display box summary and contents list"
+
+  check_allergen_conflict:
+    description: "Check if box has allergen products for customer"
+    joins:
+      - "shipment_box_contents"
+      - "products (for allergens)"
+      - "customers (for restrictions)"
+    filter:
+      - "shipment_box_id = :boxId"
+      - "customer_id matches shipment customer"
+    notes: "Allergen warning logic - yellow banner display"
+
+# RLS Policies (existing)
+rls_policies:
+  pattern: "Organization isolation per ADR-013"
+  policies_used:
+    - table: "shipments"
+      name: "shipments_org_isolation"
+      operation: "ALL"
+      description: "Users see only their organization's shipments"
+
+    - table: "shipment_boxes"
+      name: "shipment_boxes_org_isolation"
+      operation: "ALL"
+      description: "Users see only boxes in their organization"
+
+    - table: "shipment_box_contents"
+      name: "shipment_box_contents_org_isolation"
+      operation: "ALL"
+      description: "Users see only contents in their organization"
+
+# Business Rules
+business_rules:
+  - rule: "First box auto-creation"
+    constraint: "When shipment selected, create Box 1 if none exists"
+    enforcement: "Application logic in PackingScannerService"
+    field: "shipment_boxes.box_number = 1"
+
+  - rule: "Multiple open boxes"
+    constraint: "Can have multiple boxes open simultaneously"
+    enforcement: "shipment_boxes.status = 'open' allows N records per shipment"
+    notes: "Enables packing into multiple boxes before closing"
+
+  - rule: "Box numbering"
+    constraint: "box_number auto-increments per shipment (1, 2, 3...)"
+    enforcement: "Application assigns next number on create"
+    notes: "UNIQUE(shipment_id, box_number) constraint enforced"
+
+  - rule: "Weight capture"
+    constraint: "Weight optional during packing, required for complete-packing"
+    enforcement: "shipment_boxes.weight allows NULL during packing"
+    notes: "Complete packing validation checks all boxes have weight"
+
+  - rule: "LP allocation"
+    constraint: "LP must be allocated to this shipment's SO"
+    enforcement: "Query checks pick_list.sales_order_id = shipment.sales_order_id"
+    notes: "Prevents packing unrelated LPs"
+
+  - rule: "Lot number traceability"
+    constraint: "Capture lot_number from LP in box_contents"
+    enforcement: "Application copies license_plate.lot_number to shipment_box_contents.lot_number"
+    notes: "Full traceability for recalls"
+
+  - rule: "Allergen separation"
+    constraint: "Warning if box has multiple allergens matching customer restrictions"
+    enforcement: "Application queries customer.allergen_restrictions vs product.allergens"
+    notes: "Non-blocking warning, packer can override"
+
+  - rule: "Box closure"
+    constraint: "Cannot close empty box"
+    enforcement: "POST /api/shipping/scanner/pack/box/close validates contents.count > 0"
+    notes: "Business logic validation"
+
+  - rule: "Shipment completion"
+    constraint: "Cannot complete packing unless all boxes closed and have weight"
+    enforcement: "POST /api/shipping/scanner/complete-packing validates requirements"
+    notes: "Ensures data integrity before moving to next phase"
+
+# Indexes
+indexes:
+  used_from_07_11:
+    - "idx_shipments_org_status ON shipments(org_id, status)"
+    - "idx_shipment_boxes_shipment ON shipment_boxes(shipment_id)"
+    - "idx_shipment_box_contents_box ON shipment_box_contents(shipment_box_id)"
+    - "idx_shipment_box_contents_lp ON shipment_box_contents(license_plate_id)"
+
+  performance_targets:
+    pending_shipments_query: "< 500ms for 100 shipments"
+    available_lps_query: "< 500ms for 100 LPs"
+    box_contents_query: "< 200ms for 50 items"
+    allergen_check_query: "< 100ms per product check"
+
+# Data Consistency
+data_consistency:
+  - name: "Cascade delete"
+    rule: "Deleting shipment deletes boxes and contents (ON DELETE CASCADE from Story 07.11)"
+    notes: "Referential integrity maintained"
+
+  - name: "Org isolation"
+    rule: "All records must have org_id matching user's context"
+    enforcement: "RLS policies + application validation"
+    notes: "Multi-tenant safety"
+
+  - name: "Duplicate LPs in box"
+    rule: "Same LP cannot be added twice to same box"
+    enforcement: "Application logic checks shipment_box_contents for existing LP"
+    notes: "Business rule, not DB constraint (LPs can be split across boxes)"
+
+  - name: "Quantity validation"
+    rule: "Packed qty cannot exceed LP available qty"
+    enforcement: "Application compares against license_plate.available_qty"
+    notes: "Inventory control"
+
+# No migrations needed
+migrations:
+  note: "Story 07.12 uses existing schema from Story 07.11"
+  possible_future_extension: "If offline support added, may need sync metadata table in Phase 3"
