@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && npm install --legacy-peer-deps && cd apps/frontend && npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "crons": [{
+    "path": "/api/cron/cleanup-invitations",
+    "schedule": "0 2 * * 0"
+  }]
+}
