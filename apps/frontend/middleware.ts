@@ -2,65 +2,95 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          )
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  // Refresh session if needed
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
   const { pathname } = request.nextUrl
 
   // Define public routes (no auth required)
-  // Note: No /signup - this is an invitation-only system (see Story 1.3)
   const publicRoutes = [
     '/login',
     '/forgot-password',
     '/reset-password',
     '/auth/callback',
+    '/signup',
   ]
 
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
+  // Check if current path is a public route
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route + '/'))
 
-  // If not authenticated and trying to access protected route
-  if (!session && !isPublicRoute) {
-    const redirectUrl = new URL('/login', request.url)
-    // Preserve original URL for redirect after login
-    redirectUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(redirectUrl)
+  // Skip middleware if Supabase is not configured
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (isPublicRoute) {
+      return NextResponse.next()
+    }
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // If authenticated and trying to access auth pages, redirect to dashboard
-  if (session && isPublicRoute && pathname !== '/auth/callback') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
 
-  return supabaseResponse
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            )
+            supabaseResponse = NextResponse.next({
+              request,
+            })
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options)
+            )
+          },
+        },
+      }
+    )
+
+    // Refresh session if needed
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
+
+    // If there's an auth error, allow public routes, redirect others to login
+    if (error) {
+      console.error('Middleware auth error:', error.message)
+      if (isPublicRoute) {
+        return supabaseResponse
+      }
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // If not authenticated and trying to access protected route
+    if (!session && !isPublicRoute) {
+      const redirectUrl = new URL('/login', request.url)
+      // Preserve original URL for redirect after login
+      if (pathname !== '/' && pathname !== '/login') {
+        redirectUrl.searchParams.set('redirect', pathname)
+      }
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // If authenticated and trying to access auth pages, redirect to dashboard
+    if (session && isPublicRoute && pathname !== '/auth/callback') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    return supabaseResponse
+  } catch (error) {
+    // If anything fails, allow public routes
+    console.error('Middleware error:', error)
+    if (isPublicRoute) {
+      return NextResponse.next()
+    }
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
 }
 
 export const config = {
