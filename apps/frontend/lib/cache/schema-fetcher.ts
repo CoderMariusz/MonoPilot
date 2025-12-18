@@ -299,12 +299,14 @@ export async function getTableSchemaWithFetcher(
     // Check pre-defined schemas first (instant)
     if (KNOWN_SCHEMAS[tableName]) {
       console.log(`[SchemaFetcher] Using pre-defined schema for: ${tableName}`)
-      return KNOWN_SCHEMAS[tableName]
+      return KNOWN_SCHEMAS[tableName] as unknown as Record<string, unknown>
     }
 
     // Fall back to database query
     console.log(`[SchemaFetcher] Fetching schema from DB for: ${tableName}`)
-    return fetchSchemaFromDatabase(tableName)
+    const dbSchema = await fetchSchemaFromDatabase(tableName)
+    // Agent cache expects a Record<string, unknown>; cast safely (null -> empty object)
+    return (dbSchema ?? {}) as unknown as Record<string, unknown>
   }) as Promise<TableSchema | null>
 }
 
