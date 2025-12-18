@@ -1,4 +1,5 @@
 import { createServerSupabase } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { ModuleCard, type ModuleCardProps } from '@/components/dashboard/ModuleCard'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { WelcomeBanner } from '@/components/dashboard/WelcomeBanner'
@@ -7,29 +8,40 @@ import { QuickActions } from '@/components/dashboard/QuickActions'
 export default async function DashboardPage() {
   const supabase = await createServerSupabase()
 
-  // Authentication is handled by parent layout
+  // Authentication is handled by parent layout, but we need session for queries
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
+  // If no session, redirect (should be caught by layout, but safety check)
+  if (!session) {
+    redirect('/login')
+  }
+
   // Get current user to check org_id
-  const { data: currentUser } = await supabase
+  const { data: currentUser, error: userError } = await supabase
     .from('users')
     .select('org_id, role')
-    .eq('id', session!.user.id)
+    .eq('id', session.user.id)
     .single()
+
+  // If user not found or error, sign out and redirect
+  if (!currentUser || userError) {
+    await supabase.auth.signOut()
+    redirect('/login')
+  }
 
   // Get organization to check setup status and enabled modules
   const { data: organization } = await supabase
     .from('organizations')
     .select('setup_completed, enabled_modules')
-    .eq('id', currentUser!.org_id)
+    .eq('id', currentUser.org_id)
     .single()
 
   const showWelcomeBanner = !organization?.setup_completed
   const enabledModules = organization?.enabled_modules || []
 
-  const user = session!.user
+  const user = session.user
 
   // Define all available module cards
   const allModules: ModuleCardProps[] = [
