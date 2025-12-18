@@ -19,13 +19,16 @@ export default async function AuthenticatedLayout({
   }
 
   // Get current user to check org_id
-  const { data: currentUser } = await supabase
+  const { data: currentUser, error: userError } = await supabase
     .from('users')
     .select('org_id, role')
     .eq('id', session.user.id)
     .single()
 
-  if (!currentUser) {
+  // If user record not found, sign out and redirect
+  // This handles cases where session exists but user was deleted or RLS blocks access
+  if (!currentUser || userError) {
+    await supabase.auth.signOut()
     redirect('/login')
   }
 
