@@ -6,7 +6,7 @@
     "dev": "cd apps/frontend && pnpm dev",
     "build": "cd apps/frontend && pnpm build",
     "start": "cd apps/frontend && pnpm start",
-    "vercel:install": "corepack enable && corepack prepare pnpm@8.15.0 --activate && pnpm install --no-frozen-lockfile",
+     "vercel:install": "corepack enable && corepack prepare pnpm@8.15.0 --activate && pnpm install --no-frozen-lockfile",
     "lint": "cd apps/frontend && pnpm lint",
     "type-check": "cd apps/frontend && pnpm type-check",
     "clean": "rm -rf node_modules apps/frontend/node_modules apps/frontend/.next",
@@ -27,9 +27,9 @@
     "bmad:update": "npx bmad-method@alpha update"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "20.x"
   },
-  "packageManager": "pnpm@8.15.0",
+   "packageManager": "pnpm@8.15.0",
   "devDependencies": {
     "@faker-js/faker": "^9.3.0",
     "@playwright/test": "^1.49.0",

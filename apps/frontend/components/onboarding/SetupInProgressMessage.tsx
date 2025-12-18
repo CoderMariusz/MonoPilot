@@ -1,7 +1,7 @@
 'use client'
 
 import { CheckCircle2 } from 'lucide-react'
-import type { OrgContext } from '@/lib/hooks/useOrgContext'
+import type { OrgContext } from '@/lib/types/organization'
 
 /**
  * SetupInProgressMessage Component
@@ -19,15 +19,15 @@ export function SetupInProgressMessage({
 }: SetupInProgressMessageProps) {
   if (!context) return null
 
-  const { organizations, user } = context
+  const { organization } = context
   const setupItems = [
     {
       label: 'Organization profile created',
-      completed: !!organizations.id,
+      completed: !!organization.id,
     },
     {
-      label: `First admin user configured (${user?.email || 'you'})`,
-      completed: !!user?.id,
+      label: 'First admin user configured',
+      completed: !!context.user_id,
     },
   ]
 

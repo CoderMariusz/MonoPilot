@@ -82,6 +82,7 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
         locale,
         currency,
         onboarding_step,
+        onboarding_skipped,
         onboarding_completed_at,
         is_active
       ),
@@ -106,8 +107,22 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
     throw new ForbiddenError('User account is inactive')
   }
 
+  const organizationRow = Array.isArray(data.organizations)
+    ? data.organizations[0]
+    : data.organizations
+
+  if (!organizationRow) {
+    throw new NotFoundError('Organization not found')
+  }
+
+  const roleRow = Array.isArray(data.roles) ? data.roles[0] : data.roles
+
+  if (!roleRow) {
+    throw new NotFoundError('Role not found')
+  }
+
   // Check organization is active
-  if (!data.organizations.is_active) {
+  if (!organizationRow.is_active) {
     throw new ForbiddenError('Organization is inactive')
   }
 
@@ -115,19 +130,20 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
   const context: OrgContext = {
     org_id: data.org_id,
     user_id: data.id,
-    role_code: data.roles.code,
-    role_name: data.roles.name,
-    permissions: data.roles.permissions as Record<string, string>,
+    role_code: roleRow.code,
+    role_name: roleRow.name,
+    permissions: roleRow.permissions as Record<string, string>,
     organization: {
-      id: data.organizations.id,
-      name: data.organizations.name,
-      slug: data.organizations.slug,
-      timezone: data.organizations.timezone,
-      locale: data.organizations.locale,
-      currency: data.organizations.currency,
-      onboarding_step: data.organizations.onboarding_step,
-      onboarding_completed_at: data.organizations.onboarding_completed_at,
-      is_active: data.organizations.is_active,
+      id: organizationRow.id,
+      name: organizationRow.name,
+      slug: organizationRow.slug,
+      timezone: organizationRow.timezone,
+      locale: organizationRow.locale,
+      currency: organizationRow.currency,
+      onboarding_step: organizationRow.onboarding_step,
+      onboarding_skipped: organizationRow.onboarding_skipped,
+      onboarding_completed_at: organizationRow.onboarding_completed_at,
+      is_active: organizationRow.is_active,
     },
   }
 

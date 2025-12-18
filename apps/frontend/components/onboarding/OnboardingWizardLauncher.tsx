@@ -115,7 +115,7 @@ export function OnboardingWizardLauncher() {
               Quick Onboarding Wizard
             </h3>
             <p className="mb-6 text-sm text-muted-foreground">
-              Let's get your organization ready in 15 minutes:
+              Let&apos;s get your organization ready in 15 minutes:
             </p>
             <OnboardingStepIndicator />
             <p className="mt-6 text-sm text-muted-foreground">

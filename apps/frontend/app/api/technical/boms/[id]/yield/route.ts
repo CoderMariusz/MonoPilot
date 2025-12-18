@@ -14,10 +14,10 @@ import { calculateBOMYield } from '@/lib/services/bom-service'
  *   - actualQuantity: Expected output after waste
  *   - wasteQuantity: Expected waste amount
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest) {
+  // Extract dynamic param `id` from the request pathname (route: /api/technical/boms/:id/yield)
+  const pathSegments = request.nextUrl.pathname.split('/').filter(Boolean)
+  const id = pathSegments[pathSegments.length - 2]
   try {
     const searchParams = request.nextUrl.searchParams
     const quantity = parseFloat(searchParams.get('quantity') || '1')
@@ -31,7 +31,7 @@ export async function GET(
     }
 
     // Calculate yield
-    const result = await calculateBOMYield(params.id, quantity)
+    const result = await calculateBOMYield(id, quantity)
 
     return NextResponse.json(result)
   } catch (error) {

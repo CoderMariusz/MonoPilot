@@ -30,15 +30,17 @@ export interface OrgContext {
   role_code: string
   role_name: string
   permissions: Record<string, string>
-  organization: {
-    id: string
-    name: string
-    slug: string
-    timezone: string
-    locale: string
-    currency: string
-    onboarding_step: number
-    onboarding_completed_at: string | null
-    is_active: boolean
-  }
+  organization: Pick<
+    Organization,
+    | 'id'
+    | 'name'
+    | 'slug'
+    | 'timezone'
+    | 'locale'
+    | 'currency'
+    | 'onboarding_step'
+    | 'onboarding_completed_at'
+    | 'onboarding_skipped'
+    | 'is_active'
+  >
 }

@@ -46,3 +46,13 @@ claude_desktop_config.json.NEW
 
 # Claude settings with potential secrets
 .claude/settings.local.json
+.vercel
+.env*.local
+
+# Build outputs
+dist/
+build/
+.out/
+.next/
+.cache/
+node_modules/

@@ -57,7 +57,7 @@ export function SkipConfirmationDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Skip Onboarding Wizard?</AlertDialogTitle>
           <AlertDialogDescription>
-            We'll create a demo warehouse and default location so you can start
+            We&apos;ll create a demo warehouse and default location so you can start
             exploring MonoPilot immediately. You can configure everything
             manually in Settings.
           </AlertDialogDescription>

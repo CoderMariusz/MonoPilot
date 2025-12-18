@@ -17,10 +17,10 @@ import { scaleBOM } from '@/lib/services/bom-service'
  * Note: This is a read-only calculation. To save scaled BOM,
  *       use the clone endpoint with custom quantities.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest) {
+  // Extract dynamic param `id` from the request pathname (route: /api/technical/boms/:id/scale)
+  const pathSegments = request.nextUrl.pathname.split('/').filter(Boolean)
+  const id = pathSegments[pathSegments.length - 2]
   try {
     const searchParams = request.nextUrl.searchParams
     const multiplierParam = searchParams.get('multiplier')
@@ -44,7 +44,7 @@ export async function GET(
     }
 
     // Calculate scaled quantities
-    const result = await scaleBOM(params.id, multiplier)
+    const result = await scaleBOM(id, multiplier)
 
     return NextResponse.json(result)
   } catch (error) {

@@ -59,7 +59,7 @@ export function OnboardingWizardModal({
         <DialogHeader>
           <DialogTitle>Skip Onboarding Wizard?</DialogTitle>
           <DialogDescription>
-            We'll create a demo warehouse and default location so you can start
+            We&apos;ll create a demo warehouse and default location so you can start
             exploring MonoPilot immediately.
           </DialogDescription>
         </DialogHeader>
