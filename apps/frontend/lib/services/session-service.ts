@@ -4,12 +4,16 @@ import { addToBlacklist } from './jwt-blacklist-service'
 
 /**
  * Session Service
- * Story: 1.4 Session Management
- * Task 2: Session Service - Core Logic (AC: all)
+ * Story: 01.15 Session & Password Management
+ * Task: Session Service - Core Logic
  *
- * Handles user session CRUD, termination, and activity tracking
+ * Handles user session CRUD, termination, and activity tracking.
+ * Implements multi-device session management with device tracking and timeout configuration.
  */
 
+/**
+ * User session record from database
+ */
 export interface UserSession {
   id: string
   user_id: string
@@ -24,6 +28,9 @@ export interface UserSession {
   created_at: string
 }
 
+/**
+ * Parameters for creating a new session
+ */
 export interface CreateSessionParams {
   userId: string
   tokenId: string // JWT jti claim
@@ -165,56 +172,47 @@ export async function terminateSession(
  * @param userId - User UUID
  * @param exceptTokenId - Current session token ID (keep this one active), optional
  * @param tokenExpiry - JWT exp claim (Unix timestamp), optional (defaults to current time + 1 day)
- * @returns Result object with success status, count, and optional error
+ * @returns Number of sessions terminated
+ * @throws Error if operation fails
  */
 export async function terminateAllSessions(
   userId: string,
   exceptTokenId?: string,
   tokenExpiry?: number
-): Promise<{ success: boolean; count?: number; error?: string }> {
-  try {
-    const supabase = await createServerSupabase()
+): Promise<number> {
+  const supabase = await createServerSupabase()
 
-    // Default token expiry to 24 hours from now if not provided
-    const expiry = tokenExpiry || Math.floor(Date.now() / 1000) + 86400
+  // Default token expiry to 24 hours from now if not provided
+  const expiry = tokenExpiry || Math.floor(Date.now() / 1000) + 86400
 
-    // Build query for active sessions
-    let query = supabase
-      .from('user_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
+  // Build query for active sessions
+  let query = supabase
+    .from('user_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true)
 
-    // If exceptTokenId provided, exclude it from termination
-    if (exceptTokenId) {
-      query = query.neq('token_id', exceptTokenId)
-    }
-
-    const { data: sessions, error: fetchError } = await query
-
-    if (fetchError) {
-      return {
-        success: false,
-        error: `Failed to fetch sessions: ${fetchError.message}`,
-      }
-    }
-
-    if (!sessions || sessions.length === 0) {
-      return { success: true, count: 0 }
-    }
-
-    // Terminate each session
-    for (const session of sessions) {
-      await terminateSession(session.id, userId, expiry)
-    }
-
-    return { success: true, count: sessions.length }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
+  // If exceptTokenId provided, exclude it from termination
+  if (exceptTokenId) {
+    query = query.neq('token_id', exceptTokenId)
   }
+
+  const { data: sessions, error: fetchError } = await query
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch sessions: ${fetchError.message}`)
+  }
+
+  if (!sessions || sessions.length === 0) {
+    return 0
+  }
+
+  // Terminate each session
+  for (const session of sessions) {
+    await terminateSession(session.id, userId, expiry)
+  }
+
+  return sessions.length
 }
 
 /**
