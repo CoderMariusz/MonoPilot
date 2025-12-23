@@ -1,0 +1,209 @@
+================================================================
+SIMPLE FIX GUIDE - Story 01.11 Frontend Integration
+================================================================
+
+FILE TO FIX:
+apps/frontend/app/(authenticated)/settings/production-lines/page.tsx
+
+----------------------------------------------------------------
+FIX 1: Update Header Comment (Lines 1-7)
+----------------------------------------------------------------
+
+FIND:
+/**
+ * Production Line Management Page
+ * Story: 1.8 Production Line Configuration
+ * Task: BATCH 2 - List Page
+ * AC-007.4: Lines list view with search, filters, sort
+ * AC-007.2: Delete production line with FK validation
+ */
+
+REPLACE WITH:
+/**
+ * Production Line Management Page
+ * Story: 01.11 - Production Lines CRUD
+ * Purpose: Main page for production line CRUD operations
+ */
+
+----------------------------------------------------------------
+FIX 2: Update Import Statement (Line 34)
+----------------------------------------------------------------
+
+FIND:
+import { ProductionLineFormModal } from '@/components/settings/ProductionLineFormModal'
+
+REPLACE WITH:
+import { ProductionLineModal } from '@/components/settings/production-lines'
+
+----------------------------------------------------------------
+FIX 3: Fix API Path #1 (Line ~82)
+----------------------------------------------------------------
+
+FIND:
+const response = await fetch(`/api/settings/lines?${params.toString()}`)
+
+REPLACE WITH:
+const response = await fetch(`/api/v1/settings/production-lines?${params.toString()}`)
+
+----------------------------------------------------------------
+FIX 4: Fix API Path #2 (Line ~104)
+----------------------------------------------------------------
+
+FIND:
+const response = await fetch('/api/settings/warehouses')
+
+REPLACE WITH:
+const response = await fetch('/api/v1/settings/warehouses')
+
+----------------------------------------------------------------
+FIX 5: Fix API Path #3 (Line ~129)
+----------------------------------------------------------------
+
+FIND:
+const response = await fetch(`/api/settings/lines/${line.id}`, {
+
+REPLACE WITH:
+const response = await fetch(`/api/v1/settings/production-lines/${line.id}`, {
+
+----------------------------------------------------------------
+FIX 6: Update Component Usage (Lines ~329-342)
+----------------------------------------------------------------
+
+FIND:
+{(showCreateModal || editingLine) && (
+  <ProductionLineFormModal
+    line={editingLine}
+    onClose={() => {
+      setShowCreateModal(false)
+      setEditingLine(null)
+    }}
+    onSuccess={() => {
+      fetchLines()
+      setShowCreateModal(false)
+      setEditingLine(null)
+    }}
+  />
+)}
+
+REPLACE WITH:
+{(showCreateModal || editingLine) && (
+  <ProductionLineModal
+    mode={editingLine ? 'edit' : 'create'}
+    productionLine={editingLine}
+    open={showCreateModal || !!editingLine}
+    onClose={() => {
+      setShowCreateModal(false)
+      setEditingLine(null)
+    }}
+    onSubmit={async (data) => {
+      try {
+        const url = editingLine
+          ? `/api/v1/settings/production-lines/${editingLine.id}`
+          : '/api/v1/settings/production-lines'
+        const method = editingLine ? 'PUT' : 'POST'
+
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to save production line')
+        }
+
+        toast({
+          title: 'Success',
+          description: `Production line ${editingLine ? 'updated' : 'created'} successfully`,
+        })
+
+        fetchLines()
+        setShowCreateModal(false)
+        setEditingLine(null)
+      } catch (error) {
+        console.error('Error saving production line:', error)
+        throw error
+      }
+    }}
+    warehouses={warehouses}
+    availableMachines={[]}
+    availableProducts={[]}
+  />
+)}
+
+----------------------------------------------------------------
+FIX 7: Add State for Modal Data (After line ~61)
+----------------------------------------------------------------
+
+ADD AFTER LINE ~61 (after warehouses state):
+  const [availableMachines, setAvailableMachines] = useState<Array<{ id: string; code: string; name: string; status: any; capacity_per_hour: number | null }>>([])
+  const [availableProducts, setAvailableProducts] = useState<Array<{ id: string; code: string; name: string; category?: string }>>([])
+
+----------------------------------------------------------------
+FIX 8: Fetch Modal Data (After fetchWarehouses function)
+----------------------------------------------------------------
+
+ADD AFTER fetchWarehouses function:
+  const fetchAvailableMachines = async () => {
+    try {
+      const response = await fetch('/api/v1/settings/machines?status=ACTIVE,MAINTENANCE')
+      if (!response.ok) return
+      const data = await response.json()
+      setAvailableMachines(data.machines || [])
+    } catch (error) {
+      console.error('Error fetching machines:', error)
+    }
+  }
+
+  const fetchAvailableProducts = async () => {
+    try {
+      const response = await fetch('/api/v1/technical/products')
+      if (!response.ok) return
+      const data = await response.json()
+      setAvailableProducts(data.products || [])
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    }
+  }
+
+----------------------------------------------------------------
+FIX 9: Call New Fetch Functions (In useEffect)
+----------------------------------------------------------------
+
+UPDATE the useEffect that calls fetchWarehouses (line ~66):
+
+FROM:
+useEffect(() => {
+  fetchWarehouses()
+}, [])
+
+TO:
+useEffect(() => {
+  fetchWarehouses()
+  fetchAvailableMachines()
+  fetchAvailableProducts()
+}, [])
+
+================================================================
+VERIFICATION
+================================================================
+
+After making all changes:
+
+1. Save file
+2. Restart dev server: pnpm dev
+3. Navigate to: http://localhost:3000/settings/production-lines
+4. Click "Add Production Line"
+5. Verify modal has 3 tabs: Basic Info, Machine Sequence, Product Compatibility
+6. Fill form and submit
+7. Check that line appears in table
+
+================================================================
+TEST STATUS
+================================================================
+
+Component Tests: 30/30 PASSING ✓
+Integration Test: Manual verification required
+
+================================================================

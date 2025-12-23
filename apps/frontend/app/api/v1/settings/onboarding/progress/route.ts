@@ -1,89 +1,91 @@
 /**
- * API Route: PUT /api/v1/settings/onboarding/progress
+ * API Route: POST /api/v1/settings/onboarding/progress
  * Story: 01.3 - Onboarding Wizard Launcher
  *
- * Updates wizard progress (step number) for authenticated user's organization
- * Admin-only operation
+ * Updates onboarding wizard progress as user advances through steps.
+ * Sets started_at on first progress update, completed_at when reaching final step.
  */
 
 import { NextResponse } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { OnboardingService } from '@/lib/services/onboarding-service'
 import {
   getOrgContext,
   deriveUserIdFromSession,
 } from '@/lib/services/org-context-service'
 import { handleApiError } from '@/lib/utils/api-error-handler'
-import { hasAdminAccess } from '@/lib/services/permission-service'
-import { ForbiddenError } from '@/lib/errors/forbidden-error'
-import { OnboardingService } from '@/lib/services/onboarding-service'
 
 /**
- * PUT /api/v1/settings/onboarding/progress
- * Updates wizard progress (current step)
+ * POST /api/v1/settings/onboarding/progress
+ * Updates wizard progress step
  *
- * Request:
+ * Body:
  * {
- *   step: number; // 1-6
+ *   step: number // Step number (1-6)
  * }
  *
  * Response:
  * {
- *   success: true;
- *   step: number;
+ *   success: true
  * }
  *
  * Errors:
- * - 400: Bad Request (invalid step number)
+ * - 400: Bad Request (invalid step number or missing body)
  * - 401: Unauthorized (no session)
- * - 403: Forbidden (not admin or inactive user/org)
+ * - 403: Forbidden (inactive user/org or insufficient permissions)
  * - 404: Not Found (user not found)
+ * - 500: Internal Server Error (update failed)
  *
- * @example
- * ```typescript
- * const response = await fetch('/api/v1/settings/onboarding/progress', {
- *   method: 'PUT',
- *   headers: { 'Content-Type': 'application/json' },
- *   body: JSON.stringify({ step: 3 }),
- * });
- * const data = await response.json();
- * console.log(data.step); // 3
- * ```
+ * Security:
+ * - Requires OWNER or ADMIN role
+ * - Validates step number is integer between 1-6
+ * - Automatically sets timestamps (started_at, completed_at)
  */
-export async function PUT(request: Request) {
+export async function POST(request: Request) {
   try {
     // 1. Get authenticated user from session
     const userId = await deriveUserIdFromSession()
 
-    // 2. Get org context
+    // 2. Get org context for tenant isolation and permission check
     const context = await getOrgContext(userId)
 
-    // 3. Check admin permission
-    if (!hasAdminAccess(context.role_code)) {
-      throw new ForbiddenError('Only administrators can update onboarding progress')
+    // 3. Check permissions (only OWNER and ADMIN can update progress)
+    const allowedRoles = ['owner', 'admin']
+    if (!allowedRoles.includes(context.role_code)) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions' },
+        { status: 403 }
+      )
     }
 
-    // 4. Parse request body
-    const body = await request.json()
-    const { step } = body
-
-    // 5. Validate step number (1-6)
-    if (typeof step !== 'number' || step < 1 || step > 6) {
+    // 4. Parse and validate request body
+    let body: any
+    try {
+      body = await request.json()
+    } catch (e) {
       return NextResponse.json(
-        { error: 'Invalid step number. Must be between 1 and 6' },
+        { error: 'Invalid JSON' },
         { status: 400 }
       )
     }
 
-    // 6. Update progress via service
-    await OnboardingService.updateProgress(context.org_id, step)
+    // 5. Validate step number
+    const step = body?.step
+    if (typeof step !== 'number' || !Number.isInteger(step) || step < 1 || step > 6) {
+      return NextResponse.json(
+        { error: 'Invalid step number (must be integer 1-6)' },
+        { status: 400 }
+      )
+    }
 
-    // 7. Return success
-    return NextResponse.json(
-      {
-        success: true,
-        step,
-      },
-      { status: 200 }
-    )
+    // 6. Get server-side Supabase client
+    const supabase = await createServerSupabase()
+
+    // 7. Update progress
+    await OnboardingService.updateProgress(supabase, context.org_id, step)
+
+    // 8. Return success
+    return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }

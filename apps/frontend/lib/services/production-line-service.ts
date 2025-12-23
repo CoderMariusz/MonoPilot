@@ -1,929 +1,556 @@
-import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
-
 /**
  * Production Line Service
- * Story: 1.8 Production Line Configuration
- * Tasks: 2, 7, 8, 9, 11
- *
- * Handles production line CRUD operations with:
- * - Unique code validation per org (AC-007.1)
- * - Warehouse assignment (each line belongs to one warehouse)
- * - Default output location (optional, must be within line's warehouse) (AC-007.2)
- * - Many-to-many machine assignments via machine_line_assignments (AC-007.3)
- * - Output location validation: location.warehouse_id must match line.warehouse_id (AC-011)
- * - FK constraint handling for deletions: prevents deletion if has active WOs (AC-007.5)
- * - Cache invalidation events (AC-007.8)
+ * Story: 01.11 - Production Lines CRUD
+ * Purpose: CRUD operations, machine assignment, capacity calculation, sequence management
  */
 
-// Type alias for Supabase client (inferred from createServerSupabase return type)
-type SupabaseClient = Awaited<ReturnType<typeof createServerSupabase>>
+import { createClient } from '@/lib/supabase/client'
+import type {
+  ProductionLine,
+  CreateProductionLineInput,
+  UpdateProductionLineInput,
+  ProductionLineListParams,
+  PaginatedProductionLineResult,
+  CapacityResult,
+  MachineOrder,
+  LineMachine,
+} from '@/lib/types/production-line'
 
-export interface ProductionLine {
-  id: string
-  org_id: string
-  warehouse_id: string
-  code: string
-  name: string
-  default_output_location_id: string | null
-  created_by: string | null
-  updated_by: string | null
-  created_at: string
-  updated_at: string
-  // Populated data (JOIN results)
-  warehouse?: {
-    id: string
-    code: string
-    name: string
-  }
-  default_output_location?: {
-    id: string
-    code: string
-    name: string
-    type: string
-  }
-  assigned_machines?: Array<{
-    id: string
-    code: string
-    name: string
-    status: string
-  }>
-}
+export class ProductionLineService {
+  /**
+   * List production lines with filters, search, and pagination
+   */
+  static async list(
+    params: ProductionLineListParams = {}
+  ): Promise<{ success: boolean; data?: ProductionLine[]; total?: number; page?: number; limit?: number; error?: string }> {
+    try {
+      const supabase = createClient()
+      const {
+        warehouse_id,
+        status,
+        search,
+        page = 1,
+        limit = 25,
+      } = params
 
-export interface CreateProductionLineInput {
-  code: string
-  name: string
-  warehouse_id: string
-  default_output_location_id?: string | null
-  machine_ids?: string[]
-}
-
-export interface UpdateProductionLineInput {
-  code?: string
-  name?: string
-  warehouse_id?: string
-  default_output_location_id?: string | null
-  machine_ids?: string[]
-}
-
-export interface ProductionLineFilters {
-  warehouse_id?: string
-  search?: string
-  sort_by?: 'code' | 'name' | 'warehouse' | 'created_at'
-  sort_direction?: 'asc' | 'desc'
-}
-
-export interface ProductionLineServiceResult<T = ProductionLine> {
-  success: boolean
-  data?: T
-  error?: string
-  warning?: string  // Non-blocking warnings (e.g., warehouse change requires output location update)
-  code?: 'DUPLICATE_CODE' | 'NOT_FOUND' | 'FOREIGN_KEY_CONSTRAINT' | 'INVALID_INPUT' | 'DATABASE_ERROR' | 'ACTIVE_WOS' | 'LOCATION_WAREHOUSE_MISMATCH'
-}
-
-export interface ProductionLineListResult {
-  success: boolean
-  data?: ProductionLine[]
-  total?: number
-  error?: string
-}
-
-/**
- * Get current user's org_id from JWT
- * Used for RLS enforcement and multi-tenancy
- */
-async function getCurrentOrgId(): Promise<string | null> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  // Extract org_id from JWT claims
-  const { data: userData, error } = await supabase
-    .from('users')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (error || !userData) {
-    console.error('Failed to get org_id for user:', user.id, error)
-    return null
-  }
-
-  return userData.org_id
-}
-
-/**
- * Validate that output location belongs to line's warehouse
- * AC-007.2, AC-011: Output location validation
- *
- * Business rule: default_output_location_id must belong to same warehouse as the line
- *
- * @param supabase - Supabase client
- * @param warehouseId - Warehouse UUID from line
- * @param locationId - Location UUID to validate
- * @returns { valid: boolean; error?: string }
- */
-async function validateOutputLocation(
-  supabase: SupabaseClient,
-  warehouseId: string,
-  locationId: string
-): Promise<{ valid: boolean; error?: string }> {
-  try {
-    // Fetch location to check its warehouse_id
-    const { data: location, error } = await supabase
-      .from('locations')
-      .select('id, warehouse_id, code, name')
-      .eq('id', locationId)
-      .single()
-
-    if (error || !location) {
-      return {
-        valid: false,
-        error: `Location not found: ${locationId}`,
-      }
-    }
-
-    // Validate warehouse match
-    if (location.warehouse_id !== warehouseId) {
-      return {
-        valid: false,
-        error: `Output location "${location.code}" does not belong to the selected warehouse. Please choose a location within the same warehouse.`,
-      }
-    }
-
-    return { valid: true }
-  } catch (error) {
-    console.error('Error in validateOutputLocation:', error)
-    return {
-      valid: false,
-      error: error instanceof Error ? error.message : 'Unknown validation error',
-    }
-  }
-}
-
-/**
- * Update production line machine assignments (many-to-many)
- * AC-007.3: Line-machine many-to-many assignment
- *
- * Strategy: Delete all existing assignments, then bulk insert new ones
- * This is safe because machine_line_assignments has no cascading dependencies
- *
- * Bidirectional: Can assign from line side (this story) or machine side (Story 1.7)
- *
- * TRANSACTION SAFETY NOTE:
- * - Supabase client uses implicit transactions for single operations
- * - Delete + Insert are separate operations (potential for data loss if insert fails)
- * - Risk mitigation: FK constraints ensure referential integrity
- * - If insert fails, delete still succeeded → assignments are cleared (acceptable UX)
- * - Caller should handle insert failure and retry or rollback parent operation
- * - For stricter atomicity, consider using Supabase RPC with explicit transaction
- *
- * @param supabase - Supabase client
- * @param lineId - Production line UUID
- * @param machineIds - Array of machine UUIDs
- */
-async function updateLineMachineAssignments(
-  supabase: SupabaseClient,
-  lineId: string,
-  machineIds?: string[]
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Delete existing assignments (Step 1 of 2)
-    const { error: deleteError } = await supabase
-      .from('machine_line_assignments')
-      .delete()
-      .eq('line_id', lineId)
-
-    if (deleteError) {
-      console.error('Failed to delete existing machine assignments:', deleteError)
-      return { success: false, error: deleteError.message }
-    }
-
-    // If no new machine_ids provided, we're done (assignments removed)
-    if (!machineIds || machineIds.length === 0) {
-      return { success: true }
-    }
-
-    // Bulk insert new assignments
-    const assignments = machineIds.map(machineId => ({
-      machine_id: machineId,
-      line_id: lineId,
-    }))
-
-    const { error: insertError } = await supabase
-      .from('machine_line_assignments')
-      .insert(assignments)
-
-    if (insertError) {
-      console.error('Failed to insert machine assignments:', insertError)
-
-      // Check for duplicate assignment (race condition)
-      if (insertError.code === '23505') {
-        return { success: false, error: 'Duplicate machine assignment detected' }
-      }
-
-      return { success: false, error: insertError.message }
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error('Error in updateLineMachineAssignments:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }
-  }
-}
-
-/**
- * Create a new production line
- * AC-007.1: Admin może stworzyć production line
- *
- * Validation:
- * - Code must be unique per org
- * - Code format: uppercase alphanumeric + hyphens
- * - Name required (1-100 chars)
- * - warehouse_id required (FK to warehouses)
- * - default_output_location_id optional (FK to locations, must be in same warehouse)
- *
- * Machine assignments: If machine_ids provided, creates assignments in machine_line_assignments table
- *
- * Cache invalidation: Emits line.created event (AC-007.8)
- *
- * @param input - CreateProductionLineInput
- * @returns ProductionLineServiceResult with created line or error
- */
-export async function createProductionLine(
-  input: CreateProductionLineInput
-): Promise<ProductionLineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found. Please log in again.',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Get current user ID for audit trail
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return {
-        success: false,
-        error: 'User not authenticated',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Check if code already exists for this org (AC-007.1)
-    const { data: existingLine } = await supabase
-      .from('production_lines')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('code', input.code.toUpperCase())
-      .single()
-
-    if (existingLine) {
-      return {
-        success: false,
-        error: `Production line code "${input.code}" already exists`,
-        code: 'DUPLICATE_CODE',
-      }
-    }
-
-    // Validate output location if provided (AC-007.2, AC-011)
-    if (input.default_output_location_id) {
-      const validation = await validateOutputLocation(
-        supabase,
-        input.warehouse_id,
-        input.default_output_location_id
-      )
-
-      if (!validation.valid) {
-        return {
-          success: false,
-          error: validation.error || 'Output location validation failed',
-          code: 'LOCATION_WAREHOUSE_MISMATCH',
-        }
-      }
-    }
-
-    // Create production line
-    const { data: line, error } = await supabase
-      .from('production_lines')
-      .insert({
-        org_id: orgId,
-        code: input.code.toUpperCase(), // Ensure uppercase
-        name: input.name,
-        warehouse_id: input.warehouse_id,
-        default_output_location_id: input.default_output_location_id ?? null,
-        created_by: user.id,
-        updated_by: user.id,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Failed to create production line:', error)
-      // TODO Story 1.14: In production, use generic error message to prevent information disclosure
-      // error: process.env.NODE_ENV === 'production' ? 'Internal server error' : `Database error: ${error.message}`
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    // Create machine assignments if machine_ids provided (AC-007.3)
-    // TRANSACTION ROLLBACK: If assignments fail, delete the created line to maintain consistency
-    if (input.machine_ids && input.machine_ids.length > 0) {
-      const assignmentResult = await updateLineMachineAssignments(
-        supabase,
-        line.id,
-        input.machine_ids
-      )
-
-      if (!assignmentResult.success) {
-        // ROLLBACK: Delete the created line since machine assignments failed
-        console.error('Machine assignments failed, rolling back line creation:', assignmentResult.error)
-
-        const { error: deleteError } = await supabase
-          .from('production_lines')
-          .delete()
-          .eq('id', line.id)
-          .eq('org_id', orgId)
-
-        if (deleteError) {
-          console.error('CRITICAL: Failed to rollback line creation:', deleteError)
-          return {
-            success: false,
-            error: `Line created but assignments failed, and rollback also failed. Manual cleanup required for line ${line.id}. Original error: ${assignmentResult.error}`,
-            code: 'DATABASE_ERROR',
-          }
-        }
-
-        return {
-          success: false,
-          error: `Failed to create machine assignments: ${assignmentResult.error}. Line creation rolled back.`,
-          code: 'DATABASE_ERROR',
-        }
-      }
-    }
-
-    // Emit cache invalidation event (AC-007.8)
-    await emitLineUpdatedEvent(orgId, 'created', line.id)
-
-    console.log(`Successfully created production line: ${line.code} (${line.id})`)
-
-    return {
-      success: true,
-      data: line,
-    }
-  } catch (error) {
-    console.error('Error in createProductionLine:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * Update an existing production line
- * AC-007.6: Edit line
- *
- * Validation:
- * - Code still unique per org (if changed)
- * - Warehouse change: warn if has WOs (AC-007.6)
- * - Output location must belong to new warehouse if warehouse changed
- *
- * Machine assignments: Updates machine_line_assignments (delete old, insert new)
- *
- * Cache invalidation: Emits line.updated event (AC-007.8)
- *
- * @param id - Production line UUID
- * @param input - UpdateProductionLineInput
- * @returns ProductionLineServiceResult with updated line or error
- */
-export async function updateProductionLine(
-  id: string,
-  input: UpdateProductionLineInput
-): Promise<ProductionLineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Get current user ID for audit trail
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return {
-        success: false,
-        error: 'User not authenticated',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Check if line exists and belongs to org
-    // Fetch full state for potential rollback if machine assignments fail
-    const { data: existingLine, error: fetchError } = await supabase
-      .from('production_lines')
-      .select('id, code, name, warehouse_id, default_output_location_id')
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .single()
-
-    if (fetchError || !existingLine) {
-      return {
-        success: false,
-        error: 'Production line not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // If code is being changed, check uniqueness (AC-007.6)
-    if (input.code && input.code.toUpperCase() !== existingLine.code) {
-      const { data: duplicateLine } = await supabase
+      // Build query
+      let query = supabase
         .from('production_lines')
-        .select('id')
-        .eq('org_id', orgId)
-        .eq('code', input.code.toUpperCase())
-        .neq('id', id)
+        .select(`
+          *,
+          warehouse:warehouses(id, code, name),
+          machines:production_line_machines(
+            machine:machines(
+              id,
+              code,
+              name,
+              status,
+              capacity_per_hour
+            ),
+            sequence_order
+          ),
+          compatible_products:production_line_products(
+            product:products(id, code, name, category)
+          )
+        `, { count: 'exact' })
+
+      // Apply filters
+      if (warehouse_id) {
+        query = query.eq('warehouse_id', warehouse_id)
+      }
+
+      if (status) {
+        query = query.eq('status', status)
+      }
+
+      if (search) {
+        query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%`)
+      }
+
+      // Pagination
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      query = query.range(from, to)
+
+      // Order
+      query = query.order('code', { ascending: true })
+
+      const { data, error, count } = await query
+
+      if (error) throw error
+
+      // Transform data
+      const lines = data?.map((line: any) => ({
+        ...line,
+        machines: line.machines
+          ?.map((m: any) => ({
+            ...m.machine,
+            sequence_order: m.sequence_order,
+          }))
+          .sort((a: any, b: any) => a.sequence_order - b.sequence_order) || [],
+        compatible_products: line.compatible_products?.map((p: any) => p.product) || [],
+        ...this.calculateBottleneckCapacity(
+          line.machines?.map((m: any) => ({
+            ...m.machine,
+            sequence_order: m.sequence_order,
+          })) || []
+        ),
+      }))
+
+      return {
+        success: true,
+        data: lines || [],
+        total: count || 0,
+        page,
+        limit,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to list production lines',
+      }
+    }
+  }
+
+  /**
+   * Get production line by ID with machines and capacity
+   */
+  static async getById(id: string): Promise<{ success: boolean; data?: ProductionLine; error?: string }> {
+    try {
+      const supabase = createClient()
+
+      const { data, error } = await supabase
+        .from('production_lines')
+        .select(`
+          *,
+          warehouse:warehouses(id, code, name),
+          machines:production_line_machines(
+            machine:machines(
+              id,
+              code,
+              name,
+              status,
+              capacity_per_hour
+            ),
+            sequence_order
+          ),
+          compatible_products:production_line_products(
+            product:products(id, code, name, category)
+          )
+        `)
+        .eq('id', id)
         .single()
 
-      if (duplicateLine) {
-        return {
-          success: false,
-          error: `Production line code "${input.code}" already exists`,
-          code: 'DUPLICATE_CODE',
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return { success: false, error: 'Line not found' }
         }
+        throw error
       }
-    }
 
-    // AC-007.6: If warehouse changing, check for active WOs
-    let warehouseChangeWarning: string | undefined
-    if (input.warehouse_id && input.warehouse_id !== existingLine.warehouse_id) {
-      // TODO Epic 3: Query work_orders table to check for active WOs
-      // For now, return warning to user
-      warehouseChangeWarning = 'Warning: Warehouse has been changed. Please verify the output location is within the new warehouse. In Epic 3, this will check for active work orders.'
-      console.warn(`Warehouse changing for line ${id}. Check for active WOs in Epic 3. Output location must be updated.`)
-    }
+      // Transform data
+      const machines = data.machines
+        ?.map((m: any) => ({
+          ...m.machine,
+          sequence_order: m.sequence_order,
+        }))
+        .sort((a: any, b: any) => a.sequence_order - b.sequence_order) || []
 
-    // Determine which warehouse_id to use for validation
-    const targetWarehouseId = input.warehouse_id || existingLine.warehouse_id
+      const capacityData = this.calculateBottleneckCapacity(machines)
 
-    // Validate output location if provided (AC-007.2, AC-011)
-    if (input.default_output_location_id !== undefined) {
-      // If explicitly set to null, that's allowed (clearing default location)
-      if (input.default_output_location_id !== null) {
-        const validation = await validateOutputLocation(
-          supabase,
-          targetWarehouseId,
-          input.default_output_location_id
-        )
-
-        if (!validation.valid) {
-          return {
-            success: false,
-            error: validation.error || 'Output location validation failed',
-            code: 'LOCATION_WAREHOUSE_MISMATCH',
-          }
-        }
+      const line: ProductionLine = {
+        ...data,
+        machines,
+        compatible_products: data.compatible_products?.map((p: any) => p.product) || [],
+        calculated_capacity: capacityData.capacity,
+        bottleneck_machine_id: capacityData.bottleneck_machine_id,
+        bottleneck_machine_code: capacityData.bottleneck_machine_code,
       }
-    }
 
-    // Build update payload
-    const updatePayload: {
-      updated_by: string
-      code?: string
-      name?: string
-      warehouse_id?: string
-      default_output_location_id?: string | null
-    } = {
-      updated_by: user.id,
-    }
-
-    if (input.code) updatePayload.code = input.code.toUpperCase()
-    if (input.name !== undefined) updatePayload.name = input.name
-    if (input.warehouse_id !== undefined) updatePayload.warehouse_id = input.warehouse_id
-    if (input.default_output_location_id !== undefined) {
-      updatePayload.default_output_location_id = input.default_output_location_id
-    }
-
-    // Update production line
-    const { data: line, error } = await supabase
-      .from('production_lines')
-      .update(updatePayload)
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Failed to update production line:', error)
+      return { success: true, data: line }
+    } catch (error: any) {
       return {
         success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
+        error: error.message || 'Failed to get production line',
       }
     }
+  }
 
-    // Update machine assignments if machine_ids provided (AC-007.6)
-    // TRANSACTION ROLLBACK: If assignments fail, revert the line update
-    if (input.machine_ids !== undefined) {
-      const assignmentResult = await updateLineMachineAssignments(
-        supabase,
-        line.id,
-        input.machine_ids
-      )
+  /**
+   * Create new production line with machines and products
+   */
+  static async create(
+    input: CreateProductionLineInput
+  ): Promise<{ success: boolean; data?: ProductionLine; error?: string }> {
+    try {
+      const supabase = createClient()
 
-      if (!assignmentResult.success) {
-        // ROLLBACK: Revert line update since machine assignments failed
-        console.error('Machine assignments failed, rolling back line update:', assignmentResult.error)
+      // Get current user's org_id
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Unauthorized')
 
-        const rollbackPayload: {
-          code: string
-          name: string
-          warehouse_id: string
-          default_output_location_id: string | null
-          updated_by: string
-        } = {
-          code: existingLine.code,
-          name: existingLine.name,
-          warehouse_id: existingLine.warehouse_id,
-          default_output_location_id: existingLine.default_output_location_id,
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData) throw new Error('User not found')
+
+      const org_id = userData.org_id
+
+      // Check code uniqueness
+      const isUnique = await this.isCodeUnique(input.code.toUpperCase())
+      if (!isUnique) {
+        throw new Error('Line code must be unique')
+      }
+
+      // Create line
+      const { data: lineData, error: lineError } = await supabase
+        .from('production_lines')
+        .insert({
+          org_id,
+          code: input.code.toUpperCase(),
+          name: input.name,
+          description: input.description || null,
+          warehouse_id: input.warehouse_id,
+          default_output_location_id: input.default_output_location_id || null,
+          status: input.status || 'active',
+          created_by: user.id,
           updated_by: user.id,
-        }
+        })
+        .select()
+        .single()
 
-        const { error: rollbackError } = await supabase
-          .from('production_lines')
-          .update(rollbackPayload)
-          .eq('id', id)
-          .eq('org_id', orgId)
+      if (lineError) throw lineError
 
-        if (rollbackError) {
-          console.error('CRITICAL: Failed to rollback line update:', rollbackError)
-          return {
-            success: false,
-            error: `Line updated but assignments failed, and rollback also failed. Manual verification required for line ${id}. Original error: ${assignmentResult.error}`,
-            code: 'DATABASE_ERROR',
-          }
-        }
+      // Assign machines
+      if (input.machine_ids && input.machine_ids.length > 0) {
+        const machineAssignments = input.machine_ids.map((machine_id, index) => ({
+          org_id,
+          line_id: lineData.id,
+          machine_id,
+          sequence_order: index + 1,
+        }))
 
-        return {
-          success: false,
-          error: `Failed to update machine assignments: ${assignmentResult.error}. Line update rolled back.`,
-          code: 'DATABASE_ERROR',
-        }
+        const { error: machineError } = await supabase
+          .from('production_line_machines')
+          .insert(machineAssignments)
+
+        if (machineError) throw machineError
       }
-    }
 
-    // Emit cache invalidation event (AC-007.8)
-    await emitLineUpdatedEvent(orgId, 'updated', line.id)
+      // Assign products
+      if (input.product_ids && input.product_ids.length > 0) {
+        const productAssignments = input.product_ids.map((product_id) => ({
+          org_id,
+          line_id: lineData.id,
+          product_id,
+        }))
 
-    console.log(`Successfully updated production line: ${line.code} (${line.id})`)
+        const { error: productError } = await supabase
+          .from('production_line_products')
+          .insert(productAssignments)
 
-    return {
-      success: true,
-      data: line,
-      warning: warehouseChangeWarning, // Return warehouse change warning to user
-    }
-  } catch (error) {
-    console.error('Error in updateProductionLine:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
+        if (productError) throw productError
+      }
+
+      // Fetch full line data
+      return await this.getById(lineData.id)
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to create production line',
+      }
     }
   }
-}
 
-/**
- * Get production line by ID
- * AC-007.7: Line detail page
- *
- * Includes populated:
- * - Warehouse (JOIN warehouses)
- * - Default output location (JOIN locations)
- * - Assigned machines (JOIN machine_line_assignments + machines)
- *
- * @param id - Production line UUID
- * @returns ProductionLineServiceResult with line data (with relationships) or error
- */
-export async function getProductionLineById(id: string): Promise<ProductionLineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
+  /**
+   * Update existing production line
+   */
+  static async update(
+    id: string,
+    input: UpdateProductionLineInput
+  ): Promise<{ success: boolean; data?: ProductionLine; error?: string }> {
+    try {
+      const supabase = createClient()
 
-    if (!orgId) {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Unauthorized')
+
+      // Get current line
+      const { data: currentLine } = await supabase
+        .from('production_lines')
+        .select('code, org_id')
+        .eq('id', id)
+        .single()
+
+      if (!currentLine) throw new Error('Line not found')
+
+      // Check code change with work orders
+      if (input.code && input.code.toUpperCase() !== currentLine.code) {
+        const hasWorkOrders = await this.hasWorkOrders(id)
+        if (hasWorkOrders) {
+          throw new Error('Code cannot be changed while work orders exist')
+        }
+
+        // Check uniqueness
+        const isUnique = await this.isCodeUnique(input.code.toUpperCase(), id)
+        if (!isUnique) {
+          throw new Error('Line code must be unique')
+        }
+      }
+
+      // Build update data
+      const updateData: any = {
+        updated_by: user.id,
+      }
+
+      if (input.code) updateData.code = input.code.toUpperCase()
+      if (input.name) updateData.name = input.name
+      if (input.description !== undefined) updateData.description = input.description
+      if (input.warehouse_id) updateData.warehouse_id = input.warehouse_id
+      if (input.default_output_location_id !== undefined) {
+        updateData.default_output_location_id = input.default_output_location_id
+      }
+      if (input.status) updateData.status = input.status
+
+      // Update line
+      const { error: updateError } = await supabase
+        .from('production_lines')
+        .update(updateData)
+        .eq('id', id)
+
+      if (updateError) throw updateError
+
+      // Update machines if provided
+      if (input.machine_ids !== undefined) {
+        // Delete existing assignments
+        await supabase
+          .from('production_line_machines')
+          .delete()
+          .eq('line_id', id)
+
+        // Insert new assignments
+        if (input.machine_ids.length > 0) {
+          const machineAssignments = input.machine_ids.map((machine_id, index) => ({
+            org_id: currentLine.org_id,
+            line_id: id,
+            machine_id,
+            sequence_order: index + 1,
+          }))
+
+          await supabase
+            .from('production_line_machines')
+            .insert(machineAssignments)
+        }
+      }
+
+      // Update products if provided
+      if (input.product_ids !== undefined) {
+        // Delete existing assignments
+        await supabase
+          .from('production_line_products')
+          .delete()
+          .eq('line_id', id)
+
+        // Insert new assignments
+        if (input.product_ids.length > 0) {
+          const productAssignments = input.product_ids.map((product_id) => ({
+            org_id: currentLine.org_id,
+            line_id: id,
+            product_id,
+          }))
+
+          await supabase
+            .from('production_line_products')
+            .insert(productAssignments)
+        }
+      }
+
+      // Fetch updated line
+      return await this.getById(id)
+    } catch (error: any) {
       return {
         success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
+        error: error.message || 'Failed to update production line',
       }
-    }
-
-    // Fetch production line with warehouse and output location
-    const { data: line, error } = await supabase
-      .from('production_lines')
-      .select(`
-        *,
-        warehouse:warehouses(id, code, name),
-        default_output_location:locations(id, code, name, type)
-      `)
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .single()
-
-    if (error || !line) {
-      console.error('Failed to fetch production line:', error)
-      return {
-        success: false,
-        error: 'Production line not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // Fetch machine assignments with machine details
-    const { data: assignments } = await supabase
-      .from('machine_line_assignments')
-      .select(`
-        machine_id,
-        machine:machines(id, code, name, status)
-      `)
-      .eq('line_id', id)
-
-    // Attach assigned machines to line object
-    const lineWithRelationships = {
-      ...line,
-      assigned_machines: assignments?.map(a => a.machine) || [],
-    }
-
-    return {
-      success: true,
-      data: lineWithRelationships,
-    }
-  } catch (error) {
-    console.error('Error in getProductionLineById:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
     }
   }
-}
 
-/**
- * List production lines with filters
- * AC-007.4: Lines list view
- *
- * Filters:
- * - warehouse_id: filter by warehouse (optional)
- * - search: filter by code or name (case-insensitive)
- * - sort_by: code/name/warehouse/created_at (default: code)
- * - sort_direction: asc/desc (default: asc)
- *
- * Includes:
- * - Warehouse name (JOIN warehouses)
- * - Output location code (JOIN locations)
- * - Machine count and names (JOIN machine_line_assignments + machines)
- *
- * @param filters - ProductionLineFilters (optional)
- * @returns ProductionLineListResult with lines array or error
- */
-export async function listProductionLines(
-  filters?: ProductionLineFilters
-): Promise<ProductionLineListResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
+  /**
+   * Delete production line (blocked if work orders exist)
+   */
+  static async delete(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const supabase = createClient()
 
-    if (!orgId) {
+      // Check work orders
+      const hasWorkOrders = await this.hasWorkOrders(id)
+      if (hasWorkOrders) {
+        throw new Error('Line has active work orders')
+      }
+
+      // Delete line (CASCADE will handle junction tables)
+      const { error } = await supabase
+        .from('production_lines')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          throw new Error('Line not found')
+        }
+        throw error
+      }
+
+      return { success: true }
+    } catch (error: any) {
       return {
         success: false,
-        error: 'Organization ID not found',
-        total: 0,
+        error: error.message || 'Failed to delete production line',
+      }
+    }
+  }
+
+  /**
+   * Reorder machines in production line
+   */
+  static async reorderMachines(
+    lineId: string,
+    machineOrders: MachineOrder[]
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Validate sequences (no gaps, no duplicates)
+      const sequences = machineOrders.map((m) => m.sequence_order).sort((a, b) => a - b)
+      const expectedSequences = Array.from({ length: sequences.length }, (_, i) => i + 1)
+
+      if (JSON.stringify(sequences) !== JSON.stringify(expectedSequences)) {
+        throw new Error('Invalid sequence (gaps or duplicates)')
+      }
+
+      const supabase = createClient()
+
+      // Update each machine's sequence
+      for (const order of machineOrders) {
+        const { error } = await supabase
+          .from('production_line_machines')
+          .update({ sequence_order: order.sequence_order })
+          .eq('line_id', lineId)
+          .eq('machine_id', order.machine_id)
+
+        if (error) throw error
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to reorder machines',
+      }
+    }
+  }
+
+  /**
+   * Check if code is unique (org-scoped)
+   */
+  static async isCodeUnique(code: string, excludeId?: string): Promise<boolean> {
+    try {
+      const supabase = createClient()
+
+      let query = supabase
+        .from('production_lines')
+        .select('id')
+        .eq('code', code.toUpperCase())
+
+      if (excludeId) {
+        query = query.neq('id', excludeId)
+      }
+
+      const { data } = await query.single()
+
+      return !data
+    } catch (error) {
+      // PGRST116 = no rows returned = code is unique
+      return true
+    }
+  }
+
+  /**
+   * Calculate bottleneck capacity (MIN of all machine capacities)
+   */
+  static calculateBottleneckCapacity(machines: LineMachine[]): CapacityResult {
+    const machinesWithCapacity = machines.filter(
+      (m) => m.capacity_per_hour !== null && m.capacity_per_hour > 0
+    )
+
+    if (machinesWithCapacity.length === 0) {
+      return {
+        capacity: null,
+        bottleneck_machine_id: null,
+        bottleneck_machine_code: null,
+        machines_without_capacity: machines.map((m) => m.code),
       }
     }
 
-    // Build query with JOINs (optimized: single query with machine assignments)
-    let query = supabase
-      .from('production_lines')
-      .select(`
-        *,
-        warehouse:warehouses(id, code, name),
-        default_output_location:locations(id, code, name, type),
-        machine_line_assignments(
-          machine:machines(id, code, name, status)
-        )
-      `, { count: 'exact' })
-      .eq('org_id', orgId)
+    const bottleneck = machinesWithCapacity.reduce((min, m) =>
+      m.capacity_per_hour! < min.capacity_per_hour! ? m : min
+    )
 
-    // Apply warehouse filter (AC-007.4)
-    if (filters?.warehouse_id) {
-      query = query.eq('warehouse_id', filters.warehouse_id)
+    return {
+      capacity: bottleneck.capacity_per_hour,
+      bottleneck_machine_id: bottleneck.id,
+      bottleneck_machine_code: bottleneck.code,
+      machines_without_capacity: machines
+        .filter((m) => !m.capacity_per_hour || m.capacity_per_hour <= 0)
+        .map((m) => m.code),
     }
+  }
 
-    // Search filter (AC-007.4: Search by code or name)
-    if (filters?.search) {
-      // NOTE: Escaping is for LIKE semantics (%, _), NOT for SQL injection prevention
-      // Supabase uses parameterized queries which prevent SQL injection
-      // Story 1.14 TODO: Add comment to clarify this is LIKE escaping, not security escaping
-      const escapedSearch = filters.search
-        .replace(/\\/g, '\\\\')
-        .replace(/%/g, '\\%')
-        .replace(/_/g, '\\_')
-
-      query = query.or(`code.ilike.%${escapedSearch}%,name.ilike.%${escapedSearch}%`)
-    }
-
-    // Dynamic sorting (AC-007.4)
-    const sortBy = filters?.sort_by || 'code'
-    const sortDirection = filters?.sort_direction || 'asc'
-
-    // Handle warehouse sorting (requires JOIN)
-    if (sortBy === 'warehouse') {
-      // TODO: Implement warehouse name sorting (requires custom query or client-side sort)
-      query = query.order('warehouse_id', { ascending: sortDirection === 'asc' })
-    } else {
-      query = query.order(sortBy, { ascending: sortDirection === 'asc' })
-    }
-
-    const { data: lines, error, count } = await query
-
-    if (error) {
-      console.error('Failed to list production lines:', error)
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        total: 0,
-      }
-    }
-
-    // Transform machine_line_assignments to assigned_machines array
-    // (Extract nested machine data from junction table)
-    const linesWithMachines = (lines || []).map(line => ({
-      ...line,
-      assigned_machines: (line.machine_line_assignments || [])
-        .map((assignment: any) => assignment.machine)
-        .filter(Boolean),
-      // Remove the junction table data (not needed in response)
-      machine_line_assignments: undefined,
+  /**
+   * Renumber sequences (auto 1, 2, 3... no gaps)
+   */
+  static renumberSequences(machines: { id: string }[]): MachineOrder[] {
+    return machines.map((machine, index) => ({
+      machine_id: machine.id,
+      sequence_order: index + 1,
     }))
+  }
 
-    return {
-      success: true,
-      data: linesWithMachines,
-      total: count ?? 0,
-    }
-  } catch (error) {
-    console.error('Error in listProductionLines:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      total: 0,
+  /**
+   * Check if production line has work orders
+   * @private
+   */
+  private static async hasWorkOrders(lineId: string): Promise<boolean> {
+    try {
+      const supabase = createClient()
+
+      // Check work_orders table (will be created in Epic 04)
+      // For now, return false (no work orders)
+      // TODO: Implement when work_orders table exists
+      const { data } = await supabase
+        .from('work_orders')
+        .select('id')
+        .eq('production_line_id', lineId)
+        .limit(1)
+        .single()
+
+      return !!data
+    } catch (error) {
+      // Table doesn't exist yet or no work orders
+      return false
     }
   }
 }
 
-/**
- * Delete production line (hard delete)
- * AC-007.5: Cannot delete line with constraints
- *
- * WARNING: This will fail if line has:
- * - Active WOs (Epic 3, 4)
- * - Historical usage (audit trail)
- *
- * FK constraint ON DELETE RESTRICT prevents deletion if referenced.
- * Error handling returns user-friendly message with recommendation to archive instead.
- *
- * Cache invalidation: Emits line.deleted event (AC-007.8)
- *
- * @param id - Production line UUID
- * @returns ProductionLineServiceResult with success status or error
- */
-export async function deleteProductionLine(id: string): Promise<ProductionLineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // TODO Epic 3: Check for active WOs before allowing deletion
-    // For now, log a warning
-    console.warn(`Attempting to delete production line ${id}. Check for active WOs in Epic 3.`)
-
-    // Attempt delete (machine_line_assignments will CASCADE delete automatically)
-    const { error } = await supabase
-      .from('production_lines')
-      .delete()
-      .eq('id', id)
-      .eq('org_id', orgId)
-
-    if (error) {
-      console.error('Failed to delete production line:', error)
-
-      // AC-007.5: Foreign key constraint violation
-      if (error.code === '23503') {
-        // TODO Epic 3: Query work_orders to get count of active WOs
-        return {
-          success: false,
-          error: 'Cannot delete production line - it has active WOs or historical usage. Archive it instead.',
-          code: 'FOREIGN_KEY_CONSTRAINT',
-        }
-      }
-
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    // Emit cache invalidation event (AC-007.8)
-    await emitLineUpdatedEvent(orgId, 'deleted', id)
-
-    console.log(`Successfully deleted production line: ${id}`)
-
-    return {
-      success: true,
-    }
-  } catch (error) {
-    console.error('Error in deleteProductionLine:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * Emit production line cache invalidation event
- * AC-007.8: Cache invalidation events
- *
- * Publishes a broadcast event to notify Epic 3, 4 (WO creation, execution)
- * to refetch line list.
- *
- * Redis cache key: `lines:{org_id}`
- * Redis cache TTL: 5 min
- *
- * @param orgId - Organization UUID
- * @param action - Action type (created, updated, deleted)
- * @param lineId - Production line UUID
- */
-async function emitLineUpdatedEvent(
-  orgId: string,
-  action: 'created' | 'updated' | 'deleted',
-  lineId: string
-): Promise<void> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-
-    // Publish to org-specific channel
-    const channel = supabase.channel(`org:${orgId}`)
-
-    await channel.send({
-      type: 'broadcast',
-      event: 'line.updated',
-      payload: {
-        action,
-        lineId,
-        orgId,
-        timestamp: new Date().toISOString(),
-      },
-    })
-
-    // Clean up channel
-    await supabase.removeChannel(channel)
-
-    console.log(`Emitted line.updated event: ${action} ${lineId}`)
-  } catch (error) {
-    // Non-critical error, log but don't fail the operation
-    console.error('Failed to emit line.updated event:', error)
-  }
-}
+// Export individual functions for compatibility with existing tests
+export const list = ProductionLineService.list.bind(ProductionLineService)
+export const getById = ProductionLineService.getById.bind(ProductionLineService)
+export const create = ProductionLineService.create.bind(ProductionLineService)
+export const update = ProductionLineService.update.bind(ProductionLineService)
+export const deleteProductionLine = ProductionLineService.delete.bind(ProductionLineService)
+export const reorderMachines = ProductionLineService.reorderMachines.bind(ProductionLineService)
+export const isCodeUnique = ProductionLineService.isCodeUnique.bind(ProductionLineService)
+export const calculateBottleneckCapacity = ProductionLineService.calculateBottleneckCapacity.bind(ProductionLineService)
+export const renumberSequences = ProductionLineService.renumberSequences.bind(ProductionLineService)

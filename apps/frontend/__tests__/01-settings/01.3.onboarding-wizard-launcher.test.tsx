@@ -35,6 +35,11 @@ vi.mock('next/navigation', () => ({
 }))
 
 /**
+ * Mock fetch for API calls
+ */
+const mockFetch = vi.fn()
+
+/**
  * Helper function to create properly structured mock data
  *
  * Note: The SetupInProgressMessage component expects `organizations` (plural)
@@ -105,12 +110,8 @@ function createMockOrgContext(overrides: {
       role_code: 'admin',
       role_name: 'Administrator',
       permissions: {},
-      // Formal OrgContext type uses singular 'organization'
+      // OrgContext type uses singular 'organization' (canonical)
       organization: orgData,
-      // Component SetupInProgressMessage expects plural 'organizations' - add both for compatibility
-      organizations: orgData,
-      // Component also expects 'user' directly on context
-      user: userData,
     } : null,
     isLoading: overrides.isLoading ?? false,
     error: overrides.error ?? null,
@@ -136,6 +137,12 @@ describe('Story 01.3: Onboarding Wizard Launcher', () => {
       organization: null,
       isLoading: false,
     }))
+    // Mock fetch for API calls - default to successful response
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    })
+    global.fetch = mockFetch
   })
 
   describe('AC-01.3.1: Show wizard for new organizations', () => {
@@ -317,27 +324,29 @@ describe('Story 01.3: Onboarding Wizard Launcher', () => {
   describe('AC-01.3.5: Save progress when navigating away', () => {
     it('should persist onboarding_step when step 1 completed', async () => {
       // GIVEN step 1 completed
-      const mockSaveProgress = vi.fn()
       mockUseOrgContext.mockReturnValue(createMockOrgContext({
         organization: {
           id: 'test-org-id',
           onboarding_step: 0,
         },
-        saveProgress: mockSaveProgress,
       }))
 
       const user = userEvent.setup()
       render(<OnboardingWizardLauncher />)
 
-      // WHEN step 1 completed and navigating away
+      // WHEN "Start Onboarding Wizard" clicked
       const startButton = screen.getByRole('button', { name: /start onboarding wizard/i })
       await user.click(startButton)
 
-      // THEN progress saved (onboarding_step=1)
+      // THEN progress saved via fetch API call (onboarding_step=1)
       await waitFor(() => {
-        expect(mockSaveProgress).toHaveBeenCalledWith(expect.objectContaining({
-          onboarding_step: 1,
-        }))
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/v1/settings/onboarding/progress'),
+          expect.objectContaining({
+            method: 'PUT',
+            body: JSON.stringify({ step: 1 }),
+          })
+        )
       })
     })
 
@@ -382,30 +391,21 @@ describe('Story 01.3: Onboarding Wizard Launcher', () => {
     })
 
     it('should load shared progress from database', async () => {
-      // GIVEN shared onboarding state
-      const mockLoadProgress = vi.fn().mockResolvedValue({
-        onboarding_step: 3,
-        wizard_progress: {
-          step: 3,
-          step1: { company_name: 'Test Org' },
-          step2: { warehouse_code: 'WH01' },
-        },
-      })
-
+      // GIVEN shared onboarding state (step 3 is loaded from context)
       mockUseOrgContext.mockReturnValue(createMockOrgContext({
         organization: {
           id: 'test-org-id',
           onboarding_step: 3,
+          onboarding_completed_at: null,
         },
-        loadProgress: mockLoadProgress,
       }))
 
       // WHEN loading wizard
       render(<OnboardingWizardLauncher />)
 
-      // THEN shared progress loaded
+      // THEN shared progress is displayed (step 3 visible)
       await waitFor(() => {
-        expect(mockLoadProgress).toHaveBeenCalled()
+        expect(screen.getByText(/step 3: storage locations/i)).toBeInTheDocument()
       })
     })
   })

@@ -1,5 +1,5 @@
 {
-  "name": "monopilot2",
+  "name": "monopilot",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -39,6 +39,7 @@
     "@sendgrid/mail": "^8.1.6",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.84.0",
+    "@tanstack/react-query": "^5.90.12",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -84,8 +85,8 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.12"
-  }
-  ,"engines": {
+  },
+  "engines": {
     "node": "20.x || 22.x"
   }
 }

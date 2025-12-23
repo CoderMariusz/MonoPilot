@@ -1,0 +1,302 @@
+# AGENT HANDOFF: Tax Codes - Effective Dates & Expiration Tracking
+
+agent: frontend-dev
+epic: "01-settings"
+story: "01.13"
+phase: "CRITICAL REWRITE"
+priority: HIGH
+task: "Add effective_from/effective_to fields with expiration indicators to Tax Codes"
+
+# ============================================
+# CRITICAL WARNING
+# ============================================
+
+warning: |
+  V1 code missing ENTIRE effective dates functionality!
+  V1 has Country filter - v2 needs Effective Date filter instead
+
+  This is FR-SET-083 compliance requirement (not implemented in v1).
+
+  V2 must add:
+  - effective_from, effective_to fields
+  - Expiration indicators (✓, ⏰, ⌛)
+  - Effective Date filter dropdown
+  - Date overlap validation
+
+# ============================================
+# CONTEXT
+# ============================================
+
+wireframes:
+  primary:
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-021-tax-code-list.md
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-021a-tax-code-create-modal.md
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-021b-tax-code-edit-modal.md
+
+compliance:
+  - FR-SET-083: Tax code effective date support
+
+migration_plan:
+  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.9)
+
+reference_code:
+  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/tax-codes/page.tsx
+  can_keep: "Overall structure (TaxCodesDataTable pattern)"
+  must_add: "Effective Date column, expiration indicators, date filter"
+
+# ============================================
+# NEW ARCHITECTURE
+# ============================================
+
+architecture:
+  effective_dates:
+    fields:
+      - effective_from (date, optional, defaults to today for new rates)
+      - effective_to (date, optional, nullable = ongoing/indefinite)
+
+    states:
+      future:
+        condition: "effective_from > today"
+        display: "Future (not yet effective)"
+
+      active:
+        condition: "(effective_from IS NULL OR effective_from <= today) AND (effective_to IS NULL OR effective_to >= today)"
+        display: "Active"
+        indicator: "✓ (green checkmark)"
+
+      expires_soon:
+        condition: "effective_to - today <= 30 days AND effective_to >= today"
+        display: "Active (expires soon)"
+        indicator: "⏰ (orange warning)"
+
+      expired:
+        condition: "effective_to < today"
+        display: "Expired"
+        indicator: "⌛ (gray hourglass)"
+
+    validation:
+      - effective_to must be after effective_from (if both provided)
+      - No overlapping date ranges for same tax code
+      - Cannot set past date as effective_from when creating new
+      - Warning toast if effective_to within 30 days
+
+  computed_fields:
+    - expires_soon (boolean)
+    - is_currently_active (boolean)
+    - days_until_expiry (integer, only if expires_soon = true)
+
+  display_format:
+    - "DD/MM/YY-DD/MM/YY" (e.g., "01/01/25-31/12/25")
+    - "DD/MM/YY onwards" (if effective_to is null)
+    - "Ongoing" (if both are null)
+
+# ============================================
+# OUTPUT FILES
+# ============================================
+
+output:
+  pages:
+    - apps/frontend/app/(authenticated)/settings-v2/tax-codes/page.tsx
+
+  components:
+    - components/settings-v2/tax-codes/TaxCodesDataTable.tsx            # Add Effective column
+    - components/settings-v2/tax-codes/TaxCodeModal.tsx                 # Add date fields
+    - components/settings-v2/tax-codes/EffectiveDateRangePicker.tsx     # Date range input
+    - components/settings-v2/tax-codes/ExpirationIndicator.tsx          # ✓, ⏰, ⌛ icons
+    - components/settings-v2/tax-codes/EffectiveDateFilter.tsx          # Filter dropdown
+    - components/settings-v2/tax-codes/SetDefaultDialog.tsx             # Migrated from v1
+    - components/settings-v2/tax-codes/DeleteTaxCodeDialog.tsx          # Migrated from v1
+
+# ============================================
+# REQUIREMENTS
+# ============================================
+
+requirements:
+
+  table_changes:
+    new_column:
+      name: "Effective"
+      position: After "Type" column
+      display: |
+        - "01/01/25-31/12/25" (both dates set)
+        - "01/01/25 onwards" (only from set)
+        - "Ongoing" (both null)
+      width: 150px
+
+    expiration_indicators:
+      - ✓ (green): Currently valid
+      - ⏰ (orange): Expires within 30 days
+      - ⌛ (gray): Expired
+      location: Next to "Effective" column or in Status badge
+
+  new_filter:
+    name: "Effective Dates"
+    location: Filter bar (replace Country filter)
+    options:
+      - All
+      - Currently Active (today between dates)
+      - Expires Soon (<30 days)
+      - Expired (effective_to < today)
+      - Future (effective_from > today)
+
+  modal_changes:
+    new_fields:
+      - Effective From (date picker, optional, defaults to today)
+      - Effective To (date picker, optional, nullable)
+      - Help text: "Leave 'To' empty for ongoing validity"
+
+    validation:
+      - effective_to > effective_from (if both set)
+      - No overlapping ranges for same code
+      - Warning if effective_to < today + 30 days: "This rate will expire soon"
+
+  pre_populated_rates:
+    polish_vat:
+      - VAT-23 (23.00%, Standard): 2025-01-01 to 2025-12-31
+      - VAT-08 (8.00%, Reduced): 2025-01-01 to 2025-12-31
+      - VAT-05 (5.00%, Reduced): 2025-01-01 to 2025-12-31
+      - VAT-00 (0.00%, Zero): 2025-01-01 to 2025-12-31
+      - VAT-EX (0.00%, Exempt): 2025-01-01 to 2025-12-31
+      - VAT-NP (0.00%, N/A): null to null (ongoing)
+
+# ============================================
+# REUSABLE ASSETS
+# ============================================
+
+reusable:
+  services:
+    existing:
+      - lib/services/tax-code-service.ts
+
+    must_add:
+      - getTaxCodesExpiringSoon(days = 30) → filters expires_soon
+      - getActiveTaxCodes(date = today) → filters by is_currently_active
+      - validateDateOverlap(code, from, to) → checks overlap
+      - calculateExpirationStatus(effective_to) → returns ✓/⏰/⌛
+
+  schemas:
+    file: lib/validation/tax-code-schemas.ts
+    required_updates:
+      add_fields:
+        - effective_from (z.string().date().optional())
+        - effective_to (z.string().date().optional().nullable())
+      add_validation:
+        - Date ordering (to > from)
+        - No date overlap for same code
+        - Future date validation (from cannot be past when creating)
+
+  existing_components_to_migrate:
+    - tax-codes/SetDefaultDialog.tsx ✅ (can reuse)
+    - tax-codes/DeleteTaxCodeDialog.tsx ✅ (can reuse)
+    - tax-codes/TaxCodeStatusBadge.tsx ✅ (can reuse)
+    - tax-codes/TaxCodeRateBadge.tsx ✅ (can reuse)
+
+# ============================================
+# ISOLATION RULES
+# ============================================
+
+isolation:
+  allowed:
+    - Read: SET-021, SET-021a, SET-021b wireframes
+    - Use: lib/services/tax-code-service.ts (UPDATE methods)
+    - Migrate: Some v1 components (SetDefaultDialog, etc.) if compliant
+    - Create in: settings-v2/tax-codes/
+
+  forbidden:
+    - Copy v1 TaxCodeModal without adding date fields
+    - Keep Country filter (should be Effective Date filter)
+
+  verification:
+    - Check TaxCodeModal has effective_from/to fields
+    - Check table has Effective column
+    - Check filter is "Effective Dates" not "Country"
+
+# ============================================
+# IMPLEMENTATION GUIDE
+# ============================================
+
+implementation:
+
+  step_1_update_schema:
+    file: lib/validation/tax-code-schemas.ts
+    add:
+      - effective_from: z.string().date().optional()
+      - effective_to: z.string().date().optional().nullable()
+      - Validation: effective_to > effective_from
+      - Validation: no overlap check
+
+  step_2_update_service:
+    file: lib/services/tax-code-service.ts
+    add_methods:
+      - getTaxCodesExpiringSoon(days: number): Promise<TaxCode[]>
+      - getActiveTaxCodes(asOfDate: Date): Promise<TaxCode[]>
+      - validateDateOverlap(code, from, to): Promise<boolean>
+
+  step_3_build_components:
+    order:
+      1. EffectiveDateRangePicker.tsx (date range input)
+      2. ExpirationIndicator.tsx (✓, ⏰, ⌛ logic)
+      3. EffectiveDateFilter.tsx (filter dropdown)
+      4. TaxCodeModal.tsx (add date fields to existing structure)
+      5. TaxCodesDataTable.tsx (add Effective column)
+
+  step_4_integrate:
+    - Add Effective column to table (after Type)
+    - Add Expiration indicator (inline with status or separate column)
+    - Replace Country filter with Effective Date filter
+    - Add date fields to modal
+    - Add validation warnings
+
+# ============================================
+# ACCEPTANCE CRITERIA
+# ============================================
+
+acceptance:
+  visual:
+    - [ ] "Effective" column displays date ranges correctly
+    - [ ] Expiration indicators show: ✓ (green), ⏰ (orange), ⌛ (gray)
+    - [ ] Effective Date filter has 5 options (All/Active/Soon/Expired/Future)
+    - [ ] Modal has date range picker for effective_from/to
+    - [ ] Warning toast appears if setting effective_to < 30 days
+
+  functionality:
+    - [ ] Can create tax code with date range
+    - [ ] Can create tax code with no end date (ongoing)
+    - [ ] Cannot create overlapping date ranges for same code
+    - [ ] Filter "Currently Active" shows only valid rates
+    - [ ] Filter "Expires Soon" shows rates expiring <30 days
+    - [ ] Pre-populated Polish VAT rates have annual dates (2025-01-01 to 2025-12-31)
+
+  states:
+    - [ ] Loading state works
+    - [ ] Success state shows dates
+    - [ ] Empty state suggests creating first tax code
+    - [ ] Error state has Retry
+
+  compliance:
+    - [ ] FR-SET-083: Effective date support implemented
+    - [ ] Date validation prevents overlaps
+    - [ ] Expiration warnings functional
+
+# ============================================
+# TESTING
+# ============================================
+
+testing:
+  manual:
+    - Create VAT-TEST: 2025-01-01 to 2025-12-31 → should show ✓
+    - Create VAT-SOON: today to (today + 15 days) → should show ⏰ + warning toast
+    - Create VAT-EXPIRED: 2024-01-01 to 2024-12-31 → should show ⌛
+    - Create VAT-ONGOING: null to null → should display "Ongoing"
+    - Try creating overlap: 2025-06-01 to 2025-12-31 when 2025-01-01 to 2025-12-31 exists → should fail
+    - Filter "Expires Soon" → should show only VAT-SOON
+    - Filter "Currently Active" → should show VAT-TEST (not VAT-EXPIRED)
+
+# ============================================
+# EFFORT
+# ============================================
+
+estimated_hours: 8-10
+complexity: MEDIUM-HIGH (date logic + validation)
+critical_path: true
+compliance_requirement: "FR-SET-083"

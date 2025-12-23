@@ -2,71 +2,54 @@
  * API Route: GET /api/v1/settings/onboarding/status
  * Story: 01.3 - Onboarding Wizard Launcher
  *
- * Returns onboarding status for authenticated user's organization
- * Used by frontend to determine whether to show wizard modal
+ * Returns onboarding status for the authenticated user's organization.
+ * Used by frontend to determine whether to show wizard and current step.
  */
 
 import { NextResponse } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { OnboardingService } from '@/lib/services/onboarding-service'
 import {
   getOrgContext,
   deriveUserIdFromSession,
 } from '@/lib/services/org-context-service'
 import { handleApiError } from '@/lib/utils/api-error-handler'
-import { hasAdminAccess } from '@/lib/services/permission-service'
-import { OnboardingService } from '@/lib/services/onboarding-service'
-import { OnboardingStatusResponseSchema } from '@/lib/validation/onboarding-schemas'
 
 /**
  * GET /api/v1/settings/onboarding/status
- * Returns current onboarding status for logged-in organization
+ * Returns onboarding status for current organization
  *
  * Response:
  * {
- *   step: number;              // 0-6 (0=not started, 6=complete)
- *   started_at: string | null; // ISO timestamp
- *   completed_at: string | null;
- *   skipped: boolean;
- *   can_skip: boolean;         // True if admin role
+ *   step: number,              // Current step (0=not started, 1-6=wizard steps)
+ *   started_at: string | null, // ISO timestamp when wizard first shown
+ *   completed_at: string | null, // ISO timestamp when wizard completed or skipped
+ *   skipped: boolean,          // True if user chose to skip wizard
+ *   is_complete: boolean       // True if onboarding is complete
  * }
  *
  * Errors:
  * - 401: Unauthorized (no session)
  * - 403: Forbidden (inactive user/org)
  * - 404: Not Found (user not found)
- *
- * @example
- * ```typescript
- * const response = await fetch('/api/v1/settings/onboarding/status');
- * const data = await response.json();
- * console.log(data.step); // 0
- * console.log(data.can_skip); // true (if admin)
- * ```
+ * - 500: Internal Server Error
  */
 export async function GET(request: Request) {
   try {
     // 1. Get authenticated user from session
     const userId = await deriveUserIdFromSession()
 
-    // 2. Get org context
+    // 2. Get org context for tenant isolation
     const context = await getOrgContext(userId)
 
-    // 3. Fetch onboarding status via service
-    const status = await OnboardingService.getStatus(context.org_id)
+    // 3. Get server-side Supabase client
+    const supabase = await createServerSupabase()
 
-    // 4. Build response
-    const response = {
-      step: status.step,
-      started_at: status.started_at,
-      completed_at: status.completed_at,
-      skipped: status.skipped,
-      can_skip: hasAdminAccess(context.role_code),
-    }
+    // 4. Get onboarding status from service
+    const status = await OnboardingService.getStatus(supabase, context.org_id)
 
-    // 5. Validate response against schema
-    const validated = OnboardingStatusResponseSchema.parse(response)
-
-    // 6. Return status
-    return NextResponse.json(validated, { status: 200 })
+    // 5. Return status
+    return NextResponse.json(status, { status: 200 })
   } catch (error) {
     return handleApiError(error)
   }

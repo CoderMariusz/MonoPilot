@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { hasPermission, requirePermission, canAssignRole } from '@/lib/services/permission-service'
 
 // Types - These will be implemented by DEV
 type Role =
@@ -37,12 +38,6 @@ type Module =
   | 'technical'
 
 type Action = 'create' | 'read' | 'update' | 'delete'
-
-// Functions to be implemented by DEV
-// These should be exported from lib/services/permission-service.ts
-declare function hasPermission(role: Role, module: Module, action: Action): boolean
-declare function requirePermission(role: Role, module: Module, action: Action): void
-declare function canAssignRole(assignerRole: Role, targetRole: Role): boolean
 
 describe('hasPermission - Core Permission Logic', () => {
   describe('SUPER_ADMIN role - Full CRUD on all modules', () => {

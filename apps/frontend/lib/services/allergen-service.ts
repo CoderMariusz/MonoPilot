@@ -1,56 +1,31 @@
-import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
+import { createServerSupabase } from '../supabase/server'
+import type { Allergen } from '../types/allergen'
 
 /**
  * Allergen Service
- * Story: 1.9 Allergen Management
- * Tasks: 3, 5, 8, 9
+ * Story: 01.12 - Allergens Management
  *
- * Handles allergen CRUD operations with:
- * - 14 EU major allergens preloaded (AC-008.1)
- * - Custom allergen support (AC-008.3)
- * - Delete protection for preloaded & in-use allergens (AC-008.2, AC-008.4)
- * - Product count via JOIN (AC-008.5)
- * - Idempotent seeding (AC-008.7)
- * - Cache invalidation events (AC-008.8)
+ * Global read-only service for EU mandatory allergens.
+ * NO org_id filtering - allergens are global reference data.
+ * NO create/update/delete - read-only in MVP.
+ *
+ * Acceptance Criteria:
+ * - AC-AL-01: List all 14 EU allergens sorted by display_order
+ * - AC-AS-01 to AC-AS-03: Full-text search across all languages
+ * - AC-ML-01 to AC-ML-02: Multi-language support
  */
 
-export interface Allergen {
-  id: string
-  org_id: string
-  code: string
-  name: string
-  is_major: boolean
-  is_custom: boolean
-  created_at: string
-  updated_at: string
-  product_count?: number  // AC-008.5: Count of products using this allergen
-}
-
-export interface CreateAllergenInput {
-  code: string
-  name: string
-  is_major?: boolean  // Default: false for custom allergens
-}
-
-export interface UpdateAllergenInput {
-  code?: string
-  name?: string
-  is_major?: boolean
-}
-
 export interface AllergenFilters {
-  is_major?: boolean | 'all'
-  is_custom?: boolean | 'all'
   search?: string
-  sort_by?: 'code' | 'name' | 'is_major'
-  sort_direction?: 'asc' | 'desc'
+  is_eu_mandatory?: boolean
+  is_active?: boolean
 }
 
 export interface AllergenServiceResult<T = Allergen> {
   success: boolean
   data?: T
   error?: string
-  code?: 'DUPLICATE_CODE' | 'NOT_FOUND' | 'FOREIGN_KEY_CONSTRAINT' | 'PRELOADED_ALLERGEN' | 'IN_USE' | 'INVALID_INPUT' | 'DATABASE_ERROR'
+  code?: 'NOT_FOUND' | 'DATABASE_ERROR' | 'UNAUTHORIZED'
 }
 
 export interface AllergenListResult {
@@ -58,484 +33,120 @@ export interface AllergenListResult {
   data?: Allergen[]
   total?: number
   error?: string
+  code?: 'DATABASE_ERROR' | 'UNAUTHORIZED'
 }
 
 /**
- * Get current user's org_id from JWT
- * Used for RLS enforcement and multi-tenancy
- */
-async function getCurrentOrgId(): Promise<string | null> {
-  const supabase = await createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  // Extract org_id from JWT claims
-  const { data: userData, error } = await supabase
-    .from('users')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (error || !userData) {
-    console.error('Failed to get org_id for user:', user.id, error)
-    return null
-  }
-
-  return userData.org_id
-}
-
-/**
- * Seed 14 EU major allergens for an organization
- * AC-008.1, AC-008.7: Preload 14 EU major allergens
+ * Get all allergens
+ * AC-AL-01: Returns all 14 EU allergens sorted by display_order
  *
- * Based on EU Regulation 1169/2011 on food allergen labeling.
- * Idempotent - safe to call multiple times (ON CONFLICT DO NOTHING).
- *
- * Allergens:
- * 1. Milk, 2. Eggs, 3. Fish, 4. Crustaceans, 5. Tree Nuts, 6. Peanuts,
- * 7. Gluten (Wheat), 8. Soybeans, 9. Sesame Seeds, 10. Mustard,
- * 11. Celery, 12. Lupin, 13. Sulphur Dioxide/Sulphites, 14. Molluscs
- *
- * @param orgId - Organization UUID (required)
- * @returns AllergenServiceResult with success status
- */
-export async function seedEuAllergens(orgId: string): Promise<AllergenServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID is required',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Call Postgres function to seed allergens
-    // Function defined in migration 011_seed_eu_allergens_function.sql
-    const { error } = await supabase.rpc('seed_eu_allergens', {
-      p_org_id: orgId,
-    })
-
-    if (error) {
-      console.error('Failed to seed EU allergens:', error)
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    console.log(`Successfully seeded 14 EU allergens for org: ${orgId}`)
-
-    // Emit cache invalidation event
-    await emitAllergenUpdatedEvent(orgId, 'created', null)
-
-    return {
-      success: true,
-    }
-  } catch (error) {
-    console.error('Error in seedEuAllergens:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * Create a custom allergen
- * AC-008.3: Admin może dodać custom allergens
- *
- * Validation:
- * - Code must be unique per org
- * - Code format: uppercase alphanumeric + hyphens (e.g., CUSTOM-01)
- * - Name required (1-100 chars)
- * - is_major: default false for custom allergens
- * - is_custom: automatically set to true
- *
- * Cache invalidation: Emits allergen.created event (AC-008.8)
- *
- * @param input - CreateAllergenInput
- * @returns AllergenServiceResult with created allergen or error
- */
-export async function createAllergen(
-  input: CreateAllergenInput
-): Promise<AllergenServiceResult> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found. Please log in again.',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Check if code already exists for this org (AC-008.3)
-    const { data: existingAllergen } = await supabaseAdmin
-      .from('allergens')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('code', input.code.toUpperCase())
-      .single()
-
-    if (existingAllergen) {
-      return {
-        success: false,
-        error: `Allergen code "${input.code}" already exists`,
-        code: 'DUPLICATE_CODE',
-      }
-    }
-
-    // Create custom allergen - use admin client to bypass RLS
-    const { data: allergen, error } = await supabaseAdmin
-      .from('allergens')
-      .insert({
-        org_id: orgId,
-        code: input.code.toUpperCase(), // Ensure uppercase
-        name: input.name,
-        is_major: input.is_major ?? false, // Default false for custom
-        is_custom: true, // All user-created allergens are custom
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Failed to create allergen:', error)
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    // Emit cache invalidation event (AC-008.8)
-    await emitAllergenUpdatedEvent(orgId, 'created', allergen.id)
-
-    console.log(`Successfully created allergen: ${allergen.code} (${allergen.id})`)
-
-    return {
-      success: true,
-      data: allergen,
-    }
-  } catch (error) {
-    console.error('Error in createAllergen:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * Update an allergen
- * AC-008.1: Preloaded allergens can be edited (e.g., translate name)
- * AC-008.4: Custom allergens fully editable
- *
- * Validation:
- * - Code still unique per org (if changed)
- * - Preloaded allergens (is_custom = false) can only edit name/is_major
- * - Custom allergens can edit all fields
- *
- * Cache invalidation: Emits allergen.updated event (AC-008.8)
- *
- * @param id - Allergen UUID
- * @param input - UpdateAllergenInput
- * @returns AllergenServiceResult with updated allergen or error
- */
-export async function updateAllergen(
-  id: string,
-  input: UpdateAllergenInput
-): Promise<AllergenServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Check if allergen exists and belongs to org
-    const { data: existingAllergen, error: fetchError } = await supabase
-      .from('allergens')
-      .select('id, code, is_custom')
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .single()
-
-    if (fetchError || !existingAllergen) {
-      return {
-        success: false,
-        error: 'Allergen not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // If code is being changed, check uniqueness
-    if (input.code && input.code.toUpperCase() !== existingAllergen.code) {
-      const { data: duplicateAllergen } = await supabase
-        .from('allergens')
-        .select('id')
-        .eq('org_id', orgId)
-        .eq('code', input.code.toUpperCase())
-        .neq('id', id)
-        .single()
-
-      if (duplicateAllergen) {
-        return {
-          success: false,
-          error: `Allergen code "${input.code}" already exists`,
-          code: 'DUPLICATE_CODE',
-        }
-      }
-    }
-
-    // Build update payload
-    const updatePayload: any = {}
-
-    if (input.code !== undefined) updatePayload.code = input.code.toUpperCase()
-    if (input.name !== undefined) updatePayload.name = input.name
-    if (input.is_major !== undefined) updatePayload.is_major = input.is_major
-
-    // Update allergen
-    const { data: allergen, error } = await supabase
-      .from('allergens')
-      .update(updatePayload)
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Failed to update allergen:', error)
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    // Emit cache invalidation event (AC-008.8)
-    await emitAllergenUpdatedEvent(orgId, 'updated', allergen.id)
-
-    console.log(`Successfully updated allergen: ${allergen.code} (${allergen.id})`)
-
-    return {
-      success: true,
-      data: allergen,
-    }
-  } catch (error) {
-    console.error('Error in updateAllergen:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * Get allergen by ID
- *
- * Includes product count via JOIN to product_allergens (Epic 2)
- *
- * @param id - Allergen UUID
- * @returns AllergenServiceResult with allergen data or error
- */
-export async function getAllergenById(id: string): Promise<AllergenServiceResult> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Fetch allergen - use admin client
-    const { data: allergen, error } = await supabaseAdmin
-      .from('allergens')
-      .select('*')
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .single()
-
-    if (error || !allergen) {
-      console.error('Failed to fetch allergen:', error)
-      return {
-        success: false,
-        error: 'Allergen not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // TODO Epic 2: Join with product_allergens to get product count
-    // For now, set product_count to 0
-    const allergenWithCount = {
-      ...allergen,
-      product_count: 0,
-    }
-
-    return {
-      success: true,
-      data: allergenWithCount,
-    }
-  } catch (error) {
-    console.error('Error in getAllergenById:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * List allergens with filters
- * AC-008.5: Allergens list view
- *
- * Filters:
- * - is_major: true/false/all (filter major allergens)
- * - is_custom: true/false/all (filter custom allergens)
- * - search: filter by code or name (case-insensitive)
- * - sort_by: code/name/is_major (default: code)
- * - sort_direction: asc/desc (default: asc)
- *
- * Includes product count via JOIN (AC-008.5: Products column)
- *
- * @param filters - AllergenFilters (optional)
+ * @param filters - Optional filters (search, is_eu_mandatory, is_active)
  * @returns AllergenListResult with allergens array or error
  */
-export async function listAllergens(
+export async function getAllergens(
   filters?: AllergenFilters
 ): Promise<AllergenListResult> {
   try {
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
+    const supabase = await createServerSupabase()
 
-    if (!orgId) {
+    // Auth check
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return {
         success: false,
-        error: 'Organization ID not found',
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
         total: 0,
       }
     }
 
-    // Build query - use admin client
-    let query = supabaseAdmin
+    // Build query - NO org_id filter (global data)
+    let query = supabase
       .from('allergens')
       .select('*', { count: 'exact' })
-      .eq('org_id', orgId)
+      .eq('is_active', filters?.is_active ?? true)
 
-    // Apply is_major filter (AC-008.5)
-    if (filters?.is_major !== undefined && filters.is_major !== 'all') {
-      query = query.eq('is_major', filters.is_major)
+    // Filter by EU mandatory status
+    if (filters?.is_eu_mandatory !== undefined) {
+      query = query.eq('is_eu_mandatory', filters.is_eu_mandatory)
     }
 
-    // Apply is_custom filter (AC-008.5)
-    if (filters?.is_custom !== undefined && filters.is_custom !== 'all') {
-      query = query.eq('is_custom', filters.is_custom)
+    // AC-AS-01 to AC-AS-03: Full-text search across all language fields
+    if (filters?.search && filters.search.trim().length > 0) {
+      const searchTerm = filters.search.trim().toLowerCase()
+
+      // Search across code and all language fields
+      query = query.or(
+        `code.ilike.%${searchTerm}%,` +
+        `name_en.ilike.%${searchTerm}%,` +
+        `name_pl.ilike.%${searchTerm}%,` +
+        `name_de.ilike.%${searchTerm}%,` +
+        `name_fr.ilike.%${searchTerm}%`
+      )
     }
 
-    // Search filter (AC-008.5: Search by code or name)
-    if (filters?.search) {
-      const escapedSearch = filters.search
-        .replace(/\\/g, '\\\\')
-        .replace(/%/g, '\\%')
-        .replace(/_/g, '\\_')
-
-      query = query.or(`code.ilike.%${escapedSearch}%,name.ilike.%${escapedSearch}%`)
-    }
-
-    // Dynamic sorting (AC-008.5)
-    const sortBy = filters?.sort_by || 'code'
-    const sortDirection = filters?.sort_direction || 'asc'
-    query = query.order(sortBy, { ascending: sortDirection === 'asc' })
+    // Always sort by display_order (AC-AL-01)
+    query = query.order('display_order', { ascending: true })
 
     const { data: allergens, error, count } = await query
 
     if (error) {
-      console.error('Failed to list allergens:', error)
+      console.error('[AllergenService] Failed to fetch allergens:', error)
       return {
         success: false,
         error: `Database error: ${error.message}`,
+        code: 'DATABASE_ERROR',
         total: 0,
       }
     }
 
-    // TODO Epic 2: After product_allergens table exists, JOIN to get product counts
-    // For now, set product_count to 0 for all allergens
-    const allergensWithCounts = allergens?.map(allergen => ({
-      ...allergen,
-      product_count: 0,
-    })) || []
-
     return {
       success: true,
-      data: allergensWithCounts,
+      data: allergens || [],
       total: count ?? 0,
     }
   } catch (error) {
-    console.error('Error in listAllergens:', error)
+    console.error('[AllergenService] Error in getAllergens:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
+      code: 'DATABASE_ERROR',
       total: 0,
     }
   }
 }
 
 /**
- * Delete allergen
- * AC-008.2: Preloaded allergens cannot be deleted
- * AC-008.4: Custom allergens deletable if not in use
- *
- * Validation:
- * - is_custom must be true (cannot delete preloaded allergens)
- * - Allergen must not be used in products (FK constraint check)
- *
- * Error handling returns user-friendly message.
- *
- * Cache invalidation: Emits allergen.deleted event (AC-008.8)
+ * Get allergen by ID
+ * AC-AL-03: Returns single allergen by UUID
  *
  * @param id - Allergen UUID
- * @returns AllergenServiceResult with success status or error
+ * @returns AllergenServiceResult with allergen data or error
  */
-export async function deleteAllergen(id: string): Promise<AllergenServiceResult> {
+export async function getAllergenById(id: string): Promise<AllergenServiceResult> {
   try {
     const supabase = await createServerSupabase()
-    const orgId = await getCurrentOrgId()
 
-    if (!orgId) {
+    // Auth check
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       return {
         success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
       }
     }
 
-    // Check if allergen exists and is deletable
-    const { data: allergen, error: fetchError } = await supabase
+    // Fetch allergen - NO org_id filter (global data)
+    const { data: allergen, error } = await supabase
       .from('allergens')
-      .select('id, code, is_custom')
+      .select('*')
       .eq('id', id)
-      .eq('org_id', orgId)
+      .eq('is_active', true)
       .single()
 
-    if (fetchError || !allergen) {
+    if (error || !allergen) {
+      console.error('[AllergenService] Allergen not found:', id, error)
       return {
         success: false,
         error: 'Allergen not found',
@@ -543,56 +154,12 @@ export async function deleteAllergen(id: string): Promise<AllergenServiceResult>
       }
     }
 
-    // AC-008.2: Cannot delete preloaded allergens
-    if (!allergen.is_custom) {
-      return {
-        success: false,
-        error: 'Cannot delete EU major allergen. Only custom allergens can be deleted.',
-        code: 'PRELOADED_ALLERGEN',
-      }
-    }
-
-    // TODO Epic 2: Check if allergen is used in products
-    // Query product_allergens table to count usage
-    // For now, attempt delete and catch FK constraint error
-
-    // Attempt delete
-    const { error } = await supabase
-      .from('allergens')
-      .delete()
-      .eq('id', id)
-      .eq('org_id', orgId)
-
-    if (error) {
-      console.error('Failed to delete allergen:', error)
-
-      // AC-008.4: Foreign key constraint violation (allergen in use)
-      if (error.code === '23503') {
-        // TODO Epic 2: Query product_allergens to get product count
-        return {
-          success: false,
-          error: 'Cannot delete allergen - it is used by one or more products',
-          code: 'IN_USE',
-        }
-      }
-
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    // Emit cache invalidation event (AC-008.8)
-    await emitAllergenUpdatedEvent(orgId, 'deleted', id)
-
-    console.log(`Successfully deleted allergen: ${allergen.code} (${id})`)
-
     return {
       success: true,
+      data: allergen,
     }
   } catch (error) {
-    console.error('Error in deleteAllergen:', error)
+    console.error('[AllergenService] Error in getAllergenById:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -602,47 +169,100 @@ export async function deleteAllergen(id: string): Promise<AllergenServiceResult>
 }
 
 /**
- * Emit allergen cache invalidation event
- * AC-008.8: Cache invalidation events
+ * Get allergen by code
+ * AC-AL-02: Returns allergen by code (A01-A14)
  *
- * Publishes a broadcast event to notify Epic 2 (Product allergen assignment)
- * and Epic 8 (NPD formulation) to refetch allergen list.
- *
- * Redis cache key: `allergens:{org_id}`
- * Redis cache TTL: 10 min
- *
- * @param orgId - Organization UUID
- * @param action - Action type (created, updated, deleted)
- * @param allergenId - Allergen UUID (null for bulk operations like seeding)
+ * @param code - Allergen code (e.g., 'A01', 'A07')
+ * @returns AllergenServiceResult with allergen data or error
  */
-async function emitAllergenUpdatedEvent(
-  orgId: string,
-  action: 'created' | 'updated' | 'deleted',
-  allergenId: string | null
-): Promise<void> {
+export async function getAllergenByCode(code: string): Promise<AllergenServiceResult> {
   try {
     const supabase = await createServerSupabase()
 
-    // Publish to org-specific channel
-    const channel = supabase.channel(`org:${orgId}`)
+    // Auth check
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return {
+        success: false,
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+      }
+    }
 
-    await channel.send({
-      type: 'broadcast',
-      event: 'allergen.updated',
-      payload: {
-        action,
-        allergenId,
-        orgId,
-        timestamp: new Date().toISOString(),
-      },
-    })
+    // Fetch allergen by code - NO org_id filter (global data)
+    const { data: allergen, error } = await supabase
+      .from('allergens')
+      .select('*')
+      .eq('code', code.toUpperCase())
+      .eq('is_active', true)
+      .single()
 
-    // Clean up channel
-    await supabase.removeChannel(channel)
+    if (error || !allergen) {
+      console.error('[AllergenService] Allergen not found by code:', code, error)
+      return {
+        success: false,
+        error: `Allergen with code "${code}" not found`,
+        code: 'NOT_FOUND',
+      }
+    }
 
-    console.log(`Emitted allergen.updated event: ${action} ${allergenId || 'bulk'}`)
+    return {
+      success: true,
+      data: allergen,
+    }
   } catch (error) {
-    // Non-critical error, log but don't fail the operation
-    console.error('Failed to emit allergen.updated event:', error)
+    console.error('[AllergenService] Error in getAllergenByCode:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      code: 'DATABASE_ERROR',
+    }
   }
+}
+
+/**
+ * Get allergen name by language preference
+ * AC-ML-01: Returns localized name based on user preference
+ *
+ * Helper method for UI display.
+ *
+ * @param allergen - Allergen object
+ * @param lang - Language code ('en', 'pl', 'de', 'fr')
+ * @returns Localized allergen name
+ */
+export function getName(allergen: Allergen, lang: 'en' | 'pl' | 'de' | 'fr' = 'en'): string {
+  switch (lang) {
+    case 'pl':
+      return allergen.name_pl
+    case 'de':
+      return allergen.name_de || allergen.name_en
+    case 'fr':
+      return allergen.name_fr || allergen.name_en
+    default:
+      return allergen.name_en
+  }
+}
+
+/**
+ * Get allergens formatted for Select component
+ * AC-UX-01: Returns allergens in format for dropdown selection
+ *
+ * @param lang - Language code for label
+ * @returns Array of { value, label, code, icon_url }
+ */
+export async function getAllergensForSelect(
+  lang: 'en' | 'pl' | 'de' | 'fr' = 'en'
+): Promise<{ value: string; label: string; code: string; icon_url: string | null }[]> {
+  const result = await getAllergens({ is_active: true })
+
+  if (!result.success || !result.data) {
+    return []
+  }
+
+  return result.data.map(allergen => ({
+    value: allergen.id,
+    label: getName(allergen, lang),
+    code: allergen.code,
+    icon_url: allergen.icon_url,
+  }))
 }

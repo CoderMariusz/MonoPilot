@@ -22,7 +22,7 @@ describe('CreateUserSchema', () => {
         email: 'john.doe@example.com',
         first_name: 'John',
         last_name: 'Doe',
-        role: 'admin',
+        role_id: 'role-admin-id',
       })
 
       expect(result.success).toBe(true)
@@ -30,30 +30,22 @@ describe('CreateUserSchema', () => {
         expect(result.data.email).toBe('john.doe@example.com')
         expect(result.data.first_name).toBe('John')
         expect(result.data.last_name).toBe('Doe')
-        expect(result.data.role).toBe('admin')
+        expect(result.data.role_id).toBe('role-admin-id')
       }
     })
 
-    it('should accept all 10 role types', () => {
-      const roles: Array<typeof UserRoleEnum._type> = [
-        'admin',
-        'manager',
-        'operator',
-        'viewer',
-        'planner',
-        'technical',
-        'purchasing',
-        'warehouse',
-        'qc',
-        'finance',
+    it('should accept role_id as UUID string', () => {
+      const roleIds = [
+        'role-admin-id',
+        'role-manager-id',
       ]
 
-      roles.forEach((role) => {
+      roleIds.forEach((role_id) => {
         const result = CreateUserSchema.safeParse({
           email: 'test@example.com',
           first_name: 'Test',
           last_name: 'User',
-          role,
+          role_id,
         })
         expect(result.success).toBe(true)
       })
@@ -64,7 +56,7 @@ describe('CreateUserSchema', () => {
         email: 'test@example.com',
         first_name: '  John  ',
         last_name: '  Doe  ',
-        role: 'viewer',
+        role_id: 'role-viewer-id',
       })
 
       expect(result.success).toBe(true)
@@ -81,7 +73,7 @@ describe('CreateUserSchema', () => {
         email: 'not-an-email',
         first_name: 'John',
         last_name: 'Doe',
-        role: 'admin',
+        role_id: 'role-admin-id',
       })
 
       expect(result.success).toBe(false)
@@ -94,7 +86,7 @@ describe('CreateUserSchema', () => {
       const result = CreateUserSchema.safeParse({
         first_name: 'John',
         last_name: 'Doe',
-        role: 'admin',
+        role_id: 'role-admin-id',
       })
 
       expect(result.success).toBe(false)
@@ -105,7 +97,7 @@ describe('CreateUserSchema', () => {
         email: 'test@example.com',
         first_name: '',
         last_name: 'Doe',
-        role: 'admin',
+        role_id: 'role-admin-id',
       })
 
       expect(result.success).toBe(false)
@@ -114,17 +106,17 @@ describe('CreateUserSchema', () => {
       }
     })
 
-    it('should reject first_name longer than 50 characters', () => {
+    it('should reject first_name longer than 100 characters', () => {
       const result = CreateUserSchema.safeParse({
         email: 'test@example.com',
-        first_name: 'A'.repeat(51),
+        first_name: 'A'.repeat(101),
         last_name: 'Doe',
-        role: 'admin',
+        role_id: 'role-admin-id',
       })
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.errors[0].message).toContain('50 characters')
+        expect(result.error.errors[0].message).toContain('100 characters')
       }
     })
 
@@ -145,7 +137,7 @@ describe('CreateUserSchema', () => {
         email: longEmail,
         first_name: 'John',
         last_name: 'Doe',
-        role: 'admin',
+        role_id: 'role-admin-id',
       })
 
       expect(result.success).toBe(false)
@@ -183,14 +175,14 @@ describe('UpdateUserSchema', () => {
       }
     })
 
-    it('should accept role update', () => {
+    it('should accept role_id update', () => {
       const result = UpdateUserSchema.safeParse({
-        role: 'manager',
+        role_id: 'role-manager-id',
       })
 
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.role).toBe('manager')
+        expect(result.data.role_id).toBe('role-manager-id')
       }
     })
 
@@ -217,9 +209,9 @@ describe('UpdateUserSchema', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should reject first_name longer than 50 characters', () => {
+    it('should reject first_name longer than 100 characters', () => {
       const result = UpdateUserSchema.safeParse({
-        first_name: 'A'.repeat(51),
+        first_name: 'A'.repeat(101),
       })
 
       expect(result.success).toBe(false)
@@ -233,9 +225,9 @@ describe('UpdateUserSchema', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should reject invalid role', () => {
+    it('should reject empty role_id if provided', () => {
       const result = UpdateUserSchema.safeParse({
-        role: 'super_admin',
+        role_id: '',
       })
 
       expect(result.success).toBe(false)

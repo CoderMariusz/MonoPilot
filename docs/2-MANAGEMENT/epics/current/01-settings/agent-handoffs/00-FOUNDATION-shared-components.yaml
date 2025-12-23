@@ -1,0 +1,304 @@
+# AGENT HANDOFF: Foundation - Shared Components for Settings v2
+
+agent: frontend-dev
+epic: "01-settings"
+phase: "FOUNDATION"
+priority: CRITICAL
+task: "Create shared/reusable components for Settings v2 - blocks all other work"
+
+# ============================================
+# CONTEXT
+# ============================================
+
+wireframes:
+  reference:
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-012-warehouse-list.md  # Best example of DataTable with actions
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-008-user-list.md       # Best example of Actions menu [⋮]
+
+migration_plan:
+  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md
+
+# ============================================
+# OUTPUT FILES TO CREATE
+# ============================================
+
+output:
+  directory: apps/frontend/components/settings-v2/shared/
+
+  files:
+    - DataTableWithDetails.tsx        # Base DataTable with 2nd row support
+    - ActionsMenu.tsx                 # [⋮] dropdown menu pattern
+    - StatusBadge.tsx                 # Unified status badges
+    - TypeBadge.tsx                   # Unified type badges (warehouse, machine, etc.)
+    - EmptyState.tsx                  # Illustrations + CTA for empty lists
+    - ErrorState.tsx                  # Error display with Retry + Contact Support
+    - LoadingState.tsx                # Skeleton loaders for tables
+    - ActivityLogPanel.tsx            # Reusable activity log panel (timeline view)
+    - ConfirmationDialog.tsx          # Standardized confirmation dialogs
+
+# ============================================
+# REQUIREMENTS
+# ============================================
+
+requirements:
+
+  DataTableWithDetails:
+    purpose: "Base table component that supports 2nd row for extra details"
+    props:
+      - columns (array of column definitions)
+      - data (array of row data)
+      - renderDetails (optional function to render 2nd row)
+      - onRowClick (optional)
+      - loading (boolean)
+      - error (string)
+      - emptyMessage (string)
+    features:
+      - Sortable columns
+      - Pagination support
+      - 2nd row toggle (expand/collapse per row)
+      - Loading skeleton
+      - Empty state integration
+      - Error state integration
+    example_usage: |
+      <DataTableWithDetails
+        columns={productColumns}
+        data={products}
+        renderDetails={(product) => (
+          <ProductRowDetails product={product} />
+        )}
+        loading={isLoading}
+        error={error}
+        emptyMessage="No products found"
+      />
+
+  ActionsMenu:
+    purpose: "[⋮] dropdown menu with dynamic action items"
+    props:
+      - actions (array of action definitions)
+      - onAction (callback)
+      - disabled (boolean)
+    features:
+      - Keyboard navigation (Tab, Enter, Escape)
+      - Icon support per action
+      - Disabled state per action
+      - Separator support between action groups
+      - Touch target >= 48x48dp
+    example_actions: |
+      [
+        { id: 'view', label: 'View Details', icon: Eye },
+        { id: 'edit', label: 'Edit', icon: Edit },
+        { type: 'separator' },
+        { id: 'delete', label: 'Delete', icon: Trash2, variant: 'destructive' }
+      ]
+
+  StatusBadge:
+    purpose: "Consistent status badge across all screens"
+    variants:
+      - active (green)
+      - inactive (gray)
+      - disabled (gray)
+      - pending (yellow)
+      - error (red)
+      - success (green)
+    props:
+      - status (string)
+      - variant (optional override)
+    features:
+      - WCAG AA contrast (4.5:1)
+      - Consistent colors across all screens
+
+  TypeBadge:
+    purpose: "Type classification badges (warehouse type, machine type, etc.)"
+    types:
+      warehouses: General, Raw Materials, WIP, Finished Goods, Quarantine
+      machines: Mixer, Oven, Packaging, Filling, Labeling, Other
+      products: RM, WIP, FG, PKG, BP
+      allergens: EU14, Custom
+    props:
+      - type (string)
+      - category (warehouse | machine | product | allergen)
+    features:
+      - Color-coded by category
+      - Consistent across module
+
+  EmptyState:
+    purpose: "Empty state with illustration and CTA"
+    props:
+      - icon (React component or emoji)
+      - title (string)
+      - description (string)
+      - action (optional button config)
+    features:
+      - Center-aligned
+      - Large icon (h-12 w-12)
+      - Clear CTA button
+      - Accessible (proper heading hierarchy)
+    example: |
+      <EmptyState
+        icon={Warehouse}
+        title="No Warehouses Found"
+        description="You haven't created any warehouses yet. Start by adding your first warehouse location."
+        action={{
+          label: "Add Your First Warehouse",
+          onClick: handleCreate
+        }}
+      />
+
+  ErrorState:
+    purpose: "Error display with retry functionality"
+    props:
+      - error (string or Error object)
+      - onRetry (callback)
+      - showSupport (boolean, default true)
+    features:
+      - Warning icon
+      - Error message display
+      - Retry button
+      - Contact Support button (links to support)
+      - ARIA live region (assertive)
+
+  LoadingState:
+    purpose: "Skeleton loader for tables"
+    props:
+      - rows (number, default 3)
+      - columns (number, default 5)
+    features:
+      - Animated skeleton
+      - Table structure mimicking
+      - ARIA busy state
+
+  ActivityLogPanel:
+    purpose: "Reusable activity log panel (used by many screens)"
+    props:
+      - resourceType (string: 'warehouse', 'user', 'machine', etc.)
+      - resourceId (string)
+    features:
+      - Timeline view (vertical)
+      - Grouped by date
+      - User avatar + name
+      - Action description
+      - Timestamp (relative: "2 hours ago")
+      - Pagination (load more)
+      - Filter by action type
+    api:
+      - GET /api/v1/settings/activity-logs?resource_type={type}&resource_id={id}
+
+  ConfirmationDialog:
+    purpose: "Standardized confirmation dialogs"
+    props:
+      - open (boolean)
+      - title (string)
+      - description (string)
+      - confirmLabel (string, default "Confirm")
+      - cancelLabel (string, default "Cancel")
+      - onConfirm (callback)
+      - onCancel (callback)
+      - variant ('default' | 'destructive')
+    features:
+      - ShadCN AlertDialog base
+      - Consistent styling
+      - Keyboard support (Enter = confirm, Escape = cancel)
+
+# ============================================
+# ISOLATION RULES
+# ============================================
+
+isolation:
+  allowed_imports:
+    - "@/components/ui/*"               # ShadCN components
+    - "@/lib/utils"                     # Utilities
+    - "lucide-react"                    # Icons
+    - "react", "react-dom"              # React
+
+  forbidden_imports:
+    - "@/app/(authenticated)/settings/*"           # v1 pages
+    - "@/components/settings/*"                    # v1 components
+    - "@/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/*"  # Archive
+
+  verification:
+    command: "grep -r \"from '@/components/settings/'\" apps/frontend/components/settings-v2/shared/"
+    expected: "ZERO results (or only settings-v2/ refs)"
+
+# ============================================
+# ACCEPTANCE CRITERIA
+# ============================================
+
+acceptance:
+  - [ ] All 9 components created in components/settings-v2/shared/
+  - [ ] DataTableWithDetails supports 2nd row rendering
+  - [ ] ActionsMenu has keyboard navigation (Tab, Enter, Escape)
+  - [ ] All badges pass WCAG AA contrast (4.5:1)
+  - [ ] EmptyState matches wireframe empty states
+  - [ ] ErrorState has Retry + Contact Support buttons
+  - [ ] LoadingState shows animated skeletons
+  - [ ] ActivityLogPanel fetches from API and displays timeline
+  - [ ] ConfirmationDialog supports destructive variant
+  - [ ] Zero imports from v1 code (verified)
+  - [ ] TypeScript compiles with zero errors
+  - [ ] All components have TypeScript interfaces
+  - [ ] All components are properly exported
+
+# ============================================
+# TECHNICAL SPECS
+# ============================================
+
+tech_stack:
+  - React 19
+  - TypeScript
+  - ShadCN UI
+  - TailwindCSS
+  - Lucide React (icons)
+
+patterns:
+  - Use ShadCN components as base
+  - Server components where possible
+  - Client components for interactivity ('use client')
+  - Composition pattern (small, reusable components)
+
+# ============================================
+# TESTING
+# ============================================
+
+testing:
+  unit_tests:
+    - Create: components/settings-v2/shared/__tests__/ActionsMenu.test.tsx
+    - Create: components/settings-v2/shared/__tests__/DataTableWithDetails.test.tsx
+
+  manual_testing:
+    - Verify ActionsMenu keyboard nav
+    - Verify StatusBadge colors (use contrast checker)
+    - Verify EmptyState renders correctly
+    - Verify LoadingState animates
+
+# ============================================
+# EFFORT ESTIMATE
+# ============================================
+
+estimated_hours: 6-8
+complexity: MEDIUM
+blocks: "All Phase 2-5 work (shared components must exist first)"
+critical_path: true
+
+# ============================================
+# COMPLETION CRITERIA
+# ============================================
+
+done_when:
+  - All 9 components exist and export correctly
+  - Import audit passes (zero v1 imports)
+  - TypeScript compiles
+  - Basic tests pass
+  - Components can be imported in other settings-v2/ code
+  - README created: components/settings-v2/shared/README.md
+
+# ============================================
+# HANDOFF TO NEXT AGENT
+# ============================================
+
+next_agent:
+  - "01-PRIORITY-locations-tree.yaml" (use shared components)
+  - "02-PRIORITY-allergens-custom.yaml" (use shared components)
+
+artifacts_created:
+  - components/settings-v2/shared/* (9 components)
+  - Foundation ready for Phase 2 work

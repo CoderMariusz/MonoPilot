@@ -14,6 +14,8 @@ export default defineConfig({
     ],
     exclude: ['node_modules', '.next', 'dist'],
     env: {
+      NODE_ENV: "test",
+      VITEST: "true",
       // Vitest will automatically load .env files
       // These can be overridden in test environment
       NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
