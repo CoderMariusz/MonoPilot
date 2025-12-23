@@ -109,7 +109,6 @@ describe('AllergenService', () => {
     vi.mocked(createServerSupabase).mockResolvedValue(mockSupabase)
   })
 
-describe('AllergenService', () => {
   describe('getAllergens()', () => {
     it('should return all 14 EU allergens', async () => {
       // Arrange

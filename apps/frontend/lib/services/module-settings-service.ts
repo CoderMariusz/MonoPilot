@@ -236,14 +236,13 @@ export class ModuleSettingsService {
     // Enable all modules
     const timestamp = new Date().toISOString()
     for (const code of Array.from(modulesToEnable)) {
-      const module = allModules.find(m => m.code === code)
-      if (!module) continue
-
+      const moduleData = allModules.find(m => m.code === code)
+      if (!moduleData) continue
       const { error } = await supabase
         .from('organization_modules')
         .upsert({
           org_id: orgId,
-          module_id: module.id,
+          module_id: moduleData.id,
           enabled: true,
           enabled_at: timestamp,
         }, {
@@ -289,8 +288,8 @@ export class ModuleSettingsService {
     // Disable all modules
     const timestamp = new Date().toISOString()
     for (const code of Array.from(modulesToDisable)) {
-      const module = allModules.find(m => m.code === code)
-      if (!module) continue
+      const moduleData = allModules.find(m => m.code === code)
+      if (!moduleData) continue
 
       const { error } = await supabase
         .from('organization_modules')
@@ -299,7 +298,7 @@ export class ModuleSettingsService {
           disabled_at: timestamp,
         })
         .eq('org_id', orgId)
-        .eq('module_id', module.id)
+        .eq('module_id', moduleData.id)
 
       if (error) {
         throw new Error(`Failed to disable module ${code}`)
@@ -329,23 +328,23 @@ export class ModuleSettingsService {
     }
 
     // Get module info
-    const { data: module, error: moduleError } = await supabase
+    const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
       .select('*')
       .eq('id', moduleId)
       .single()
 
-    if (moduleError || !module) {
+    if (moduleError || !moduleData) {
       throw new Error('Module not found')
     }
 
     // ISSUE 3 FIX: Explicit Settings check first
-    if (module.code === 'settings') {
+    if (moduleData.code === 'settings') {
       throw new Error('Settings module cannot be disabled')
     }
 
     // Then check can_disable flag as secondary validation
-    if (!module.can_disable) {
+    if (!moduleData.can_disable) {
       throw new Error('Module cannot be disabled')
     }
 
