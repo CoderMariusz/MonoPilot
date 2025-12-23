@@ -30,6 +30,50 @@ export interface SendInvitationEmailParams {
 }
 
 /**
+ * Format date in readable format (e.g., "December 23, 2025")
+ * @param date - Date to format
+ * @returns Formatted date string
+ */
+function formatExpiryDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+/**
+ * Retry an async operation with exponential backoff
+ * @param operation - Async function to retry
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @returns Result of the operation
+ * @throws Error if all retries fail
+ */
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries = 3
+): Promise<T> {
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error as Error
+
+      // If not the last attempt, wait before retrying (exponential backoff)
+      if (attempt < maxRetries) {
+        const delayMs = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
+        console.log(`⏳ Retrying in ${delayMs}ms... (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+      }
+    }
+  }
+
+  throw lastError || new Error('Operation failed after retries')
+}
+
+/**
  * Build invitation email HTML template
  *
  * AC-003.6: Invitation email template with org name, role, link, QR code, expiry
@@ -39,11 +83,7 @@ export interface SendInvitationEmailParams {
  */
 function buildInvitationEmailHTML(params: SendInvitationEmailParams): string {
   const signupUrl = buildSignupUrl(params.token, params.email)
-  const expiryDate = params.expiresAt.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const expiryDate = formatExpiryDate(params.expiresAt)
 
   return `
 <!DOCTYPE html>
@@ -145,11 +185,7 @@ function buildInvitationEmailHTML(params: SendInvitationEmailParams): string {
  */
 function buildInvitationEmailText(params: SendInvitationEmailParams): string {
   const signupUrl = buildSignupUrl(params.token, params.email)
-  const expiryDate = params.expiresAt.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const expiryDate = formatExpiryDate(params.expiresAt)
 
   return `
 You've been invited to ${params.orgName}
@@ -199,19 +235,14 @@ export async function sendInvitationEmail(
     html: buildInvitationEmailHTML(params),
   }
 
-  // Retry logic: 3 attempts with exponential backoff (1s, 2s, 4s)
-  const maxRetries = 3
-  let lastError: Error | null = null
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
+  // Send email with retry logic (3 attempts with exponential backoff: 1s, 2s, 4s)
+  try {
+    await retryWithBackoff(async () => {
       const startTime = Date.now()
       await sgMail.send(msg)
       const elapsed = Date.now() - startTime
 
-      console.log(
-        `✅ Invitation email sent to ${params.email} in ${elapsed}ms (attempt ${attempt}/${maxRetries})`
-      )
+      console.log(`✅ Invitation email sent to ${params.email} in ${elapsed}ms`)
 
       // AC-002.6: Email sent within 5s
       if (elapsed > 5000) {
@@ -219,28 +250,13 @@ export async function sendInvitationEmail(
           `⚠️  Email took ${elapsed}ms (exceeds 5s target). Consider investigating SendGrid performance.`
         )
       }
+    }, 3)
 
-      return true
-    } catch (error) {
-      lastError = error as Error
-      console.error(
-        `❌ Failed to send invitation email (attempt ${attempt}/${maxRetries}):`,
-        error
-      )
-
-      // If not the last attempt, wait before retrying (exponential backoff)
-      if (attempt < maxRetries) {
-        const delayMs = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
-        console.log(`⏳ Retrying in ${delayMs}ms...`)
-        await new Promise((resolve) => setTimeout(resolve, delayMs))
-      }
-    }
+    return true
+  } catch (error) {
+    const err = error as Error
+    throw new Error(`Failed to send invitation email after 3 attempts: ${err.message}`)
   }
-
-  // All retries failed
-  throw new Error(
-    `Failed to send invitation email after ${maxRetries} attempts: ${lastError?.message}`
-  )
 }
 
 /**
