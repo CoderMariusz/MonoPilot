@@ -2,225 +2,115 @@ import { z } from 'zod'
 
 /**
  * Location Management Validation Schemas
- * Story: 1.6 Location Management
- *
- * Zod schemas for location CRUD operations with zone/capacity toggle validation
+ * Story: 01.9 - Warehouse Locations Management
+ * Purpose: Hierarchical location validation with level and type enums
  */
 
 // ============================================================================
 // ENUMS
 // ============================================================================
 
-export const LocationTypeEnum = z.enum([
-  'receiving',
-  'production',
-  'storage',
-  'shipping',
-  'transit',
-  'quarantine',
-])
+export const LocationLevelEnum = z.enum(['zone', 'aisle', 'rack', 'bin'])
+export type LocationLevel = z.infer<typeof LocationLevelEnum>
 
+export const LocationTypeEnum = z.enum([
+  'bulk',
+  'pallet',
+  'shelf',
+  'floor',
+  'staging',
+])
 export type LocationType = z.infer<typeof LocationTypeEnum>
 
 // ============================================================================
-// CREATE LOCATION SCHEMA (AC-005.1, AC-005.2)
+// CREATE LOCATION SCHEMA (Story 01.9)
 // ============================================================================
 
-export const CreateLocationSchema = z
-  .object({
-    warehouse_id: z.string().uuid('Invalid warehouse ID'),
+export const createLocationSchema = z.object({
+  code: z
+    .string()
+    .min(1, 'Code is required')
+    .max(50, 'Code must be less than 50 characters')
+    .regex(/^[A-Z0-9-]+$/, 'Code must be uppercase alphanumeric with hyphens only')
+    .trim(),
 
-    code: z
-      .string()
-      .min(2, 'Code must be at least 2 characters')
-      .max(50, 'Code must be less than 50 characters')
-      .regex(/^[A-Z0-9-]+$/, 'Code must be uppercase alphanumeric with hyphens only')
-      .trim(),
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(255, 'Name must be less than 255 characters')
+    .trim(),
 
-    name: z
-      .string()
-      .min(1, 'Name is required')
-      .max(100, 'Name must be less than 100 characters')
-      .trim(),
+  description: z.string().max(1000).optional().nullable(),
 
-    type: LocationTypeEnum,
+  parent_id: z.string().uuid().optional().nullable(),
 
-    // Optional fields with toggle flags (AC-005.2)
-    zone: z
-      .string()
-      .max(100, 'Zone must be less than 100 characters')
-      .trim()
-      .optional()
-      .nullable(),
+  level: LocationLevelEnum,
 
-    zone_enabled: z.boolean().optional().default(false),
+  location_type: LocationTypeEnum.default('shelf'),
 
-    capacity: z
-      .number()
-      .positive('Capacity must be greater than 0')
-      .optional()
-      .nullable(),
+  max_pallets: z
+    .number()
+    .int()
+    .positive('Max pallets must be greater than 0')
+    .optional()
+    .nullable(),
 
-    capacity_enabled: z.boolean().optional().default(false),
+  max_weight_kg: z
+    .number()
+    .positive('Max weight must be greater than 0')
+    .optional()
+    .nullable(),
 
-    // Barcode (auto-generated if not provided)
-    barcode: z
-      .string()
-      .max(100, 'Barcode must be less than 100 characters')
-      .optional(),
+  is_active: z.boolean().optional().default(true),
+})
 
-    is_active: z.boolean().optional().default(true),
-  })
-  .refine(
-    (data) => {
-      // AC-005.2: If zone_enabled = true, zone must not be null
-      if (data.zone_enabled) {
-        return data.zone !== null && data.zone !== undefined && data.zone.trim() !== ''
-      }
-      return true
-    },
-    {
-      message: 'Zone is required when zone_enabled is true',
-      path: ['zone'],
-    }
-  )
-  .refine(
-    (data) => {
-      // AC-005.2: If capacity_enabled = true, capacity must be > 0
-      if (data.capacity_enabled) {
-        return (
-          data.capacity !== null &&
-          data.capacity !== undefined &&
-          data.capacity > 0
-        )
-      }
-      return true
-    },
-    {
-      message: 'Capacity is required and must be greater than 0 when capacity_enabled is true',
-      path: ['capacity'],
-    }
-  )
-
-export type CreateLocationInput = z.input<typeof CreateLocationSchema>
+export type CreateLocationInput = z.infer<typeof createLocationSchema>
 
 // ============================================================================
-// UPDATE LOCATION SCHEMA (AC-005.1, AC-005.2)
+// UPDATE LOCATION SCHEMA (Story 01.9)
 // ============================================================================
 
-export const UpdateLocationSchema = z
-  .object({
-    code: z
-      .string()
-      .min(2, 'Code must be at least 2 characters')
-      .max(50, 'Code must be less than 50 characters')
-      .regex(/^[A-Z0-9-]+$/, 'Code must be uppercase alphanumeric with hyphens only')
-      .trim()
-      .optional(),
+export const updateLocationSchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(255, 'Name must be less than 255 characters')
+    .trim()
+    .optional(),
 
-    name: z
-      .string()
-      .min(1, 'Name cannot be empty')
-      .max(100, 'Name must be less than 100 characters')
-      .trim()
-      .optional(),
+  description: z.string().max(1000).optional().nullable(),
 
-    type: LocationTypeEnum.optional(),
+  location_type: LocationTypeEnum.optional(),
 
-    zone: z
-      .string()
-      .max(100, 'Zone must be less than 100 characters')
-      .trim()
-      .optional()
-      .nullable(),
+  max_pallets: z
+    .number()
+    .int()
+    .positive('Max pallets must be greater than 0')
+    .optional()
+    .nullable(),
 
-    zone_enabled: z.boolean().optional(),
+  max_weight_kg: z
+    .number()
+    .positive('Max weight must be greater than 0')
+    .optional()
+    .nullable(),
 
-    capacity: z
-      .number()
-      .positive('Capacity must be greater than 0')
-      .optional()
-      .nullable(),
-
-    capacity_enabled: z.boolean().optional(),
-
-    barcode: z
-      .string()
-      .max(100, 'Barcode must be less than 100 characters')
-      .optional(),
-
-    is_active: z.boolean().optional(),
-  })
-  .refine(
-    (data) => {
-      // AC-005.2: If zone_enabled = true, zone must not be null
-      if (data.zone_enabled === true) {
-        return data.zone !== null && data.zone !== undefined && data.zone.trim() !== ''
-      }
-      return true
-    },
-    {
-      message: 'Zone is required when zone_enabled is true',
-      path: ['zone'],
-    }
-  )
-  .refine(
-    (data) => {
-      // AC-005.2: If capacity_enabled = true, capacity must be > 0
-      if (data.capacity_enabled === true) {
-        return (
-          data.capacity !== null &&
-          data.capacity !== undefined &&
-          data.capacity > 0
-        )
-      }
-      return true
-    },
-    {
-      message: 'Capacity is required and must be greater than 0 when capacity_enabled is true',
-      path: ['capacity'],
-    }
-  )
-
-export type UpdateLocationInput = z.input<typeof UpdateLocationSchema>
-
-// ============================================================================
-// LOCATION FILTERS SCHEMA (AC-005.4)
-// ============================================================================
-
-export const LocationFiltersSchema = z.object({
-  warehouse_id: z.string().uuid().optional(),
-  type: LocationTypeEnum.optional(),
   is_active: z.boolean().optional(),
-  search: z.string().optional(), // Search by code or name
 })
 
-export type LocationFilters = z.infer<typeof LocationFiltersSchema>
+export type UpdateLocationInput = z.infer<typeof updateLocationSchema>
 
 // ============================================================================
-// BULK LOCATION CREATE SCHEMA (AC-005.7)
+// LOCATION LIST PARAMS SCHEMA (Story 01.9)
 // ============================================================================
 
-export const BulkLocationCreateSchema = z.object({
-  warehouse_id: z.string().uuid('Invalid warehouse ID'),
-  locations: z
-    .array(
-      z.object({
-        code: z
-          .string()
-          .min(2)
-          .max(50)
-          .regex(/^[A-Z0-9-]+$/),
-        name: z.string().min(1).max(100),
-        type: LocationTypeEnum,
-        zone: z.string().max(100).optional().nullable(),
-        zone_enabled: z.boolean().optional().default(false),
-        capacity: z.number().positive().optional().nullable(),
-        capacity_enabled: z.boolean().optional().default(false),
-      })
-    )
-    .min(1, 'At least one location is required')
-    .max(100, 'Cannot create more than 100 locations at once'),
+export const locationListParamsSchema = z.object({
+  view: z.enum(['tree', 'flat']).optional().default('tree'),
+  level: LocationLevelEnum.optional(),
+  type: LocationTypeEnum.optional(),
+  parent_id: z.string().uuid().optional().nullable(),
+  search: z.string().optional(),
+  include_capacity: z.boolean().optional().default(false),
 })
 
-export type BulkLocationCreateInput = z.input<typeof BulkLocationCreateSchema>
+export type LocationListParams = z.infer<typeof locationListParamsSchema>

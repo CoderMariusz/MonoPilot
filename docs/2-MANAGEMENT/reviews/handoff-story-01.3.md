@@ -1,274 +1,356 @@
-# Handoff: Story 01.3 - Onboarding Wizard Launcher
+# Handoff: Story 01.3 → DEV (for fixes)
 
-**Date:** 2025-12-18
-**Status:** REQUEST_CHANGES (3 blocking issues)
-**Blocking Issues:** MAJOR (Test coverage, Hook response parsing, Zod validation)
-
----
-
-## Executive Summary
-
-Story 01.3 implements the onboarding wizard launcher with comprehensive backend and frontend. Implementation is **70-80% complete** but requires manual fixes before QA:
-
-- **Backend**: 100% complete (3 API endpoints + Service + Validation)
-- **Frontend**: 90% complete (7 components + hook, but response parsing mismatch)
-- **Tests**: Exist but need fixes (21-79% passing depending on mock structure)
-- **Security**: ✅ PASSED (no direct DB access, admin checks, RLS compliant)
+**From**: CODE-REVIEWER
+**To**: BACKEND-DEV / FRONTEND-DEV
+**Date**: 2025-12-19
+**Decision**: REQUEST CHANGES
 
 ---
 
-## Files Created (17 total)
+## Status
 
-### Backend (4 files) - COMPLETE
-1. ✅ `apps/frontend/app/api/v1/settings/onboarding/status/route.ts` (69 lines)
-2. ✅ `apps/frontend/app/api/v1/settings/onboarding/skip/route.ts` (93 lines)
-3. ✅ `apps/frontend/app/api/v1/settings/onboarding/progress/route.ts` (90 lines)
-4. ✅ `apps/frontend/lib/services/onboarding-service.ts` (341 lines)
-
-### Frontend (7 files) - CREATED but needs fixes
-5. ⚠️ `apps/frontend/lib/hooks/useOnboardingStatus.ts` (RESPONSE PARSING MISMATCH)
-6. ✅ `apps/frontend/components/onboarding/OnboardingGuard.tsx`
-7. ✅ `apps/frontend/components/onboarding/OnboardingWizardModal.tsx`
-8. ✅ `apps/frontend/components/onboarding/OnboardingLauncher.tsx`
-9. ✅ `apps/frontend/components/onboarding/OnboardingStepIndicator.tsx`
-10. ✅ `apps/frontend/components/onboarding/SkipConfirmationDialog.tsx`
-11. ✅ `apps/frontend/components/onboarding/SetupInProgressMessage.tsx`
-
-### Tests (5 files) - CREATED
-12-16. ✅ Test files created (status: 4-15 passing depending on mock structure)
-
-### Missing (1 file) - REQUIRED
-17. ❌ `apps/frontend/lib/validation/onboarding-schemas.ts` (Zod schemas - MUST CREATE)
+- **Implementation**: 85% complete
+- **Tests**: 50/54 passing (92.6%)
+- **Blockers**: 3 critical, 2 major
+- **Estimated Fix Time**: 4-6 hours
 
 ---
 
-## Blocking Issues - MUST FIX Before Approval
+## What's Working Well ✓
 
-### Issue #1: Missing Zod Validation Schemas (MAJOR)
-**Severity:** MAJOR
-**Effort:** 30 minutes
-**File:** `apps/frontend/lib/validation/onboarding-schemas.ts` (MISSING - create new)
+1. **Security**: All OWASP checks pass
+   - Authentication/authorization properly implemented
+   - UUID validation prevents SQL injection
+   - Generic error messages (no info leakage)
 
-**Required Content:**
-```typescript
-import { z } from 'zod'
+2. **Code Quality**: TypeScript strict mode, excellent documentation
+   - Service layer architecture is exemplary
+   - Clean separation of concerns
+   - Comprehensive JSDoc on all functions
 
-export const OnboardingStatusSchema = z.object({
-  step: z.number().int().min(0).max(6),
-  started_at: z.string().datetime().nullable(),
-  completed_at: z.string().datetime().nullable(),
-  skipped: z.boolean(),
-  can_skip: z.boolean(),
-})
+3. **Test Coverage**: 92.6% pass rate
+   - Tests linked to acceptance criteria
+   - Proper mocking and isolation
+   - Given/When/Then format
 
-export const UpdateProgressSchema = z.object({
-  step: z.number().int().min(1).max(6),
-})
+4. **Architecture**: Follows MonoPilot patterns
+   - RESTful API routes
+   - Service layer isolation
+   - Zod validation schemas
 
-export const SkipResultSchema = z.object({
-  success: z.boolean(),
-  demo_data: z.object({
-    warehouse_id: z.string().uuid().optional(),
-    location_id: z.string().uuid().optional(),
-    product_id: z.string().uuid().optional(),
-  }).optional(),
-})
+---
 
-export type OnboardingStatus = z.infer<typeof OnboardingStatusSchema>
-export type UpdateProgress = z.infer<typeof UpdateProgressSchema>
-export type SkipResult = z.infer<typeof SkipResultSchema>
+## Critical Blockers (MUST FIX)
+
+### 1. Missing Database Migration
+**Priority**: P0 (blocks deployment)
+**File**: `supabase/migrations/XXX_add_onboarding_columns.sql`
+
+**Required**:
+```sql
+ALTER TABLE organizations
+  ADD COLUMN IF NOT EXISTS onboarding_step INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS onboarding_started_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS onboarding_skipped BOOLEAN DEFAULT false;
 ```
 
-Then update API routes to use schemas:
-```typescript
-// In each route:
-import { OnboardingStatusSchema } from '@/lib/validation/onboarding-schemas'
-
-const validated = OnboardingStatusSchema.parse(response)
-return NextResponse.json(validated)
-```
-
----
-
-### Issue #2: Hook Response Parsing Mismatch (MAJOR)
-**Severity:** MAJOR
-**Effort:** 2 minutes
-**File:** `apps/frontend/lib/hooks/useOnboardingStatus.ts` lines 71-73
-
-**Current (WRONG):**
-```typescript
-const currentStep = data.onboarding_step ?? 0
-const completed = !!data.onboarding_completed_at
-const skipped = data.onboarding_skipped ?? false
-```
-
-**Required Fix:**
-```typescript
-const currentStep = data.step ?? 0
-const completed = !!data.completed_at
-const skipped = data.skipped ?? false
-```
-
-**Reason:** API returns `step`, `completed_at`, `skipped`. Hook expects different field names.
-
----
-
-### Issue #3: Missing Test Coverage (MAJOR)
-**Severity:** MAJOR
-**Effort:** 1-2 hours
-**Status:** Tests exist but have mock structure mismatches
-
-**Actions:**
-1. Run `pnpm test -- --run` in `apps/frontend`
-2. Fix failing tests - most failures due to mock structure mismatch
-3. Ensure 80%+ test coverage on Story 01.3 files
-4. All tests must pass before approval
-
-**Mock Structure Issue:**
-Tests expect: `mockUseOrgContext.mockReturnValue({ organization: {...} })`
-Component expects: `mockUseOrgContext.mockReturnValue({ data: { organization: {...} }, refetch: vi.fn() })`
-
-Update all test mocks to match actual hook return structure.
-
----
-
-## Security Review - ✅ PASSED
-
-### Positive Findings
-1. ✅ **No Direct DB Access**: Hook uses `/api/v1/settings/onboarding/status` endpoint (not direct Supabase)
-2. ✅ **Admin Role Checks**: All mutation endpoints check `hasAdminAccess(context.role_code)`
-3. ✅ **ADR-013 Compliance**: Perfect multi-tenancy validation (userId → orgId mapping)
-4. ✅ **Input Validation**: UUID and step range validation present
-5. ✅ **Error Handling**: Comprehensive error handling with proper HTTP status codes
-
-### Security Issues Found
-0 critical vulnerabilities. Minor issue: Error messages should sanitize database details (nice-to-have).
-
----
-
-## Code Quality - ✅ EXCELLENT
-
-### Positive Findings
-1. ✅ **TypeScript Strict Mode**: No `any` types, all properly typed
-2. ✅ **JSDoc Comments**: Excellent documentation on all methods
-3. ✅ **Service Layer**: Clean separation of concerns
-4. ✅ **MonoPilot Patterns**: Follows all documented conventions
-5. ✅ **Component Design**: All 7 components follow ShadCN UI patterns
-
-### Code Style
-- Follows MonoPilot patterns (API routes, service layer, hooks, components)
-- Proper file organization
-- Consistent naming conventions
-
----
-
-## Test Status
-
-### Current Status
-- **Tests Created**: 5 files, 26+ test cases
-- **Passing Rate**: 4-15/19 passing (21-79% depending on mock fixes)
-- **Coverage Target**: 80%+
-- **Blockers**: Mock structure mismatches, missing validation imports
-
-### Test Files
-1. `apps/frontend/lib/hooks/__tests__/useOnboardingStatus.test.ts`
-2. `apps/frontend/components/onboarding/__tests__/OnboardingGuard.test.tsx`
-3. `apps/frontend/components/onboarding/__tests__/OnboardingWizardModal.test.tsx`
-4. `apps/frontend/__tests__/integration/onboarding-flow.test.ts`
-5. `apps/frontend/__tests__/e2e/onboarding.spec.ts`
-
----
-
-## Acceptance Criteria Verification
-
-| Criterion | Status | Notes |
-|-----------|--------|-------|
-| Onboarding page created | ⚠️ PARTIAL | Component exists but not tested |
-| OnboardingWizardModal | ✅ PASS | File: `OnboardingWizardModal.tsx` |
-| OnboardingGuard | ✅ PASS | File: `OnboardingGuard.tsx` |
-| SkipConfirmationDialog | ✅ PASS | File: `SkipConfirmationDialog.tsx` |
-| SetupInProgressMessage | ✅ PASS | File: `SetupInProgressMessage.tsx` |
-| OnboardingLauncher | ✅ PASS | File: `OnboardingLauncher.tsx` |
-| OnboardingStepIndicator | ✅ PASS | File: `OnboardingStepIndicator.tsx` |
-| useOnboardingStatus hook | ❌ FAIL | Response parsing mismatch (Issue #2) |
-| GET /onboarding/status | ✅ PASS | File: `status/route.ts` |
-| POST /onboarding/skip | ✅ PASS | File: `skip/route.ts` |
-| PUT /onboarding/progress | ✅ PASS | File: `progress/route.ts` |
-| OnboardingService | ✅ PASS | File: `onboarding-service.ts` |
-| Admin role checks | ✅ PASS | All mutation endpoints check admin access |
-| RLS enforcement | ✅ PASS | Uses getOrgContext() for isolation |
-| Wireframe SET-001 | ✅ PASS | OnboardingLauncher matches spec |
-| Unit tests present | ⚠️ PARTIAL | Tests exist but need mock fixes (Issue #3) |
-
-**Acceptance Score:** 13/16 (81%) - **REQUEST_CHANGES**
-
----
-
-## Required Actions Before QA
-
-### Action 1: Create Zod Validation (30 min)
+**Verification**:
 ```bash
-# Create new file:
-apps/frontend/lib/validation/onboarding-schemas.ts
-# Add schemas per Issue #1 above
+psql -c "\d organizations" | grep onboarding
 ```
 
-### Action 2: Fix Hook Response Parsing (2 min)
+---
+
+### 2. Test Failures (4 tests)
+**Priority**: P0 (quality gate)
+
+#### 2a. Wizard shows when onboarding complete
+**File**: `components/onboarding/OnboardingWizardLauncher.tsx:87`
+
+**Issue**: Component doesn't check `onboarding_completed_at` before rendering wizard.
+
+**Fix**:
+```typescript
+// After line 87: if (!context) return null
+const isOnboardingComplete =
+  context.organizations?.onboarding_completed_at ||
+  context.organization?.onboarding_completed_at
+
+if (isOnboardingComplete) {
+  router.push('/dashboard')
+  return null
+}
+```
+
+**Tests affected**:
+- ✗ should NOT display wizard when onboarding_completed_at is set
+- ✗ should redirect to dashboard when onboarding completed
+
+#### 2b. URL parsing error in tests
+**File**: `components/onboarding/OnboardingWizardLauncher.tsx:29`
+
+**Issue**: Fetch uses relative URL `/api/...` which fails in test environment.
+
+**Fix Option 1** (prefer this):
+```typescript
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
+const response = await fetch(`${apiUrl}/api/v1/settings/onboarding/progress`, {
+  method: 'PUT',
+  // ...
+})
+```
+
+**Fix Option 2**: Update test mocks to handle relative URLs.
+
+**Test affected**:
+- ✗ should persist onboarding_step when step 1 completed
+
+#### 2c. Multi-admin test expectations
+**File**: `__tests__/01-settings/01.3.onboarding-wizard-launcher.test.tsx`
+
+**Issue**: Test expects database fetch, but may need test adjustment vs code fix.
+
+**Action**: Review test expectations - may be test issue, not code issue.
+
+**Test affected**:
+- ✗ should load shared progress from database
+
+---
+
+### 3. Type Mismatch: organization vs organizations
+**Priority**: P0 (runtime safety)
+
+**Issue**: Components use inconsistent property names:
+- `OnboardingGuard` expects `context.organization` (singular)
+- `OnboardingWizardLauncher` expects `context.organizations` (plural)
+- Test mocks provide BOTH as workaround
+
+**Fix**:
+1. Define canonical type in `lib/types/org-context.ts`:
+```typescript
+export interface OrgContext {
+  org_id: string
+  user_id: string
+  role_code: string
+  role_name: string
+  permissions: Record<string, unknown>
+  organization: Organization  // SINGULAR - canonical
+  user: User
+}
+```
+
+2. Update all components to use `context.organization` (singular)
+
+3. Remove test workarounds providing both properties
+
+**Files to update**:
+- `components/onboarding/OnboardingWizardLauncher.tsx`
+- `components/onboarding/OnboardingGuard.tsx`
+- `__tests__/01-settings/01.3.onboarding-wizard-launcher.test.tsx`
+
+---
+
+## Major Issues (SHOULD FIX)
+
+### 4. Service Layer Uses Client Supabase
+**Priority**: P1 (architecture)
+**File**: `lib/services/onboarding-service.ts`
+
+**Issue**:
+```typescript
+import { createClient } from '@/lib/supabase/client'  // CLIENT-SIDE
+```
+
+Service called from API routes (server-side) but imports client Supabase.
+
+**Fix Options**:
+1. Pass Supabase client to service methods:
+```typescript
+export class OnboardingService {
+  static async getStatus(
+    supabase: SupabaseClient,  // Add parameter
+    orgId: string
+  ): Promise<OnboardingStatus> {
+    // Use passed parameter, not createClient()
+  }
+}
+```
+
+2. OR document that service is client-side only
+
+---
+
+### 5. Demo Data Not Transactional
+**Priority**: P1 (data integrity)
+**File**: `lib/services/onboarding-service.ts:247-339`
+
+**Issue**: Sequential inserts (warehouse → location → product) can leave partial data if any step fails.
+
+**Fix**: Create database RPC function with transaction:
+
+```sql
+-- supabase/migrations/XXX_create_demo_data_function.sql
+CREATE OR REPLACE FUNCTION create_demo_data(p_org_id UUID)
+RETURNS JSON AS $$
+DECLARE
+  v_warehouse_id UUID;
+  v_location_id UUID;
+  v_product_id UUID;
+BEGIN
+  -- All in one transaction (automatic rollback on error)
+
+  INSERT INTO warehouses (org_id, code, name, type, is_default, is_active)
+  VALUES (p_org_id, 'DEMO-WH', 'Main Warehouse', 'general', true, true)
+  RETURNING id INTO v_warehouse_id;
+
+  INSERT INTO locations (org_id, warehouse_id, code, name, type, is_active)
+  VALUES (p_org_id, v_warehouse_id, 'DEFAULT', 'Default Location', 'zone', true)
+  RETURNING id INTO v_location_id;
+
+  INSERT INTO products (org_id, code, name, uom, status, is_active)
+  VALUES (p_org_id, 'SAMPLE-001', 'Sample Product', 'EA', 'active', true)
+  RETURNING id INTO v_product_id;
+
+  RETURN json_build_object(
+    'warehouse_id', v_warehouse_id,
+    'location_id', v_location_id,
+    'product_id', v_product_id
+  );
+END;
+$$ LANGUAGE plpgsql;
+```
+
+Then call from service:
+```typescript
+static async createDemoData(orgId: string): Promise<DemoDataResult> {
+  const { data, error } = await supabase
+    .rpc('create_demo_data', { p_org_id: orgId })
+
+  if (error) throw new Error(`Failed: ${error.message}`)
+
+  return {
+    success: true,
+    warehouse_id: data.warehouse_id,
+    location_id: data.location_id,
+    product_id: data.product_id,
+  }
+}
+```
+
+---
+
+## Files Modified (for reference)
+
+### Backend
+- `app/api/v1/settings/onboarding/status/route.ts` - GET status
+- `app/api/v1/settings/onboarding/skip/route.ts` - POST skip wizard
+- `app/api/v1/settings/onboarding/progress/route.ts` - PUT update progress
+- `lib/services/onboarding-service.ts` - Business logic (341 lines)
+- `lib/validation/onboarding-schemas.ts` - Zod schemas
+
+### Frontend
+- `components/onboarding/OnboardingWizardModal.tsx` - Wizard UI (273 lines)
+- `components/onboarding/OnboardingGuard.tsx` - Route guard (127 lines)
+- `components/onboarding/OnboardingWizardLauncher.tsx` - Launcher page (163 lines)
+- `lib/hooks/useOnboardingStatus.ts` - Status hook (102 lines)
+
+### Tests
+- `__tests__/01-settings/01.3.onboarding-wizard-launcher.test.tsx` - Integration
+- `components/onboarding/__tests__/OnboardingWizardModal.test.tsx` - Unit
+- `components/onboarding/__tests__/OnboardingGuard.test.tsx` - Unit
+- `lib/hooks/__tests__/useOnboardingStatus.test.tsx` - Unit
+
+---
+
+## Fix Checklist
+
+### Critical (MUST DO)
+- [ ] Create database migration (`XXX_add_onboarding_columns.sql`)
+- [ ] Run migration locally and verify columns exist
+- [ ] Add completion check to `OnboardingWizardLauncher` (line 87)
+- [ ] Fix URL parsing in fetch calls OR update test mocks
+- [ ] Review multi-admin test expectations
+- [ ] Define canonical `OrgContext` type
+- [ ] Update all components to use singular `organization`
+- [ ] Remove test workarounds providing both properties
+- [ ] Run all tests - target 100% pass rate
+
+### Major (SHOULD DO)
+- [ ] Pass Supabase client to service methods OR document client-side usage
+- [ ] Create `create_demo_data` RPC function
+- [ ] Update `OnboardingService.createDemoData()` to use RPC
+
+### Minor (NICE TO HAVE)
+- [ ] Add missing ARIA attributes (`aria-modal`, `role="alertdialog"`)
+- [ ] Add manual keyboard navigation testing
+- [ ] Add audit logging for skip action
+- [ ] Add rate limiting to skip endpoint
+
+---
+
+## Testing Instructions (After Fixes)
+
+### 1. Database Migration
 ```bash
-# Edit existing file:
-apps/frontend/lib/hooks/useOnboardingStatus.ts
-# Lines 71-73: Change field names per Issue #2 above
+# Run migration
+psql -f supabase/migrations/XXX_add_onboarding_columns.sql
+
+# Verify columns exist
+psql -c "\d organizations" | grep onboarding
+
+# Expected output:
+# onboarding_step          | integer | default 0
+# onboarding_started_at    | timestamp with time zone |
+# onboarding_completed_at  | timestamp with time zone |
+# onboarding_skipped       | boolean | default false
 ```
 
-### Action 3: Fix Tests (1-2 hours)
+### 2. Run Tests
 ```bash
 cd apps/frontend
+npm test onboarding
 
-# Run tests to identify failures
-pnpm test -- --run
-
-# Fix mock structures in all test files
-# Update field names to match actual API response structure
-
-# Run again to verify 80%+ passing
-pnpm test -- --run --coverage
+# Expected: 54/54 tests passing (100%)
 ```
 
-### Action 4: Get CODE-REVIEWER Approval
-After fixes:
-1. Commit changes
-2. Request fresh code review
-3. Verify APPROVED decision
-4. Proceed to QA
+### 3. Manual Testing
+```bash
+# Start dev server
+npm run dev
+
+# Test scenarios:
+1. Create new org (onboarding_step=0) → should show wizard
+2. Set onboarding_completed_at → should redirect to dashboard
+3. Click "Skip Wizard" → should create demo data
+4. Log out, log in → should resume at saved step
+5. Login as non-admin → should show "Setup in progress" message
+```
 
 ---
 
-## Next Steps
+## Re-Review Criteria
 
-1. **Developer**: Apply 3 fixes (30 min + 1-2 hours testing)
-2. **CODE-REVIEWER**: Re-review fixes, confirm APPROVED
-3. **QA**: Validate 8 acceptance criteria
-4. **DOCS**: Generate documentation
-5. **Release**: Commit and create PR to main
+Once fixes are complete, request re-review. CODE-REVIEWER will check:
 
----
+1. All 54 tests passing (100%)
+2. Database migration exists and runs successfully
+3. Type consistency (`organization` singular throughout)
+4. No runtime errors in manual testing
+5. Demo data creation is atomic (all or nothing)
 
-## Handoff Checklist
-
-**For Next Developer:**
-- [ ] Create `onboarding-schemas.ts` with Zod validation
-- [ ] Fix hook response parsing (2 field name changes)
-- [ ] Fix test mock structures (all test files)
-- [ ] Run full test suite: `pnpm test -- --run --coverage`
-- [ ] Verify 80%+ coverage and all tests passing
-- [ ] Request CODE-REVIEWER approval
-- [ ] Proceed to QA
-
-**Estimated Time:** 2-3 hours
+**Target**: APPROVED status → QA-AGENT handoff
 
 ---
 
-**Generated:** 2025-12-18
-**From:** CODE-REVIEWER + Implementation Reports
-**Status:** REQUEST_CHANGES (3 issues must fix)
-**Quality:** HIGH (70-80% complete, fixes are straightforward)
+## Questions?
+
+If any blockers are unclear or need clarification:
+1. Review full code review: `code-review-story-01.3.md`
+2. Check story spec: `01.3.onboarding-wizard-launcher.md`
+3. Reference similar patterns: Story 01.4 (approved)
+
+---
+
+**Handoff Created**: 2025-12-19
+**Next Review**: After dev completes fixes

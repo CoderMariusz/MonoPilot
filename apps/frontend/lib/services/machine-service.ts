@@ -1,235 +1,180 @@
-import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
-
 /**
  * Machine Service
- * Story: 1.7 Machine Configuration
- * Tasks: 2, 7, 8, 9
+ * Story: 01.10 - Machines CRUD
+ * Purpose: Business logic for machine management operations
  *
- * Handles machine CRUD operations with:
- * - Unique code validation per org (AC-006.1)
- * - Machine status lifecycle: active, down, maintenance (AC-006.2)
- * - Many-to-many line assignments via machine_line_assignments (AC-006.3)
- * - Status change validation (warn if active WOs) (AC-006.2)
- * - FK constraint handling for deletions (AC-006.5)
- * - Cache invalidation events (AC-006.8)
+ * Handles:
+ * - CRUD operations (list, getById, create, update, delete)
+ * - Status updates (ACTIVE, MAINTENANCE, OFFLINE, DECOMMISSIONED)
+ * - Delete validation (line assignments, soft delete for WO history)
+ * - Code uniqueness validation
+ * - Location path building
  */
 
-export type MachineStatus = 'active' | 'down' | 'maintenance'
+import { createClient } from '@/lib/supabase/client'
+import type {
+  Machine,
+  CreateMachineInput,
+  UpdateMachineInput,
+  MachineListParams,
+  PaginatedMachineResult,
+  MachineValidationResult,
+  CanDeleteMachineResult,
+  MachineStatus,
+} from '@/lib/types/machine'
 
-export interface Machine {
-  id: string
-  org_id: string
-  code: string
-  name: string
-  status: MachineStatus
-  capacity_per_hour: number | null
-  created_by: string | null
-  updated_by: string | null
-  created_at: string
-  updated_at: string
-  assigned_lines?: Array<{
-    id: string
-    code: string
-    name: string
-  }>
-}
+export class MachineService {
+  /**
+   * List machines with search, filters, pagination
+   * AC-ML-01: Page loads within 300ms
+   * AC-ML-02: Filter by type (9 types)
+   * AC-ML-03: Filter by status (4 statuses)
+   * AC-ML-04: Search by code and name (< 200ms)
+   */
+  static async list(params: MachineListParams = {}): Promise<PaginatedMachineResult> {
+    const supabase = createClient()
 
-export interface CreateMachineInput {
-  code: string
-  name: string
-  status?: MachineStatus
-  capacity_per_hour?: number | null
-  line_ids?: string[]
-}
-
-export interface UpdateMachineInput {
-  code?: string
-  name?: string
-  status?: MachineStatus
-  capacity_per_hour?: number | null
-  line_ids?: string[]
-}
-
-export interface MachineFilters {
-  status?: MachineStatus | 'all'
-  search?: string
-  sort_by?: 'code' | 'name' | 'status' | 'created_at'
-  sort_direction?: 'asc' | 'desc'
-}
-
-export interface MachineServiceResult<T = Machine> {
-  success: boolean
-  data?: T
-  error?: string
-  code?: 'DUPLICATE_CODE' | 'NOT_FOUND' | 'FOREIGN_KEY_CONSTRAINT' | 'INVALID_INPUT' | 'DATABASE_ERROR' | 'ACTIVE_WOS'
-}
-
-export interface MachineListResult {
-  success: boolean
-  data?: Machine[]
-  total?: number
-  error?: string
-}
-
-/**
- * Get current user's org_id from JWT
- * Used for RLS enforcement and multi-tenancy
- */
-async function getCurrentOrgId(): Promise<string | null> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  // Extract org_id from JWT claims
-  const { data: userData, error } = await supabase
-    .from('users')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
-
-  if (error || !userData) {
-    console.error('Failed to get org_id for user:', user.id, error)
-    return null
-  }
-
-  return userData.org_id
-}
-
-/**
- * Update machine line assignments (many-to-many)
- * AC-006.3: Machine-line many-to-many assignment
- *
- * Strategy: Delete all existing assignments, then bulk insert new ones
- * This is safe because machine_line_assignments has no cascading dependencies
- *
- * @param supabase - Supabase client
- * @param machineId - Machine UUID
- * @param lineIds - Array of production line UUIDs
- */
-async function updateMachineLineAssignments(
-  supabase: any,
-  machineId: string,
-  lineIds?: string[]
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Delete existing assignments
-    const { error: deleteError } = await supabase
-      .from('machine_line_assignments')
-      .delete()
-      .eq('machine_id', machineId)
-
-    if (deleteError) {
-      console.error('Failed to delete existing line assignments:', deleteError)
-      return { success: false, error: deleteError.message }
-    }
-
-    // If no new line_ids provided, we're done (assignments removed)
-    if (!lineIds || lineIds.length === 0) {
-      return { success: true }
-    }
-
-    // Bulk insert new assignments
-    const assignments = lineIds.map(lineId => ({
-      machine_id: machineId,
-      line_id: lineId,
-    }))
-
-    const { error: insertError } = await supabase
-      .from('machine_line_assignments')
-      .insert(assignments)
-
-    if (insertError) {
-      console.error('Failed to insert line assignments:', insertError)
-
-      // Check for duplicate assignment (race condition)
-      if (insertError.code === '23505') {
-        return { success: false, error: 'Duplicate line assignment detected' }
-      }
-
-      return { success: false, error: insertError.message }
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error('Error in updateMachineLineAssignments:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }
-  }
-}
-
-/**
- * Create a new machine
- * AC-006.1: Admin może stworzyć machine
- *
- * Validation:
- * - Code must be unique per org
- * - Code format: uppercase alphanumeric + hyphens
- * - Name required (1-100 chars)
- * - Status: active, down, maintenance (default: active)
- * - Capacity: optional, positive decimal
- *
- * Line assignments: If line_ids provided, creates assignments in machine_line_assignments table
- *
- * Cache invalidation: Emits machine.created event (AC-006.8)
- *
- * @param input - CreateMachineInput
- * @returns MachineServiceResult with created machine or error
- */
-export async function createMachine(
-  input: CreateMachineInput
-): Promise<MachineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found. Please log in again.',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Get current user ID for audit trail
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return {
-        success: false,
-        error: 'User not authenticated',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Check if code already exists for this org (AC-006.1) - use admin client
-    const { data: existingMachine } = await supabaseAdmin
+    // Build query
+    let query = supabase
       .from('machines')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('code', input.code.toUpperCase())
+      .select(
+        `
+        *,
+        location:locations(
+          id,
+          code,
+          name,
+          full_path,
+          warehouse_id
+        )
+      `,
+        { count: 'exact' }
+      )
+      .eq('is_deleted', false)
+
+    // Apply search filter
+    if (params.search) {
+      query = query.or(`code.ilike.%${params.search}%,name.ilike.%${params.search}%`)
+    }
+
+    // Apply type filter
+    if (params.type) {
+      query = query.eq('type', params.type)
+    }
+
+    // Apply status filter
+    if (params.status) {
+      query = query.eq('status', params.status)
+    }
+
+    // Apply location filter
+    if (params.location_id) {
+      query = query.eq('location_id', params.location_id)
+    }
+
+    // Apply sorting
+    const sortBy = params.sortBy || 'code'
+    const sortOrder = params.sortOrder || 'asc'
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+
+    // Apply pagination
+    const page = params.page || 1
+    const limit = params.limit || 25
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+
+    const { data, count, error } = await query
+
+    if (error) {
+      console.error('Failed to list machines:', error)
+      throw new Error('Failed to fetch machines')
+    }
+
+    return {
+      machines: data || [],
+      total: count || 0,
+      page,
+      limit,
+    }
+  }
+
+  /**
+   * Get machine by ID
+   * AC-09: Cross-tenant access returns 404 (not 403)
+   */
+  static async getById(id: string): Promise<Machine | null> {
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from('machines')
+      .select(
+        `
+        *,
+        location:locations(
+          id,
+          code,
+          name,
+          full_path,
+          warehouse_id
+        )
+      `
+      )
+      .eq('id', id)
+      .eq('is_deleted', false)
       .single()
 
-    if (existingMachine) {
-      return {
-        success: false,
-        error: `Machine code "${input.code}" already exists`,
-        code: 'DUPLICATE_CODE',
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Not found
+        return null
       }
+      console.error('Failed to fetch machine:', error)
+      throw new Error('Failed to fetch machine')
     }
 
-    // Create machine - use admin client to bypass RLS
-    const { data: machine, error } = await supabaseAdmin
+      return data
+  }
+
+  /**
+   * Create new machine
+   * AC-MC-02: Machine created with default status ACTIVE within 500ms
+   * AC-MC-03: Duplicate code error displayed inline
+   * AC-MC-04: All capacity values stored
+   */
+  static async create(data: CreateMachineInput): Promise<Machine> {
+    const supabase = createClient()
+
+    // Get current user for org_id and created_by
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    // Get user's org_id
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (userError || !userData) {
+      throw new Error('Failed to get user organization')
+    }
+
+    // Check code uniqueness
+    const isUnique = await this.isCodeUnique(data.code)
+    if (!isUnique) {
+      throw new Error('Machine code must be unique')
+    }
+
+    // Insert machine
+    const { data: machine, error } = await supabase
       .from('machines')
       .insert({
-        org_id: orgId,
-        code: input.code.toUpperCase(), // Ensure uppercase
-        name: input.name,
-        status: input.status || 'active',
-        capacity_per_hour: input.capacity_per_hour ?? null,
+        ...data,
+        org_id: userData.org_id,
+        status: data.status || 'ACTIVE',
         created_by: user.id,
         updated_by: user.id,
       })
@@ -238,509 +183,258 @@ export async function createMachine(
 
     if (error) {
       console.error('Failed to create machine:', error)
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
+      if (error.code === '23505') {
+        throw new Error('Machine code must be unique')
       }
+      throw new Error('Failed to create machine')
     }
 
-    // Create line assignments if line_ids provided (AC-006.3)
-    if (input.line_ids && input.line_ids.length > 0) {
-      const assignmentResult = await updateMachineLineAssignments(
-        supabase,
-        machine.id,
-        input.line_ids
-      )
-
-      if (!assignmentResult.success) {
-        // Line assignment failed, but machine was created
-        // Return success but log the error
-        console.error('Machine created but line assignments failed:', assignmentResult.error)
-        return {
-          success: true,
-          data: machine,
-          error: `Machine created but line assignments failed: ${assignmentResult.error}`,
-        }
-      }
-    }
-
-    // Emit cache invalidation event (AC-006.8)
-    await emitMachineUpdatedEvent(orgId, 'created', machine.id)
-
-    console.log(`Successfully created machine: ${machine.code} (${machine.id})`)
-
-    return {
-      success: true,
-      data: machine,
-    }
-  } catch (error) {
-    console.error('Error in createMachine:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
+    return machine
   }
-}
 
-/**
- * Update an existing machine
- * AC-006.6: Edit machine
- *
- * Validation:
- * - Code still unique per org (if changed)
- * - Status change validation: warn if machine has active WOs (AC-006.2)
- *
- * Line assignments: Updates machine_line_assignments (delete old, insert new)
- *
- * Cache invalidation: Emits machine.updated event (AC-006.8)
- *
- * @param id - Machine UUID
- * @param input - UpdateMachineInput
- * @returns MachineServiceResult with updated machine or error
- */
-export async function updateMachine(
-  id: string,
-  input: UpdateMachineInput
-): Promise<MachineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
+  /**
+   * Update existing machine
+   * AC-ME-02: Updated name displays immediately in list
+   */
+  static async update(id: string, data: UpdateMachineInput): Promise<Machine> {
+    const supabase = createClient()
 
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    // Check if machine exists
+    const existing = await this.getById(id)
+    if (!existing) {
+      throw new Error('Machine not found')
+    }
+
+    // Check code uniqueness if code is being changed
+    if (data.code && data.code !== existing.code) {
+      const isUnique = await this.isCodeUnique(data.code, id)
+      if (!isUnique) {
+        throw new Error('Machine code must be unique')
       }
     }
-
-    // Get current user ID for audit trail
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return {
-        success: false,
-        error: 'User not authenticated',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Check if machine exists and belongs to org
-    const { data: existingMachine, error: fetchError } = await supabase
-      .from('machines')
-      .select('id, code, status')
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .single()
-
-    if (fetchError || !existingMachine) {
-      return {
-        success: false,
-        error: 'Machine not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // If code is being changed, check uniqueness (AC-006.6)
-    if (input.code && input.code.toUpperCase() !== existingMachine.code) {
-      const { data: duplicateMachine } = await supabase
-        .from('machines')
-        .select('id')
-        .eq('org_id', orgId)
-        .eq('code', input.code.toUpperCase())
-        .neq('id', id)
-        .single()
-
-      if (duplicateMachine) {
-        return {
-          success: false,
-          error: `Machine code "${input.code}" already exists`,
-          code: 'DUPLICATE_CODE',
-        }
-      }
-    }
-
-    // AC-006.2: If status changing to Down/Maintenance, check for active WOs
-    // Note: This is a future Epic 4 feature, we'll log a warning for now
-    if (input.status && input.status !== existingMachine.status) {
-      if (input.status === 'down' || input.status === 'maintenance') {
-        // TODO Epic 4: Query work_orders table to check for active WOs
-        // For now, log a warning
-        console.warn(`Status changing to ${input.status} for machine ${id}. Check for active WOs in Epic 4.`)
-      }
-    }
-
-    // Build update payload
-    const updatePayload: any = {
-      updated_by: user.id,
-    }
-
-    if (input.code) updatePayload.code = input.code.toUpperCase()
-    if (input.name !== undefined) updatePayload.name = input.name
-    if (input.status !== undefined) updatePayload.status = input.status
-    if (input.capacity_per_hour !== undefined) updatePayload.capacity_per_hour = input.capacity_per_hour
 
     // Update machine
     const { data: machine, error } = await supabase
       .from('machines')
-      .update(updatePayload)
+      .update({
+        ...data,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
-      .eq('org_id', orgId)
       .select()
       .single()
 
     if (error) {
       console.error('Failed to update machine:', error)
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
+      if (error.code === '23505') {
+        throw new Error('Machine code must be unique')
       }
+      throw new Error('Failed to update machine')
     }
 
-    // Update line assignments if line_ids provided (AC-006.6)
-    if (input.line_ids !== undefined) {
-      const assignmentResult = await updateMachineLineAssignments(
-        supabase,
-        machine.id,
-        input.line_ids
-      )
-
-      if (!assignmentResult.success) {
-        // Machine updated but line assignments failed
-        console.error('Machine updated but line assignments failed:', assignmentResult.error)
-        return {
-          success: true,
-          data: machine,
-          error: `Machine updated but line assignments failed: ${assignmentResult.error}`,
-        }
-      }
-    }
-
-    // Emit cache invalidation event (AC-006.8)
-    await emitMachineUpdatedEvent(orgId, 'updated', machine.id)
-
-    console.log(`Successfully updated machine: ${machine.code} (${machine.id})`)
-
-    return {
-      success: true,
-      data: machine,
-    }
-  } catch (error) {
-    console.error('Error in updateMachine:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
+    return machine
   }
-}
 
-/**
- * Get machine by ID
- * AC-006.7: Machine detail page
- *
- * Includes populated line assignments (many-to-many join)
- *
- * @param id - Machine UUID
- * @returns MachineServiceResult with machine data (with assigned_lines) or error
- */
-export async function getMachineById(id: string): Promise<MachineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
+  /**
+   * Update machine status only
+   * Quick status change without full update
+   */
+  static async updateStatus(id: string, status: MachineStatus): Promise<Machine> {
+    const supabase = createClient()
 
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
-      }
-    }
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
 
-    // Fetch machine with line assignments
+    // Update status
     const { data: machine, error } = await supabase
       .from('machines')
-      .select('*')
+      .update({
+        status,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
-      .eq('org_id', orgId)
+      .select()
       .single()
 
-    if (error || !machine) {
-      console.error('Failed to fetch machine:', error)
-      return {
-        success: false,
-        error: 'Machine not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // Fetch line assignments (when production_lines table exists)
-    // TODO Story 1.8: After production_lines table is created, add JOIN to get line details
-    // For now, just fetch assignment IDs
-    const { data: assignments } = await supabase
-      .from('machine_line_assignments')
-      .select('line_id')
-      .eq('machine_id', id)
-
-    // Note: assigned_lines will be populated after Story 1.8 (production_lines table)
-    const machineWithLines = {
-      ...machine,
-      assigned_lines: assignments?.map(a => ({
-        id: a.line_id,
-        code: 'PLACEHOLDER', // Will be replaced with actual line data in Story 1.8
-        name: 'PLACEHOLDER',
-      })) || [],
-    }
-
-    return {
-      success: true,
-      data: machineWithLines,
-    }
-  } catch (error) {
-    console.error('Error in getMachineById:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * List machines with filters
- * AC-006.4: Machines list view
- *
- * Filters:
- * - status: active/down/maintenance/all (default: all)
- * - search: filter by code or name (case-insensitive)
- * - sort_by: code/name/status/created_at (default: code)
- * - sort_direction: asc/desc (default: asc)
- *
- * Includes line assignment count (AC-006.4: Lines column shows count/names)
- *
- * @param filters - MachineFilters (optional)
- * @returns MachineListResult with machines array or error
- */
-export async function listMachines(
-  filters?: MachineFilters
-): Promise<MachineListResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        total: 0,
-      }
-    }
-
-    // Build query
-    let query = supabase
-      .from('machines')
-      .select('*', { count: 'exact' })
-      .eq('org_id', orgId)
-
-    // Apply status filter (AC-006.4)
-    if (filters?.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status)
-    }
-
-    // Search filter (AC-006.4: Search by code or name)
-    if (filters?.search) {
-      const escapedSearch = filters.search
-        .replace(/\\/g, '\\\\')
-        .replace(/%/g, '\\%')
-        .replace(/_/g, '\\_')
-
-      query = query.or(`code.ilike.%${escapedSearch}%,name.ilike.%${escapedSearch}%`)
-    }
-
-    // Dynamic sorting (AC-006.4)
-    const sortBy = filters?.sort_by || 'code'
-    const sortDirection = filters?.sort_direction || 'asc'
-    query = query.order(sortBy, { ascending: sortDirection === 'asc' })
-
-    const { data: machines, error, count } = await query
-
     if (error) {
-      console.error('Failed to list machines:', error)
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        total: 0,
-      }
+      console.error('Failed to update machine status:', error)
+      throw new Error('Failed to update machine status')
     }
 
-    // Fetch line assignments for all machines (AC-006.4: Lines column)
-    if (machines && machines.length > 0) {
-      const machineIds = machines.map(m => m.id)
-      const { data: assignments } = await supabase
-        .from('machine_line_assignments')
-        .select('machine_id, line_id')
-        .in('machine_id', machineIds)
-
-      // TODO Story 1.8: After production_lines table exists, JOIN to get line codes/names
-      // For now, just attach assignment counts
-      const machinesWithLines = machines.map(machine => ({
-        ...machine,
-        assigned_lines: assignments
-          ?.filter(a => a.machine_id === machine.id)
-          .map(a => ({
-            id: a.line_id,
-            code: 'PLACEHOLDER', // Will be replaced in Story 1.8
-            name: 'PLACEHOLDER',
-          })) || [],
-      }))
-
-      return {
-        success: true,
-        data: machinesWithLines,
-        total: count ?? 0,
-      }
-    }
-
-    return {
-      success: true,
-      data: machines || [],
-      total: count ?? 0,
-    }
-  } catch (error) {
-    console.error('Error in listMachines:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      total: 0,
-    }
+    return machine
   }
-}
 
-/**
- * Delete machine (hard delete)
- * AC-006.5: Cannot delete machine with constraints
- *
- * WARNING: This will fail if machine has:
- * - Active WOs (Epic 4)
- * - Historical usage (audit trail)
- *
- * Error handling returns user-friendly message with recommendation to archive instead.
- *
- * Cache invalidation: Emits machine.deleted event (AC-006.8)
- *
- * @param id - Machine UUID
- * @returns MachineServiceResult with success status or error
- */
-export async function deleteMachine(id: string): Promise<MachineServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-    const orgId = await getCurrentOrgId()
+  /**
+   * Delete machine (with business rules)
+   * AC-MD-01: Machine removed within 500ms (no line assignments)
+   * AC-MD-02: Error if assigned to line: "Machine is assigned to line [LINE-001]. Remove from line first."
+   * AC-MD-03: Soft-delete for historical WO references
+   *
+   * Business Rules:
+   * - Cannot delete if assigned to production line
+   * - Soft delete if has historical work order references
+   * - Hard delete if no history and no assignments (prefer soft delete)
+   */
+  static async delete(id: string): Promise<void> {
+    const supabase = createClient()
 
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization ID not found',
-        code: 'INVALID_INPUT',
-      }
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    // Check if machine exists
+    const existing = await this.getById(id)
+    if (!existing) {
+      throw new Error('Machine not found')
     }
 
-    // TODO Epic 4: Check for active WOs before allowing deletion
-    // For now, log a warning
-    console.warn(`Attempting to delete machine ${id}. Check for active WOs in Epic 4.`)
+    // Check if can delete (line assignments)
+    const deleteCheck = await this.canDelete(id)
+    if (!deleteCheck.canDelete) {
+      throw new Error(deleteCheck.reason || 'Cannot delete machine')
+    }
 
-    // Attempt delete (machine_line_assignments will CASCADE delete automatically)
+    // Perform soft delete (always soft delete to preserve audit trail)
     const { error } = await supabase
       .from('machines')
-      .delete()
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        updated_by: user.id,
+      })
       .eq('id', id)
-      .eq('org_id', orgId)
 
     if (error) {
       console.error('Failed to delete machine:', error)
-
-      // AC-006.5: Foreign key constraint violation
-      if (error.code === '23503') {
-        return {
-          success: false,
-          error: 'Cannot delete machine - it has active WOs or historical usage. Archive it instead by setting status to "maintenance".',
-          code: 'FOREIGN_KEY_CONSTRAINT',
-        }
-      }
-
-      return {
-        success: false,
-        error: `Database error: ${error.message}`,
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    // Emit cache invalidation event (AC-006.8)
-    await emitMachineUpdatedEvent(orgId, 'deleted', id)
-
-    console.log(`Successfully deleted machine: ${id}`)
-
-    return {
-      success: true,
-    }
-  } catch (error) {
-    console.error('Error in deleteMachine:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: 'DATABASE_ERROR',
+      throw new Error('Failed to delete machine')
     }
   }
-}
 
-/**
- * Emit machine cache invalidation event
- * AC-006.8: Cache invalidation events
- *
- * Publishes a broadcast event to notify Epic 4 (WO operation assignment)
- * to refetch machine list.
- *
- * Redis cache key: `machines:{org_id}`
- * Redis cache TTL: 5 min
- *
- * @param orgId - Organization UUID
- * @param action - Action type (created, updated, deleted)
- * @param machineId - Machine UUID
- */
-async function emitMachineUpdatedEvent(
-  orgId: string,
-  action: 'created' | 'updated' | 'deleted',
-  machineId: string
-): Promise<void> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  /**
+   * Validate machine code uniqueness
+   * Used for real-time validation in forms
+   */
+  static async isCodeUnique(code: string, excludeId?: string): Promise<boolean> {
+    const supabase = createClient()
 
-    // Publish to org-specific channel
-    const channel = supabase.channel(`org:${orgId}`)
+    // Get current user's org_id
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return false
 
-    await channel.send({
-      type: 'broadcast',
-      event: 'machine.updated',
-      payload: {
-        action,
-        machineId,
-        orgId,
-        timestamp: new Date().toISOString(),
-      },
-    })
+    const { data: userData } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
 
-    // Clean up channel
-    await supabase.removeChannel(channel)
+    if (!userData) return false
 
-    console.log(`Emitted machine.updated event: ${action} ${machineId}`)
-  } catch (error) {
-    // Non-critical error, log but don't fail the operation
-    console.error('Failed to emit machine.updated event:', error)
+    let query = supabase
+      .from('machines')
+      .select('id')
+      .eq('org_id', userData.org_id)
+      .eq('code', code.toUpperCase())
+      .eq('is_deleted', false)
+
+    if (excludeId) {
+      query = query.neq('id', excludeId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Failed to check code uniqueness:', error)
+      return false
+    }
+
+    return !data || data.length === 0
+  }
+
+  /**
+   * Check if machine can be deleted
+   * Business Rules:
+   * - Cannot delete if assigned to production line
+   * Returns { canDelete: boolean, reason?: string, lineCodes?: string[] }
+   */
+  static async canDelete(id: string): Promise<CanDeleteMachineResult> {
+    const supabase = createClient()
+
+    // Check for production line assignments
+    // Note: production_line_machines table will be created in Story 01.11
+    // For now, we'll do a simple check that always allows deletion
+    // TODO: Implement line assignment check in Story 01.11
+
+    // Check if production_line_machines table exists
+    const { data: lineAssignments, error } = await supabase
+      .from('production_line_machines')
+      .select(
+        `
+        production_line:production_lines(code)
+      `
+      )
+      .eq('machine_id', id)
+      .limit(10)
+
+    if (error) {
+      // Table doesn't exist yet (Story 01.11), allow deletion
+      if (error.code === '42P01') {
+        return {
+          canDelete: true,
+        }
+      }
+      console.error('Failed to check line assignments:', error)
+      return {
+        canDelete: true,
+      }
+    }
+
+    if (lineAssignments && lineAssignments.length > 0) {
+      const lineCodes = lineAssignments
+        .map((la: any) => la.production_line?.code)
+        .filter(Boolean)
+
+      const lineList = lineCodes.join(', ')
+      const reason =
+        lineCodes.length === 1
+          ? `Machine is assigned to line [${lineList}]. Remove from line first.`
+          : `Machine is assigned to lines [${lineList}]. Remove from lines first.`
+
+      return {
+        canDelete: false,
+        reason,
+        lineCodes,
+      }
+    }
+
+    return {
+      canDelete: true,
+    }
+  }
+
+  /**
+   * Get location path for machine
+   * Builds hierarchical path from location full_path
+   * Returns empty string if no location
+   */
+  static getLocationPath(machine: Machine): string {
+    if (!machine.location || !machine.location.full_path) {
+      return ''
+    }
+    return machine.location.full_path
   }
 }

@@ -472,12 +472,11 @@ export async function deleteLocation(
     const supabase = await createServerSupabase()
 
     // Step 1: Check if location is used as warehouse default
-    const { data: usedAsDefault, error: checkError } = await supabase
+    // FIXED: Use parameterized queries - fetch all warehouses then check in JS
+    const { data: allWarehouses, error: checkError } = await supabase
       .from('warehouses')
       .select('id, code, name, default_receiving_location_id, default_shipping_location_id, transit_location_id')
       .eq('org_id', orgId)
-      .or(`default_receiving_location_id.eq.${id},default_shipping_location_id.eq.${id},transit_location_id.eq.${id}`)
-      .limit(1)
 
     if (checkError) {
       console.error('Error checking warehouse defaults:', checkError)
@@ -486,6 +485,13 @@ export async function deleteLocation(
         error: 'Failed to check dependencies',
       }
     }
+
+    // Check if location is used as warehouse default (application-level, not SQL injection)
+    const usedAsDefault = allWarehouses?.filter(w =>
+      w.default_receiving_location_id === id ||
+      w.default_shipping_location_id === id ||
+      w.transit_location_id === id
+    ) || []
 
     if (usedAsDefault && usedAsDefault.length > 0) {
       const warehouse = usedAsDefault[0]

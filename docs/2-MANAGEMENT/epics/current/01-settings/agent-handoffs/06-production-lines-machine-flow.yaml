@@ -1,0 +1,85 @@
+# AGENT HANDOFF: Production Lines - Add Machine Flow Visualization
+
+agent: frontend-dev
+epic: "01-settings"
+story: "01.11"
+phase: "REFACTOR"
+priority: MEDIUM
+task: "Add machine flow visualization in 2nd row (Mixer → Oven → Cooler → Packing)"
+
+# ============================================
+# CONTEXT
+# ============================================
+
+wireframes:
+  - docs/3-ARCHITECTURE/ux/wireframes/SET-018-production-line-list.md
+  - docs/3-ARCHITECTURE/ux/wireframes/SET-019-production-line-create-edit-modal.md
+
+migration_plan:
+  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.7)
+
+reference_code:
+  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/production-lines/page.tsx
+  has: "MachineSequenceEditor in modal (exists!)"
+  missing: "Machine flow visualization in list 2nd row"
+  note: "MachineSequenceEditor shows sequence in modal - need to reuse for list display"
+
+# ============================================
+# OUTPUT
+# ============================================
+
+output:
+  pages:
+    - apps/frontend/app/(authenticated)/settings-v2/production-lines/page.tsx
+
+  components:
+    - components/settings-v2/production-lines/ProductionLinesDataTable.tsx
+    - components/settings-v2/production-lines/ProductionLineModal.tsx (SET-019)
+    - components/settings-v2/production-lines/MachineFlowVisualization.tsx (NEW - 2nd row)
+    - components/settings-v2/production-lines/CapacityDisplay.tsx (units/hour)
+    - components/settings-v2/production-lines/ManageMachinesPanel.tsx
+
+# ============================================
+# REQUIREMENTS
+# ============================================
+
+requirements:
+
+  second_row:
+    content: "Machine sequence with arrows"
+    format: "Mixer → Oven → Cooler → Packing"
+    style: "Gray text, arrows between machine names"
+    fallback: "No machines assigned" (if machine_count = 0)
+
+  remove_from_v1:
+    - "Output Location" column (not in wireframe)
+    - Info banner at bottom (not in wireframe)
+
+  add:
+    - Capacity column (units/hour)
+    - Machine flow 2nd row
+    - Actions: Manage Machines, View Work Orders
+
+# ============================================
+# REUSABLE
+# ============================================
+
+reusable:
+  from_v1:
+    - MachineSequenceEditor.tsx ✅ (exists in modal, adapt for list display)
+
+  services:
+    - lib/services/production-line-service.ts ✅
+
+# ============================================
+# ACCEPTANCE
+# ============================================
+
+acceptance:
+  - [ ] 2nd row shows: "Mixer → Oven → Cooler → Packing"
+  - [ ] Capacity column shows units/hour
+  - [ ] "Output Location" column removed
+  - [ ] Actions menu has: Edit, Manage Machines, View Work Orders
+
+estimated_hours: 8-10
+complexity: MEDIUM

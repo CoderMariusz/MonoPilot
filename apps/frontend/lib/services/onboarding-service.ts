@@ -6,14 +6,44 @@
  * Provides methods for checking status, updating progress, and skipping wizard
  * with automatic demo data generation.
  *
+ * **Architecture:** Service layer accepts Supabase client as parameter to support
+ * both server-side (API routes) and client-side usage. API routes should pass
+ * server-side client via createServerSupabase().
+ *
  * **Security:** All methods require org_id validation and proper session authentication.
  * Follows ADR-013 multi-tenant isolation pattern.
  *
  * @see {@link docs/2-MANAGEMENT/epics/current/01-settings/01.3.onboarding-wizard-launcher.md}
  */
 
-import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { isValidUUID } from '@/lib/utils/validation'
+
+/**
+ * Total number of wizard steps.
+ */
+const TOTAL_STEPS = 6
+
+/**
+ * Validates org_id and throws if invalid.
+ * @param orgId - Organization UUID to validate
+ * @throws {Error} If org_id is missing or not a valid UUID
+ */
+function validateOrgId(orgId: string): void {
+  if (!orgId || !isValidUUID(orgId)) {
+    throw new Error('Invalid organization ID')
+  }
+}
+
+/**
+ * Fields that can be updated on the organizations table for onboarding.
+ */
+interface OnboardingUpdateData {
+  onboarding_step?: number
+  onboarding_started_at?: string
+  onboarding_completed_at?: string
+  onboarding_skipped?: boolean
+}
 
 /**
  * Onboarding status for an organization
@@ -45,7 +75,7 @@ export interface DemoDataResult {
  * Service class for managing onboarding wizard operations.
  *
  * Provides CRUD operations for onboarding status and demo data creation.
- * All methods validate org_id and follow multi-tenant isolation pattern.
+ * All methods accept Supabase client as first parameter for server-side usage.
  */
 export class OnboardingService {
   /**
@@ -57,13 +87,15 @@ export class OnboardingService {
    * **Security:** Validates org_id format to prevent SQL injection.
    * Uses RLS policies for tenant isolation.
    *
+   * @param supabase - Supabase client (server-side or client-side)
    * @param orgId - Organization UUID
    * @returns {Promise<OnboardingStatus>} Current onboarding status
    * @throws {Error} If org_id is invalid or organization not found
    *
    * @example
    * ```typescript
-   * const status = await OnboardingService.getStatus(orgId);
+   * const supabase = createServerSupabase();
+   * const status = await OnboardingService.getStatus(supabase, orgId);
    * if (status.is_complete) {
    *   // Skip wizard
    * } else {
@@ -71,13 +103,8 @@ export class OnboardingService {
    * }
    * ```
    */
-  static async getStatus(orgId: string): Promise<OnboardingStatus> {
-    // Validate input
-    if (!orgId || !isValidUUID(orgId)) {
-      throw new Error('Invalid organization ID')
-    }
-
-    const supabase = createClient()
+  static async getStatus(supabase: SupabaseClient, orgId: string): Promise<OnboardingStatus> {
+    validateOrgId(orgId)
 
     // Fetch onboarding fields from organizations table
     const { data, error } = await supabase
@@ -102,9 +129,11 @@ export class OnboardingService {
   /**
    * Skip wizard and create demo data
    *
-   * Creates demo warehouse, location, and product, then marks onboarding
-   * as complete and skipped. This is a transactional operation - if any
-   * step fails, all changes are rolled back.
+   * Creates demo warehouse, location, and product via transactional RPC function,
+   * then marks onboarding as complete and skipped.
+   *
+   * **Transactional:** Uses database RPC function create_onboarding_demo_data()
+   * to ensure atomic operation - all changes rollback on error.
    *
    * **Security:** Validates org_id. Should be called only after admin role check.
    * Creates data with proper org_id association for RLS isolation.
@@ -115,28 +144,30 @@ export class OnboardingService {
    * - Product: code='SAMPLE-001', name='Sample Product', uom='EA', status='active'
    * - Module toggles: technical=true, all others=false
    *
+   * @param supabase - Supabase client (server-side or client-side)
    * @param orgId - Organization UUID
    * @returns {Promise<DemoDataResult>} IDs of created demo data
    * @throws {Error} If org_id is invalid or demo data creation fails
    *
    * @example
    * ```typescript
-   * const result = await OnboardingService.skipWizard(orgId);
+   * const supabase = createServerSupabase();
+   * const result = await OnboardingService.skipWizard(supabase, orgId);
    * console.log('Demo warehouse:', result.warehouse_id);
    * // Redirect to dashboard
    * ```
    */
-  static async skipWizard(orgId: string): Promise<DemoDataResult> {
-    // Validate input
-    if (!orgId || !isValidUUID(orgId)) {
-      throw new Error('Invalid organization ID')
-    }
-
-    const supabase = createClient()
+  static async skipWizard(supabase: SupabaseClient, orgId: string): Promise<DemoDataResult> {
+    validateOrgId(orgId)
 
     try {
-      // Create demo data
-      const demoData = await this.createDemoData(orgId)
+      // Call database RPC function for transactional demo data creation
+      const { data: demoData, error: rpcError } = await supabase
+        .rpc('create_onboarding_demo_data', { p_org_id: orgId })
+
+      if (rpcError || !demoData) {
+        throw new Error(`Failed to create demo data: ${rpcError?.message || 'Unknown error'}`)
+      }
 
       // Mark onboarding as complete and skipped
       const { error: updateError } = await supabase
@@ -144,7 +175,7 @@ export class OnboardingService {
         .update({
           onboarding_completed_at: new Date().toISOString(),
           onboarding_skipped: true,
-          onboarding_step: 6, // Set to final step
+          onboarding_step: TOTAL_STEPS, // Set to final step
         })
         .eq('id', orgId)
 
@@ -152,7 +183,12 @@ export class OnboardingService {
         throw new Error(`Failed to update onboarding status: ${updateError.message}`)
       }
 
-      return demoData
+      return {
+        success: true,
+        warehouse_id: demoData.warehouse_id,
+        location_id: demoData.location_id,
+        product_id: demoData.product_id,
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       throw new Error(`Failed to skip wizard: ${message}`)
@@ -168,6 +204,7 @@ export class OnboardingService {
    * **Security:** Validates org_id and step range (1-6).
    * Should be called only after admin role check.
    *
+   * @param supabase - Supabase client (server-side or client-side)
    * @param orgId - Organization UUID
    * @param step - Step number (1-6)
    * @returns {Promise<void>}
@@ -175,21 +212,17 @@ export class OnboardingService {
    *
    * @example
    * ```typescript
-   * await OnboardingService.updateProgress(orgId, 3);
+   * const supabase = createServerSupabase();
+   * await OnboardingService.updateProgress(supabase, orgId, 3);
    * // Wizard now shows step 3
    * ```
    */
-  static async updateProgress(orgId: string, step: number): Promise<void> {
-    // Validate input
-    if (!orgId || !isValidUUID(orgId)) {
-      throw new Error('Invalid organization ID')
-    }
+  static async updateProgress(supabase: SupabaseClient, orgId: string, step: number): Promise<void> {
+    validateOrgId(orgId)
 
-    if (step < 1 || step > 6 || !Number.isInteger(step)) {
-      throw new Error('Invalid step number (must be 1-6)')
+    if (step < 1 || step > TOTAL_STEPS || !Number.isInteger(step)) {
+      throw new Error(`Invalid step number (must be 1-${TOTAL_STEPS})`)
     }
-
-    const supabase = createClient()
 
     // Check if this is first progress update
     const { data: currentData } = await supabase
@@ -198,7 +231,7 @@ export class OnboardingService {
       .eq('id', orgId)
       .single()
 
-    const updateData: Record<string, any> = {
+    const updateData: OnboardingUpdateData = {
       onboarding_step: step,
     }
 
@@ -207,8 +240,8 @@ export class OnboardingService {
       updateData.onboarding_started_at = new Date().toISOString()
     }
 
-    // If reaching step 6, mark as complete
-    if (step === 6) {
+    // If reaching final step, mark as complete
+    if (step === TOTAL_STEPS) {
       updateData.onboarding_completed_at = new Date().toISOString()
     }
 
@@ -219,122 +252,6 @@ export class OnboardingService {
 
     if (error) {
       throw new Error(`Failed to update progress: ${error.message}`)
-    }
-  }
-
-  /**
-   * Create demo warehouse, location, and product
-   *
-   * Internal method used by skipWizard. Creates minimal demo data
-   * to allow users to explore MonoPilot immediately.
-   *
-   * **Security:** Validates org_id. All created data is associated
-   * with org_id for proper RLS isolation.
-   *
-   * **Note:** This method assumes warehouses, locations, and products
-   * tables exist. If schema is different, adjust table names and fields.
-   *
-   * @param orgId - Organization UUID
-   * @returns {Promise<DemoDataResult>} IDs of created demo data
-   * @throws {Error} If any creation step fails
-   *
-   * @example
-   * ```typescript
-   * const demo = await OnboardingService.createDemoData(orgId);
-   * // Demo data ready for immediate use
-   * ```
-   */
-  static async createDemoData(orgId: string): Promise<DemoDataResult> {
-    // Validate input
-    if (!orgId || !isValidUUID(orgId)) {
-      throw new Error('Invalid organization ID')
-    }
-
-    const supabase = createClient()
-
-    try {
-      // 1. Create demo warehouse
-      const { data: warehouse, error: warehouseError } = await supabase
-        .from('warehouses')
-        .insert({
-          org_id: orgId,
-          code: 'DEMO-WH',
-          name: 'Main Warehouse',
-          type: 'general',
-          is_default: true,
-          is_active: true,
-        })
-        .select('id')
-        .single()
-
-      if (warehouseError || !warehouse) {
-        throw new Error(`Failed to create demo warehouse: ${warehouseError?.message || 'Unknown error'}`)
-      }
-
-      // 2. Create default location under demo warehouse
-      const { data: location, error: locationError } = await supabase
-        .from('locations')
-        .insert({
-          org_id: orgId,
-          warehouse_id: warehouse.id,
-          code: 'DEFAULT',
-          name: 'Default Location',
-          type: 'zone',
-          is_active: true,
-        })
-        .select('id')
-        .single()
-
-      if (locationError || !location) {
-        throw new Error(`Failed to create demo location: ${locationError?.message || 'Unknown error'}`)
-      }
-
-      // 3. Create sample product
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .insert({
-          org_id: orgId,
-          code: 'SAMPLE-001',
-          name: 'Sample Product',
-          uom: 'EA',
-          status: 'active',
-          is_active: true,
-        })
-        .select('id')
-        .single()
-
-      if (productError || !product) {
-        throw new Error(`Failed to create demo product: ${productError?.message || 'Unknown error'}`)
-      }
-
-      // 4. Set module toggles (technical=true, others=false)
-      // Note: Assuming modules table exists with org_id and module_code
-      // If schema is different, adjust this section
-      const { error: modulesError } = await supabase
-        .from('module_toggles')
-        .insert([
-          { org_id: orgId, module_code: 'technical', is_enabled: true },
-          { org_id: orgId, module_code: 'planning', is_enabled: false },
-          { org_id: orgId, module_code: 'production', is_enabled: false },
-          { org_id: orgId, module_code: 'warehouse', is_enabled: false },
-          { org_id: orgId, module_code: 'quality', is_enabled: false },
-          { org_id: orgId, module_code: 'shipping', is_enabled: false },
-        ])
-
-      if (modulesError) {
-        // Log warning but don't fail - module toggles might not exist yet
-        console.warn(`Warning: Failed to set module toggles: ${modulesError.message}`)
-      }
-
-      return {
-        success: true,
-        warehouse_id: warehouse.id,
-        location_id: location.id,
-        product_id: product.id,
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(`Failed to create demo data: ${message}`)
     }
   }
 }

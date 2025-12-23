@@ -1,23 +1,28 @@
 /**
  * Production Line Validation Schemas
- * Story: 1.8 Production Line Configuration
- * AC-007.1, AC-007.6: Client-side and server-side validation
+ * Story: 01.11 - Production Lines CRUD
+ * Purpose: Zod schemas for production line create/update with machine orders and product IDs
  */
 
 import { z } from 'zod'
 
 // Create Production Line Schema
-// AC-007.1: Admin może stworzyć production line
-export const createProductionLineSchema = z.object({
+export const productionLineCreateSchema = z.object({
   code: z
     .string()
     .min(2, 'Line code must be at least 2 characters')
     .max(50, 'Code must be 50 characters or less')
-    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens'),
+    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens')
+    .transform((val) => val.toUpperCase()),
   name: z
     .string()
     .min(1, 'Line name is required')
     .max(100, 'Name must be 100 characters or less'),
+  description: z
+    .string()
+    .max(500, 'Description must be 500 characters or less')
+    .optional()
+    .nullable(),
   warehouse_id: z
     .string()
     .uuid('Invalid warehouse ID format'),
@@ -26,43 +31,37 @@ export const createProductionLineSchema = z.object({
     .uuid('Invalid location ID format')
     .optional()
     .nullable(),
+  status: z
+    .enum(['active', 'maintenance', 'inactive', 'setup'])
+    .default('active'),
   machine_ids: z
     .array(z.string().uuid('Invalid machine ID format'))
+    .max(20, 'Maximum 20 machines per line')
+    .optional()
+    .default([]),
+  product_ids: z
+    .array(z.string().uuid('Invalid product ID format'))
     .optional()
     .default([]),
 })
 
-// Update Production Line Schema
-// AC-007.6: Edit line
-export const updateProductionLineSchema = z.object({
-  code: z
-    .string()
-    .min(2, 'Line code must be at least 2 characters')
-    .max(50, 'Code must be 50 characters or less')
-    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens')
-    .optional(),
-  name: z
-    .string()
-    .min(1, 'Line name is required')
-    .max(100, 'Name must be 100 characters or less')
-    .optional(),
-  warehouse_id: z
-    .string()
-    .uuid('Invalid warehouse ID format')
-    .optional(),
-  default_output_location_id: z
-    .string()
-    .uuid('Invalid location ID format')
-    .optional()
-    .nullable(),
-  machine_ids: z
-    .array(z.string().uuid('Invalid machine ID format'))
-    .optional(),
+// Update Production Line Schema (partial)
+export const productionLineUpdateSchema = productionLineCreateSchema.partial()
+
+// Machine Reorder Schema
+export const machineReorderSchema = z.object({
+  machine_orders: z.array(
+    z.object({
+      machine_id: z.string().uuid('Invalid machine ID format'),
+      sequence_order: z.number().int().min(1, 'Sequence order must start from 1'),
+    })
+  ),
 })
 
 // TypeScript types
-export type CreateProductionLineInput = z.input<typeof createProductionLineSchema>
-export type UpdateProductionLineInput = z.input<typeof updateProductionLineSchema>
+export type CreateProductionLineInput = z.infer<typeof productionLineCreateSchema>
+export type UpdateProductionLineInput = z.infer<typeof productionLineUpdateSchema>
+export type MachineReorderInput = z.infer<typeof machineReorderSchema>
 
 // Production Line Filters Schema
 // AC-007.4: Lines list view with filters

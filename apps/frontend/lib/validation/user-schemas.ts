@@ -31,7 +31,7 @@ export const UserStatusEnum = z.enum(['invited', 'active', 'inactive'])
 export type UserStatus = z.infer<typeof UserStatusEnum>
 
 // ============================================================================
-// CREATE USER SCHEMA (AC-002.1)
+// CREATE USER SCHEMA (AC-002.1) - Updated for Story 01.5a
 // ============================================================================
 
 export const CreateUserSchema = z.object({
@@ -44,40 +44,54 @@ export const CreateUserSchema = z.object({
   first_name: z
     .string()
     .min(1, 'First name is required')
-    .max(50, 'First name must be less than 50 characters')
+    .max(100, 'First name must be at most 100 characters')
     .trim(),
 
   last_name: z
     .string()
     .min(1, 'Last name is required')
-    .max(50, 'Last name must be less than 50 characters')
+    .max(100, 'Last name must be at most 100 characters')
     .trim(),
 
-  role: UserRoleEnum,
+  role_id: z
+    .string()
+    .min(1, 'Role is required'),
+
+  language: z
+    .string()
+    .optional()
+    .default('en'),
 })
 
 export type CreateUserInput = z.input<typeof CreateUserSchema>
 
 // ============================================================================
-// UPDATE USER SCHEMA (AC-002.3)
+// UPDATE USER SCHEMA (AC-002.3) - Updated for Story 01.5a
 // ============================================================================
 
 export const UpdateUserSchema = z.object({
   first_name: z
     .string()
     .min(1, 'First name cannot be empty')
-    .max(50, 'First name must be less than 50 characters')
+    .max(100, 'First name must be at most 100 characters')
     .trim()
     .optional(),
 
   last_name: z
     .string()
     .min(1, 'Last name cannot be empty')
-    .max(50, 'Last name must be less than 50 characters')
+    .max(100, 'Last name must be at most 100 characters')
     .trim()
     .optional(),
 
-  role: UserRoleEnum.optional(),
+  role_id: z
+    .string()
+    .min(1, 'Role is required')
+    .optional(),
+
+  language: z
+    .string()
+    .optional(),
 
   status: UserStatusEnum.optional(),
 

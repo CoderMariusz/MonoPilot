@@ -1,101 +1,79 @@
 /**
  * Machine Validation Schemas
- * Story: 1.7 Machine Configuration
- * AC-006.1, AC-006.6: Client-side and server-side validation
+ * Story: 01.10 - Machines CRUD
+ * Purpose: Zod schemas for machine validation
  */
 
 import { z } from 'zod'
 
+// Machine Type Enum
+export const machineTypeEnum = z.enum([
+  'MIXER',
+  'OVEN',
+  'FILLER',
+  'PACKAGING',
+  'CONVEYOR',
+  'BLENDER',
+  'CUTTER',
+  'LABELER',
+  'OTHER',
+])
+
 // Machine Status Enum
-export const machineStatusEnum = z.enum(['active', 'down', 'maintenance'])
-export type MachineStatus = z.infer<typeof machineStatusEnum>
+export const machineStatusEnum = z.enum(['ACTIVE', 'MAINTENANCE', 'OFFLINE', 'DECOMMISSIONED'])
 
 // Create Machine Schema
-// AC-006.1: Admin może stworzyć machine
-export const createMachineSchema = z.object({
+export const machineCreateSchema = z.object({
   code: z
     .string()
-    .min(2, 'Machine code must be at least 2 characters')
+    .min(1, 'Machine code is required')
     .max(50, 'Code must be 50 characters or less')
-    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens'),
+    .regex(/^[A-Z0-9-]+$/, 'Code must be uppercase alphanumeric with hyphens only')
+    .transform((val) => val.toUpperCase()),
   name: z
     .string()
     .min(1, 'Machine name is required')
     .max(100, 'Name must be 100 characters or less'),
-  status: machineStatusEnum.optional().default('active'),
-  capacity_per_hour: z
+  description: z
+    .string()
+    .max(500, 'Description must be 500 characters or less')
+    .nullable()
+    .optional()
+    .or(z.literal('').transform(() => null)),
+  type: machineTypeEnum,
+  status: machineStatusEnum.default('ACTIVE').optional(),
+  units_per_hour: z
     .number()
-    .positive('Capacity must be a positive number')
-    .optional()
-    .nullable(),
-  line_ids: z
-    .array(z.string().uuid('Invalid line ID format'))
-    .optional()
-    .default([]),
+    .int('Units per hour must be an integer')
+    .min(0, 'Units per hour must be positive')
+    .nullable()
+    .optional(),
+  setup_time_minutes: z
+    .number()
+    .int('Setup time must be an integer')
+    .min(0, 'Setup time must be positive')
+    .nullable()
+    .optional(),
+  max_batch_size: z
+    .number()
+    .int('Max batch size must be an integer')
+    .min(0, 'Max batch size must be positive')
+    .nullable()
+    .optional(),
+  location_id: z.string().uuid('Invalid location ID').nullable().optional(),
 })
 
-// Update Machine Schema
-// AC-006.6: Edit machine
-export const updateMachineSchema = z.object({
-  code: z
-    .string()
-    .min(2, 'Machine code must be at least 2 characters')
-    .max(50, 'Code must be 50 characters or less')
-    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens')
-    .optional(),
-  name: z
-    .string()
-    .min(1, 'Machine name is required')
-    .max(100, 'Name must be 100 characters or less')
-    .optional(),
-  status: machineStatusEnum.optional(),
-  capacity_per_hour: z
-    .number()
-    .positive('Capacity must be a positive number')
-    .optional()
-    .nullable(),
-  line_ids: z
-    .array(z.string().uuid('Invalid line ID format'))
-    .optional(),
+// Update Machine Schema (derived from create schema using .partial() - DRY pattern)
+export const machineUpdateSchema = machineCreateSchema.partial()
+
+// Machine Status Update Schema
+export const machineStatusSchema = z.object({
+  status: machineStatusEnum,
 })
 
 // TypeScript types
-export type CreateMachineInput = z.input<typeof createMachineSchema>
-export type UpdateMachineInput = z.input<typeof updateMachineSchema>
-
-// Machine Filters Schema
-// AC-006.4: Machines list view with filters
-export const machineFiltersSchema = z.object({
-  search: z.string().optional(),
-  status: z.enum(['active', 'down', 'maintenance', 'all']).optional(),
-  sort_by: z.enum(['code', 'name', 'status', 'created_at']).optional(),
-  sort_direction: z.enum(['asc', 'desc']).optional(),
-})
-
-// Machine Filters (for list page)
-export interface MachineFilters {
-  search?: string
-  status?: 'active' | 'down' | 'maintenance' | 'all'
-  sort_by?: 'code' | 'name' | 'status' | 'created_at'
-  sort_direction?: 'asc' | 'desc'
-}
-
-// Machine Type
-export interface Machine {
-  id: string
-  code: string
-  name: string
-  status: MachineStatus
-  capacity_per_hour: number | null
-  created_at: string
-  updated_at: string
-  created_by: string | null
-  updated_by: string | null
-  org_id: string
-  // Joined line objects (when queried with joins)
-  assigned_lines?: Array<{
-    id: string
-    code: string
-    name: string
-  }>
-}
+export type CreateMachineInput = z.input<typeof machineCreateSchema>
+export type UpdateMachineInput = z.input<typeof machineUpdateSchema>
+export type MachineStatusInput = z.infer<typeof machineStatusSchema>
+export type MachineType = z.infer<typeof machineTypeEnum>
+export type MachineStatus = z.infer<typeof machineStatusEnum>

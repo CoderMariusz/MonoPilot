@@ -50,19 +50,28 @@ export function useOnboardingStatus(): OnboardingStatus {
       setLoading(true)
       setError(null)
 
-      // Use API endpoint for proper security
-      const response = await fetch('/api/v1/settings/onboarding/status')
+      const supabase = createClient()
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch status: ${response.statusText}`)
+      // Fetch organization data directly
+      const { data, error: dbError } = await supabase
+        .from('organizations')
+        .select(
+          'onboarding_step, onboarding_started_at, onboarding_completed_at, onboarding_skipped'
+        )
+        .single()
+
+      if (dbError) {
+        throw new Error(dbError.message)
       }
 
-      const data = await response.json()
+      if (!data) {
+        throw new Error('Organization not found')
+      }
 
       // Set state from fetched data
-      const currentStep = data.step ?? 0
-      const completed = !!data.completed_at
-      const skipped = data.skipped ?? false
+      const currentStep = data.onboarding_step ?? 0
+      const completed = !!data.onboarding_completed_at
+      const skipped = data.onboarding_skipped ?? false
 
       setStep(currentStep)
       setIsComplete(completed)

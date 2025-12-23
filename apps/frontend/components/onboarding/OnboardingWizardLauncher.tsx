@@ -86,6 +86,14 @@ export function OnboardingWizardLauncher() {
 
   if (!context) return null
 
+  // Check if onboarding is complete - if so, redirect to dashboard
+  const isOnboardingComplete = context.organization?.onboarding_completed_at
+
+  if (isOnboardingComplete) {
+    router.push('/dashboard')
+    return null
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-blue-50 to-white">
       {/* Header */}

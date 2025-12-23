@@ -1,0 +1,477 @@
+# AGENT HANDOFF: Locations Hierarchy Tree View - COMPLETE REWRITE
+
+agent: frontend-dev
+epic: "01-settings"
+story: "01.9"
+phase: "CRITICAL REWRITE"
+priority: HIGHEST
+task: "Build Location Hierarchy Tree View from scratch - COMPLETE ARCHITECTURAL CHANGE from flat table to tree"
+
+# ============================================
+# CRITICAL WARNING
+# ============================================
+
+warning: |
+  This is the HARDEST rewrite in Epic 1.
+  Old v1 code uses FLAT TABLE with types: receiving/production/storage
+  New v2 spec uses TREE VIEW with types: Zone/Aisle/Rack/Bin/Shelf/Bulk
+
+  DO NOT copy v1 code - it's completely different architecture!
+  Build from wireframe specification only.
+
+# ============================================
+# CONTEXT
+# ============================================
+
+wireframes:
+  primary:
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-014-location-hierarchy-view.md
+    - docs/3-ARCHITECTURE/ux/wireframes/SET-015-location-create-edit-modal.md
+
+story_file:
+  - docs/2-MANAGEMENT/epics/current/01-settings/01.9.locations-hierarchy.md (if exists)
+
+migration_plan:
+  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.5)
+
+reference_code:
+  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/locations/page.tsx
+  warning: "READ ONLY for API patterns - DO NOT COPY UI CODE"
+  why_different: |
+    V1: Flat table, types (receiving/production/storage)
+    V2: Tree view, types (Zone/Aisle/Rack/Bin/Shelf/Bulk)
+    Cannot refactor - must rebuild!
+
+# ============================================
+# NEW ARCHITECTURE
+# ============================================
+
+architecture:
+  hierarchy_model:
+    description: "4-level tree structure with strict parent-child rules"
+    types:
+      - Zone           # Top-level organizational area
+      - Aisle          # Row within zone
+      - Rack           # Vertical storage unit
+      - Bin            # Individual storage container (leaf)
+      - Shelf          # Horizontal storage level (leaf)
+      - Bulk Storage   # Large storage area (leaf or top-level)
+
+  hierarchy_rules:
+    root_level:
+      parent: null
+      allowed_children: [Zone, Bulk Storage]
+      description: "Top level of warehouse"
+
+    Zone:
+      parent: null
+      allowed_children: [Aisle, Shelf, Bulk Storage]
+      level: 1
+
+    Aisle:
+      parent: Zone
+      allowed_children: [Rack]
+      level: 2
+
+    Rack:
+      parent: Aisle
+      allowed_children: [Bin, Shelf]
+      level: 3
+
+    Bin:
+      parent: Rack
+      allowed_children: [] # LEAF NODE
+      level: 4
+
+    Shelf:
+      parent: [Zone, Rack]
+      allowed_children: [] # LEAF NODE
+      level: 3 or 4
+
+    Bulk_Storage:
+      parent: [null, Zone]
+      allowed_children: [] # LEAF NODE
+      level: 1
+
+  max_depth: 4
+  example_path: "ZONE-A / AISLE-A1 / RACK-A1-01 / BIN-A1-01-1"
+
+  data_model:
+    fields:
+      - id (uuid)
+      - warehouse_id (uuid, FK)
+      - parent_location_id (uuid, nullable, FK to self)
+      - code (string, unique per warehouse)
+      - type (enum: Zone, Aisle, Rack, Bin, Shelf, Bulk Storage)
+      - status (enum: active, empty, full, reserved, disabled)
+      - barcode (string, optional)
+      - capacity (integer, optional, max LPs)
+      - level (integer, computed, 0-4)
+      - path (string, computed, "ZONE-A/AISLE-A1/RACK-A1-01")
+      - lp_count (integer, computed, recursive count including children)
+
+# ============================================
+# OUTPUT FILES
+# ============================================
+
+output:
+  pages:
+    - apps/frontend/app/(authenticated)/settings-v2/locations/page.tsx
+
+  components:
+    - components/settings-v2/locations/LocationTreeView.tsx          # Main tree container
+    - components/settings-v2/locations/LocationTreeNode.tsx          # Recursive node component
+    - components/settings-v2/locations/LocationModal.tsx             # CREATE/EDIT modal (SET-015)
+    - components/settings-v2/locations/AddChildLocationModal.tsx     # Pre-selects parent
+    - components/settings-v2/locations/MoveLocationDialog.tsx        # Tree parent selector
+    - components/settings-v2/locations/HierarchyStats.tsx            # Summary footer
+    - components/settings-v2/locations/ExpandCollapseControls.tsx    # [Expand All] buttons
+    - components/settings-v2/locations/LocationTypeSelect.tsx        # Type dropdown with validation
+
+# ============================================
+# REQUIREMENTS
+# ============================================
+
+requirements:
+
+  tree_rendering:
+    - Recursive component (LocationTreeNode calls itself for children)
+    - Indentation shows hierarchy depth (16px per level)
+    - Expand/collapse state management (per node)
+    - Icons: [▼] = expanded, [▸] = collapsed
+    - [Expand All] / [Collapse All] buttons
+    - Search highlights matching nodes + auto-expands parents
+
+  visual_structure:
+    per_row:
+      - Expand/collapse icon (if has children)
+      - Location code
+      - Type badge (Zone/Aisle/Rack/Bin/Shelf/Bulk)
+      - Status badge (Active/Empty/Full/Reserved/Disabled)
+      - LP count (this node + all descendants recursively)
+      - Actions menu [⋮]
+
+  actions_menu:
+    items:
+      - Edit Location
+      - Add Child Location (disabled for leaf nodes: Bin, Shelf, Bulk)
+      - Move Location (parent selector dialog)
+      - View Contents (navigate to /warehouse/inventory?location={id})
+      - Disable Location (validation: must be empty)
+      - Enable Location (if disabled)
+      - Delete Location (validation: must be empty + no children)
+
+  hierarchy_validation:
+    create:
+      - Parent-child type combination must be valid per rules
+      - Max depth not exceeded (4 levels)
+      - Code unique per warehouse
+    move:
+      - New parent must exist
+      - New parent-child type valid
+      - Cannot move parent into own descendant (circular ref prevention)
+      - New path doesn't exceed max depth
+    delete:
+      - Must be empty (lp_count = 0)
+      - Must have no children
+      - Cannot delete if referenced by WO routing
+
+  lp_count_calculation:
+    description: "Recursive count including all descendants"
+    logic: |
+      function calculateLPCount(node):
+        count = node.direct_lp_count
+        for child in node.children:
+          count += calculateLPCount(child)
+        return count
+
+  summary_stats:
+    location: Footer below tree
+    displays:
+      - "Total: X locations"
+      - "Active: X"
+      - "Empty: X"
+      - "With LPs: X"
+
+# ============================================
+# REUSABLE ASSETS
+# ============================================
+
+reusable:
+  services:
+    - lib/services/location-service.ts
+    - May need NEW methods:
+      - getLocationTree(warehouse_id) → nested structure
+      - moveLocation(id, new_parent_id) → validates + moves subtree
+      - validateHierarchy(parent_id, child_type) → boolean
+
+  schemas:
+    - lib/validation/location-schemas.ts
+    - MUST UPDATE:
+      - Change types enum (Zone, Aisle, Rack, Bin, Shelf, Bulk Storage)
+      - Add parent_location_id field
+      - Add level field
+      - Add path field
+      - Remove old types (receiving/production/storage)
+
+  shared_components:
+    - components/settings-v2/shared/ActionsMenu.tsx
+    - components/settings-v2/shared/StatusBadge.tsx
+    - components/settings-v2/shared/TypeBadge.tsx
+    - components/settings-v2/shared/EmptyState.tsx
+    - components/settings-v2/shared/ErrorState.tsx
+    - components/settings-v2/shared/LoadingState.tsx
+
+# ============================================
+# ISOLATION RULES
+# ============================================
+
+isolation:
+  allowed:
+    - Read wireframes: SET-014, SET-015
+    - Use services: lib/services/location-service.ts (update as needed)
+    - Use schemas: lib/validation/location-schemas.ts (UPDATE types!)
+    - Create in: settings-v2/locations/
+    - Reference v1: FOR LOGIC ONLY (API endpoints, error handling)
+
+  forbidden:
+    - Edit: app/(authenticated)/settings/locations/ (v1 - frozen)
+    - Import from: @/app/(authenticated)/settings/locations/*
+    - Import from: @/components/settings/locations/*
+    - Copy UI code from v1 (completely different design)
+
+  verification:
+    - grep -r "from '@/components/settings/locations'" components/settings-v2/locations/
+    - Expected: ZERO results
+
+# ============================================
+# IMPLEMENTATION GUIDE
+# ============================================
+
+implementation:
+
+  step_1_read_wireframe:
+    - Read SET-014 completely (understand tree structure)
+    - Read SET-015 (modal with parent selector)
+    - Note hierarchy rules table
+    - Note all 4 states (Loading, Success, Empty, Error)
+
+  step_2_update_schemas:
+    file: lib/validation/location-schemas.ts
+    changes:
+      - Update type enum to: Zone, Aisle, Rack, Bin, Shelf, Bulk Storage
+      - Add parent_location_id (z.string().uuid().nullable())
+      - Add level (z.number().int().min(0).max(4))
+      - Add path (z.string())
+      - Add lp_count (z.number().int().min(0))
+      - Add hierarchy validation rules
+
+  step_3_build_tree_components:
+    order:
+      1. LocationTreeNode.tsx (recursive component)
+      2. LocationTreeView.tsx (container with expand/collapse state)
+      3. ExpandCollapseControls.tsx ([Expand All] buttons)
+      4. HierarchyStats.tsx (summary footer)
+      5. LocationTypeSelect.tsx (with validation)
+
+  step_4_build_modals:
+    order:
+      1. LocationModal.tsx (CREATE/EDIT with parent selector)
+      2. AddChildLocationModal.tsx (parent pre-filled)
+      3. MoveLocationDialog.tsx (tree parent selector)
+
+  step_5_build_page:
+    file: apps/frontend/app/(authenticated)/settings-v2/locations/page.tsx
+    integrate:
+      - LocationTreeView (main component)
+      - Search + filters
+      - Add Location button
+      - All 4 states
+
+  step_6_test:
+    - Create test location tree (Zone > Aisle > Rack > Bin)
+    - Verify expand/collapse works
+    - Verify LP count recursive calculation
+    - Verify hierarchy validation (cannot create Bin under Zone)
+    - Verify move validation (cannot create circular ref)
+
+# ============================================
+# EXAMPLE CODE STRUCTURE
+# ============================================
+
+example_tree_node:
+  component: |
+    interface LocationTreeNodeProps {
+      location: Location;
+      level: number;
+      isExpanded: boolean;
+      onToggle: (id: string) => void;
+      onAction: (action: string, location: Location) => void;
+    }
+
+    export function LocationTreeNode({ location, level, isExpanded, onToggle, onAction }: LocationTreeNodeProps) {
+      const hasChildren = location.children && location.children.length > 0;
+      const indentation = level * 16; // 16px per level
+
+      return (
+        <>
+          <TableRow style={{ paddingLeft: indentation }}>
+            <TableCell>
+              {hasChildren && (
+                <Button variant="ghost" size="icon" onClick={() => onToggle(location.id)}>
+                  {isExpanded ? <ChevronDown /> : <ChevronRight />}
+                </Button>
+              )}
+              {location.code}
+            </TableCell>
+            <TableCell><TypeBadge type={location.type} category="location" /></TableCell>
+            <TableCell><StatusBadge status={location.status} /></TableCell>
+            <TableCell>{location.lp_count}</TableCell>
+            <TableCell>
+              <ActionsMenu
+                actions={getLocationActions(location)}
+                onAction={(action) => onAction(action, location)}
+              />
+            </TableCell>
+          </TableRow>
+
+          {isExpanded && hasChildren && (
+            location.children.map(child => (
+              <LocationTreeNode
+                key={child.id}
+                location={child}
+                level={level + 1}
+                isExpanded={expandedNodes.has(child.id)}
+                onToggle={onToggle}
+                onAction={onAction}
+              />
+            ))
+          )}
+        </>
+      );
+    }
+
+# ============================================
+# ACCEPTANCE CRITERIA
+# ============================================
+
+acceptance:
+  visual:
+    - [ ] Tree view renders with proper indentation
+    - [ ] Expand/collapse icons ([▼] [▸]) work
+    - [ ] [Expand All] / [Collapse All] buttons work
+    - [ ] Parent-child hierarchy visible (indentation)
+    - [ ] LP count shows recursive total
+    - [ ] Summary stats display (Total, Active, Empty, With LPs)
+
+  functionality:
+    - [ ] Can create root-level locations (Zone, Bulk Storage)
+    - [ ] Can add child locations (e.g., Aisle under Zone)
+    - [ ] Cannot add invalid child (e.g., Bin under Zone) - validation error
+    - [ ] Cannot exceed max depth (4 levels)
+    - [ ] Move location validates new parent
+    - [ ] Cannot move parent into descendant (circular ref blocked)
+    - [ ] Delete requires empty location (lp_count = 0) + no children
+    - [ ] Search auto-expands parent nodes to show match
+
+  states:
+    - [ ] Loading: Skeleton tree (3 rows)
+    - [ ] Success: Full tree with expand/collapse
+    - [ ] Empty: "No locations found" + CTA
+    - [ ] Error: "Failed to load" + Retry
+
+  isolation:
+    - [ ] Zero imports from v1 code
+    - [ ] Uses shared components from settings-v2/shared/
+    - [ ] TypeScript compiles
+    - [ ] No console errors
+
+# ============================================
+# TESTING CHECKLIST
+# ============================================
+
+testing:
+  manual:
+    - Create location tree: ZONE-A > AISLE-A1 > RACK-A1-01 > BIN-A1-01-1
+    - Verify indentation increases per level
+    - Expand/collapse ZONE-A (children show/hide)
+    - Try creating Bin directly under Zone (should fail validation)
+    - Try moving ZONE-A under AISLE-A1 (should fail - circular ref)
+    - Delete empty bin (should work)
+    - Try deleting rack with bins (should fail - has children)
+    - Search for "A1" (should auto-expand ZONE-A)
+
+  validation:
+    - Hierarchy rules enforced (per SET-014 table)
+    - Max depth 4 levels
+    - Code unique per warehouse
+    - LP count recursive calculation correct
+
+# ============================================
+# REUSABLE ASSETS
+# ============================================
+
+reusable:
+  services:
+    existing:
+      - lib/services/location-service.ts (base CRUD exists)
+
+    may_need_to_add:
+      - getLocationTree(warehouse_id) → returns nested structure
+      - moveLocation(location_id, new_parent_id) → validates + moves
+      - validateHierarchy(parent_id, child_type) → returns boolean
+      - calculateLPCount(location_id) → recursive count
+
+  schemas:
+    file: lib/validation/location-schemas.ts
+    required_updates:
+      old_types: [receiving, production, storage, shipping, transit, quarantine]
+      new_types: [Zone, Aisle, Rack, Bin, Shelf, "Bulk Storage"]
+      new_fields:
+        - parent_location_id (z.string().uuid().nullable())
+        - level (z.number().int().min(0).max(4))
+        - path (z.string())
+        - lp_count (z.number().int().min(0))
+
+  shared_components:
+    - settings-v2/shared/ActionsMenu.tsx (for row actions)
+    - settings-v2/shared/TypeBadge.tsx (for location type)
+    - settings-v2/shared/StatusBadge.tsx (for location status)
+    - settings-v2/shared/EmptyState.tsx (for empty warehouse)
+    - settings-v2/shared/ErrorState.tsx (for errors)
+
+# ============================================
+# EFFORT & COMPLEXITY
+# ============================================
+
+estimated_hours: 14-16
+complexity: HIGHEST (architectural change + recursive rendering)
+critical_path: true
+blocks: "None (independent screen)"
+validates: "Parallel build approach (if this works, everything else is easier)"
+
+# ============================================
+# COMPLETION CRITERIA
+# ============================================
+
+done_when:
+  - [ ] Tree view renders correctly with indentation
+  - [ ] All hierarchy rules enforced
+  - [ ] Expand/collapse state works
+  - [ ] LP count recursive calculation works
+  - [ ] Move location validates hierarchy
+  - [ ] All 4 states implemented
+  - [ ] All actions work (Edit, Add Child, Move, Delete, etc.)
+  - [ ] Summary stats display
+  - [ ] Zero v1 imports
+  - [ ] TypeScript compiles
+  - [ ] Manual testing checklist passed
+
+# ============================================
+# HANDOFF TO NEXT
+# ============================================
+
+next_phase:
+  - "02-CRITICAL-allergens-custom.yaml"
+  - Locations tree validates the parallel build approach
+  - If successful, proceed with other critical rewrites

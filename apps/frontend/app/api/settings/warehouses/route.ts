@@ -65,13 +65,27 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sort_by')
     const sortDirection = searchParams.get('sort_direction')
 
+    // Build filters object
+    const filtersInput: Record<string, any> = {}
+
+    if (search) {
+      filtersInput.search = search
+    }
+
+    if (isActive !== null) {
+      filtersInput.is_active = isActive === 'true' ? true : isActive === 'false' ? false : undefined
+    }
+
+    if (sortBy) {
+      filtersInput.sort_by = sortBy
+    }
+
+    if (sortDirection) {
+      filtersInput.sort_direction = sortDirection
+    }
+
     // Validate filters
-    const filters: WarehouseFilters = warehouseFiltersSchema.parse({
-      is_active: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-      search: search || undefined,
-      sort_by: sortBy || undefined,
-      sort_direction: sortDirection || undefined,
-    })
+    const filters: WarehouseFilters = warehouseFiltersSchema.parse(filtersInput)
 
     // Call service method
     const result = await listWarehouses(filters)

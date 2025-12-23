@@ -1,0 +1,90 @@
+# AGENT HANDOFF: Machines - Add 2nd Row Details & Maintenance Actions
+
+agent: frontend-dev
+epic: "01-settings"
+story: "01.10"
+phase: "REFACTOR"
+priority: MEDIUM
+task: "Add 2nd row details (capacity/specs) and Maintenance actions to Machines page"
+
+# ============================================
+# CONTEXT
+# ============================================
+
+wireframes:
+  - docs/3-ARCHITECTURE/ux/wireframes/SET-016-machine-list.md
+  - docs/3-ARCHITECTURE/ux/wireframes/SET-017-machine-create-edit-modal.md
+
+migration_plan:
+  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.6)
+
+reference_code:
+  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/machines/page.tsx
+  status: "70% compliant - has structure, missing 2nd row and maintenance actions"
+
+# ============================================
+# OUTPUT
+# ============================================
+
+output:
+  pages:
+    - apps/frontend/app/(authenticated)/settings-v2/machines/page.tsx
+
+  components:
+    - components/settings-v2/machines/MachinesDataTable.tsx
+    - components/settings-v2/machines/MachineModal.tsx (SET-017)
+    - components/settings-v2/machines/MachineRowDetails.tsx (NEW - 2nd row)
+    - components/settings-v2/machines/MaintenanceModal.tsx (NEW)
+    - components/settings-v2/machines/MaintenanceHistoryPanel.tsx (NEW)
+    - components/settings-v2/machines/AssignToLineModal.tsx (NEW)
+
+# ============================================
+# REQUIREMENTS
+# ============================================
+
+requirements:
+
+  second_row:
+    content: "Capacity/specs + installation date OR maintenance/disabled info"
+    examples:
+      active: "Capacity: 500L • Installed: 2023-01-15"
+      maintenance: "Under maintenance since 2025-12-09"
+      disabled: "Decommissioned 2024-11-20 by John Smith"
+
+  actions_menu:
+    items:
+      - Edit Machine
+      - Assign to Production Line (dropdown selector)
+      - Set to Maintenance (reason + estimated return date)
+      - Mark as Active (if status = maintenance)
+      - Disable Machine (validation: not in active WO)
+      - Enable Machine (if status = disabled)
+      - View Maintenance History (panel with past records)
+      - View Activity Log
+
+# ============================================
+# REUSABLE
+# ============================================
+
+reusable:
+  from_v1_can_migrate:
+    - MachineTypeBadge.tsx ✅
+    - MachineStatusBadge.tsx ✅
+    - MachineCapacityDisplay.tsx ✅
+
+  services:
+    - lib/services/machine-service.ts ✅
+
+# ============================================
+# ACCEPTANCE
+# ============================================
+
+acceptance:
+  - [ ] 2nd row shows capacity/specs OR maintenance info
+  - [ ] Actions menu has 8 options
+  - [ ] Maintenance modal works (reason + date)
+  - [ ] Maintenance history panel shows
+  - [ ] Assign to Line works
+
+estimated_hours: 8-10
+complexity: MEDIUM
