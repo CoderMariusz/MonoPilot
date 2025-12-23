@@ -20,8 +20,8 @@ export function ProductionLineStatusBadge({
   status,
   className,
 }: ProductionLineStatusBadgeProps) {
-  const colors = PRODUCTION_LINE_STATUS_COLORS[status]
-  const label = PRODUCTION_LINE_STATUS_LABELS[status]
+  const colors = PRODUCTION_LINE_STATUS_COLORS[status] || { bg: 'bg-gray-100', text: 'text-gray-800' }
+  const label = PRODUCTION_LINE_STATUS_LABELS[status] || status
 
   return (
     <Badge

@@ -16,10 +16,9 @@ wireframes:
   - docs/3-ARCHITECTURE/ux/wireframes/SET-019-production-line-create-edit-modal.md
 
 migration_plan:
-  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.7)
 
 reference_code:
-  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/production-lines/page.tsx
+  old_v1: apps/frontend/app/(authenticated)/settings/production-lines/page.tsx
   has: "MachineSequenceEditor in modal (exists!)"
   missing: "Machine flow visualization in list 2nd row"
   note: "MachineSequenceEditor shows sequence in modal - need to reuse for list display"
@@ -30,14 +29,14 @@ reference_code:
 
 output:
   pages:
-    - apps/frontend/app/(authenticated)/settings-v2/production-lines/page.tsx
+    - apps/frontend/app/(authenticated)/settings/production-lines/page.tsx
 
   components:
-    - components/settings-v2/production-lines/ProductionLinesDataTable.tsx
-    - components/settings-v2/production-lines/ProductionLineModal.tsx (SET-019)
-    - components/settings-v2/production-lines/MachineFlowVisualization.tsx (NEW - 2nd row)
-    - components/settings-v2/production-lines/CapacityDisplay.tsx (units/hour)
-    - components/settings-v2/production-lines/ManageMachinesPanel.tsx
+    - components/settings/production-lines/ProductionLinesDataTable.tsx
+    - components/settings/production-lines/ProductionLineModal.tsx (SET-019)
+    - components/settings/production-lines/MachineFlowVisualization.tsx (NEW - 2nd row)
+    - components/settings/production-lines/CapacityDisplay.tsx (units/hour)
+    - components/settings/production-lines/ManageMachinesPanel.tsx
 
 # ============================================
 # REQUIREMENTS

@@ -17,10 +17,9 @@ wireframes:
   - docs/3-ARCHITECTURE/ux/wireframes/SET-010-user-invitations.md
 
 migration_plan:
-  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.3)
 
 reference_code:
-  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/users/page.tsx
+  old_v1: apps/frontend/app/(authenticated)/settings/users/page.tsx
   keep_from_v1: "Tabs pattern (Users + Invitations) - this is GOOD addition not in wireframe"
   must_replace: "Inline Edit/Delete buttons → Actions menu [⋮]"
   must_fix: "Role names (admin/manager → Super Admin/Production Manager)"
@@ -64,16 +63,16 @@ architecture:
 
 output:
   pages:
-    - apps/frontend/app/(authenticated)/settings-v2/users/page.tsx
+    - apps/frontend/app/(authenticated)/settings/users/page.tsx
 
   components:
-    - components/settings-v2/users/UsersDataTable.tsx
-    - components/settings-v2/users/UserModal.tsx (SET-009)
-    - components/settings-v2/users/UserActionsMenu.tsx ([⋮] menu component)
-    - components/settings-v2/users/InvitationsTable.tsx (migrate from v1 if compliant)
-    - components/settings-v2/users/ChangeRoleModal.tsx (NEW)
-    - components/settings-v2/users/ResendInviteButton.tsx (inline in Users tab)
-    - components/settings-v2/users/DeactivateConfirmDialog.tsx
+    - components/settings/users/UsersDataTable.tsx
+    - components/settings/users/UserModal.tsx (SET-009)
+    - components/settings/users/UserActionsMenu.tsx ([⋮] menu component)
+    - components/settings/users/InvitationsTable.tsx (migrate from v1 if compliant)
+    - components/settings/users/ChangeRoleModal.tsx (NEW)
+    - components/settings/users/ResendInviteButton.tsx (inline in Users tab)
+    - components/settings/users/DeactivateConfirmDialog.tsx
 
 # ============================================
 # REQUIREMENTS
@@ -117,9 +116,9 @@ reusable:
     - lib/services/user-service.ts ✅
 
   shared:
-    - settings-v2/shared/ActionsMenu.tsx (use for [⋮])
-    - settings-v2/shared/StatusBadge.tsx
-    - settings-v2/shared/ActivityLogPanel.tsx
+    - settings/shared/ActionsMenu.tsx (use for [⋮])
+    - settings/shared/StatusBadge.tsx
+    - settings/shared/ActivityLogPanel.tsx
 
   from_v1_if_compliant:
     - InvitationsTable.tsx (check vs SET-010)
@@ -133,7 +132,7 @@ isolation:
   allowed:
     - Migrate: InvitationsTable if SET-010 compliant
     - Use: lib/services/user-service.ts
-    - Create in: settings-v2/users/
+    - Create in: settings/users/
 
   forbidden:
     - Copy inline button pattern (must use actions menu)

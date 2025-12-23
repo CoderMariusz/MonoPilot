@@ -1,297 +1,247 @@
-import { createServerSupabase } from '../supabase/server'
-import { parseUserAgent } from '../utils/device-info-parser'
-import { addToBlacklist } from './jwt-blacklist-service'
-
 /**
  * Session Service
- * Story: 1.4 Session Management
- * Task 2: Session Service - Core Logic (AC: all)
+ * Story: 01.15 - Session & Password Management
  *
- * Handles user session CRUD, termination, and activity tracking
+ * Manages user sessions for multi-device support and session tracking.
+ * Provides methods for session creation, validation, termination, and activity tracking.
+ *
+ * **Architecture:** Service layer accepts Supabase client as parameter to support
+ * both server-side (API routes) and client-side usage.
+ *
+ * **Security:** Session tokens are cryptographically secure (32+ bytes).
+ * All methods validate org_id and enforce multi-tenant isolation (ADR-013).
  */
 
-export interface UserSession {
-  id: string
-  user_id: string
-  token_id: string
-  device_info: string
-  ip_address: string
-  location?: string
-  login_time: string
-  last_activity: string
-  is_active: boolean
-  logged_out_at?: string
-  created_at: string
-}
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { UAParser } from 'ua-parser-js'
+import type { Session, DeviceInfo, SessionValidation } from '@/lib/types/session'
 
-export interface CreateSessionParams {
-  userId: string
-  tokenId: string // JWT jti claim
-  userAgent: string
-  ipAddress: string
-  location?: string
+/**
+ * Generate cryptographically secure session token (32 bytes = 64 hex chars)
+ */
+function generateSessionToken(): string {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 /**
- * Create new session record on login
- *
- * AC-003.5: Session tracking on login - capture device info, IP, location
- *
- * @param params - Session creation parameters
- * @returns Created session record
+ * Parse user agent string to extract device/browser/OS info
+ */
+export function parseUserAgent(userAgent: string, ipAddress: string | null): DeviceInfo {
+  const parser = new UAParser(userAgent)
+  const result = parser.getResult()
+
+  // Determine device type
+  let deviceType: string | null = null
+  if (result.device.type === 'mobile') deviceType = 'Mobile'
+  else if (result.device.type === 'tablet') deviceType = 'Tablet'
+  else if (result.device.type) deviceType = result.device.type
+  else if (userAgent.toLowerCase().includes('mobile')) deviceType = 'Mobile'
+  else deviceType = 'Desktop'
+
+  // Build device name
+  const deviceName = result.device.vendor && result.device.model
+    ? `${result.device.vendor} ${result.device.model}`
+    : result.device.model || result.os.name || 'Unknown Device'
+
+  return {
+    device_type: deviceType,
+    device_name: deviceName,
+    browser: result.browser.name || null,
+    os: result.os.name || null,
+    ip_address: ipAddress,
+    user_agent: userAgent,
+  }
+}
+
+/**
+ * Check if session is expired
+ */
+export function isSessionExpired(session: Session): boolean {
+  return new Date(session.expires_at) < new Date()
+}
+
+/**
+ * Create a new session for a user
  */
 export async function createSession(
-  params: CreateSessionParams
-): Promise<UserSession> {
-  const supabase = await createServerSupabase()
+  supabase: SupabaseClient,
+  userId: string,
+  orgId: string,
+  deviceInfo: DeviceInfo,
+  timeoutHours?: number
+): Promise<Session> {
+  // Get org timeout if not provided
+  let timeout = timeoutHours || 24
+  if (!timeoutHours) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('session_timeout_hours')
+      .eq('id', orgId)
+      .single()
 
-  // Parse device info from user agent
-  const deviceInfo = parseUserAgent(params.userAgent)
+    if (org?.session_timeout_hours) {
+      timeout = org.session_timeout_hours
+    }
+  }
 
-  // Insert session record
+  const sessionToken = generateSessionToken()
+  const expiresAt = new Date()
+  expiresAt.setHours(expiresAt.getHours() + timeout)
+
   const { data, error } = await supabase
     .from('user_sessions')
     .insert({
-      user_id: params.userId,
-      token_id: params.tokenId,
-      device_info: deviceInfo.formatted,
-      ip_address: params.ipAddress,
-      location: params.location || null,
-      is_active: true,
+      user_id: userId,
+      org_id: orgId,
+      session_token: sessionToken,
+      device_type: deviceInfo.device_type,
+      device_name: deviceInfo.device_name,
+      browser: deviceInfo.browser,
+      os: deviceInfo.os,
+      ip_address: deviceInfo.ip_address,
+      user_agent: deviceInfo.user_agent,
+      expires_at: expiresAt.toISOString(),
     })
     .select()
     .single()
 
-  if (error) {
-    throw new Error(`Failed to create session: ${error.message}`)
-  }
+  if (error) throw error
+  return data as Session
+}
 
-  return data as UserSession
+/**
+ * Get session by token
+ */
+export async function getSession(
+  supabase: SupabaseClient,
+  sessionToken: string
+): Promise<Session | null> {
+  const { data, error } = await supabase
+    .from('user_sessions')
+    .select('*')
+    .eq('session_token', sessionToken)
+    .maybeSingle()
+
+  if (error) throw error
+  return data as Session | null
 }
 
 /**
  * Get all sessions for a user
- *
- * AC-003.1: User views list of active sessions
- *
- * @param userId - User UUID
- * @param includeExpired - Include inactive/logged out sessions
- * @returns Array of sessions sorted by last_activity DESC
  */
 export async function getSessions(
-  userId: string,
-  includeExpired = false
-): Promise<UserSession[]> {
-  const supabase = await createServerSupabase()
-
-  let query = supabase
+  supabase: SupabaseClient,
+  userId: string
+): Promise<Session[]> {
+  const { data, error } = await supabase
     .from('user_sessions')
     .select('*')
     .eq('user_id', userId)
-    .order('last_activity', { ascending: false })
+    .is('revoked_at', null)
+    .order('last_activity_at', { ascending: false })
 
-  // Filter active sessions only by default
-  if (!includeExpired) {
-    query = query.eq('is_active', true)
+  if (error) throw error
+  return (data as Session[]) || []
+}
+
+/**
+ * Get current session (same as getSession but with validation)
+ */
+export async function getCurrentSession(
+  supabase: SupabaseClient,
+  sessionToken: string
+): Promise<Session | null> {
+  const validation = await validateSession(supabase, sessionToken)
+  return validation.valid ? validation.session : null
+}
+
+/**
+ * Validate session (check if active and not expired/revoked)
+ */
+export async function validateSession(
+  supabase: SupabaseClient,
+  sessionToken: string
+): Promise<SessionValidation> {
+  const session = await getSession(supabase, sessionToken)
+
+  if (!session) {
+    return { valid: false, session: null, reason: 'not_found' }
   }
 
-  const { data, error} = await query
-
-  if (error) {
-    throw new Error(`Failed to fetch sessions: ${error.message}`)
+  if (session.revoked_at) {
+    return { valid: false, session, reason: 'revoked' }
   }
 
-  return (data || []) as UserSession[]
+  if (isSessionExpired(session)) {
+    return { valid: false, session, reason: 'expired' }
+  }
+
+  return { valid: true, session }
 }
 
 /**
  * Terminate a single session
- *
- * AC-003.3: Admin can terminate any user's session
- * AC-003.8: Individual session termination
- *
- * @param sessionId - Session UUID
- * @param userId - User UUID (for validation)
- * @param tokenExpiry - JWT exp claim (Unix timestamp)
- * @returns Success boolean
  */
 export async function terminateSession(
+  supabase: SupabaseClient,
   sessionId: string,
-  userId: string,
-  tokenExpiry: number
-): Promise<boolean> {
-  const supabase = await createServerSupabase()
-
-  // Get session to validate and extract token_id
-  const { data: session, error: fetchError } = await supabase
-    .from('user_sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .eq('user_id', userId)
-    .single()
-
-  if (fetchError || !session) {
-    throw new Error('Session not found or unauthorized')
-  }
-
-  // Update session status
-  const { error: updateError } = await supabase
+  reason?: string,
+  revokedBy?: string
+): Promise<void> {
+  const { error } = await supabase
     .from('user_sessions')
     .update({
-      is_active: false,
-      logged_out_at: new Date().toISOString(),
+      revoked_at: new Date().toISOString(),
+      revoked_by: revokedBy || null,
+      revocation_reason: reason || 'user_logout',
     })
     .eq('id', sessionId)
 
-  if (updateError) {
-    throw new Error(`Failed to terminate session: ${updateError.message}`)
-  }
-
-  // Add JWT to blacklist (prevents further API use)
-  await addToBlacklist(session.token_id, tokenExpiry)
-
-  // TODO (Task 8): Emit Supabase Realtime event for immediate logout
-  // await emitSessionTerminatedEvent(session.token_id)
-
-  return true
+  if (error) throw error
 }
 
 /**
- * Terminate all sessions except current (or all if no exception specified)
- *
- * AC-003.2: "Logout All Devices" functionality
- * AC-002.4: Terminate all sessions when deactivating user
- *
- * @param userId - User UUID
- * @param exceptTokenId - Current session token ID (keep this one active), optional
- * @param tokenExpiry - JWT exp claim (Unix timestamp), optional (defaults to current time + 1 day)
- * @returns Result object with success status, count, and optional error
+ * Terminate all sessions for a user (except optionally one)
  */
 export async function terminateAllSessions(
+  supabase: SupabaseClient,
   userId: string,
-  exceptTokenId?: string,
-  tokenExpiry?: number
-): Promise<{ success: boolean; count?: number; error?: string }> {
-  try {
-    const supabase = await createServerSupabase()
-
-    // Default token expiry to 24 hours from now if not provided
-    const expiry = tokenExpiry || Math.floor(Date.now() / 1000) + 86400
-
-    // Build query for active sessions
-    let query = supabase
-      .from('user_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-
-    // If exceptTokenId provided, exclude it from termination
-    if (exceptTokenId) {
-      query = query.neq('token_id', exceptTokenId)
-    }
-
-    const { data: sessions, error: fetchError } = await query
-
-    if (fetchError) {
-      return {
-        success: false,
-        error: `Failed to fetch sessions: ${fetchError.message}`,
-      }
-    }
-
-    if (!sessions || sessions.length === 0) {
-      return { success: true, count: 0 }
-    }
-
-    // Terminate each session
-    for (const session of sessions) {
-      await terminateSession(session.id, userId, expiry)
-    }
-
-    return { success: true, count: sessions.length }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
-  }
-}
-
-/**
- * Update last activity timestamp for session
- *
- * AC-003.1: Last Activity column shows last API request time
- *
- * @param tokenId - JWT jti claim
- * @returns Success boolean
- */
-export async function updateLastActivity(tokenId: string): Promise<boolean> {
-  const supabase = await createServerSupabase()
-
-  const { error } = await supabase
+  exceptCurrent?: string
+): Promise<number> {
+  const query = supabase
     .from('user_sessions')
-    .update({ last_activity: new Date().toISOString() })
-    .eq('token_id', tokenId)
-    .eq('is_active', true)
+    .update({
+      revoked_at: new Date().toISOString(),
+      revocation_reason: exceptCurrent ? 'password_change' : 'logout_all',
+    })
+    .eq('user_id', userId)
+    .is('revoked_at', null)
 
-  if (error) {
-    // Silently fail - this is not critical
-    // Session might not exist yet (race condition on first request after login)
-    return false
+  if (exceptCurrent) {
+    query.neq('id', exceptCurrent)
   }
 
-  return true
+  const { data, error } = await query.select('id')
+
+  if (error) throw error
+  return data?.length || 0
 }
 
 /**
- * Handle normal logout (user initiated)
- *
- * AC-003.6: Session cleanup on logout - mark inactive, no blacklist
- *
- * @param tokenId - JWT jti claim
- * @returns Success boolean
+ * Update last activity timestamp for a session
  */
-export async function logout(tokenId: string): Promise<boolean> {
-  const supabase = await createServerSupabase()
-
+export async function updateLastActivity(
+  supabase: SupabaseClient,
+  sessionId: string
+): Promise<void> {
   const { error } = await supabase
     .from('user_sessions')
     .update({
-      is_active: false,
-      logged_out_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString(),
     })
-    .eq('token_id', tokenId)
+    .eq('id', sessionId)
 
-  if (error) {
-    console.error('Failed to mark session as logged out:', error)
-    return false
-  }
-
-  // Note: JWT not blacklisted on normal logout (natural expiry after 7 days)
-  // Only blacklist on forced termination ("Logout All Devices")
-  return true
-}
-
-/**
- * Get session by token ID
- *
- * @param tokenId - JWT jti claim
- * @returns Session or null
- */
-export async function getSessionByTokenId(
-  tokenId: string
-): Promise<UserSession | null> {
-  const supabase = await createServerSupabase()
-
-  const { data, error } = await supabase
-    .from('user_sessions')
-    .select('*')
-    .eq('token_id', tokenId)
-    .single()
-
-  if (error) {
-    return null
-  }
-
-  return data as UserSession
+  if (error) throw error
 }

@@ -31,7 +31,11 @@ export interface InvitationRecord {
   updated_at: string
 }
 
-// JWT secret helper function - retrieves at runtime to avoid build-time errors
+/**
+ * JWT secret helper function - retrieves at runtime to avoid build-time errors
+ * @returns JWT secret from environment
+ * @throws Error in production if JWT_SECRET not set
+ */
 function getJWTSecret(): string {
   const JWT_SECRET = process.env.JWT_SECRET || ''
 
@@ -44,6 +48,16 @@ function getJWTSecret(): string {
   }
 
   return JWT_SECRET
+}
+
+/**
+ * Calculate expiry date (7 days from now)
+ * @returns Date object set to 7 days in the future
+ */
+function calculateExpiryDate(): Date {
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + 7)
+  return expiresAt
 }
 
 /**
@@ -121,13 +135,11 @@ export async function createInvitation(params: {
   role: string
   invitedBy: string
 }): Promise<InvitationRecord> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Generate token and expiry date
   const token = generateInvitationToken(params.email, params.role, params.orgId)
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + 7) // 7 days from now
+  const expiresAt = calculateExpiryDate()
 
   // Insert invitation record
   const { data, error } = await supabaseAdmin
@@ -167,8 +179,7 @@ export async function getInvitations(
     search?: string
   }
 ): Promise<(InvitationRecord & { invited_by_name?: string })[]> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   let query = supabaseAdmin
     .from('user_invitations')
@@ -219,8 +230,7 @@ export async function resendInvitation(
   invitationId: string,
   orgId: string
 ): Promise<InvitationRecord> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Get current invitation
   const { data: invitation, error: fetchError } = await supabaseAdmin
@@ -240,8 +250,7 @@ export async function resendInvitation(
     invitation.role,
     invitation.org_id
   )
-  const newExpiresAt = new Date()
-  newExpiresAt.setDate(newExpiresAt.getDate() + 7)
+  const newExpiresAt = calculateExpiryDate()
 
   // Update invitation
   const { data, error } = await supabaseAdmin
@@ -276,8 +285,7 @@ export async function cancelInvitation(
   invitationId: string,
   orgId: string
 ): Promise<void> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Get invitation
   const { data: invitation, error: fetchError } = await supabaseAdmin
@@ -326,8 +334,7 @@ export async function cancelInvitation(
  * @param token - JWT token from signup link
  */
 export async function acceptInvitation(token: string): Promise<void> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Validate token
   const payload = validateInvitationToken(token)

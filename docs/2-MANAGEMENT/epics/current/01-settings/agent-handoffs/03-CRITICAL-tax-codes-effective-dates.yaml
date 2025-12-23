@@ -37,10 +37,9 @@ compliance:
   - FR-SET-083: Tax code effective date support
 
 migration_plan:
-  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.9)
 
 reference_code:
-  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/tax-codes/page.tsx
+  old_v1: apps/frontend/app/(authenticated)/settings/tax-codes/page.tsx
   can_keep: "Overall structure (TaxCodesDataTable pattern)"
   must_add: "Effective Date column, expiration indicators, date filter"
 
@@ -96,16 +95,16 @@ architecture:
 
 output:
   pages:
-    - apps/frontend/app/(authenticated)/settings-v2/tax-codes/page.tsx
+    - apps/frontend/app/(authenticated)/settings/tax-codes/page.tsx
 
   components:
-    - components/settings-v2/tax-codes/TaxCodesDataTable.tsx            # Add Effective column
-    - components/settings-v2/tax-codes/TaxCodeModal.tsx                 # Add date fields
-    - components/settings-v2/tax-codes/EffectiveDateRangePicker.tsx     # Date range input
-    - components/settings-v2/tax-codes/ExpirationIndicator.tsx          # ✓, ⏰, ⌛ icons
-    - components/settings-v2/tax-codes/EffectiveDateFilter.tsx          # Filter dropdown
-    - components/settings-v2/tax-codes/SetDefaultDialog.tsx             # Migrated from v1
-    - components/settings-v2/tax-codes/DeleteTaxCodeDialog.tsx          # Migrated from v1
+    - components/settings/tax-codes/TaxCodesDataTable.tsx            # Add Effective column
+    - components/settings/tax-codes/TaxCodeModal.tsx                 # Add date fields
+    - components/settings/tax-codes/EffectiveDateRangePicker.tsx     # Date range input
+    - components/settings/tax-codes/ExpirationIndicator.tsx          # ✓, ⏰, ⌛ icons
+    - components/settings/tax-codes/EffectiveDateFilter.tsx          # Filter dropdown
+    - components/settings/tax-codes/SetDefaultDialog.tsx             # Migrated from v1
+    - components/settings/tax-codes/DeleteTaxCodeDialog.tsx          # Migrated from v1
 
 # ============================================
 # REQUIREMENTS
@@ -200,7 +199,7 @@ isolation:
     - Read: SET-021, SET-021a, SET-021b wireframes
     - Use: lib/services/tax-code-service.ts (UPDATE methods)
     - Migrate: Some v1 components (SetDefaultDialog, etc.) if compliant
-    - Create in: settings-v2/tax-codes/
+    - Create in: settings/tax-codes/
 
   forbidden:
     - Copy v1 TaxCodeModal without adding date fields

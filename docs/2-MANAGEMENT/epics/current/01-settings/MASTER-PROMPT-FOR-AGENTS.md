@@ -1,6 +1,6 @@
 # 🎯 MASTER PROMPT - Settings v2 Rebuild (Epic 01)
 
-**Copy-paste this to agents starting work on Settings v2**
+**Copy-paste this to agents starting work on Settings module**
 
 ---
 
@@ -9,7 +9,7 @@
 You are rebuilding the Settings module (Epic 01) using **Parallel Build → Atomic Swap** strategy.
 
 **Key Points:**
-- Build NEW code in `settings-v2/` directory
+- Build NEW code in `settings/` directory
 - OLD code in `settings/` is FROZEN (read-only reference)
 - Build from WIREFRAMES (not from old code)
 - Verify isolation after each file
@@ -22,8 +22,8 @@ You are rebuilding the Settings module (Epic 01) using **Parallel Build → Atom
 ```
 ✅ CREATE HERE:
 apps/frontend/
-├── app/(authenticated)/settings-v2/          ← YOUR PAGES
-├── components/settings-v2/                   ← YOUR COMPONENTS
+├── app/(authenticated)/settings/          ← YOUR PAGES
+├── components/settings/                   ← YOUR COMPONENTS
 └── lib/
     ├── services/ (update if needed)
     ├── validation/ (update if needed)
@@ -36,7 +36,7 @@ apps/frontend/
 apps/frontend/
 ├── app/(authenticated)/settings/             ← V1 FROZEN
 ├── components/settings/                      ← V1 FROZEN
-└── app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/  ← READ ONLY
+└── app/(authenticated)/settings (reference only)/  ← READ ONLY
 ```
 
 ---
@@ -66,8 +66,8 @@ docs/2-MANAGEMENT/epics/current/01-settings/agent-handoffs/
 - ✅ Read story files (docs/2-MANAGEMENT/epics/current/01-settings/*.md)
 - ✅ Use services (lib/services/*.ts) - reuse or update
 - ✅ Use schemas (lib/validation/*.ts) - verify vs wireframe, update if needed
-- ✅ Create pages in `settings-v2/`
-- ✅ Create components in `settings-v2/`
+- ✅ Create pages in `settings/`
+- ✅ Create components in `settings/`
 - ✅ Reference v1 code FOR LOGIC ONLY (understand API calls, error handling)
 
 ### **❌ YOU CANNOT:**
@@ -76,7 +76,7 @@ docs/2-MANAGEMENT/epics/current/01-settings/agent-handoffs/
 - ❌ Import from `@/app/(authenticated)/settings/*` (v1 paths)
 - ❌ Import from `@/components/settings/*` (v1 component paths)
 - ❌ Copy-paste v1 UI code (rebuild from wireframe!)
-- ❌ Edit files in `_archive-settings-v1-DO-NOT-TOUCH/`
+- ❌ Edit files in `settings (reference only)/`
 
 ---
 
@@ -126,7 +126,7 @@ cat docs/2-MANAGEMENT/epics/current/01-settings/01.9.locations-hierarchy.md
 ### **4. (Optional) Reference V1 Code**
 ```bash
 # Example for Locations:
-cat apps/frontend/app/\(authenticated\)/_archive-settings-v1-DO-NOT-TOUCH/locations/page.tsx
+cat apps/frontend/app/\(authenticated\)/settings (reference only)/locations/page.tsx
 
 # Use for:
 # - Understanding API endpoint patterns
@@ -166,8 +166,8 @@ reusable:
   schemas:
     - lib/validation/location-schemas.ts (MUST UPDATE types)
   shared:
-    - settings-v2/shared/ActionsMenu.tsx
-    - settings-v2/shared/StatusBadge.tsx
+    - settings/shared/ActionsMenu.tsx
+    - settings/shared/StatusBadge.tsx
 
 // Check if they exist:
 ls lib/services/location-service.ts
@@ -183,16 +183,16 @@ ls lib/validation/location-schemas.ts
 // Example for Locations (from handoff):
 output:
   pages:
-    - settings-v2/locations/page.tsx
+    - settings/locations/page.tsx
 
   components:
-    - components/settings-v2/locations/LocationTreeView.tsx
-    - components/settings-v2/locations/LocationTreeNode.tsx
-    - components/settings-v2/locations/LocationModal.tsx
+    - components/settings/locations/LocationTreeView.tsx
+    - components/settings/locations/LocationTreeNode.tsx
+    - components/settings/locations/LocationModal.tsx
     // ... etc
 
 // Create each file according to wireframe specs
-// Use shared components from settings-v2/shared/
+// Use shared components from settings/shared/
 ```
 
 ### **Step 4: Implement All 4 States**
@@ -225,7 +225,7 @@ return <DataTableWithDetails ... />
 ### **Step 5: Verify Isolation**
 ```bash
 # After creating files, run:
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 
 # Should pass all checks:
 # ✅ No v1 imports
@@ -262,7 +262,7 @@ States:
 
 Isolation:
   ☐ Zero imports from v1 code (verified with script)
-  ☐ Only imports from allowed paths (lib/*, settings-v2/*, ui/*)
+  ☐ Only imports from allowed paths (lib/*, settings/*, ui/*)
   ☐ TypeScript compiles with zero errors
   ☐ No console errors in browser
 
@@ -340,13 +340,13 @@ cat docs/2-MANAGEMENT/epics/current/01-settings/agent-handoffs/00-FOUNDATION-sha
 cat docs/3-ARCHITECTURE/ux/wireframes/SET-012-warehouse-list.md  # Best example
 
 # 3. Create 9 components in:
-# apps/frontend/components/settings-v2/shared/
+# apps/frontend/components/settings/shared/
 
 # 4. Verify
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 
 # 5. Create PR:
-# Title: "feat(settings-v2): create shared components (Foundation)"
+# Title: "feat(settings): create shared components (Foundation)"
 # Branch: feature/set-v2-00-foundation
 ```
 
@@ -362,7 +362,7 @@ cat docs/3-ARCHITECTURE/ux/wireframes/SET-014-location-hierarchy-view.md
 cat docs/3-ARCHITECTURE/ux/wireframes/SET-015-location-create-edit-modal.md
 
 # 3. (Optional) Reference v1 for API patterns only
-cat apps/frontend/app/\(authenticated\)/_archive-settings-v1-DO-NOT-TOUCH/locations/page.tsx
+cat apps/frontend/app/\(authenticated\)/settings (reference only)/locations/page.tsx
 # NOTE: V1 has FLAT TABLE (wrong!) - DO NOT copy UI code
 
 # 4. Update schema first
@@ -370,14 +370,14 @@ cat apps/frontend/app/\(authenticated\)/_archive-settings-v1-DO-NOT-TOUCH/locati
 # Change types: Zone, Aisle, Rack, Bin, Shelf, Bulk Storage
 
 # 5. Build tree components
-# Create: components/settings-v2/locations/LocationTreeView.tsx (recursive)
+# Create: components/settings/locations/LocationTreeView.tsx (recursive)
 
 # 6. Test tree rendering
 # Create test: Zone > Aisle > Rack > Bin
 # Verify expand/collapse, hierarchy validation
 
 # 7. Verify isolation
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 
 # Estimated: 14-16 hours (longest in Epic 1)
 ```
@@ -399,7 +399,7 @@ bash scripts/check-settings-v2-isolation.sh
 ---
 
 **Created:** 2025-12-23
-**Branch:** `feature/settings-v2-rebuild`
+**Branch:** `feature/settings-rebuild`
 **Strategy:** Parallel Build → Atomic Swap
 **Handoffs:** 7 ready (more will be created)
 **Status:** Ready for Agent Execution

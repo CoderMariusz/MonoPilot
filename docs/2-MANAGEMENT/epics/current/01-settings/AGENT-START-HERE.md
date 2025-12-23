@@ -2,7 +2,7 @@
 
 **Epic:** 01 - Settings Module v2 Rebuild
 **Status:** ✅ Ready for Agents
-**Branch:** `feature/settings-v2-rebuild`
+**Branch:** `feature/settings-rebuild`
 **Created:** 2025-12-23
 
 ---
@@ -14,17 +14,17 @@
 ```bash
 # 1. Verify you're on correct branch
 git branch --show-current
-# Should show: feature/settings-v2-rebuild
+# Should show: feature/settings-rebuild
 
 # 2. Read your handoff file
 cat docs/2-MANAGEMENT/epics/current/01-settings/agent-handoffs/00-FOUNDATION-shared-components.yaml
 
 # 3. Start building
 # Create 9 shared components in:
-# apps/frontend/components/settings-v2/shared/
+# apps/frontend/components/settings/shared/
 
 # 4. Verify isolation after completion
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 ```
 
 ---
@@ -97,7 +97,7 @@ Can be parallelized
 Read:
   - docs/3-ARCHITECTURE/ux/wireframes/SET-*.md
   - docs/2-MANAGEMENT/epics/current/01-settings/*.md
-  - apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/* (REFERENCE ONLY)
+  - apps/frontend/app/(authenticated)/settings (reference only)/* (REFERENCE ONLY)
 
 Use:
   - lib/services/*-service.ts (reuse/update)
@@ -105,8 +105,8 @@ Use:
   - lib/hooks/* (reuse/create)
 
 Create:
-  - apps/frontend/app/(authenticated)/settings-v2/*
-  - apps/frontend/components/settings-v2/*
+  - apps/frontend/app/(authenticated)/settings/*
+  - apps/frontend/components/settings/*
 ```
 
 ### **❌ FORBIDDEN:**
@@ -115,15 +115,15 @@ Do NOT:
   - Edit: app/(authenticated)/settings/* (v1 frozen)
   - Edit: components/settings/* (v1 frozen)
   - Import from: @/app/(authenticated)/settings/*
-  - Import from: @/components/settings/* (use settings-v2/)
+  - Import from: @/components/settings/* (use settings/)
   - Copy-paste v1 UI code
-  - Touch: _archive-settings-v1-DO-NOT-TOUCH/* (except reading)
+  - Touch: settings (reference only)/* (except reading)
 ```
 
 ### **⚠️ VERIFICATION (After Each Screen):**
 ```bash
 # Run this after completing each handoff:
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 
 # Should output:
 # ✅ No v1 app imports found
@@ -136,7 +136,6 @@ bash scripts/check-settings-v2-isolation.sh
 ## 📖 KEY DOCUMENTS
 
 ### **Must Read:**
-1. **Migration Plan:** `docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md`
    - Overall strategy
    - Why parallel build
    - Complete timeline
@@ -152,7 +151,7 @@ bash scripts/check-settings-v2-isolation.sh
    - Field definitions
 
 ### **Optional Reference:**
-4. **Old Code:** `app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/`
+4. **Old Code:** `app/(authenticated)/settings (reference only)/`
    - FOR LOGIC UNDERSTANDING ONLY
    - DO NOT COPY UI CODE
    - Read API patterns, error handling
@@ -180,9 +179,9 @@ bash scripts/check-settings-v2-isolation.sh
    ├─ Note error handling
    └─ DO NOT copy UI code
 
-4. Build in settings-v2/
-   ├─ Create page in app/(authenticated)/settings-v2/
-   ├─ Create components in components/settings-v2/
+4. Build in settings/
+   ├─ Create page in app/(authenticated)/settings/
+   ├─ Create components in components/settings/
    ├─ Use shared components
    └─ Follow wireframe exactly
 
@@ -194,7 +193,7 @@ bash scripts/check-settings-v2-isolation.sh
 
 6. Create PR
    ├─ Branch: feature/set-v2-SET-XXX-screen-name
-   ├─ Title: "feat(settings-v2): implement SET-XXX [screen name]"
+   ├─ Title: "feat(settings): implement SET-XXX [screen name]"
    ├─ Description: Link to wireframe + handoff file
    └─ Checklist: All acceptance criteria checked
 ```
@@ -208,8 +207,8 @@ bash scripts/check-settings-v2-isolation.sh
 Error: import { WarehouseModal } from '@/components/settings/warehouses'
 
 Fix:
-- Use: import { WarehouseModal } from '@/components/settings-v2/warehouses'
-- Or rebuild component in settings-v2/
+- Use: import { WarehouseModal } from '@/components/settings/warehouses'
+- Or rebuild component in settings/
 ```
 
 ### **Issue: "Wireframe doesn't match old code"**
@@ -238,10 +237,10 @@ Fix:
 ### **Check Status:**
 ```bash
 # How many screens completed?
-ls apps/frontend/app/\(authenticated\)/settings-v2/ -d */ | wc -l
+ls apps/frontend/app/\(authenticated\)/settings/ -d */ | wc -l
 
 # Run isolation check
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 
 # Check TypeScript
 cd apps/frontend && npx tsc --noEmit
@@ -313,7 +312,6 @@ Total: 0/20 handoffs complete
 ## 📞 HELP & SUPPORT
 
 ### **Questions?**
-- Read: `docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md`
 - Check: Your handoff YAML file
 - Review: Wireframe (SET-XXX.md)
 
@@ -325,7 +323,7 @@ Total: 0/20 handoffs complete
 ### **Before Creating PR:**
 ```bash
 # Run full verification:
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 cd apps/frontend && npx tsc --noEmit
 npm run test -- your-screen-name
 ```
@@ -338,9 +336,9 @@ npm run test -- your-screen-name
 ```
 Read: docs/2-MANAGEMENT/epics/current/01-settings/agent-handoffs/00-FOUNDATION-shared-components.yaml
 
-Build: 9 shared components in components/settings-v2/shared/
+Build: 9 shared components in components/settings/shared/
 
-Verify: bash scripts/check-settings-v2-isolation.sh
+Verify: bash scripts/check-settings-isolation.sh
 
 Estimated: 6-8 hours
 
