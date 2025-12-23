@@ -87,8 +87,8 @@ export function LocationForm({
 
   const isEditMode = !!location
 
-  const form = useForm<CreateLocationInput | UpdateLocationInput>({
-    resolver: zodResolver(isEditMode ? UpdateLocationSchema : CreateLocationSchema) as any,
+  const form = useForm<CreateLocationInput>({
+    resolver: zodResolver(isEditMode ? UpdateLocationSchema : CreateLocationSchema),
     defaultValues: {
       warehouse_id: location?.warehouse_id || '',
       code: location?.code || '',

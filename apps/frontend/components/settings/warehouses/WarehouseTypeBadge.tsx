@@ -15,8 +15,8 @@ interface WarehouseTypeBadgeProps {
 }
 
 export function WarehouseTypeBadge({ type }: WarehouseTypeBadgeProps) {
-  const label = WAREHOUSE_TYPE_LABELS[type]
-  const colors = WAREHOUSE_TYPE_COLORS[type]
+  const label = WAREHOUSE_TYPE_LABELS[type] || type
+  const colors = WAREHOUSE_TYPE_COLORS[type] || { bg: 'bg-gray-100', text: 'text-gray-800' }
 
   return (
     <Badge

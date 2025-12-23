@@ -12,16 +12,16 @@ import { z } from 'zod'
 // ============================================================================
 
 export const UserRoleEnum = z.enum([
+  'owner',
   'admin',
-  'manager',
-  'operator',
-  'viewer',
+  'production_manager',
+  'quality_manager',
+  'warehouse_manager',
+  'production_operator',
+  'quality_inspector',
+  'warehouse_operator',
   'planner',
-  'technical',
-  'purchasing',
-  'warehouse',
-  'qc',
-  'finance',
+  'viewer',
 ])
 
 export type UserRole = z.infer<typeof UserRoleEnum>
@@ -164,16 +164,16 @@ export function validateUserFilters(data: unknown): UserFilters {
 // ============================================================================
 
 export const roleLabels: Record<UserRole, string> = {
-  admin: 'Admin',
-  manager: 'Manager',
-  operator: 'Operator',
-  viewer: 'Viewer',
+  owner: 'Owner',
+  admin: 'Administrator',
+  production_manager: 'Production Manager',
+  quality_manager: 'Quality Manager',
+  warehouse_manager: 'Warehouse Manager',
+  production_operator: 'Production Operator',
+  quality_inspector: 'Quality Inspector',
+  warehouse_operator: 'Warehouse Operator',
   planner: 'Planner',
-  technical: 'Technical',
-  purchasing: 'Purchasing',
-  warehouse: 'Warehouse',
-  qc: 'Quality Control',
-  finance: 'Finance',
+  viewer: 'Viewer',
 }
 
 export const statusLabels: Record<UserStatus, string> = {
