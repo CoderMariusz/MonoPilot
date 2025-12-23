@@ -32,10 +32,9 @@ story_file:
   - docs/2-MANAGEMENT/epics/current/01-settings/01.9.locations-hierarchy.md (if exists)
 
 migration_plan:
-  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.5)
 
 reference_code:
-  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/locations/page.tsx
+  old_v1: apps/frontend/app/(authenticated)/settings/locations/page.tsx
   warning: "READ ONLY for API patterns - DO NOT COPY UI CODE"
   why_different: |
     V1: Flat table, types (receiving/production/storage)
@@ -116,17 +115,17 @@ architecture:
 
 output:
   pages:
-    - apps/frontend/app/(authenticated)/settings-v2/locations/page.tsx
+    - apps/frontend/app/(authenticated)/settings/locations/page.tsx
 
   components:
-    - components/settings-v2/locations/LocationTreeView.tsx          # Main tree container
-    - components/settings-v2/locations/LocationTreeNode.tsx          # Recursive node component
-    - components/settings-v2/locations/LocationModal.tsx             # CREATE/EDIT modal (SET-015)
-    - components/settings-v2/locations/AddChildLocationModal.tsx     # Pre-selects parent
-    - components/settings-v2/locations/MoveLocationDialog.tsx        # Tree parent selector
-    - components/settings-v2/locations/HierarchyStats.tsx            # Summary footer
-    - components/settings-v2/locations/ExpandCollapseControls.tsx    # [Expand All] buttons
-    - components/settings-v2/locations/LocationTypeSelect.tsx        # Type dropdown with validation
+    - components/settings/locations/LocationTreeView.tsx          # Main tree container
+    - components/settings/locations/LocationTreeNode.tsx          # Recursive node component
+    - components/settings/locations/LocationModal.tsx             # CREATE/EDIT modal (SET-015)
+    - components/settings/locations/AddChildLocationModal.tsx     # Pre-selects parent
+    - components/settings/locations/MoveLocationDialog.tsx        # Tree parent selector
+    - components/settings/locations/HierarchyStats.tsx            # Summary footer
+    - components/settings/locations/ExpandCollapseControls.tsx    # [Expand All] buttons
+    - components/settings/locations/LocationTypeSelect.tsx        # Type dropdown with validation
 
 # ============================================
 # REQUIREMENTS
@@ -215,12 +214,12 @@ reusable:
       - Remove old types (receiving/production/storage)
 
   shared_components:
-    - components/settings-v2/shared/ActionsMenu.tsx
-    - components/settings-v2/shared/StatusBadge.tsx
-    - components/settings-v2/shared/TypeBadge.tsx
-    - components/settings-v2/shared/EmptyState.tsx
-    - components/settings-v2/shared/ErrorState.tsx
-    - components/settings-v2/shared/LoadingState.tsx
+    - components/settings/shared/ActionsMenu.tsx
+    - components/settings/shared/StatusBadge.tsx
+    - components/settings/shared/TypeBadge.tsx
+    - components/settings/shared/EmptyState.tsx
+    - components/settings/shared/ErrorState.tsx
+    - components/settings/shared/LoadingState.tsx
 
 # ============================================
 # ISOLATION RULES
@@ -231,7 +230,7 @@ isolation:
     - Read wireframes: SET-014, SET-015
     - Use services: lib/services/location-service.ts (update as needed)
     - Use schemas: lib/validation/location-schemas.ts (UPDATE types!)
-    - Create in: settings-v2/locations/
+    - Create in: settings/locations/
     - Reference v1: FOR LOGIC ONLY (API endpoints, error handling)
 
   forbidden:
@@ -241,7 +240,7 @@ isolation:
     - Copy UI code from v1 (completely different design)
 
   verification:
-    - grep -r "from '@/components/settings/locations'" components/settings-v2/locations/
+    - grep -r "from '@/components/settings/locations'" components/settings/locations/
     - Expected: ZERO results
 
 # ============================================
@@ -281,7 +280,7 @@ implementation:
       3. MoveLocationDialog.tsx (tree parent selector)
 
   step_5_build_page:
-    file: apps/frontend/app/(authenticated)/settings-v2/locations/page.tsx
+    file: apps/frontend/app/(authenticated)/settings/locations/page.tsx
     integrate:
       - LocationTreeView (main component)
       - Search + filters
@@ -382,7 +381,7 @@ acceptance:
 
   isolation:
     - [ ] Zero imports from v1 code
-    - [ ] Uses shared components from settings-v2/shared/
+    - [ ] Uses shared components from settings/shared/
     - [ ] TypeScript compiles
     - [ ] No console errors
 
@@ -434,11 +433,11 @@ reusable:
         - lp_count (z.number().int().min(0))
 
   shared_components:
-    - settings-v2/shared/ActionsMenu.tsx (for row actions)
-    - settings-v2/shared/TypeBadge.tsx (for location type)
-    - settings-v2/shared/StatusBadge.tsx (for location status)
-    - settings-v2/shared/EmptyState.tsx (for empty warehouse)
-    - settings-v2/shared/ErrorState.tsx (for errors)
+    - settings/shared/ActionsMenu.tsx (for row actions)
+    - settings/shared/TypeBadge.tsx (for location type)
+    - settings/shared/StatusBadge.tsx (for location status)
+    - settings/shared/EmptyState.tsx (for empty warehouse)
+    - settings/shared/ErrorState.tsx (for errors)
 
 # ============================================
 # EFFORT & COMPLEXITY

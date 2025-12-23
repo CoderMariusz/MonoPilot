@@ -16,10 +16,9 @@ wireframes:
   - docs/3-ARCHITECTURE/ux/wireframes/SET-017-machine-create-edit-modal.md
 
 migration_plan:
-  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.6)
 
 reference_code:
-  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/machines/page.tsx
+  old_v1: apps/frontend/app/(authenticated)/settings/machines/page.tsx
   status: "70% compliant - has structure, missing 2nd row and maintenance actions"
 
 # ============================================
@@ -28,15 +27,15 @@ reference_code:
 
 output:
   pages:
-    - apps/frontend/app/(authenticated)/settings-v2/machines/page.tsx
+    - apps/frontend/app/(authenticated)/settings/machines/page.tsx
 
   components:
-    - components/settings-v2/machines/MachinesDataTable.tsx
-    - components/settings-v2/machines/MachineModal.tsx (SET-017)
-    - components/settings-v2/machines/MachineRowDetails.tsx (NEW - 2nd row)
-    - components/settings-v2/machines/MaintenanceModal.tsx (NEW)
-    - components/settings-v2/machines/MaintenanceHistoryPanel.tsx (NEW)
-    - components/settings-v2/machines/AssignToLineModal.tsx (NEW)
+    - components/settings/machines/MachinesDataTable.tsx
+    - components/settings/machines/MachineModal.tsx (SET-017)
+    - components/settings/machines/MachineRowDetails.tsx (NEW - 2nd row)
+    - components/settings/machines/MaintenanceModal.tsx (NEW)
+    - components/settings/machines/MaintenanceHistoryPanel.tsx (NEW)
+    - components/settings/machines/AssignToLineModal.tsx (NEW)
 
 # ============================================
 # REQUIREMENTS

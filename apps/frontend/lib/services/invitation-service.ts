@@ -121,8 +121,7 @@ export async function createInvitation(params: {
   role: string
   invitedBy: string
 }): Promise<InvitationRecord> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Generate token and expiry date
   const token = generateInvitationToken(params.email, params.role, params.orgId)
@@ -167,8 +166,7 @@ export async function getInvitations(
     search?: string
   }
 ): Promise<(InvitationRecord & { invited_by_name?: string })[]> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   let query = supabaseAdmin
     .from('user_invitations')
@@ -219,8 +217,7 @@ export async function resendInvitation(
   invitationId: string,
   orgId: string
 ): Promise<InvitationRecord> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Get current invitation
   const { data: invitation, error: fetchError } = await supabaseAdmin
@@ -276,8 +273,7 @@ export async function cancelInvitation(
   invitationId: string,
   orgId: string
 ): Promise<void> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Get invitation
   const { data: invitation, error: fetchError } = await supabaseAdmin
@@ -326,8 +322,7 @@ export async function cancelInvitation(
  * @param token - JWT token from signup link
  */
 export async function acceptInvitation(token: string): Promise<void> {
-  const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
 
   // Validate token
   const payload = validateInvitationToken(token)

@@ -1,4 +1,4 @@
-# Agent Handoffs - Epic 01 Settings v2
+# Agent Handoffs - Epic 01 Settings
 
 **Purpose:** Ready-to-use prompts for agents rebuilding Settings module
 **Epic:** 01 - Settings
@@ -212,7 +212,7 @@ Agent D: New Screens (batch 2)
   - Read wireframes (SET-*.md)
   - Use services (lib/services/)
   - Update schemas (lib/validation/)
-  - Create in settings-v2/
+  - Create in settings/
   - Reference v1 FOR LOGIC ONLY
 
 ❌ FORBIDDEN:
@@ -225,13 +225,13 @@ Agent D: New Screens (batch 2)
 ### **Verification (Run After Each Screen):**
 ```bash
 # 1. Import audit
-grep -r "from '@/app/(authenticated)/settings/'" apps/frontend/app/\(authenticated\)/settings-v2/
+grep -r "from '@/app/(authenticated)/settings/'" apps/frontend/app/\(authenticated\)/settings/
 
 # 2. TypeScript check
 cd apps/frontend && npx tsc --noEmit
 
 # 3. Isolation check
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 ```
 
 ---
@@ -279,7 +279,7 @@ handoff_file: docs/2-MANAGEMENT/epics/current/01-settings/agent-handoffs/01-CRIT
 instruction: |
   Read the handoff file completely.
   Follow all requirements exactly.
-  Build in settings-v2/ directory only.
+  Build in settings/ directory only.
   Do not import from v1 code.
   Verify isolation after completion.
 ```
@@ -297,7 +297,7 @@ cat docs/2-MANAGEMENT/epics/current/01-settings/agent-handoffs/01-CRITICAL-locat
 "Build Locations tree view according to handoff file 01-CRITICAL-locations-tree-rewrite.yaml"
 
 # 4. Verify
-bash scripts/check-settings-v2-isolation.sh
+bash scripts/check-settings-isolation.sh
 ```
 
 ---

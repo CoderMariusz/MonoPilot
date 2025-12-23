@@ -40,10 +40,9 @@ compliance:
   - FR-SET-072: Multi-language support (EN/PL/DE/FR)
 
 migration_plan:
-  - docs/2-MANAGEMENT/EPIC-01-MIGRATION-PLAN.md (section 2.8)
 
 reference_code:
-  old_v1: apps/frontend/app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/allergens/page.tsx
+  old_v1: apps/frontend/app/(authenticated)/settings/allergens/page.tsx
   warning: "DO NOT USE - it's read-only, v2 needs CRUD"
   why_wrong: |
     V1: <AllergenReadOnlyBanner /> + read-only table
@@ -102,17 +101,17 @@ architecture:
 
 output:
   pages:
-    - apps/frontend/app/(authenticated)/settings-v2/allergens/page.tsx
+    - apps/frontend/app/(authenticated)/settings/allergens/page.tsx
 
   components:
-    - components/settings-v2/allergens/AllergenManagementView.tsx     # Main view
-    - components/settings-v2/allergens/AllergensDataTable.tsx         # Table with actions
-    - components/settings-v2/allergens/LanguageSelector.tsx           # EN/PL/DE/FR dropdown
-    - components/settings-v2/allergens/CustomAllergenModal.tsx        # Create/edit C01...
-    - components/settings-v2/allergens/EditEU14AllergenModal.tsx      # Edit icon/desc only
-    - components/settings-v2/allergens/AllergenTypeBadge.tsx          # EU14 (blue/locked) vs Custom (green)
-    - components/settings-v2/allergens/AllergenIcon.tsx               # Emoji display
-    - components/settings-v2/allergens/ProductsUsingAllergenModal.tsx # View products list
+    - components/settings/allergens/AllergenManagementView.tsx     # Main view
+    - components/settings/allergens/AllergensDataTable.tsx         # Table with actions
+    - components/settings/allergens/LanguageSelector.tsx           # EN/PL/DE/FR dropdown
+    - components/settings/allergens/CustomAllergenModal.tsx        # Create/edit C01...
+    - components/settings/allergens/EditEU14AllergenModal.tsx      # Edit icon/desc only
+    - components/settings/allergens/AllergenTypeBadge.tsx          # EU14 (blue/locked) vs Custom (green)
+    - components/settings/allergens/AllergenIcon.tsx               # Emoji display
+    - components/settings/allergens/ProductsUsingAllergenModal.tsx # View products list
 
 # ============================================
 # REQUIREMENTS
@@ -238,10 +237,10 @@ reusable:
         - Custom: code auto-generated
 
   shared_components:
-    - settings-v2/shared/ActionsMenu.tsx
-    - settings-v2/shared/StatusBadge.tsx
-    - settings-v2/shared/EmptyState.tsx
-    - settings-v2/shared/ErrorState.tsx
+    - settings/shared/ActionsMenu.tsx
+    - settings/shared/StatusBadge.tsx
+    - settings/shared/EmptyState.tsx
+    - settings/shared/ErrorState.tsx
 
 # ============================================
 # ISOLATION RULES
@@ -252,7 +251,7 @@ isolation:
     - Read: SET-020 wireframe
     - Use: lib/services/allergen-service.ts (update methods)
     - Use: lib/validation/allergen-schemas.ts (UPDATE for custom + multi-lang)
-    - Create in: settings-v2/allergens/
+    - Create in: settings/allergens/
 
   forbidden:
     - Import from: app/(authenticated)/settings/allergens/* (v1 read-only code)
@@ -260,7 +259,7 @@ isolation:
     - Use: AllergenReadOnlyBanner (DELETE this concept!)
 
   verification:
-    - grep -r "AllergenReadOnlyBanner" components/settings-v2/allergens/
+    - grep -r "AllergenReadOnlyBanner" components/settings/allergens/
     - Expected: ZERO results (should not exist in v2)
 
 # ============================================
