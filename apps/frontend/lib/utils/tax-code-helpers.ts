@@ -117,7 +117,7 @@ export function getRateBadgeColor(rate: number): RateBadgeColor {
  * @returns Formatted string with 2 decimal places (e.g., "23.00%")
  */
 export function formatRate(rate: number): string {
-  return \`\${rate.toFixed(2)}%\`
+  return `${rate.toFixed(2)}%`
 }
 
 /**

@@ -1,0 +1,205 @@
+
+> monopilot@0.1.0 lint C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\apps\frontend
+> next lint
+
+`next lint` is deprecated and will be removed in Next.js 16.
+For new projects, use create-next-app to choose your preferred linter.
+For existing projects, migrate to the ESLint CLI:
+npx @next/codemod@canary next-lint-to-eslint-cli .
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\pnpm-lock.yaml as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\apps\frontend\package-lock.json
+
+
+./app/(authenticated)/scanner/reserve/page.tsx
+210:6  Warning: React Hook useEffect has a missing dependency: 'syncOfflineQueue'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/settings/modules/page.tsx
+70:6  Warning: React Hook useEffect has a missing dependency: 'fetchModuleStatuses'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/settings/product-types/page.tsx
+94:6  Warning: React Hook useEffect has a missing dependency: 'fetchTypes'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/settings/production-lines/page.tsx
+179:6  Warning: React Hook useEffect has a missing dependency: 'fetchLines'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+188:6  Warning: React Hook useEffect has a missing dependency: 'fetchLines'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/settings/users/page.tsx
+91:6  Warning: React Hook useEffect has a missing dependency: 'fetchUsers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+100:6  Warning: React Hook useEffect has a missing dependency: 'fetchUsers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/settings/users/[id]/sessions/page.tsx
+89:6  Warning: React Hook useEffect has a missing dependency: 'fetchSessions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/technical/boms/page.tsx
+103:6  Warning: React Hook useEffect has a missing dependency: 'fetchBOMs'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+112:6  Warning: React Hook useEffect has a missing dependency: 'fetchBOMs'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/technical/boms/[id]/page.tsx
+138:6  Warning: React Hook useEffect has missing dependencies: 'fetchAllergens', 'fetchBOM', and 'fetchItems'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/technical/products/allergens/page.tsx
+145:6  Warning: React Hook useEffect has a missing dependency: 'fetchMatrix'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/technical/products/page.tsx
+160:6  Warning: React Hook useEffect has a missing dependency: 'fetchProducts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/technical/products/[id]/page.tsx
+216:6  Warning: React Hook useEffect has missing dependencies: 'fetchAllergens', 'fetchBOMs', 'fetchHistory', and 'fetchProduct'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/technical/routings/page.tsx
+76:6  Warning: React Hook useEffect has a missing dependency: 'fetchRoutings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+85:6  Warning: React Hook useEffect has a missing dependency: 'fetchRoutings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/technical/routings/[id]/page.tsx
+58:6  Warning: React Hook useEffect has a missing dependency: 'fetchRouting'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/modules/page.tsx
+70:6  Warning: React Hook useEffect has a missing dependency: 'fetchModuleStatuses'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/product-types/page.tsx
+94:6  Warning: React Hook useEffect has a missing dependency: 'fetchTypes'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/production-lines/page.tsx
+179:6  Warning: React Hook useEffect has a missing dependency: 'fetchLines'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+188:6  Warning: React Hook useEffect has a missing dependency: 'fetchLines'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/users/page.tsx
+91:6  Warning: React Hook useEffect has a missing dependency: 'fetchUsers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+100:6  Warning: React Hook useEffect has a missing dependency: 'fetchUsers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(authenticated)/_archive-settings-v1-DO-NOT-TOUCH/users/[id]/sessions/page.tsx
+89:6  Warning: React Hook useEffect has a missing dependency: 'fetchSessions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/POFastFlow/ReviewModal.tsx
+166:6  Warning: React Hook useEffect has missing dependencies: 'selectedWarehouse' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/POLineFormModal.tsx
+108:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/POLinesTable.tsx
+104:6  Warning: React Hook useEffect has a missing dependency: 'fetchLines'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/PurchaseOrderFormModal.tsx
+118:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+149:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/PurchaseOrdersTable.tsx
+140:6  Warning: React Hook useEffect has a missing dependency: 'fetchPurchaseOrders'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/SupplierFormModal.tsx
+125:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/SuppliersTable.tsx
+115:6  Warning: React Hook useEffect has a missing dependency: 'fetchSuppliers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+124:6  Warning: React Hook useEffect has a missing dependency: 'fetchSuppliers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/TOLineFormModal.tsx
+111:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/TOLinesTable.tsx
+98:6  Warning: React Hook useEffect has a missing dependency: 'fetchLines'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/TransferOrderFormModal.tsx
+108:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+125:6  Warning: React Hook useEffect has a missing dependency: 'formData.planned_receive_date'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/TransferOrdersTable.tsx
+117:6  Warning: React Hook useEffect has a missing dependency: 'fetchTransferOrders'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/WorkOrderFormModal.tsx
+140:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+190:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/WorkOrdersSpreadsheet.tsx
+263:6  Warning: React Hook useEffect has a missing dependency: 'handleSave'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/planning/WorkOrdersTable.tsx
+122:6  Warning: React Hook useEffect has a missing dependency: 'fetchWorkOrders'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+131:6  Warning: React Hook useEffect has a missing dependency: 'fetchWorkOrders'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/production/ByProductRegistrationDialog.tsx
+83:6  Warning: React Hook useEffect has a missing dependency: 'fetchByProducts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+120:6  Warning: React Hook useEffect has a missing dependency: 'qty'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/production/WOCompleteModal.tsx
+60:6  Warning: React Hook useEffect has a missing dependency: 'fetchPreview'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/production/WOOperationsPanel.tsx
+59:6  Warning: React Hook useEffect has a missing dependency: 'fetchOperations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/settings/InvitationModal.tsx
+152:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/settings/InvitationsTab.tsx
+92:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+101:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/settings/InvitationsTable.tsx
+100:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+109:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/settings/InvitationSuccessModal.tsx
+127:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/settings/LocationDetailModal.tsx
+301:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/settings/ProductionLineFormModal.tsx
+63:6  Warning: React Hook useEffect has a missing dependency: 'fetchWarehouses'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+73:6  Warning: React Hook useEffect has a missing dependency: 'fetchLocations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/settings/WarehouseFormModal.tsx
+58:6  Warning: React Hook useEffect has a missing dependency: 'fetchLocations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/technical/BOMCompareModal.tsx
+134:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/technical/BOMFormModal.tsx
+143:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+153:6  Warning: React Hook useEffect has a missing dependency: 'formData.output_uom'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/technical/BOMItemFormModal.tsx
+103:6  Warning: React Hook useEffect has a missing dependency: 'toast'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+113:6  Warning: React Hook useEffect has a missing dependency: 'formData.uom'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/technical/routings/operations-table.tsx
+64:6  Warning: React Hook useEffect has a missing dependency: 'fetchOperations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/_archive-settings-v1-DO-NOT-TOUCH/InvitationModal.tsx
+152:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/_archive-settings-v1-DO-NOT-TOUCH/InvitationsTab.tsx
+92:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+101:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/_archive-settings-v1-DO-NOT-TOUCH/InvitationsTable.tsx
+100:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+109:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvitations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/_archive-settings-v1-DO-NOT-TOUCH/InvitationSuccessModal.tsx
+127:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/_archive-settings-v1-DO-NOT-TOUCH/LocationDetailModal.tsx
+301:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/_archive-settings-v1-DO-NOT-TOUCH/ProductionLineFormModal.tsx
+63:6  Warning: React Hook useEffect has a missing dependency: 'fetchWarehouses'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+73:6  Warning: React Hook useEffect has a missing dependency: 'fetchLocations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/_archive-settings-v1-DO-NOT-TOUCH/WarehouseFormModal.tsx
+58:6  Warning: React Hook useEffect has a missing dependency: 'fetchLocations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./lib/services/module-settings-service.ts
+239:7  Error: Do not assign to the variable `module`. See: https://nextjs.org/docs/messages/no-assign-module-variable  @next/next/no-assign-module-variable
+292:7  Error: Do not assign to the variable `module`. See: https://nextjs.org/docs/messages/no-assign-module-variable  @next/next/no-assign-module-variable
+
+./lib/services/__tests__/allergen-service.test.ts
+Error: Parsing error: '}' expected.
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+ ELIFECYCLE  Command failed with exit code 1.

@@ -87,7 +87,6 @@ export async function POST(request: NextRequest) {
 
     // Handle database errors
     if (error) {
-      console.error('Failed to update organization:', error)
       return NextResponse.json(
         { error: 'Failed to update organization' },
         { status: 500 }
@@ -116,7 +115,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle malformed JSON or other errors
-    console.error('Error in POST /api/v1/settings/onboarding/step/1:', error)
     return NextResponse.json(
       { error: 'Bad request' },
       { status: 400 }
