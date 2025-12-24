@@ -451,7 +451,9 @@ export class ProductAllergenService {
       .eq('source', 'auto')
 
     if (validAllergenIds.length > 0) {
-      deleteQuery = deleteQuery.not('allergen_id', 'in', `(${validAllergenIds.join(',')})`)
+      // SECURITY FIX (CRIT-1): Pass array directly to Supabase (parameterized query)
+      // Before: String interpolation allowed SQL injection
+      deleteQuery = deleteQuery.not('allergen_id', 'in', validAllergenIds)
     }
 
     const { data: removed } = await deleteQuery.select('id')
