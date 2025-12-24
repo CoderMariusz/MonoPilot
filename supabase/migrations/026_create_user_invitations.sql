@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.user_invitations (
   org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   role TEXT NOT NULL, -- Role code string (e.g., 'admin', 'production_operator')
-  token TEXT UNIQUE NOT NULL, -- JWT token (variable length)
+  token TEXT UNIQUE NOT NULL, -- Secure random token (64 hex chars)
   expires_at TIMESTAMPTZ NOT NULL,
   invited_by UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
   status TEXT NOT NULL DEFAULT 'pending',
@@ -94,8 +94,8 @@ CREATE TRIGGER user_invitations_updated_at
   EXECUTE FUNCTION update_user_invitations_updated_at();
 
 -- Comments
-COMMENT ON TABLE public.user_invitations IS 'User invitation records with JWT tokens for email-based user onboarding';
-COMMENT ON COLUMN public.user_invitations.token IS 'JWT token containing email, role, org_id (7-day expiry)';
+COMMENT ON TABLE public.user_invitations IS 'User invitation records with secure random tokens for email-based user onboarding';
+COMMENT ON COLUMN public.user_invitations.token IS 'Cryptographically secure 64-char hex token (256-bit entropy)';
 COMMENT ON COLUMN public.user_invitations.role IS 'Role code string to assign to user upon acceptance';
 COMMENT ON COLUMN public.user_invitations.status IS 'Invitation status: pending, accepted, expired, cancelled';
 COMMENT ON COLUMN public.user_invitations.expires_at IS 'Invitation expiry timestamp (7 days from creation)';

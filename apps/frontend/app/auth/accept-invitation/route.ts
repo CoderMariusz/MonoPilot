@@ -22,14 +22,16 @@ export async function POST(request: NextRequest) {
       validatedData.password
     )
 
-    // 3. Return success with user data and access token for auto-login
+    // 3. Return success with user data
+    // SECURITY: No auto-login - user must verify email first
     return NextResponse.json(
       {
         user_id: result.user_id,
-        access_token: result.access_token,
         org_name: result.org_name,
+        message: 'Account created successfully. Please check your email to verify your account before logging in.',
+        requires_email_verification: true,
       },
-      { status: 200 }
+      { status: 201 } // 201 Created
     )
   } catch (error) {
     console.error('POST /api/auth/accept-invitation error:', error)
