@@ -1,0 +1,136 @@
+---
+qa_validation_result:
+  story: "TD-202, TD-203"
+  component: "Users Management Page"
+  decision: "FAIL"
+
+test_summary:
+  total_ac: 8
+  passing: 0
+  failing: 8
+  pass_rate: 0%
+
+blocking_bugs:
+  - id: "BUG-202"
+    title: "Users Table Column Order Wrong"
+    severity: "MEDIUM"
+    location: "apps/frontend/app/(authenticated)/settings/users/page.tsx"
+    lines: "233-289"
+    fix_effort: "5 minutes"
+    fix_type: "Code change - swap column positions"
+    description: |
+      Table columns display in wrong order. Current: Email, Name, Role, Status, Last Login.
+      Expected: Name, Email, Role, Status, Last Login (per wireframe SET-008).
+
+  - id: "BUG-203"
+    title: "Missing Inline Resend Invite Link"
+    severity: "MEDIUM"
+    location: "apps/frontend/app/(authenticated)/settings/users/page.tsx"
+    lines: "263-264"
+    fix_effort: "15 minutes"
+    fix_type: "Feature addition - add handler + UI"
+    description: |
+      Users table missing inline "Resend Invite" link for invited users.
+      Wireframe shows link directly in user row, but implementation hides it in separate tab.
+      Users must navigate to Invitations tab to resend invites.
+
+critical_bugs: []
+
+high_bugs: []
+
+quality_gates:
+  all_ac_pass: false
+  no_critical: true
+  no_high: true
+  no_regressions: true
+  edge_cases_tested: true
+
+requirements:
+  - required_fixes:
+      - "BUG-202: Swap Name/Email column positions in header and body"
+      - "BUG-203: Add resend handler and inline link for invited users"
+
+  - ac_failures:
+      - "AC-1: Column order (0/1 passing)"
+      - "AC-2: Inline resend link (0/1 passing)"
+      - "AC-3 through AC-8: Edge cases (0/6 passing)"
+
+  - before_retest:
+      - "Review BUG-202 detailed instructions"
+      - "Review BUG-203 detailed instructions"
+      - "Implement both fixes"
+      - "Run unit tests"
+      - "Run regression tests"
+      - "Request QA re-validation"
+
+qa_artifacts:
+  report: "docs/2-MANAGEMENT/qa/qa-report-story-TD-202-203.md"
+  bug_reports:
+    - "docs/2-MANAGEMENT/qa/bugs/BUG-202-TABLE-COLUMN-ORDER.md"
+    - "docs/2-MANAGEMENT/qa/bugs/BUG-203-MISSING-INLINE-RESEND-LINK.md"
+  summary: "QA-SUMMARY-TD-202-203.md"
+
+wireframe_reference:
+  spec: "SET-008: User List"
+  location: "docs/3-ARCHITECTURE/ux/wireframes/SET-008-user-list.md"
+  requirements:
+    - line: 22
+      description: "Column order: Name, Email, Role, Status, Last Login"
+    - line: 31
+      description: "Invited user row: Invited X days ago • [Resend Invite]"
+
+test_coverage:
+  acceptance_criteria: 8
+  edge_cases: 5
+  regression_tests: 6
+
+evidence:
+  column_order_comparison:
+    current: "Email, Name, Role, Status, Last Login"
+    expected: "Name, Email, Role, Status, Last Login"
+    status: "FAIL"
+
+  resend_link_comparison:
+    current: "Hidden in InvitationsTable (separate tab)"
+    expected: "Visible in Users table status cell"
+    status: "FAIL"
+
+regressions_found: 0
+
+notes:
+  - "No CRITICAL or HIGH severity issues"
+  - "Both issues are UX/polish level (MEDIUM)"
+  - "Workarounds exist (InvitationsTable has resend feature)"
+  - "No API, database, or dependency changes needed"
+  - "Estimated fix time: 20 minutes total"
+  - "InvitationsTable has reference implementation for resend feature"
+
+qa_agent: "Claude Code QA-AGENT"
+qa_date: "2025-12-24"
+qa_commit: "a7d60b9"
+
+status_for_orchestrator:
+  decision: "FAIL"
+  reason: "2 medium bugs found, 0/8 AC passing"
+  action: "Return to development team for bug fixes"
+  can_merge: false
+  can_deploy: false
+
+status_for_dev:
+  action_items:
+    1: "Read BUG-202 report (5 min fix)"
+    2: "Read BUG-203 report (15 min fix)"
+    3: "Implement both fixes (20 min)"
+    4: "Test changes (20 min)"
+    5: "Request QA re-validation"
+
+  estimated_time: "1 hour total"
+
+  next_steps: "Request QA re-test after implementation"
+
+---
+# DO NOT MODIFY BELOW THIS LINE - Auto-generated
+
+generated_at: 2025-12-24
+generated_by: QA-AGENT (Claude Code)
+generated_from: qa-report-story-TD-202-203.md
