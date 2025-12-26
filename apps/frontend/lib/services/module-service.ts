@@ -17,7 +17,7 @@ export interface ModuleServiceResult {
 
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
@@ -51,7 +51,8 @@ export async function getEnabledModules(): Promise<ModuleServiceResult> {
       .single()
 
     if (error || !data) {
-      return { success: false, error: 'Failed to fetch modules' }
+      console.error('Error fetching modules:', error)
+      return { success: false, error: `Failed to fetch modules: ${error?.message || 'No data found'}` }
     }
 
     // Return modules with full config
@@ -62,8 +63,9 @@ export async function getEnabledModules(): Promise<ModuleServiceResult> {
     }))
 
     return { success: true, data: { modules, enabledCodes } }
-  } catch (error) {
-    return { success: false, error: 'Unknown error' }
+  } catch (error: any) {
+    console.error('Unexpected error in getEnabledModules:', error)
+    return { success: false, error: `Unknown error: ${error?.message}` }
   }
 }
 
@@ -85,14 +87,15 @@ export async function toggleModule(
     }
 
     // Get current modules
-    const { data: org } = await supabaseAdmin
+    const { data: org, error: fetchError } = await supabaseAdmin
       .from('organizations')
       .select('modules_enabled')
       .eq('id', orgId)
       .single()
 
-    if (!org) {
-      return { success: false, error: 'Organization not found' }
+    if (fetchError || !org) {
+      console.error('Error fetching org for toggle:', fetchError)
+      return { success: false, error: `Organization not found: ${fetchError?.message}` }
     }
 
     let newModules = [...(org.modules_enabled || [])]
@@ -119,14 +122,16 @@ export async function toggleModule(
       .eq('id', orgId)
 
     if (updateError) {
+      console.error('Error updating modules:', updateError)
       return { success: false, error: updateError.message }
     }
 
     // TODO Epic 2-8: Query affected entities count
     // For now, return 0
     return { success: true, data: { modules: newModules }, affectedCount: 0 }
-  } catch (error) {
-    return { success: false, error: 'Unknown error' }
+  } catch (error: any) {
+    console.error('Unexpected error in toggleModule:', error)
+    return { success: false, error: `Unknown error: ${error?.message}` }
   }
 }
 

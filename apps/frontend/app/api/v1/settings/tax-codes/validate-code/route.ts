@@ -44,10 +44,12 @@ export async function GET(request: NextRequest) {
     }
 
     const orgId = userData.org_id
-    const roleCode = (userData.role as any)?.code
+    // Role can be object or array depending on Supabase query
+    const roleData = userData.role as any
+    const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
 
-    // Check permissions (ADMIN or SUPER_ADMIN only)
-    if (!['ADMIN', 'SUPER_ADMIN'].includes(roleCode)) {
+    // Check permissions - use lowercase role codes as stored in DB
+    if (!['owner', 'admin'].includes(userRole || '')) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
     }
 

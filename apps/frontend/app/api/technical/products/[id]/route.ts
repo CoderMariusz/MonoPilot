@@ -249,8 +249,18 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       )
     }
 
-    // TODO: Check if product is referenced in active BOMs or WOs
-    // For now, we'll allow deletion
+    // MAJOR-001 FIX: Check if product is referenced in active BOMs
+    const { count: bomCount } = await supabase
+      .from('bom_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', id)
+
+    if (bomCount && bomCount > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete product: referenced by ${bomCount} BOM item(s)` },
+        { status: 400 }
+      )
+    }
 
     // Soft delete (set deleted_at)
     const { error } = await supabase

@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { UserPlus, Search, Edit, Trash2 } from 'lucide-react'
+import { UserPlus, Search, Edit, Trash2, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { User } from '@/lib/validation/user-schemas'
 import { getRoleLabel, getStatusLabel } from '@/lib/validation/user-schemas'
@@ -53,6 +53,7 @@ export default function UsersPage() {
     token: string
     expiresAt: string
   } | null>(null)
+  const [resendingUserId, setResendingUserId] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Fetch users
@@ -139,6 +140,37 @@ export default function UsersPage() {
         description: error instanceof Error ? error.message : 'Failed to deactivate user',
         variant: 'destructive',
       })
+    }
+  }
+
+  // Resend invitation handler (BUG-203)
+  const handleResend = async (user: User) => {
+    try {
+      setResendingUserId(user.id)
+      const response = await fetch(`/api/v1/settings/users/invitations/${user.id}/resend`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to resend invitation')
+      }
+
+      toast({
+        title: 'Success',
+        description: `Invitation resent to ${user.email}`,
+      })
+
+      fetchUsers() // Refresh list
+    } catch (error) {
+      console.error('Error resending invitation:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to resend invitation',
+        variant: 'destructive',
+      })
+    } finally {
+      setResendingUserId(null)
     }
   }
 
@@ -231,8 +263,8 @@ export default function UsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Login</TableHead>
@@ -255,12 +287,31 @@ export default function UsersPage() {
                 ) : (
                   users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.email}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium">
                         {user.first_name} {user.last_name}
                       </TableCell>
+                      <TableCell>{user.email}</TableCell>
                       <TableCell>{getRoleLabel(user.role)}</TableCell>
-                      <TableCell>{getStatusBadge(user.status)}</TableCell>
+                      <TableCell>
+                        {user.status === 'invited' ? (
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(user.status)}
+                            <button
+                              onClick={() => handleResend(user)}
+                              disabled={resendingUserId === user.id}
+                              className="text-blue-600 hover:underline text-sm disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                              title="Resend invitation email"
+                            >
+                              {resendingUserId === user.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : null}
+                              Resend
+                            </button>
+                          </div>
+                        ) : (
+                          getStatusBadge(user.status)
+                        )}
+                      </TableCell>
                       <TableCell>
                         {user.last_login_at
                           ? new Date(user.last_login_at).toLocaleDateString()

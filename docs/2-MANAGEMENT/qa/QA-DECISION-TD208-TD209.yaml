@@ -1,0 +1,181 @@
+story: "TD-208, TD-209"
+decision: FAIL
+reason: "BLOCKED - Implementation phase not started (design complete only)"
+qa_report: "docs/2-MANAGEMENT/qa/qa-report-story-td208-td209.md"
+blocking_issues:
+  - "BUG-BLOCKED-TD208-TD209: 6 critical blockers"
+
+test_status:
+  ac_tested: 0
+  ac_passed: 0
+  ac_failed: 15
+  ac_total: 15
+  coverage: "0% - implementation missing"
+
+implementation_status:
+  database: "10% (schemas only, migrations exist but not applied)"
+  services: "0% (no files created)"
+  api_routes: "0% (0 of 6 routes implemented)"
+  components: "10% (AllergensDataTable shell exists, LanguageSelector missing)"
+  tests: "0% (placeholder files only, no executable tests)"
+
+blockers:
+  - id: "CRITICAL-1"
+    title: "LanguageSelector Component Missing"
+    severity: "CRITICAL"
+    impact: "Cannot test language preference feature"
+    fix_estimate_hours: 2
+
+  - id: "CRITICAL-2"
+    title: "API Routes Not Implemented"
+    severity: "CRITICAL"
+    impact: "Frontend cannot call backend"
+    routes_missing: 6
+    fix_estimate_hours: 3
+
+  - id: "CRITICAL-3"
+    title: "Service Layer Missing"
+    severity: "CRITICAL"
+    impact: "No business logic layer"
+    files_missing: 2
+    fix_estimate_hours: 2
+
+  - id: "CRITICAL-4"
+    title: "React Hooks Missing"
+    severity: "HIGH"
+    impact: "Components cannot manage state"
+    files_missing: 2
+    fix_estimate_hours: 2
+
+  - id: "CRITICAL-5"
+    title: "AllergensDataTable Missing Products Column"
+    severity: "CRITICAL"
+    impact: "TD-209 feature not visible"
+    lines_of_code: 50
+    fix_estimate_hours: 1
+
+  - id: "CRITICAL-6"
+    title: "Test Files Are Placeholders"
+    severity: "HIGH"
+    impact: "No executable tests exist"
+    placeholder_tests: 30
+    fix_estimate_hours: 4
+
+required_fixes:
+  phase_1_services:
+    - "Create user-preference-service.ts (3 methods)"
+    - "Create user-preference-schemas.ts (Zod schemas)"
+    - "Update allergen-service.ts (3 count methods)"
+    - "Estimate: 2-3 hours"
+
+  phase_2_api_routes:
+    - "Create GET /api/v1/settings/users/me/preferences"
+    - "Create PUT /api/v1/settings/users/me/preferences"
+    - "Create GET /api/v1/settings/languages"
+    - "Create GET /api/v1/settings/allergens/counts"
+    - "Create GET /api/v1/settings/allergens/{id}/count"
+    - "Create GET /api/v1/settings/allergens/{id}/products"
+    - "Estimate: 3-4 hours"
+
+  phase_3_components:
+    - "Create LanguageSelector.tsx component"
+    - "Create use-language-preference.ts hook"
+    - "Create use-allergen-counts.ts hook"
+    - "Update AllergensDataTable.tsx (add Products column)"
+    - "Estimate: 2-3 hours"
+
+  phase_4_tests:
+    - "Replace AllergensDataTable.test.tsx placeholders (30 tests)"
+    - "Create user-preference-service.test.ts (20 tests)"
+    - "Create API route tests (18 tests)"
+    - "Estimate: 4-5 hours"
+
+regression_status:
+  story_01_12_allergens: "NOT BROKEN (implementation doesn't touch existing feature)"
+  affected_areas: "None"
+
+manual_testing_status:
+  navigate_to_allergens_page: "PASS (01.12 works)"
+  display_14_allergens: "PASS"
+  allergen_search: "PASS"
+  language_selector: "FAIL - component missing"
+  change_language: "FAIL - no UI"
+  persist_language: "FAIL - no component"
+  display_product_counts: "FAIL - no column"
+  click_product_count: "FAIL - no handler"
+  navigate_to_products: "FAIL - no link"
+
+database_status:
+  migration_031_exists: true
+  migration_032_exists: true
+  migration_031_applied: false
+  migration_032_applied: false
+  rpc_functions_created: false
+  product_allergens_table_exists: false
+  notes: "Migrations exist but not yet applied to cloud database. npx supabase db push required."
+
+decision_logic:
+  rule_1: "ALL ACs must pass to PASS story"
+  rule_2: "NO CRITICAL bugs to PASS story"
+  rule_3: "Implementation must be complete to PASS story"
+  result: "Rule 1 VIOLATED (0/15 ACs testable)"
+  result: "Rule 2 VIOLATED (6 CRITICAL blockers)"
+  result: "Rule 3 VIOLATED (10% implementation only)"
+
+handoff_to_dev:
+  team: "BACKEND-DEV, FRONTEND-DEV"
+  phase: "Implementation"
+  priority: "High"
+  estimated_effort_hours: 12-17
+  timeline_estimate:
+    phase_1_services: "2-3 hours"
+    phase_2_api_routes: "3-4 hours"
+    phase_3_components: "2-3 hours"
+    phase_4_tests: "4-5 hours"
+    total: "12-17 hours"
+  start_from: "Phase 1: Service Layer"
+  detailed_guide: "docs/2-MANAGEMENT/qa/bugs/BUG-BLOCKED-TD208-TD209.md"
+
+qa_approval_conditions:
+  - "All 6 CRITICAL blockers resolved"
+  - "All 15 ACs implemented and testable"
+  - "All 66+ tests replaced with real assertions"
+  - "80%+ code coverage achieved"
+  - "Manual testing of all ACs passes"
+  - "No regression in 01.12 features"
+  - "Code review approved"
+
+qa_retest_schedule:
+  first_check: "After Phase 1 (service layer) complete"
+  second_check: "After Phase 2 (API routes) complete"
+  third_check: "After Phase 3 (components) complete"
+  final_check: "After Phase 4 (tests) complete"
+
+evidence_locations:
+  qa_report: "docs/2-MANAGEMENT/qa/qa-report-story-td208-td209.md"
+  blocking_issues: "docs/2-MANAGEMENT/qa/bugs/BUG-BLOCKED-TD208-TD209.md"
+  architecture_contracts:
+    td208_api: "docs/3-ARCHITECTURE/api/settings/user-preferences.md"
+    td209_api: "docs/3-ARCHITECTURE/api/settings/allergen-counts.md"
+  migrations:
+    user_language_pref: "supabase/migrations/031_add_user_language_preference.sql"
+    product_allergens: "supabase/migrations/032_create_product_allergens_table.sql"
+  existing_implementation:
+    allergen_component: "apps/frontend/components/settings/allergens/AllergensDataTable.tsx"
+    allergen_service: "apps/frontend/lib/services/allergen-service.ts"
+    product_allergen_service: "apps/frontend/lib/services/product-allergen-service.ts"
+    allergens_page: "apps/frontend/app/(authenticated)/settings/allergens/page.tsx"
+
+notes:
+  - "Database schemas are complete and well-designed (migrations 031, 032)"
+  - "RPC functions exist and can be tested directly in database"
+  - "API contracts documented in architecture folder"
+  - "AllergensDataTable component from story 01.12 is stable and not broken"
+  - "All 66+ tests mentioned in brief are placeholder files - not executable"
+  - "Implementation can start immediately with clear design direction"
+  - "Estimated 12-17 hours total effort for complete implementation"
+  - "No external dependencies blocking implementation"
+
+qa_agent: "QA-AGENT"
+qa_report_date: "2025-12-24"
+qa_report_time: "13:30:00 UTC"

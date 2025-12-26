@@ -55,6 +55,7 @@
     "next": "^15.1.4",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
+    "react-day-picker": "^8.10.1",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.66.1",
     "reactflow": "^11.11.4",

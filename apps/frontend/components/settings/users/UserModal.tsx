@@ -1,14 +1,15 @@
 /**
  * User Modal Component
  * Story: 01.5a - User Management CRUD (MVP)
+ * Story: 01.5b - User Warehouse Access Restrictions (TD-103)
  *
  * Create/Edit user modal with form validation
- * MVP: Warehouse access field HIDDEN (Story 01.5b)
+ * Includes: Warehouse access multi-select (Story 01.5b)
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,10 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { User } from '@/lib/types/user'
 import { CreateUserSchema, UpdateUserSchema } from '@/lib/validation/user-schemas'
 import { ZodError } from 'zod'
 import { useRoles } from '@/lib/hooks/use-roles'
+import { WarehouseMultiSelect, type Warehouse } from './WarehouseMultiSelect'
 
 interface UserModalProps {
   mode: 'create' | 'edit'
@@ -46,6 +49,8 @@ interface FormData {
   last_name: string
   role_id: string
   language: string
+  warehouse_ids: string[]
+  all_warehouses: boolean
 }
 
 const LANGUAGE_OPTIONS = [
@@ -62,12 +67,66 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
     last_name: user?.last_name || '',
     role_id: user?.role_id || '',
     language: user?.language || 'en',
+    warehouse_ids: user?.warehouse_access_ids || [],
+    all_warehouses: !user?.warehouse_access_ids || user.warehouse_access_ids.length === 0,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const { data: roles, isLoading: rolesLoading } = useRoles()
 
+  // Warehouse state (Story 01.5b)
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [warehousesLoading, setWarehousesLoading] = useState(false)
+  const [warehousesError, setWarehousesError] = useState<string | null>(null)
+
   const isEditMode = mode === 'edit'
+
+  // Fetch warehouses for multi-select (Story 01.5b)
+  const fetchWarehouses = useCallback(async () => {
+    setWarehousesLoading(true)
+    setWarehousesError(null)
+
+    try {
+      const response = await fetch('/api/settings/warehouses')
+      if (!response.ok) {
+        throw new Error('Failed to fetch warehouses')
+      }
+      const data = await response.json()
+      setWarehouses(data.warehouses || [])
+    } catch (error) {
+      console.error('Error fetching warehouses:', error)
+      setWarehousesError(
+        error instanceof Error ? error.message : 'Failed to load warehouses'
+      )
+    } finally {
+      setWarehousesLoading(false)
+    }
+  }, [])
+
+  // Fetch user's warehouse access when editing (Story 01.5b)
+  const fetchWarehouseAccess = useCallback(async (userId: string) => {
+    try {
+      const response = await fetch(`/api/v1/settings/users/${userId}/warehouse-access`)
+      if (!response.ok) {
+        return
+      }
+      const data = await response.json()
+      setFormData(prev => ({
+        ...prev,
+        warehouse_ids: data.warehouse_ids || [],
+        all_warehouses: data.all_warehouses,
+      }))
+    } catch (error) {
+      console.error('Error fetching warehouse access:', error)
+    }
+  }, [])
+
+  // Load warehouses when modal opens
+  useEffect(() => {
+    if (open) {
+      fetchWarehouses()
+    }
+  }, [open, fetchWarehouses])
 
   // Reset form when user changes
   useEffect(() => {
@@ -78,7 +137,13 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
         last_name: user.last_name || '',
         role_id: user.role_id || '',
         language: user.language || 'en',
+        warehouse_ids: user.warehouse_access_ids || [],
+        all_warehouses: !user.warehouse_access_ids || user.warehouse_access_ids.length === 0,
       })
+      // Fetch current warehouse access in edit mode
+      if (mode === 'edit' && user.id) {
+        fetchWarehouseAccess(user.id)
+      }
     } else {
       setFormData({
         email: '',
@@ -86,13 +151,15 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
         last_name: '',
         role_id: '',
         language: 'en',
+        warehouse_ids: [],
+        all_warehouses: true,
       })
     }
     setErrors({})
-  }, [user, open])
+  }, [user, open, mode, fetchWarehouseAccess])
 
   // Handle input change
-  const handleChange = (field: keyof FormData, value: string) => {
+  const handleChange = (field: keyof FormData, value: string | string[] | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     // Clear error for this field
     if (errors[field]) {
@@ -104,12 +171,72 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
     }
   }
 
+  // Handle all warehouses checkbox change (Story 01.5b)
+  const handleAllWarehousesChange = (checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      all_warehouses: checked,
+      warehouse_ids: checked ? [] : prev.warehouse_ids,
+    }))
+    // Clear warehouse_ids error if switching to all warehouses
+    if (checked && errors.warehouse_ids) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors.warehouse_ids
+        return newErrors
+      })
+    }
+  }
+
+  // Handle warehouse selection change (Story 01.5b)
+  const handleWarehouseIdsChange = (newIds: string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      warehouse_ids: newIds,
+    }))
+    // Clear error when user selects warehouses
+    if (newIds.length > 0 && errors.warehouse_ids) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors.warehouse_ids
+        return newErrors
+      })
+    }
+  }
+
+  // Check if current role requires warehouse selection (Story 01.5b)
+  const isAdminRole = () => {
+    if (!formData.role_id || !roles) return false
+    const selectedRole = roles.find(r => r.id === formData.role_id)
+    return selectedRole?.code === 'admin' || selectedRole?.code === 'super_admin'
+  }
+
   // Validate form
   const validateForm = () => {
     try {
       const schema = isEditMode ? UpdateUserSchema : CreateUserSchema
 
-      schema.parse(formData)
+      // Validate base user fields
+      const baseFormData = {
+        email: formData.email,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        role_id: formData.role_id,
+        language: formData.language,
+      }
+
+      schema.parse(baseFormData)
+
+      // Additional warehouse validation (Story 01.5b)
+      // If not admin and not all_warehouses, must have at least one warehouse
+      if (!isAdminRole() && !formData.all_warehouses && formData.warehouse_ids.length === 0) {
+        setErrors(prev => ({
+          ...prev,
+          warehouse_ids: 'Please select at least one warehouse',
+        }))
+        return false
+      }
+
       setErrors({})
       return true
     } catch (error) {
@@ -179,6 +306,29 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
         }
 
         throw new Error(data.error || 'Failed to save user')
+      }
+
+      // Update warehouse access (Story 01.5b)
+      const userId = isEditMode ? user?.id : data.id
+      if (userId) {
+        const warehousePayload = {
+          all_warehouses: formData.all_warehouses,
+          warehouse_ids: formData.all_warehouses ? [] : formData.warehouse_ids,
+        }
+
+        const warehouseResponse = await fetch(
+          `/api/v1/settings/users/${userId}/warehouse-access`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(warehousePayload),
+          }
+        )
+
+        if (!warehouseResponse.ok) {
+          console.error('Failed to update warehouse access')
+          // Continue anyway - user was created/updated successfully
+        }
       }
 
       onSuccess(data)
@@ -341,7 +491,58 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
             </select>
           </div>
 
-          {/* MVP Note: Warehouse access field HIDDEN */}
+          {/* Warehouse Access field (Story 01.5b - TD-103) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="warehouse_access">
+                Warehouse Access {!isAdminRole() && <span className="text-destructive">*</span>}
+              </Label>
+              {isAdminRole() && (
+                <span className="text-xs text-muted-foreground">
+                  Admin roles have access to all warehouses
+                </span>
+              )}
+            </div>
+
+            {/* All Warehouses checkbox */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="all_warehouses"
+                checked={formData.all_warehouses}
+                onCheckedChange={handleAllWarehousesChange}
+                disabled={submitting}
+              />
+              <label
+                htmlFor="all_warehouses"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                All Warehouses
+              </label>
+            </div>
+
+            {/* Warehouse multi-select (only shown if not all warehouses) */}
+            {!formData.all_warehouses && (
+              <WarehouseMultiSelect
+                value={formData.warehouse_ids}
+                onChange={handleWarehouseIdsChange}
+                warehouses={warehouses}
+                isLoading={warehousesLoading}
+                error={warehousesError}
+                disabled={submitting}
+                aria-label="Select warehouses this user can access"
+              />
+            )}
+
+            {errors.warehouse_ids && (
+              <p className="text-sm text-destructive">{errors.warehouse_ids}</p>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              {formData.all_warehouses
+                ? 'User will have access to all current and future warehouses.'
+                : 'Select specific warehouses this user can access.'}
+            </p>
+          </div>
 
           <DialogFooter>
             <Button

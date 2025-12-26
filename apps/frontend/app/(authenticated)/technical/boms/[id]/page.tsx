@@ -97,7 +97,6 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
       const data = await response.json()
       setBOM(data.bom || data)
     } catch (error) {
-      console.error('Error fetching BOM:', error)
       toast({ title: 'Error', description: 'Failed to load BOM details', variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -114,7 +113,7 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
         setItems(result.data || [])
       }
     } catch (error) {
-      console.error('Error fetching items:', error)
+      // Silent fail - items section will show empty state
     }
   }
 
@@ -127,7 +126,7 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
         setAllergens(data.allergens || { contains: [], may_contain: [] })
       }
     } catch (error) {
-      console.error('Error fetching allergens:', error)
+      // Silent fail - allergens section will show empty state
     }
   }
 
@@ -146,7 +145,6 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
       toast({ title: 'Success', description: 'BOM deleted successfully' })
       router.push('/technical/boms')
     } catch (error) {
-      console.error('Error deleting BOM:', error)
       toast({ title: 'Error', description: 'Failed to delete BOM', variant: 'destructive' })
     }
   }
@@ -166,7 +164,6 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
       fetchItems()
       fetchAllergens()
     } catch (error) {
-      console.error('Error deleting item:', error)
       toast({ title: 'Error', description: 'Failed to delete item', variant: 'destructive' })
     }
   }
@@ -581,7 +578,7 @@ function BOMTimelineView({ productId, currentBomId }: { productId: string; curre
           setTimeline(data.boms || [])
         }
       } catch (error) {
-        console.error('Error fetching timeline:', error)
+        // Silent fail - timeline will show empty state
       } finally {
         setLoading(false)
       }

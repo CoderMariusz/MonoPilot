@@ -75,7 +75,7 @@ export function InvitationsTable() {
       if (searchTerm) params.append('search', searchTerm)
       if (statusFilter !== 'all') params.append('status', statusFilter)
 
-      const response = await fetch(`/api/settings/invitations?${params.toString()}`)
+      const response = await fetch(`/api/v1/settings/users/invitations?${params.toString()}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch invitations')
@@ -111,7 +111,7 @@ export function InvitationsTable() {
   // Resend invitation
   const handleResend = async (invitation: Invitation) => {
     try {
-      const response = await fetch(`/api/settings/invitations/${invitation.id}/resend`, {
+      const response = await fetch(`/api/v1/settings/users/invitations/${invitation.id}/resend`, {
         method: 'POST',
       })
 
@@ -141,7 +141,7 @@ export function InvitationsTable() {
     if (!selectedInvitation) return
 
     try {
-      const response = await fetch(`/api/settings/invitations/${selectedInvitation.id}`, {
+      const response = await fetch(`/api/v1/settings/users/invitations/${selectedInvitation.id}`, {
         method: 'DELETE',
       })
 

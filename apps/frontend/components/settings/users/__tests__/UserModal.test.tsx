@@ -1,7 +1,8 @@
 /**
- * Component Tests: UserModal (Story 01.5a)
+ * Component Tests: UserModal (Story 01.5a + 01.5b)
  * Story: 01.5a - User Management CRUD (MVP)
- * Phase: RED - All tests should FAIL (no implementation yet)
+ * Story: 01.5b - User Warehouse Access Restrictions (TD-103)
+ * Phase: GREEN - Tests with implementation
  *
  * Tests the UserModal component for:
  * - Create mode: displays empty form with all fields
@@ -10,7 +11,7 @@
  * - Email disabled in edit mode
  * - Role dropdown shows names (not codes)
  * - Language dropdown (pl, en, de, fr)
- * - Warehouse access field HIDDEN in MVP
+ * - Warehouse access field (Story 01.5b - TD-103)
  * - Submit/cancel actions
  * - Error handling (duplicate email, validation errors)
  *
@@ -36,7 +37,7 @@ const mockUser: User = {
   role_id: 'role-2', // Match mockRoles ID for Administrator
   role: {
     id: 'role-2',
-    code: 'ADMIN',
+    code: 'admin', // lowercase to match isAdminRole check
     name: 'Administrator'
   },
   language: 'en',
@@ -51,16 +52,24 @@ const mockUser: User = {
  * Mock roles for dropdown
  */
 const mockRoles = [
-  { id: 'role-1', code: 'SUPER_ADMIN', name: 'Super Administrator' },
-  { id: 'role-2', code: 'ADMIN', name: 'Administrator' },
-  { id: 'role-3', code: 'PROD_MANAGER', name: 'Production Manager' },
-  { id: 'role-4', code: 'PROD_OPERATOR', name: 'Production Operator' },
-  { id: 'role-5', code: 'WAREHOUSE_MANAGER', name: 'Warehouse Manager' },
-  { id: 'role-6', code: 'WAREHOUSE_OPERATOR', name: 'Warehouse Operator' },
-  { id: 'role-7', code: 'QUALITY_MANAGER', name: 'Quality Manager' },
-  { id: 'role-8', code: 'QUALITY_INSPECTOR', name: 'Quality Inspector' },
-  { id: 'role-9', code: 'PLANNER', name: 'Planner' },
-  { id: 'role-10', code: 'VIEWER', name: 'Viewer' },
+  { id: 'role-1', code: 'super_admin', name: 'Super Administrator' },
+  { id: 'role-2', code: 'admin', name: 'Administrator' },
+  { id: 'role-3', code: 'production_manager', name: 'Production Manager' },
+  { id: 'role-4', code: 'production_operator', name: 'Production Operator' },
+  { id: 'role-5', code: 'warehouse_manager', name: 'Warehouse Manager' },
+  { id: 'role-6', code: 'warehouse_operator', name: 'Warehouse Operator' },
+  { id: 'role-7', code: 'quality_manager', name: 'Quality Manager' },
+  { id: 'role-8', code: 'quality_inspector', name: 'Quality Inspector' },
+  { id: 'role-9', code: 'planner', name: 'Planner' },
+  { id: 'role-10', code: 'viewer', name: 'Viewer' },
+]
+
+/**
+ * Mock warehouses for multi-select (Story 01.5b)
+ */
+const mockWarehouses = [
+  { id: 'wh-1', code: 'WH-001', name: 'Main Warehouse', type: 'main', is_active: true },
+  { id: 'wh-2', code: 'WH-002', name: 'Secondary Warehouse', type: 'secondary', is_active: true },
 ]
 
 /**
@@ -72,6 +81,61 @@ vi.mock('@/lib/hooks/use-roles', () => ({
     isLoading: false,
   }),
 }))
+
+/**
+ * Create a mock fetch that handles multiple API calls (Story 01.5b)
+ */
+const createMockFetch = (options: {
+  userResponse?: Partial<Response>
+  warehouseListResponse?: Partial<Response>
+  warehouseAccessResponse?: Partial<Response>
+  warehouseAccessUpdateResponse?: Partial<Response>
+} = {}) => {
+  return vi.fn((url: string, init?: RequestInit) => {
+    // Warehouse list API (GET /api/settings/warehouses)
+    if (url.includes('/api/settings/warehouses') && (!init || init.method === 'GET' || !init.method)) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ warehouses: mockWarehouses }),
+        ...options.warehouseListResponse,
+      })
+    }
+
+    // Warehouse access GET API
+    if (url.includes('/warehouse-access') && (!init || init.method === 'GET' || !init.method)) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          user_id: mockUser.id,
+          all_warehouses: true,
+          warehouse_ids: [],
+          warehouses: [],
+        }),
+        ...options.warehouseAccessResponse,
+      })
+    }
+
+    // Warehouse access PUT API
+    if (url.includes('/warehouse-access') && init?.method === 'PUT') {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true }),
+        ...options.warehouseAccessUpdateResponse,
+      })
+    }
+
+    // User API (default)
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockUser),
+      ...options.userResponse,
+    })
+  })
+}
 
 // AC-06: Modal displays email, first_name, last_name, role fields
 describe('UserModal - Create Mode', () => {
@@ -669,17 +733,17 @@ describe('UserModal - Submit Actions', () => {
 
   // AC-11: Update name reflected
   it('should submit updated data in edit mode', async () => {
-    // Mock successful API call
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
+    // Mock successful API calls (user update + warehouse access)
+    global.fetch = createMockFetch({
+      userResponse: {
         ok: true,
         status: 200,
         json: () => Promise.resolve({
           ...mockUser,
           first_name: 'Jonathan',
         }),
-      })
-    ) as any
+      },
+    }) as any
 
     render(
       <UserModal
@@ -710,18 +774,27 @@ describe('UserModal - Submit Actions', () => {
   })
 
   it('should disable submit button while submitting', async () => {
-    // Mock slow API call
-    global.fetch = vi.fn(() =>
-      new Promise((resolve) => {
+    // Mock slow API call with warehouse support
+    global.fetch = vi.fn((url: string, init?: RequestInit) => {
+      // Fast response for warehouse APIs
+      if (url.includes('/warehouses')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ warehouses: mockWarehouses }),
+        })
+      }
+      // Slow response for user creation
+      return new Promise((resolve) => {
         setTimeout(() => {
           resolve({
             ok: true,
             status: 201,
-            json: () => Promise.resolve({}),
+            json: () => Promise.resolve({ id: 'new-user-1' }),
           } as any)
         }, 1000)
       })
-    )
+    }) as any
 
     render(
       <UserModal

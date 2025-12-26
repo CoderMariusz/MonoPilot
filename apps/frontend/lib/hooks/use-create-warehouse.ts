@@ -12,7 +12,7 @@ export function useCreateWarehouse() {
   const mutateAsync = async (input: CreateWarehouseInput): Promise<Warehouse> => {
     setIsPending(true)
     try {
-      const response = await fetch('/api/settings/warehouses', {
+      const response = await fetch('/api/v1/settings/warehouses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

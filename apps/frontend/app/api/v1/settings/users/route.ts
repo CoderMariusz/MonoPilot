@@ -47,7 +47,10 @@ export async function GET(request: Request) {
 
     // Check permissions (SUPER_ADMIN, ADMIN, or VIEWER)
     const allowedRoles = ['owner', 'admin', 'viewer']
-    if (!allowedRoles.includes((userData.role as any)?.[0]?.code || '')) {
+    // Role can be object or array depending on Supabase query
+    const roleData = userData.role as any
+    const roleCode = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+    if (!allowedRoles.includes(roleCode || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -157,7 +160,10 @@ export async function POST(request: Request) {
 
     // Check permissions (only SUPER_ADMIN and ADMIN can create users)
     const allowedRoles = ['owner', 'admin']
-    if (!allowedRoles.includes((userData.role as any)?.[0]?.code || '')) {
+    // Role can be object or array depending on Supabase query
+    const roleData = userData.role as any
+    const roleCode = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+    if (!allowedRoles.includes(roleCode || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -186,6 +192,31 @@ export async function POST(request: Request) {
 
     const validatedData = validationResult.data
 
+    // Resolve role_id: use provided role_id or look up from role code
+    let resolvedRoleId = validatedData.role_id
+    if (!resolvedRoleId && validatedData.role) {
+      const { data: roleData, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('code', validatedData.role)
+        .single()
+
+      if (roleError || !roleData) {
+        return NextResponse.json(
+          { error: 'Invalid role', details: `Role "${validatedData.role}" not found` },
+          { status: 400 }
+        )
+      }
+      resolvedRoleId = roleData.id
+    }
+
+    if (!resolvedRoleId) {
+      return NextResponse.json(
+        { error: 'Validation error', details: 'Role is required' },
+        { status: 400 }
+      )
+    }
+
     // Create user
     const { data: newUser, error: createError } = await supabase
       .from('users')
@@ -193,7 +224,7 @@ export async function POST(request: Request) {
         email: validatedData.email,
         first_name: validatedData.first_name,
         last_name: validatedData.last_name,
-        role_id: validatedData.role_id,
+        role_id: resolvedRoleId,
         language: validatedData.language || 'en',
         org_id: userData.org_id,
         is_active: true,

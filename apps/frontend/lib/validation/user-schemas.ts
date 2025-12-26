@@ -53,15 +53,23 @@ export const CreateUserSchema = z.object({
     .max(100, 'Last name must be at most 100 characters')
     .trim(),
 
+  // Support both role (code) and role_id (UUID) for flexibility
+  // Form sends role code, API can accept either
+  role: UserRoleEnum.optional(),
+
   role_id: z
     .string()
-    .min(1, 'Role is required'),
+    .uuid('Invalid role ID')
+    .optional(),
 
   language: z
     .string()
     .optional()
     .default('en'),
-})
+}).refine(
+  (data) => data.role !== undefined || data.role_id !== undefined,
+  { message: 'Role is required (provide role or role_id)', path: ['role'] }
+)
 
 export type CreateUserInput = z.input<typeof CreateUserSchema>
 
@@ -84,9 +92,12 @@ export const UpdateUserSchema = z.object({
     .trim()
     .optional(),
 
+  // Support both role (code) and role_id (UUID) for flexibility
+  role: UserRoleEnum.optional(),
+
   role_id: z
     .string()
-    .min(1, 'Role is required')
+    .uuid('Invalid role ID')
     .optional(),
 
   language: z

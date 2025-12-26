@@ -11,12 +11,13 @@
  * @see {@link docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md}
  */
 
-import { createClient } from '@/lib/supabase/client'
+import { createServerSupabase } from '@/lib/supabase/server'
 import type { OrgContext } from '@/lib/types/organization'
 import { UnauthorizedError } from '@/lib/errors/unauthorized-error'
 import { NotFoundError } from '@/lib/errors/not-found-error'
 import { ForbiddenError } from '@/lib/errors/forbidden-error'
 import { isValidUUID } from '@/lib/utils/validation'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Retrieves the organization context for the authenticated user.
@@ -49,7 +50,7 @@ import { isValidUUID } from '@/lib/utils/validation'
  * @see {@link docs/3-ARCHITECTURE/api/settings/context.md} API documentation
  * @see {@link docs/3-ARCHITECTURE/guides/using-org-context.md} Developer guide
  */
-export async function getOrgContext(userId: string): Promise<OrgContext> {
+export async function getOrgContext(userId: string, supabaseClient?: SupabaseClient): Promise<OrgContext> {
   // Validate input
   if (!userId) {
     throw new UnauthorizedError('Unauthorized')
@@ -60,7 +61,8 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
     throw new NotFoundError('Invalid user ID format')
   }
 
-  const supabase = createClient()
+  // Use provided client or create server client
+  const supabase = supabaseClient || await createServerSupabase()
 
   // Single query with JOINs (no N+1)
   // Fetches: user + organization + role in one query
@@ -206,8 +208,9 @@ export function validateOrgContext(context: OrgContext): boolean {
  * }
  * ```
  */
-export async function deriveUserIdFromSession(): Promise<string> {
-  const supabase = createClient()
+export async function deriveUserIdFromSession(supabaseClient?: SupabaseClient): Promise<string> {
+  // Use provided client or create server client
+  const supabase = supabaseClient || await createServerSupabase()
 
   const {
     data: { session },

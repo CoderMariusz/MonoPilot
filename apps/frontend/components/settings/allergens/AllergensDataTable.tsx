@@ -1,12 +1,14 @@
 /**
  * AllergensDataTable Component
  * Story: 01.12 - Allergens Management
+ * Story: TD-209 - Products Column in Allergens Table
  *
  * Features:
  * - Displays 14 EU allergens (read-only)
  * - Search across all language fields (debounced 100ms)
  * - Multi-language columns and tooltips
  * - Icon display with fallback
+ * - Products column with count and link to filtered products list
  * - No pagination (only 14 items)
  * - No Add/Edit/Delete actions
  * - Loading, error, empty states
@@ -15,6 +17,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import Link from 'next/link'
 import {
   Table,
   TableBody,
@@ -30,6 +33,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AllergenIcon } from './AllergenIcon'
 import type { Allergen } from '@/lib/types/allergen'
 import { getAllergenName } from '@/lib/types/allergen'
+import { fetchAllergenProductCounts, type AllergenProductCount } from '@/lib/services/allergen-service-v2'
+import { cn } from '@/lib/utils'
 
 interface AllergensDataTableProps {
   allergens: Allergen[]
@@ -37,6 +42,11 @@ interface AllergensDataTableProps {
   error?: string
   onRetry?: () => void
   userLanguage?: 'en' | 'pl' | 'de' | 'fr'
+  /**
+   * Whether to show the Products column with counts
+   * Default: true
+   */
+  showProductsColumn?: boolean
 }
 
 export function AllergensDataTable({
@@ -45,10 +55,16 @@ export function AllergensDataTable({
   error,
   onRetry,
   userLanguage = 'en',
+  showProductsColumn = true,
 }: AllergensDataTableProps) {
   const [searchValue, setSearchValue] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Product counts state
+  const [productCounts, setProductCounts] = useState<Map<string, number>>(new Map())
+  const [countsLoading, setCountsLoading] = useState(false)
+  const [countsError, setCountsError] = useState<string | null>(null)
 
   // Debounced search (100ms)
   useEffect(() => {
@@ -70,6 +86,32 @@ export function AllergensDataTable({
     }
   }, [searchValue])
 
+  // Fetch product counts when component mounts
+  useEffect(() => {
+    if (!showProductsColumn) return
+
+    async function loadCounts() {
+      setCountsLoading(true)
+      setCountsError(null)
+
+      try {
+        const counts = await fetchAllergenProductCounts()
+        const countsMap = new Map<string, number>()
+        counts.forEach((item: AllergenProductCount) => {
+          countsMap.set(item.allergen_id, item.product_count)
+        })
+        setProductCounts(countsMap)
+      } catch (err) {
+        console.error('[AllergensDataTable] Failed to load product counts:', err)
+        setCountsError('Failed to load product counts')
+      } finally {
+        setCountsLoading(false)
+      }
+    }
+
+    loadCounts()
+  }, [showProductsColumn])
+
   // Filter allergens by search across all language fields
   const filteredAllergens = useMemo(() => {
     if (!debouncedSearch) {
@@ -89,6 +131,9 @@ export function AllergensDataTable({
     })
   }, [allergens, debouncedSearch])
 
+  // Column count for colSpan
+  const columnCount = showProductsColumn ? 7 : 6
+
   // Loading state
   if (isLoading) {
     return (
@@ -103,6 +148,7 @@ export function AllergensDataTable({
                 <Skeleton className="h-6 w-[150px]" />
                 <Skeleton className="h-6 w-[120px]" />
                 <Skeleton className="h-6 w-[120px]" />
+                {showProductsColumn && <Skeleton className="h-6 w-[60px]" />}
                 <Skeleton className="h-6 w-[80px]" />
               </div>
             ))}
@@ -146,6 +192,57 @@ export function AllergensDataTable({
     )
   }
 
+  /**
+   * Render product count cell
+   * - Shows count as link to filtered products list
+   * - Muted style for 0 count
+   * - Bold style for >= 10 count
+   * - Loading skeleton while fetching
+   */
+  const renderProductCount = (allergenId: string) => {
+    if (countsLoading) {
+      return <Skeleton className="h-5 w-8" data-testid="product-count-loading" />
+    }
+
+    if (countsError) {
+      return (
+        <span className="text-muted-foreground text-sm" title={countsError}>
+          --
+        </span>
+      )
+    }
+
+    const count = productCounts.get(allergenId) ?? 0
+
+    // Build link to products page filtered by this allergen
+    const productsUrl = `/technical/products?allergen_id=${allergenId}`
+
+    if (count === 0) {
+      return (
+        <span
+          className="text-muted-foreground"
+          data-testid={`product-count-${allergenId}`}
+        >
+          0
+        </span>
+      )
+    }
+
+    return (
+      <Link
+        href={productsUrl}
+        className={cn(
+          'text-primary hover:underline',
+          count >= 10 && 'font-bold'
+        )}
+        data-testid={`product-count-${allergenId}`}
+        title={`View ${count} product${count !== 1 ? 's' : ''} with this allergen`}
+      >
+        {count}
+      </Link>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* Search */}
@@ -167,13 +264,16 @@ export function AllergensDataTable({
               <TableHead>Name ({userLanguage.toUpperCase()})</TableHead>
               <TableHead>Name EN</TableHead>
               <TableHead>Name PL</TableHead>
+              {showProductsColumn && (
+                <TableHead className="text-center">Products</TableHead>
+              )}
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredAllergens.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={columnCount} className="text-center py-8 text-muted-foreground">
                   No allergens match your search. Try different keywords.
                 </TableCell>
               </TableRow>
@@ -197,6 +297,11 @@ export function AllergensDataTable({
                           <TableCell className="font-medium">{localizedName}</TableCell>
                           <TableCell>{allergen.name_en}</TableCell>
                           <TableCell>{allergen.name_pl}</TableCell>
+                          {showProductsColumn && (
+                            <TableCell className="text-center">
+                              {renderProductCount(allergen.id)}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Badge
                               variant={allergen.is_active ? 'default' : 'secondary'}
@@ -228,6 +333,12 @@ export function AllergensDataTable({
                           {allergen.name_fr && (
                             <p className="text-sm">
                               <span className="font-medium">FR:</span> {allergen.name_fr}
+                            </p>
+                          )}
+                          {showProductsColumn && (
+                            <p className="text-sm">
+                              <span className="font-medium">Products:</span>{' '}
+                              {productCounts.get(allergen.id) ?? 0}
                             </p>
                           )}
                         </div>

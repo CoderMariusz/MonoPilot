@@ -16,13 +16,17 @@ import {
  */
 
 describe('CreateUserSchema', () => {
+  // Valid UUIDs for testing
+  const validRoleId = '550e8400-e29b-41d4-a716-446655440000'
+  const validRoleId2 = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'
+
   describe('Valid Inputs', () => {
     it('should accept valid user data with all fields', () => {
       const result = CreateUserSchema.safeParse({
         email: 'john.doe@example.com',
         first_name: 'John',
         last_name: 'Doe',
-        role_id: 'role-admin-id',
+        role: 'admin', // Use role code
       })
 
       expect(result.success).toBe(true)
@@ -30,14 +34,14 @@ describe('CreateUserSchema', () => {
         expect(result.data.email).toBe('john.doe@example.com')
         expect(result.data.first_name).toBe('John')
         expect(result.data.last_name).toBe('Doe')
-        expect(result.data.role_id).toBe('role-admin-id')
+        expect(result.data.role).toBe('admin')
       }
     })
 
     it('should accept role_id as UUID string', () => {
       const roleIds = [
-        'role-admin-id',
-        'role-manager-id',
+        validRoleId,
+        validRoleId2,
       ]
 
       roleIds.forEach((role_id) => {
@@ -56,7 +60,7 @@ describe('CreateUserSchema', () => {
         email: 'test@example.com',
         first_name: '  John  ',
         last_name: '  Doe  ',
-        role_id: 'role-viewer-id',
+        role: 'viewer', // Use role code
       })
 
       expect(result.success).toBe(true)
@@ -73,7 +77,7 @@ describe('CreateUserSchema', () => {
         email: 'not-an-email',
         first_name: 'John',
         last_name: 'Doe',
-        role_id: 'role-admin-id',
+        role: 'admin',
       })
 
       expect(result.success).toBe(false)
@@ -86,7 +90,7 @@ describe('CreateUserSchema', () => {
       const result = CreateUserSchema.safeParse({
         first_name: 'John',
         last_name: 'Doe',
-        role_id: 'role-admin-id',
+        role: 'admin',
       })
 
       expect(result.success).toBe(false)
@@ -97,7 +101,7 @@ describe('CreateUserSchema', () => {
         email: 'test@example.com',
         first_name: '',
         last_name: 'Doe',
-        role_id: 'role-admin-id',
+        role: 'admin',
       })
 
       expect(result.success).toBe(false)
@@ -111,7 +115,7 @@ describe('CreateUserSchema', () => {
         email: 'test@example.com',
         first_name: 'A'.repeat(101),
         last_name: 'Doe',
-        role_id: 'role-admin-id',
+        role: 'admin',
       })
 
       expect(result.success).toBe(false)
@@ -137,7 +141,28 @@ describe('CreateUserSchema', () => {
         email: longEmail,
         first_name: 'John',
         last_name: 'Doe',
-        role_id: 'role-admin-id',
+        role: 'admin',
+      })
+
+      expect(result.success).toBe(false)
+    })
+
+    it('should reject missing role (neither role nor role_id)', () => {
+      const result = CreateUserSchema.safeParse({
+        email: 'test@example.com',
+        first_name: 'John',
+        last_name: 'Doe',
+      })
+
+      expect(result.success).toBe(false)
+    })
+
+    it('should reject invalid role_id format (non-UUID)', () => {
+      const result = CreateUserSchema.safeParse({
+        email: 'test@example.com',
+        first_name: 'John',
+        last_name: 'Doe',
+        role_id: 'not-a-uuid',
       })
 
       expect(result.success).toBe(false)
@@ -146,6 +171,9 @@ describe('CreateUserSchema', () => {
 })
 
 describe('UpdateUserSchema', () => {
+  // Valid UUID for testing
+  const validRoleId = '550e8400-e29b-41d4-a716-446655440000'
+
   describe('Valid Inputs', () => {
     it('should accept all fields as optional', () => {
       const result = UpdateUserSchema.safeParse({})
@@ -175,14 +203,25 @@ describe('UpdateUserSchema', () => {
       }
     })
 
-    it('should accept role_id update', () => {
+    it('should accept role_id update with valid UUID', () => {
       const result = UpdateUserSchema.safeParse({
-        role_id: 'role-manager-id',
+        role_id: validRoleId,
       })
 
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.role_id).toBe('role-manager-id')
+        expect(result.data.role_id).toBe(validRoleId)
+      }
+    })
+
+    it('should accept role update with role code', () => {
+      const result = UpdateUserSchema.safeParse({
+        role: 'production_manager',
+      })
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.role).toBe('production_manager')
       }
     })
 
@@ -225,9 +264,17 @@ describe('UpdateUserSchema', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should reject empty role_id if provided', () => {
+    it('should reject invalid role_id format (non-UUID)', () => {
       const result = UpdateUserSchema.safeParse({
-        role_id: '',
+        role_id: 'not-a-uuid',
+      })
+
+      expect(result.success).toBe(false)
+    })
+
+    it('should reject invalid role code', () => {
+      const result = UpdateUserSchema.safeParse({
+        role: 'invalid_role',
       })
 
       expect(result.success).toBe(false)
@@ -269,7 +316,7 @@ describe('UserFiltersSchema', () => {
 
     it('should accept array of roles', () => {
       const result = UserFiltersSchema.safeParse({
-        role: ['admin', 'manager'],
+        role: ['admin', 'production_manager'],  // Use valid role codes
       })
 
       expect(result.success).toBe(true)

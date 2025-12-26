@@ -15,7 +15,7 @@ USING (
     org_id = (SELECT org_id FROM users WHERE id = auth.uid())
 );
 
--- INSERT Policy: Only admins and warehouse managers can create warehouses
+-- INSERT Policy: Only owners, admins and warehouse managers can create warehouses
 CREATE POLICY warehouses_insert
 ON warehouses
 FOR INSERT
@@ -24,11 +24,11 @@ WITH CHECK (
     org_id = (SELECT org_id FROM users WHERE id = auth.uid())
     AND (
         (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
-        IN ('SUPER_ADMIN', 'ADMIN', 'WAREHOUSE_MANAGER')
+        IN ('owner', 'admin', 'warehouse_manager')
     )
 );
 
--- UPDATE Policy: Only admins and warehouse managers can update warehouses
+-- UPDATE Policy: Only owners, admins and warehouse managers can update warehouses
 CREATE POLICY warehouses_update
 ON warehouses
 FOR UPDATE
@@ -37,11 +37,11 @@ USING (
     org_id = (SELECT org_id FROM users WHERE id = auth.uid())
     AND (
         (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
-        IN ('SUPER_ADMIN', 'ADMIN', 'WAREHOUSE_MANAGER')
+        IN ('owner', 'admin', 'warehouse_manager')
     )
 );
 
--- DELETE Policy: Only super admins and admins can delete warehouses
+-- DELETE Policy: Only owners and admins can delete warehouses
 -- Note: Soft delete (is_active=false) is preferred over hard delete
 CREATE POLICY warehouses_delete
 ON warehouses
@@ -51,7 +51,7 @@ USING (
     org_id = (SELECT org_id FROM users WHERE id = auth.uid())
     AND (
         (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
-        IN ('SUPER_ADMIN', 'ADMIN')
+        IN ('owner', 'admin')
     )
 );
 

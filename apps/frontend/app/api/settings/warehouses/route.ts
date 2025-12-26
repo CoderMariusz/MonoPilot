@@ -6,24 +6,14 @@ import {
   type CreateWarehouseInput,
   type WarehouseFilters,
 } from '@/lib/validation/warehouse-schemas'
-import {
-  createWarehouse,
-  listWarehouses,
-} from '@/lib/services/warehouse-service'
 import { ZodError } from 'zod'
 
 /**
- * Warehouse API Routes
+ * Warehouse API Routes (Legacy - redirects logic to V1 implementation style but keeps old response shape)
  * Story: 1.5 Warehouse Configuration
- * Task 4: API Endpoints
- *
- * GET /api/settings/warehouses - List warehouses with filters
- * POST /api/settings/warehouses - Create new warehouse
+ * 
+ * NOTE: New code should use /api/v1/settings/warehouses
  */
-
-// ============================================================================
-// GET /api/settings/warehouses - List Warehouses (AC-004.3)
-// ============================================================================
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Get current user to check role and org_id
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
@@ -50,80 +40,83 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check authorization: Admin only (AC-004.1)
-    if (currentUser.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin role required' },
-        { status: 403 }
-      )
+    // Check authorization
+    // @ts-ignore
+    const roleCode = currentUser.role?.code
+    const allowedRoles = ['owner', 'admin', 'warehouse_manager', 'super_admin']
+    // Case insensitive check for legacy reasons
+    if (!allowedRoles.includes(roleCode?.toLowerCase())) {
+      // Also check uppercase for safety if DB has mixed case
+      if (!['SUPER_ADMIN', 'ADMIN', 'WAREHOUSE_MANAGER'].includes(roleCode)) {
+        return NextResponse.json(
+          { error: 'Forbidden: Admin role required' },
+          { status: 403 }
+        )
+      }
     }
 
-    // Parse query parameters for filtering and sorting (AC-004.3)
+    const orgId = currentUser.org_id
+
+    // Parse query parameters
     const searchParams = request.nextUrl.searchParams
     const isActive = searchParams.get('is_active')
     const search = searchParams.get('search')
     const sortBy = searchParams.get('sort_by')
     const sortDirection = searchParams.get('sort_direction')
 
-    // Build filters object
-    const filtersInput: Record<string, any> = {}
+    // Build query
+    let query = supabase
+      .from('warehouses')
+      .select('*', { count: 'exact' })
+      .eq('org_id', orgId)
 
+    // Apply search
     if (search) {
-      filtersInput.search = search
+      query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%`)
     }
 
-    if (isActive !== null) {
-      filtersInput.is_active = isActive === 'true' ? true : isActive === 'false' ? false : undefined
+    // Apply active filter
+    if (isActive !== null && isActive !== undefined) {
+      const activeBool = isActive === 'true'
+      query = query.eq('is_active', activeBool)
     }
 
-    if (sortBy) {
-      filtersInput.sort_by = sortBy
+    // Apply sorting
+    if (sortBy && ['code', 'name', 'type', 'location_count', 'created_at'].includes(sortBy)) {
+      query = query.order(sortBy, { ascending: sortDirection === 'asc' })
+    } else {
+      query = query.order('created_at', { ascending: false })
     }
 
-    if (sortDirection) {
-      filtersInput.sort_direction = sortDirection
-    }
+    // Execute
+    const { data, error, count } = await query
 
-    // Validate filters
-    const filters: WarehouseFilters = warehouseFiltersSchema.parse(filtersInput)
-
-    // Call service method
-    const result = await listWarehouses(filters)
-
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Failed to fetch warehouses' },
-        { status: 500 }
-      )
+    if (error) {
+      console.error('Error fetching warehouses:', error)
+      return NextResponse.json({ error: 'Failed to fetch warehouses' }, { status: 500 })
     }
 
     return NextResponse.json(
       {
-        warehouses: result.data || [],
-        total: result.total || 0,
+        warehouses: data || [],
+        total: count || 0,
       },
       { status: 200 }
     )
   } catch (error) {
     console.error('Error in GET /api/settings/warehouses:', error)
-
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: 'Invalid query parameters', details: error.errors },
         { status: 400 }
       )
     }
-
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
 }
-
-// ============================================================================
-// POST /api/settings/warehouses - Create Warehouse (AC-004.1)
-// ============================================================================
 
 export async function POST(request: NextRequest) {
   try {
@@ -142,7 +135,7 @@ export async function POST(request: NextRequest) {
     // Get current user to check role
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
@@ -150,8 +143,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check authorization: Admin only (AC-004.1)
-    if (currentUser.role !== 'admin') {
+    const orgId = currentUser.org_id
+    // @ts-ignore
+    const roleCode = currentUser.role?.code
+    const allowedRoles = ['owner', 'admin', 'warehouse_manager', 'super_admin']
+
+    if (!allowedRoles.includes(roleCode?.toLowerCase()) && !['SUPER_ADMIN', 'ADMIN', 'WAREHOUSE_MANAGER'].includes(roleCode)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }
@@ -160,36 +157,54 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json()
-    const validatedData: CreateWarehouseInput = createWarehouseSchema.parse(body)
+    const validatedData = createWarehouseSchema.parse(body)
 
-    // Call service method
-    const result = await createWarehouse(validatedData)
+    // Check uniqueness
+    const { data: existing } = await supabase
+      .from('warehouses')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('code', validatedData.code)
+      .single()
 
-    if (!result.success) {
-      // Handle specific error codes
-      if (result.code === 'DUPLICATE_CODE') {
-        return NextResponse.json(
-          { error: result.error || 'Warehouse code already exists' },
-          { status: 409 }
-        )
-      }
-
-      if (result.code === 'INVALID_INPUT') {
-        return NextResponse.json(
-          { error: result.error || 'Invalid input' },
-          { status: 400 }
-        )
-      }
-
+    if (existing) {
       return NextResponse.json(
-        { error: result.error || 'Failed to create warehouse' },
+        { error: 'Warehouse code already exists' },
+        { status: 409 }
+      )
+    }
+
+    // Create
+    const { data: warehouse, error: createError } = await supabase
+      .from('warehouses')
+      .insert({
+        org_id: orgId,
+        code: validatedData.code,
+        name: validatedData.name,
+        type: validatedData.type || 'GENERAL',
+        address: validatedData.address || null,
+        contact_email: validatedData.contact_email || null,
+        contact_phone: validatedData.contact_phone || null,
+        is_active: validatedData.is_active ?? true,
+        is_default: false,
+        location_count: 0,
+        created_by: session.user.id,
+        updated_by: session.user.id
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Error creating warehouse:', createError)
+      return NextResponse.json(
+        { error: 'Failed to create warehouse' },
         { status: 500 }
       )
     }
 
     return NextResponse.json(
       {
-        warehouse: result.data,
+        warehouse: warehouse,
         message: 'Warehouse created successfully',
       },
       { status: 201 }

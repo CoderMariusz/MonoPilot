@@ -61,8 +61,9 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
     it('should display section headers', () => {
       render(<OrganizationProfileStep onComplete={mockOnComplete} />)
 
-      expect(screen.getByText(/basic information/i)).toBeInTheDocument()
-      expect(screen.getByText(/regional settings/i)).toBeInTheDocument()
+      expect(screen.getByText('Organization Details')).toBeInTheDocument()
+      expect(screen.getByText('Address')).toBeInTheDocument()
+      expect(screen.getByText('Contact Information')).toBeInTheDocument()
     })
 
     it('should show required field indicators', () => {
@@ -271,6 +272,10 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
       const nameInput = screen.getByLabelText(/organization name/i)
       await user.type(nameInput, 'AB')
 
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
+
       const submitButton = screen.getByRole('button', { name: /next/i })
       await user.click(submitButton)
 
@@ -311,6 +316,10 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
       const nameInput = screen.getByLabelText(/organization name/i)
       const maxName = 'A'.repeat(100)
       await user.type(nameInput, maxName)
+
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
 
       const submitButton = screen.getByRole('button', { name: /next/i })
       await user.click(submitButton)
@@ -478,7 +487,11 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
       const nameInput = screen.getByLabelText(/organization name/i)
       await user.type(nameInput, 'Bakery Fresh Ltd')
 
-      // Timezone, language, currency are auto-detected/defaulted
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
+
+      // Timezone, language, currency, date_format are auto-detected/defaulted
 
       // WHEN 'Next' clicked
       const submitButton = screen.getByRole('button', { name: /next/i })
@@ -492,6 +505,8 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
             timezone: 'Europe/Warsaw',
             language: 'pl',
             currency: 'EUR',
+            country: 'PL',
+            date_format: 'YYYY-MM-DD',
           })
         )
       })
@@ -515,6 +530,14 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
       const currencySelect = screen.getByLabelText(/currency/i) as HTMLSelectElement
       await user.selectOptions(currencySelect, 'PLN')
 
+      // Change date format
+      const dateFormatSelect = screen.getByLabelText(/date format/i) as HTMLSelectElement
+      await user.selectOptions(dateFormatSelect, 'DD/MM/YYYY')
+
+      // Fill required country field
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
+
       const submitButton = screen.getByRole('button', { name: /next/i })
       await user.click(submitButton)
 
@@ -524,6 +547,14 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
           timezone: 'Europe/Warsaw', // Auto-detected from browser (mock)
           language: 'en',
           currency: 'PLN',
+          date_format: 'DD/MM/YYYY',
+          address_line1: '',
+          address_line2: '',
+          city: '',
+          postal_code: '',
+          country: 'PL',
+          contact_email: '',
+          contact_phone: '',
         })
       })
     })
@@ -562,6 +593,10 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
       const nameInput = screen.getByLabelText(/organization name/i)
       await user.type(nameInput, 'Test Org')
 
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
+
       const submitButton = screen.getByRole('button', { name: /next/i })
       await user.click(submitButton)
 
@@ -577,6 +612,10 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
 
       const nameInput = screen.getByLabelText(/organization name/i)
       await user.type(nameInput, 'Test Org')
+
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
 
       const submitButton = screen.getByRole('button', { name: /next/i })
       await user.click(submitButton)
@@ -640,6 +679,10 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
       const nameInput = screen.getByLabelText(/organization name/i)
       await user.type(nameInput, "Café François & Co. 2024")
 
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
+
       const submitButton = screen.getByRole('button', { name: /next/i })
       await user.click(submitButton)
 
@@ -659,6 +702,10 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
 
       const nameInput = screen.getByLabelText(/organization name/i)
       await user.type(nameInput, '  Test Org  ')
+
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
 
       const submitButton = screen.getByRole('button', { name: /next/i })
       await user.click(submitButton)
@@ -683,6 +730,10 @@ describe('Story 01.4: OrganizationProfileStep Component', () => {
 
       const nameInput = screen.getByLabelText(/organization name/i)
       await user.type(nameInput, 'Test Org')
+
+      // Fill required fields
+      const countrySelect = screen.getByLabelText(/country/i) as HTMLSelectElement
+      await user.selectOptions(countrySelect, 'PL')
 
       const submitButton = screen.getByRole('button', { name: /next/i })
 

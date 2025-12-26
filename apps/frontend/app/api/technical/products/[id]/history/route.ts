@@ -57,8 +57,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
       .single()
 
     if (!product) {
+      // Generic error to prevent information leakage about product existence across orgs
       return NextResponse.json(
-        { error: 'Product not found' },
+        { error: 'Product not found or access denied' },
         { status: 404 }
       )
     }

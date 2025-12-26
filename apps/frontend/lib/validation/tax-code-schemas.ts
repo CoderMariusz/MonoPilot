@@ -46,6 +46,45 @@ const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/
  */
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
+// Base schema without refinements for reuse
+const taxCodeBaseSchema = z.object({
+  code: z
+    .string()
+    .min(2, 'Code must be at least 2 characters')
+    .max(20, 'Code must be at most 20 characters')
+    .regex(TAX_CODE_PATTERN, 'Code must be uppercase alphanumeric with hyphens only'),
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be at most 100 characters'),
+  rate: z
+    .number()
+    .min(0, 'Rate must be between 0 and 100')
+    .max(100, 'Rate must be between 0 and 100')
+    .refine(hasMaxTwoDecimals, 'Rate must have at most 2 decimal places'),
+  country_code: z
+    .string()
+    .length(2, 'Country code must be exactly 2 characters')
+    .regex(COUNTRY_CODE_PATTERN, 'Country code must be uppercase ISO 3166-1 alpha-2 format'),
+  valid_from: z
+    .string()
+    .regex(DATE_PATTERN, 'Valid from must be in YYYY-MM-DD format'),
+  valid_to: z
+    .string()
+    .regex(DATE_PATTERN, 'Valid to must be in YYYY-MM-DD format')
+    .nullable()
+    .optional(),
+  is_default: z.boolean().optional(),
+})
+
+// Date validation refinement function
+function validateDateRange(data: { valid_from?: string; valid_to?: string | null }): boolean {
+  if (data.valid_to && data.valid_from) {
+    return new Date(data.valid_to) > new Date(data.valid_from)
+  }
+  return true
+}
+
 /**
  * Schema for creating a new tax code.
  *
@@ -59,7 +98,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
  * - is_default: optional boolean
  *
  * @example
- * ```ts
+ * \`\`\`ts
  * const result = taxCodeCreateSchema.safeParse({
  *   code: 'VAT23',
  *   name: 'VAT 23%',
@@ -67,50 +106,12 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
  *   country_code: 'PL',
  *   valid_from: '2025-01-01'
  * })
- * ```
+ * \`\`\`
  */
-export const taxCodeCreateSchema = z
-  .object({
-    code: z
-      .string()
-      .min(2, 'Code must be at least 2 characters')
-      .max(20, 'Code must be at most 20 characters')
-      .regex(TAX_CODE_PATTERN, 'Code must be uppercase alphanumeric with hyphens only'),
-    name: z
-      .string()
-      .min(2, 'Name must be at least 2 characters')
-      .max(100, 'Name must be at most 100 characters'),
-    rate: z
-      .number()
-      .min(0, 'Rate must be between 0 and 100')
-      .max(100, 'Rate must be between 0 and 100')
-      .refine(hasMaxTwoDecimals, 'Rate must have at most 2 decimal places'),
-    country_code: z
-      .string()
-      .length(2, 'Country code must be exactly 2 characters')
-      .regex(COUNTRY_CODE_PATTERN, 'Country code must be uppercase ISO 3166-1 alpha-2 format'),
-    valid_from: z
-      .string()
-      .regex(DATE_PATTERN, 'Valid from must be in YYYY-MM-DD format'),
-    valid_to: z
-      .string()
-      .regex(DATE_PATTERN, 'Valid to must be in YYYY-MM-DD format')
-      .nullable()
-      .optional(),
-    is_default: z.boolean().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.valid_to) {
-        return new Date(data.valid_to) > new Date(data.valid_from)
-      }
-      return true
-    },
-    {
-      message: 'Valid to date must be after valid from date',
-      path: ['valid_to'],
-    }
-  )
+export const taxCodeCreateSchema = taxCodeBaseSchema.refine(validateDateRange, {
+  message: 'Valid to date must be after valid from date',
+  path: ['valid_to'],
+})
 
 /**
  * Schema for updating an existing tax code.
@@ -118,7 +119,10 @@ export const taxCodeCreateSchema = z
  *
  * Note: The date range refinement still applies if both dates are provided.
  */
-export const taxCodeUpdateSchema = taxCodeCreateSchema.partial()
+export const taxCodeUpdateSchema = taxCodeBaseSchema.partial().refine(validateDateRange, {
+  message: 'Valid to date must be after valid from date',
+  path: ['valid_to'],
+})
 
 /**
  * TypeScript type inferred from create schema.

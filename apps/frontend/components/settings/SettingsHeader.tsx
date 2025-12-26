@@ -11,6 +11,7 @@ export type SettingsPage =
   | 'dashboard'
   | 'organization'
   | 'users'
+  | 'security'
   | 'warehouses'
   | 'locations'
   | 'machines'
@@ -29,6 +30,7 @@ const navItems = [
   { key: 'dashboard' as const, label: 'Settings', href: '/settings' },
   { key: 'organization' as const, label: 'Org', href: '/settings/organization' },
   { key: 'users' as const, label: 'Users', href: '/settings/users' },
+  { key: 'security' as const, label: 'Security', href: '/settings/security' },
   { key: 'warehouses' as const, label: 'WH', href: '/settings/warehouses' },
   { key: 'locations' as const, label: 'Loc', href: '/settings/locations' },
   { key: 'machines' as const, label: 'Machines', href: '/settings/machines' },
@@ -135,6 +137,7 @@ export function SettingsHeader({ currentPage, breadcrumb }: SettingsHeaderProps)
 function detectCurrentPage(pathname: string): SettingsPage {
   if (pathname.includes('/organization')) return 'organization'
   if (pathname.includes('/users')) return 'users'
+  if (pathname.includes('/security')) return 'security'
   if (pathname.includes('/warehouses')) return 'warehouses'
   if (pathname.includes('/locations')) return 'locations'
   if (pathname.includes('/machines')) return 'machines'

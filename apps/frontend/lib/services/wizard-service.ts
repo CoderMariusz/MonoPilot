@@ -130,21 +130,21 @@ export class WizardService {
     // Determine warehouse data (demo or user-provided)
     const warehouseData = data.skip
       ? {
-          code: 'DEMO-WH',
-          name: 'Demo Warehouse',
-          type: 'GENERAL',
-          is_default: true,
-          is_active: true,
-          org_id: orgId,
-        }
+        code: 'DEMO-WH',
+        name: 'Demo Warehouse',
+        type: 'GENERAL',
+        is_default: true,
+        is_active: true,
+        org_id: orgId,
+      }
       : {
-          code: data.code || 'WH-MAIN',
-          name: data.name || '',
-          type: data.type || 'GENERAL',
-          is_default: true,
-          is_active: true,
-          org_id: orgId,
-        }
+        code: data.code || 'WH-MAIN',
+        name: data.name || '',
+        type: data.type || 'GENERAL',
+        is_default: true,
+        is_active: true,
+        org_id: orgId,
+      }
 
     // Validate name is provided if not skipping
     if (!data.skip && !warehouseData.name) {
@@ -541,7 +541,7 @@ export class WizardService {
 
     // Calculate duration
     const duration = await this.calculateDuration(
-      org.onboarding_started_at,
+      org.onboarding_started_at || new Date().toISOString(),
       new Date().toISOString()
     )
 
@@ -560,7 +560,7 @@ export class WizardService {
       .from('organizations')
       .update({
         onboarding_completed_at: new Date().toISOString(),
-        wizard_completed: true,
+        // wizard_completed: true, // Column missing in some environments, relying on onboarding_completed_at
         wizard_progress: {
           ...org.wizard_progress,
           step_6: {
@@ -714,8 +714,10 @@ export class WizardService {
    * Calculate duration in seconds between two timestamps
    */
   static async calculateDuration(startedAt: string, completedAt: string): Promise<number> {
+    if (!startedAt || !completedAt) return 0
     const start = new Date(startedAt).getTime()
     const end = new Date(completedAt).getTime()
+    if (isNaN(start) || isNaN(end)) return 0
     return Math.floor((end - start) / 1000)
   }
 

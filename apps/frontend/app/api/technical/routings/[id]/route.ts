@@ -197,10 +197,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check authorization: Admin or Technical only
-    if (!['admin', 'technical'].includes(currentUser.role)) {
+    // Check authorization: Admin only (matches RLS policy routings_delete_policy)
+    if (currentUser.role !== 'admin') {
       return NextResponse.json(
-        { error: 'Forbidden: Admin or Technical role required' },
+        { error: 'Forbidden: Admin role required for deletion' },
         { status: 403 }
       )
     }

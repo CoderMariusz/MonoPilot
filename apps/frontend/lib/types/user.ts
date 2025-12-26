@@ -36,22 +36,26 @@ export interface Role {
 
 /**
  * CreateUserRequest: Payload for creating a new user (Story 01.5a)
+ * Supports both role (code) and role_id (UUID) - API resolves code to UUID
  */
 export interface CreateUserRequest {
   email: string
   first_name: string
   last_name: string
-  role_id: string
+  role?: string    // Role code (e.g., 'admin', 'viewer')
+  role_id?: string // Role UUID (alternative to role code)
   language?: string
 }
 
 /**
  * UpdateUserRequest: Payload for updating user (Story 01.5a)
+ * Supports both role (code) and role_id (UUID) - API resolves code to UUID
  */
 export interface UpdateUserRequest {
   first_name?: string
   last_name?: string
-  role_id?: string
+  role?: string    // Role code (e.g., 'admin', 'viewer')
+  role_id?: string // Role UUID (alternative to role code)
   language?: string
 }
 

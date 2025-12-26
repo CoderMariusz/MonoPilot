@@ -77,6 +77,7 @@ export interface LocationNode extends Location {
   children: LocationNode[]
   children_count: number
   capacity_percent: number | null
+  lp_count: number
 }
 
 export interface LocationTreeResponse {
@@ -126,4 +127,70 @@ export interface CanDeleteResult {
   can: boolean
   reason?: 'HAS_CHILDREN' | 'HAS_INVENTORY'
   count?: number
+}
+
+// =============================================================================
+// LP COUNT TYPES (Story TD-206)
+// =============================================================================
+
+/**
+ * Location statistics including LP counts
+ * Used for aggregated statistics display
+ */
+export interface LocationStats {
+  location_id: string
+  location_code: string
+  total_lp_count: number
+  direct_lp_count: number
+  child_lp_count: number
+  total_weight_kg: number
+  total_pallets: number
+  utilization_percent: number | null
+}
+
+/**
+ * LP count response from API/service
+ * Used for individual location LP count queries
+ */
+export interface LPCountResponse {
+  location_id: string
+  lp_count: number
+  direct_lp_count: number
+  child_lp_count: number
+  timestamp: string
+  cached: boolean
+}
+
+// =============================================================================
+// MOVE FEATURE TYPES (Story TD-207)
+// =============================================================================
+
+/**
+ * Request to move a location to a new parent
+ */
+export interface MoveLocationRequest {
+  location_id: string
+  new_parent_id: string | null
+  new_position?: number
+}
+
+/**
+ * Result of move validation
+ * Includes validation status and any conflicts/warnings
+ */
+export interface MoveValidationResult {
+  valid: boolean
+  can_move: boolean
+  reason?: string
+  conflicts: MoveConflict[]
+  warnings: string[]
+}
+
+/**
+ * Conflict details for move validation
+ */
+export interface MoveConflict {
+  type: 'CIRCULAR_REFERENCE' | 'LEVEL_MISMATCH' | 'CAPACITY_EXCEEDED' | 'INVENTORY_EXISTS'
+  message: string
+  blocking: boolean
 }

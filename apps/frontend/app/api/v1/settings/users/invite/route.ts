@@ -36,11 +36,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // 3. Check permission (AC-9: ADMIN or SUPER_ADMIN only)
-    const roleCode = (userData.roles as any).code
-    if (!['ADMIN', 'SUPER_ADMIN'].includes(roleCode)) {
+    // Role can be object or array depending on Supabase query
+    const roleData = userData.roles as any
+    const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+
+    // Check permission (AC-9: owner or admin only)
+    if (!['owner', 'admin'].includes(userRole || '')) {
       return NextResponse.json(
-        { error: 'Permission denied. Only Admin and Super Admin can invite users.' },
+        { error: 'Permission denied. Only Admin and Owner can invite users.' },
         { status: 403 }
       )
     }

@@ -225,7 +225,7 @@ export default function SettingsWizardPage() {
 
     // Save progress
     try {
-      await fetch('/api/settings/wizard/progress', {
+      await fetch('/api/settings/wizard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ step: currentStep, data: wizardData }),
@@ -251,8 +251,8 @@ export default function SettingsWizardPage() {
     try {
       setSubmitting(true)
 
-      const response = await fetch('/api/settings/wizard/complete', {
-        method: 'POST',
+      const response = await fetch('/api/settings/wizard', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(wizardData),
       })
@@ -578,52 +578,52 @@ export default function SettingsWizardPage() {
     <div>
       <SettingsHeader currentPage="wizard" />
       <div className="px-4 md:px-6 py-6 max-w-3xl mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle>Organization Setup Wizard</CardTitle>
-          <CardDescription>
-            Step {currentStep} of {totalSteps}: {stepTitles[currentStep - 1]}
-          </CardDescription>
-          <Progress value={progress} className="mt-4" />
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {renderStep()}
+        <Card>
+          <CardHeader>
+            <CardTitle>Organization Setup Wizard</CardTitle>
+            <CardDescription>
+              Step {currentStep} of {totalSteps}: {stepTitles[currentStep - 1]}
+            </CardDescription>
+            <Progress value={progress} className="mt-4" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {renderStep()}
 
-          <div className="flex items-center justify-between pt-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleBack}
-              disabled={currentStep === 1 || submitting}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
+            <div className="flex items-center justify-between pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBack}
+                disabled={currentStep === 1 || submitting}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
 
-            <Button
-              type="button"
-              onClick={handleNext}
-              disabled={submitting}
-            >
-              {currentStep === totalSteps ? (
-                submitting ? (
-                  'Completing...'
+              <Button
+                type="button"
+                onClick={handleNext}
+                disabled={submitting}
+              >
+                {currentStep === totalSteps ? (
+                  submitting ? (
+                    'Completing...'
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Complete Setup
+                    </>
+                  )
                 ) : (
                   <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Complete Setup
+                    Next
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </>
-                )
-              ) : (
-                <>
-                  Next
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

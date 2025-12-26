@@ -54,7 +54,10 @@ export async function PUT(
 
     // Check permissions (only SUPER_ADMIN and ADMIN can update users)
     const allowedRoles = ['owner', 'admin']
-    if (!allowedRoles.includes((userData.role as any)?.[0]?.code || '')) {
+    // Role can be object or array depending on Supabase query
+    const roleData = userData.role as any
+    const roleCode = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+    if (!allowedRoles.includes(roleCode || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

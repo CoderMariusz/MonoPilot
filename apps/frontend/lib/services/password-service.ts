@@ -102,6 +102,7 @@ export async function getPasswordPolicy(
 /**
  * Check if password exists in user's history (last 5 passwords)
  * SECURITY: Uses service role client to bypass RLS
+ * SECURITY: Uses constant-time check to prevent timing attacks (CWE-208)
  */
 export async function checkPasswordHistory(
   supabase: SupabaseClient,
@@ -118,15 +119,17 @@ export async function checkPasswordHistory(
 
   if (error) throw error
 
-  // Check if password matches any hash in history
-  if (history && history.length > 0) {
-    for (const entry of history) {
-      const matches = await verifyPassword(password, entry.password_hash)
-      if (matches) return true
-    }
-  }
+  // SECURITY: Always check all hashes regardless of matches (constant time)
+  // This prevents timing attacks that could reveal password history info
+  const historyHashes = (history || []).map(entry => entry.password_hash)
 
-  return false
+  // Check all hashes in parallel - execution time is consistent regardless of match position
+  const checks = await Promise.all(
+    historyHashes.map(hash => verifyPassword(password, hash))
+  )
+
+  // Return true if any hash matched
+  return checks.some(match => match === true)
 }
 
 /**
@@ -186,11 +189,19 @@ export async function isPasswordExpired(
 }
 
 /**
+ * Minimum execution time for password operations (milliseconds)
+ * SECURITY: Prevents timing attacks by ensuring consistent response times (CWE-208)
+ */
+const MIN_PASSWORD_OPERATION_TIME_MS = 100
+
+/**
  * Change user password
  * - Verifies current password
  * - Validates new password
  * - Checks password history
  * - Terminates other sessions
+ *
+ * SECURITY: Uses minimum execution time to prevent timing attacks
  */
 export async function changePassword(
   supabase: SupabaseClient,
@@ -198,75 +209,86 @@ export async function changePassword(
   currentPassword: string,
   newPassword: string
 ): Promise<void> {
-  // Get user's current password hash
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('id, org_id, password_hash')
-    .eq('id', userId)
-    .single()
+  // SECURITY: Record start time for timing attack prevention
+  const startTime = Date.now()
 
-  if (userError) throw userError
-  if (!user) throw new Error('User not found')
+  try {
+    // Get user's current password hash
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, org_id, password_hash')
+      .eq('id', userId)
+      .single()
 
-  // Verify current password (if user has password_hash)
-  if (user.password_hash) {
-    const isValid = await verifyPassword(currentPassword, user.password_hash)
-    if (!isValid) throw new Error('Current password is incorrect')
-  }
+    if (userError) throw userError
+    if (!user) throw new Error('User not found')
 
-  // Validate new password
-  const validation = validatePassword(newPassword)
-  if (!validation.valid) {
-    throw new Error('New password does not meet requirements')
-  }
+    // Verify current password (if user has password_hash)
+    if (user.password_hash) {
+      const isValid = await verifyPassword(currentPassword, user.password_hash)
+      if (!isValid) throw new Error('Current password is incorrect')
+    }
 
-  // Check if current and new password are the same
-  if (currentPassword === newPassword) {
-    throw new Error('New password must be different from current password')
-  }
+    // Validate new password
+    const validation = validatePassword(newPassword)
+    if (!validation.valid) {
+      throw new Error('New password does not meet requirements')
+    }
 
-  // Check password history (if enforced)
-  const policy = await getPasswordPolicy(supabase, user.org_id)
-  if (policy.enforce_password_history) {
-    const inHistory = await checkPasswordHistory(supabase, userId, newPassword)
-    if (inHistory) {
-      throw new Error('Password was used recently. Please choose a different password.')
+    // Check if current and new password are the same
+    if (currentPassword === newPassword) {
+      throw new Error('New password must be different from current password')
+    }
+
+    // Check password history (if enforced)
+    const policy = await getPasswordPolicy(supabase, user.org_id)
+    if (policy.enforce_password_history) {
+      const inHistory = await checkPasswordHistory(supabase, userId, newPassword)
+      if (inHistory) {
+        throw new Error('Password was used recently. Please choose a different password.')
+      }
+    }
+
+    // Hash new password
+    const newHash = await hashPassword(newPassword)
+
+    // Add old password to history (if exists)
+    if (user.password_hash) {
+      await addToHistory(supabase, userId, user.password_hash)
+    }
+
+    // Calculate password expiry date
+    let passwordExpiresAt: string | null = null
+    if (policy.password_expiry_days) {
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + policy.password_expiry_days)
+      passwordExpiresAt = expiresAt.toISOString()
+    }
+
+    // Update user password
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        password_hash: newHash,
+        password_changed_at: new Date().toISOString(),
+        password_expires_at: passwordExpiresAt,
+        force_password_change: false,
+      })
+      .eq('id', userId)
+
+    if (updateError) throw updateError
+
+    // Terminate other sessions (keep current session)
+    // Note: We don't have session_id here, so we terminate all
+    // In production, you'd pass current session_id to keep it active
+    await terminateAllSessions(supabase, userId)
+  } finally {
+    // SECURITY: Ensure minimum execution time to prevent timing attacks
+    const elapsed = Date.now() - startTime
+    if (elapsed < MIN_PASSWORD_OPERATION_TIME_MS) {
+      await new Promise(resolve => setTimeout(resolve, MIN_PASSWORD_OPERATION_TIME_MS - elapsed))
     }
   }
-
-  // Hash new password
-  const newHash = await hashPassword(newPassword)
-
-  // Add old password to history (if exists)
-  if (user.password_hash) {
-    await addToHistory(supabase, userId, user.password_hash)
-  }
-
-  // Calculate password expiry date
-  let passwordExpiresAt: string | null = null
-  if (policy.password_expiry_days) {
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + policy.password_expiry_days)
-    passwordExpiresAt = expiresAt.toISOString()
-  }
-
-  // Update user password
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({
-      password_hash: newHash,
-      password_changed_at: new Date().toISOString(),
-      password_expires_at: passwordExpiresAt,
-      force_password_change: false,
-    })
-    .eq('id', userId)
-
-  if (updateError) throw updateError
-
-  // Terminate other sessions (keep current session)
-  // Note: We don't have session_id here, so we terminate all
-  // In production, you'd pass current session_id to keep it active
-  await terminateAllSessions(supabase, userId)
 }
 
 /**

@@ -156,10 +156,13 @@ export async function POST(request: NextRequest) {
     }
 
     const orgId = userData.org_id
-    const userRole = (userData.role as any)?.code
+    // Role can be object or array depending on Supabase query
+    const roleData = userData.role as any
+    const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
 
-    // Check role permissions (SUPER_ADMIN, ADMIN, WAREHOUSE_MANAGER)
-    if (!['SUPER_ADMIN', 'ADMIN', 'WAREHOUSE_MANAGER'].includes(userRole)) {
+    // Check role permissions - use lowercase role codes as stored in DB
+    const allowedRoles = ['owner', 'admin', 'warehouse_manager']
+    if (!allowedRoles.includes(userRole || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

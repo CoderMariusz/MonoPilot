@@ -8,26 +8,28 @@ import { QuickActions } from '@/components/dashboard/QuickActions'
 export default async function DashboardPage() {
   const supabase = await createServerSupabase()
 
-  // Authentication is handled by parent layout, but we need session for queries
+  // Use getUser() instead of getSession() for security
+  // Authentication is already verified by parent layout
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
 
-  // If no session, redirect (should be caught by layout, but safety check)
-  if (!session) {
+  // If no user, redirect (should be caught by layout, but safety check)
+  if (authError || !user) {
     redirect('/login')
   }
 
   // Get current user to check org_id
   const { data: currentUser, error: userError } = await supabase
     .from('users')
-    .select('org_id, role')
-    .eq('id', session.user.id)
+    .select('org_id, role_id, first_name, last_name, email')
+    .eq('id', user.id)
     .single()
 
-  // If user not found or error, sign out and redirect
+  // If user not found or error, this means RLS is blocking or user was deleted
+  // Don't sign out here - layout will handle it
   if (!currentUser || userError) {
-    await supabase.auth.signOut()
     redirect('/login')
   }
 
@@ -40,8 +42,6 @@ export default async function DashboardPage() {
 
   const showWelcomeBanner = !organization?.setup_completed
   const enabledModules = organization?.enabled_modules || []
-
-  const user = session.user
 
   // Define all available module cards
   const allModules: ModuleCardProps[] = [

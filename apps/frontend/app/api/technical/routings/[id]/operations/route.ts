@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { createOperationSchema } from '@/lib/validation/routing-schemas'
+import { ZodError } from 'zod'
 
 export async function GET(
   request: NextRequest,
@@ -42,21 +44,33 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    // BUG-003 FIX: Check user role (admin or technical only)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
 
-    if (!body.sequence) {
-      return NextResponse.json({ error: 'sequence is required' }, { status: 400 })
+    if (userError || !userData) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
+
+    if (!['admin', 'technical'].includes(userData.role)) {
+      return NextResponse.json(
+        { error: 'Forbidden: Admin or Technical role required' },
+        { status: 403 }
+      )
+    }
+
+    // BUG-004 FIX: Validate request body with Zod schema
+    const body = await request.json()
+    const validatedData = createOperationSchema.parse(body)
 
     const { data: operation, error } = await supabase
       .from('routing_operations')
       .insert({
         routing_id: id,
-        sequence: body.sequence,
-        name: body.name || null,
-        description: body.description || null,
-        estimated_duration_minutes: body.estimated_duration_minutes || null,
-        labor_cost_per_hour: body.labor_cost_per_hour || null,
+        ...validatedData
       })
       .select()
       .single()
@@ -70,6 +84,12 @@ export async function POST(
 
     return NextResponse.json({ data: operation }, { status: 201 })
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: error.errors[0].message },
+        { status: 400 }
+      )
+    }
     console.error('Error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

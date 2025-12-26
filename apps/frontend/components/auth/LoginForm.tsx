@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { LoginSchema, type LoginInput } from '@/lib/validation/auth-schemas'
-import { signIn } from '@/lib/auth/auth-client'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -41,35 +40,42 @@ export function LoginForm() {
     setIsLoading(true)
 
     try {
-      const { session, error } = await signIn(
-        data.email,
-        data.password,
-        data.rememberMe
-      )
+      // Use server-side login API to properly set cookies
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+        }),
+      })
 
-      if (error) {
+      const result = await response.json()
+
+      if (!response.ok) {
         toast({
           variant: 'destructive',
           title: 'Login failed',
-          description: error.message,
+          description: result.error || 'Invalid credentials',
         })
         // Clear password field on error
         form.setValue('password', '')
         return
       }
 
-      if (session) {
-        toast({
-          title: 'Welcome back!',
-          description: 'Successfully logged in',
-        })
+      toast({
+        title: 'Welcome back!',
+        description: 'Successfully logged in',
+      })
 
-        // Redirect to original URL or dashboard
-        const redirect = searchParams.get('redirect') || '/dashboard'
-        router.push(redirect)
-        router.refresh()
-      }
+      // Redirect to original URL or dashboard
+      const redirect = searchParams.get('redirect') || '/dashboard'
+      router.push(redirect)
+      router.refresh()
     } catch (error) {
+      console.error('Login error:', error)
       toast({
         variant: 'destructive',
         title: 'Error',

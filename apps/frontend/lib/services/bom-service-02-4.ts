@@ -5,7 +5,9 @@
  * Architecture: Service layer accepts Supabase client as parameter to support
  * both server-side (API routes) and client-side usage.
  *
- * Security: All queries enforce org_id isolation via RLS (ADR-013).
+ * Security: All queries enforce org_id isolation via BOTH:
+ * - RLS policies (database layer)
+ * - Explicit org_id filtering (service layer - Defense in Depth, ADR-013)
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -61,18 +63,25 @@ const ROW_NOT_FOUND_ERROR_CODE = 'PGRST116'
  *
  * @param supabase - Supabase client instance
  * @param filters - Optional filter, pagination, and sorting options
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
  * @returns Paginated list of BOMs with product details
  *
  * @example
  * // Get first page of active BOMs
- * const result = await listBOMs(supabase, { status: 'active', page: 1, limit: 50 })
+ * const result = await listBOMs(supabase, { status: 'active', page: 1, limit: 50 }, orgId)
  *
  * @see AC-01 to AC-07 List page and display
  */
 export async function listBOMs(
   supabase: SupabaseClient,
-  filters: BOMFilters = {}
+  filters: BOMFilters = {},
+  orgId: string
 ): Promise<BOMsListResponse> {
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
   const {
     page = 1,
     limit = 50,
@@ -85,9 +94,11 @@ export async function listBOMs(
     sortOrder = 'desc',
   } = filters
 
-  // Build query with product join
-  let query = supabase.from('boms').select(
-    `
+  // Build query with product join and org_id filter
+  let query = supabase
+    .from('boms')
+    .select(
+      `
       *,
       product:products!product_id (
         id,
@@ -97,14 +108,18 @@ export async function listBOMs(
         uom
       )
     `,
-    { count: 'exact' }
-  )
+      { count: 'exact' }
+    )
+    .eq('org_id', orgId) // Defense in Depth - explicit org_id filter
 
   // Apply filters
   if (search) {
+    // Sanitize search input to prevent SQL injection
+    // Escape special LIKE pattern characters: % _ \
+    const sanitizedSearch = search.replace(/[%_\\]/g, '\\$&')
     // Search by product code or name via nested filter
     query = query.or(
-      `product.code.ilike.%${search}%,product.name.ilike.%${search}%`
+      `product.code.ilike.%${sanitizedSearch}%,product.name.ilike.%${sanitizedSearch}%`
     )
   }
 
@@ -158,11 +173,22 @@ export async function listBOMs(
 
 /**
  * Get single BOM by ID
+ *
+ * @param supabase - Supabase client instance
+ * @param id - BOM ID
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
+ * @returns BOM with product details or null if not found
  */
 export async function getBOM(
   supabase: SupabaseClient,
-  id: string
+  id: string,
+  orgId: string
 ): Promise<BOMWithProduct | null> {
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
   const { data, error } = await supabase
     .from('boms')
     .select(
@@ -178,6 +204,7 @@ export async function getBOM(
     `
     )
     .eq('id', id)
+    .eq('org_id', orgId) // Defense in Depth - explicit org_id filter
     .single()
 
   if (error) {
@@ -192,16 +219,29 @@ export async function getBOM(
 
 /**
  * Get next available version number for a product
+ *
+ * @param supabase - Supabase client instance
+ * @param productId - Product ID
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
+ * @returns Next version number
+ *
  * AC-09, AC-21: Auto-version
  */
 export async function getNextVersion(
   supabase: SupabaseClient,
-  productId: string
+  productId: string,
+  orgId: string
 ): Promise<number> {
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
   const { data, error } = await supabase
     .from('boms')
     .select('version')
     .eq('product_id', productId)
+    .eq('org_id', orgId) // Defense in Depth - explicit org_id filter
     .order('version', { ascending: false })
     .limit(1)
 
@@ -218,6 +258,33 @@ export async function getNextVersion(
 
 /**
  * Check if date range overlaps with existing BOMs for the same product
+ *
+ * ARCHITECTURE NOTE - Date Overlap Validation (DRY Principle):
+ *
+ * This function calls the RPC check_bom_date_overlap() for CLIENT-SIDE validation.
+ * The RPC provides early feedback to users before attempting INSERT/UPDATE.
+ *
+ * However, the DATABASE TRIGGER check_bom_date_overlap() (migration 038) is the
+ * SOURCE OF TRUTH and will ALWAYS enforce date overlap rules, even if this
+ * service-layer check is bypassed.
+ *
+ * Both use IDENTICAL daterange logic to ensure consistency.
+ *
+ * Why this is NOT a DRY violation:
+ * - Trigger: Preventive control (blocks invalid data at database level)
+ * - RPC: Early validation (provides user-friendly error messages)
+ * - Service: Orchestration layer (coordinates validation flow)
+ *
+ * This is Defense in Depth pattern, not duplication.
+ *
+ * @param supabase - Supabase client instance
+ * @param productId - Product ID
+ * @param effectiveFrom - Start date
+ * @param effectiveTo - End date (null for ongoing)
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
+ * @param excludeId - Optional BOM ID to exclude from check (for updates)
+ * @returns Overlap result with conflicting BOM if any
+ *
  * AC-18 to AC-20: Date range validation
  */
 export async function checkDateOverlap(
@@ -225,14 +292,23 @@ export async function checkDateOverlap(
   productId: string,
   effectiveFrom: string,
   effectiveTo: string | null,
+  orgId: string,
   excludeId?: string
 ): Promise<DateOverlapResult> {
-  // Use RPC function for date overlap check
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
+  // Use RPC function for date overlap check with org_id
+  // This provides early validation for user feedback
+  // Database trigger will enforce as final safeguard
   const { data, error } = await supabase.rpc('check_bom_date_overlap', {
     p_product_id: productId,
     p_effective_from: effectiveFrom,
     p_effective_to: effectiveTo,
     p_exclude_id: excludeId || null,
+    p_org_id: orgId, // Defense in Depth - pass org_id to RPC
   })
 
   if (error) {
@@ -253,12 +329,24 @@ export async function checkDateOverlap(
 
 /**
  * Create new BOM with auto-versioning and date overlap validation
+ *
+ * @param supabase - Supabase client instance
+ * @param input - Create BOM request data
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
+ * @returns Created BOM with product details
+ *
  * AC-08 to AC-13: Create BOM with versioning and validation
  */
 export async function createBOM(
   supabase: SupabaseClient,
-  input: CreateBOMRequest
+  input: CreateBOMRequest,
+  orgId: string
 ): Promise<BOMWithProduct> {
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
   // Validate input
   const validation = createBOMSchema.safeParse(input)
   if (!validation.success) {
@@ -267,12 +355,13 @@ export async function createBOM(
 
   const data = validation.data
 
-  // Check for date overlap
+  // Check for date overlap (pass orgId)
   const overlapCheck = await checkDateOverlap(
     supabase,
     data.product_id,
     data.effective_from,
-    data.effective_to || null
+    data.effective_to || null,
+    orgId
   )
 
   if (overlapCheck.overlaps) {
@@ -285,13 +374,14 @@ export async function createBOM(
     )
   }
 
-  // Get next version
-  const nextVersion = await getNextVersion(supabase, data.product_id)
+  // Get next version (pass orgId)
+  const nextVersion = await getNextVersion(supabase, data.product_id, orgId)
 
-  // Insert BOM
+  // Insert BOM with explicit org_id
   const { data: created, error } = await supabase
     .from('boms')
     .insert({
+      org_id: orgId, // Defense in Depth - explicit org_id in insert
       product_id: data.product_id,
       version: nextVersion,
       effective_from: data.effective_from,
@@ -325,13 +415,26 @@ export async function createBOM(
 
 /**
  * Update existing BOM
+ *
+ * @param supabase - Supabase client instance
+ * @param id - BOM ID
+ * @param input - Update BOM request data
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
+ * @returns Updated BOM with product details
+ *
  * AC-14 to AC-17: Edit BOM (product locked)
  */
 export async function updateBOM(
   supabase: SupabaseClient,
   id: string,
-  input: UpdateBOMRequest
+  input: UpdateBOMRequest,
+  orgId: string
 ): Promise<BOMWithProduct> {
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
   // Validate input
   const validation = updateBOMSchema.safeParse(input)
   if (!validation.success) {
@@ -349,8 +452,8 @@ export async function updateBOM(
 
   // If updating dates, check for overlap
   if (data.effective_from !== undefined || data.effective_to !== undefined) {
-    // Get current BOM to know product_id and current dates
-    const currentBOM = await getBOM(supabase, id)
+    // Get current BOM to know product_id and current dates (with org_id filter)
+    const currentBOM = await getBOM(supabase, id, orgId)
     if (!currentBOM) {
       throw new Error('BOM not found')
     }
@@ -366,6 +469,7 @@ export async function updateBOM(
       currentBOM.product_id,
       effectiveFrom,
       effectiveTo,
+      orgId,
       id // Exclude current BOM from overlap check
     )
 
@@ -376,13 +480,14 @@ export async function updateBOM(
     }
   }
 
-  // Update BOM
+  // Update BOM with org_id filter
   const { data: updated, error } = await supabase
     .from('boms')
     .update({
       ...data,
     })
     .eq('id', id)
+    .eq('org_id', orgId) // Defense in Depth - explicit org_id filter
     .select(
       `
       *,
@@ -406,23 +511,35 @@ export async function updateBOM(
 
 /**
  * Delete BOM (blocked if used in Work Orders)
+ *
+ * @param supabase - Supabase client instance
+ * @param id - BOM ID
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
+ *
  * AC-31 to AC-33: Delete with dependency checking
  */
 export async function deleteBOM(
   supabase: SupabaseClient,
-  id: string
+  id: string,
+  orgId: string
 ): Promise<void> {
-  // First, check if BOM exists
-  const bom = await getBOM(supabase, id)
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
+  // First, check if BOM exists (with org_id filter)
+  const bom = await getBOM(supabase, id, orgId)
   if (!bom) {
     throw new Error('BOM not found')
   }
 
-  // Check for Work Order references
+  // Check for Work Order references (with org_id filter in RPC)
   const { data: workOrders, error: woError } = await supabase.rpc(
     'get_work_orders_for_bom',
     {
       p_bom_id: id,
+      p_org_id: orgId, // Defense in Depth - pass org_id to RPC
     }
   )
 
@@ -435,11 +552,12 @@ export async function deleteBOM(
     throw new Error(`Cannot delete BOM used in Work Orders: ${woNumbers}`)
   }
 
-  // Delete BOM
+  // Delete BOM with org_id filter
   const { error: deleteError } = await supabase
     .from('boms')
     .delete()
     .eq('id', id)
+    .eq('org_id', orgId) // Defense in Depth - explicit org_id filter
 
   if (deleteError) {
     throw new Error(deleteError.message)
@@ -448,15 +566,28 @@ export async function deleteBOM(
 
 /**
  * Get BOM timeline for a product (all versions)
+ *
+ * @param supabase - Supabase client instance
+ * @param productId - Product ID
+ * @param orgId - Organization ID for multi-tenant isolation (REQUIRED - ADR-013)
+ * @returns Timeline response with all BOM versions
+ *
  * AC-24 to AC-30: Version timeline visualization (FR-2.23)
  */
 export async function getBOMTimeline(
   supabase: SupabaseClient,
-  productId: string
+  productId: string,
+  orgId: string
 ): Promise<BOMTimelineResponse> {
-  // Use RPC function for timeline data
+  // Validate orgId - Defense in Depth
+  if (!orgId) {
+    throw new Error('org_id is required for multi-tenant isolation')
+  }
+
+  // Use RPC function for timeline data with org_id
   const { data, error } = await supabase.rpc('get_bom_timeline', {
     p_product_id: productId,
+    p_org_id: orgId, // Defense in Depth - pass org_id to RPC
   })
 
   if (error) {

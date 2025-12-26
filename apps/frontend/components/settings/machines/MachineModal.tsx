@@ -265,8 +265,8 @@ export function MachineModal({ mode, machine, open, onClose, onSuccess }: Machin
           throw new Error(errorData.error || 'Failed to update machine')
         }
 
-        const data = await response.json()
-        result = data.machine
+        // API returns machine directly, not wrapped
+        result = await response.json()
       } else {
         const response = await fetch('/api/v1/settings/machines', {
           method: 'POST',
@@ -279,8 +279,8 @@ export function MachineModal({ mode, machine, open, onClose, onSuccess }: Machin
           throw new Error(errorData.error || 'Failed to create machine')
         }
 
-        const data = await response.json()
-        result = data.machine
+        // API returns machine directly, not wrapped
+        result = await response.json()
       }
 
       onSuccess(result)

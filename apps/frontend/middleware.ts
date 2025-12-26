@@ -52,15 +52,23 @@ export async function middleware(request: NextRequest) {
       }
     )
 
-    // Refresh session if needed
+    // Use getUser() instead of getSession() for consistency with layout
     const {
-      data: { session },
+      data: { user },
       error,
-    } = await supabase.auth.getSession()
+    } = await supabase.auth.getUser()
+
+    console.log('[Middleware]', {
+      pathname,
+      hasUser: !!user,
+      userId: user?.id,
+      error: error?.message,
+      isPublicRoute
+    })
 
     // If there's an auth error, allow public routes, redirect others to login
     if (error) {
-      console.error('Middleware auth error:', error.message)
+      console.error('[Middleware] Auth error:', error.message)
       if (isPublicRoute) {
         return supabaseResponse
       }
@@ -68,7 +76,8 @@ export async function middleware(request: NextRequest) {
     }
 
     // If not authenticated and trying to access protected route
-    if (!session && !isPublicRoute) {
+    if (!user && !isPublicRoute) {
+      console.log('[Middleware] No user, redirecting to /login')
       const redirectUrl = new URL('/login', request.url)
       // Preserve original URL for redirect after login
       if (pathname !== '/' && pathname !== '/login') {
@@ -78,10 +87,12 @@ export async function middleware(request: NextRequest) {
     }
 
     // If authenticated and trying to access auth pages, redirect to dashboard
-    if (session && isPublicRoute && pathname !== '/auth/callback') {
+    if (user && isPublicRoute && pathname !== '/auth/callback') {
+      console.log('[Middleware] User authenticated on public route, redirecting to /dashboard')
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
+    console.log('[Middleware] Allowing request to continue')
     return supabaseResponse
   } catch (error) {
     // If anything fails, allow public routes

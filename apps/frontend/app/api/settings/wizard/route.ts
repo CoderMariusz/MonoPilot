@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { saveWizardProgress, getWizardProgress, completeWizard } from '@/lib/services/wizard-service'
+import { WizardService } from '@/lib/services/wizard-service'
 import { createServerSupabase } from '@/lib/supabase/server'
 
 /**
@@ -16,20 +16,28 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const result = await getWizardProgress()
+    // Get org_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 })
+    if (!userData?.org_id) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
-    return NextResponse.json(result.data)
+    const progress = await WizardService.getProgress(userData.org_id)
+
+    return NextResponse.json({ success: true, progress })
   } catch (error) {
+    console.error('Wizard GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 /**
- * POST /api/settings/wizard/progress
+ * POST /api/settings/wizard
  * Save wizard progress
  * AC-012.3: Auto-save per step
  *
@@ -45,14 +53,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check admin role
+    // Check admin role and get org_id
     const { data: userData } = await supabase
       .from('users')
-      .select('role')
+      .select('org_id, role:roles(code)')
       .eq('id', user.id)
       .single()
 
-    if (!userData || userData.role !== 'admin') {
+    const role = userData?.role as any
+    const roleCode = role?.code || role?.[0]?.code
+    // Allow admin or owner to save progress
+    if (!userData || (roleCode !== 'admin' && roleCode !== 'owner')) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }
@@ -69,20 +80,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await saveWizardProgress(step, data)
+    // We use updateProgress to simply persist the state of the wizard
+    // This supports the resumable nature of the wizard without necessarily committing side-effects yet
+    await WizardService.updateProgress(userData.org_id, step, data)
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true, progress: result.data })
+    return NextResponse.json({ success: true })
   } catch (error) {
+    console.error('Wizard POST error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 /**
- * PUT /api/settings/wizard/complete
+ * PUT /api/settings/wizard
  * Mark wizard as completed
  * AC-012.8: Wizard completion
  *
@@ -100,25 +110,31 @@ export async function PUT() {
     // Check admin role
     const { data: userData } = await supabase
       .from('users')
-      .select('role')
+      .select('org_id, role:roles(code)')
       .eq('id', user.id)
       .single()
 
-    if (!userData || userData.role !== 'admin') {
+    const role = userData?.role as any
+    const roleCode = role?.code || role?.[0]?.code
+    if (!userData || (roleCode !== 'admin' && roleCode !== 'owner')) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }
       )
     }
 
-    const result = await completeWizard()
+    const result = await WizardService.completeWizard()
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to complete wizard' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Wizard PUT error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

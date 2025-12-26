@@ -1,9 +1,9 @@
 # MonoPilot - Project State
 
-> Last Updated: 2025-12-23 (ORCHESTRATOR Session - Stories 01.15 + 01.16)
+> Last Updated: 2025-12-24 (TD-208/TD-209 Database Schemas)
 > Epic 01 Progress: 14.91/14 (106.5%) - **Epic Complete!** ✅
 
-## Current: **14 Stories Implemented** ✅
+## Current: **14 Stories Implemented** ✅ + **Cloud Database Synced** 🚀
 
 ---
 
@@ -86,7 +86,6 @@
 - 2 services (session, password)
 - 1 utility (password-helpers)
 - 9 API routes
-- 2 types, 2 validations, 1 infrastructure
 
 **Phase 3: REFACTOR ✅**
 - 3 files refactored
@@ -272,6 +271,71 @@
 
 ---
 
+## 🆕 Track D Stories (2025-12-24)
+
+### ⏳ TD-208 - Language Selector for Allergen Names (SCHEMA DESIGNED)
+
+**Type:** Feature Extension
+**Status:** SCHEMA READY (10%)
+**Date:** 2025-12-24
+
+#### What Was Done
+
+**Database Schema:**
+- Discovered `users.language` column already exists (migration 003)
+- Added CHECK constraint for valid codes ('en', 'pl', 'de', 'fr')
+- Added index on language column
+- Created `get_user_language(UUID)` RPC function with fallback chain
+- Created `set_user_language(TEXT)` RPC function with validation
+
+**Migration:** `supabase/migrations/031_add_user_language_preference.sql`
+
+**API Contract:** `docs/3-ARCHITECTURE/api/settings/user-preferences.md`
+
+#### Remaining Work
+
+- [ ] Apply migration 031 to database
+- [ ] Implement user-preference-service.ts
+- [ ] Implement API routes
+- [ ] Implement LanguageSelector component
+- [ ] Update AllergensDataTable to use language preference
+- [ ] Write tests (33 estimated)
+
+---
+
+### ⏳ TD-209 - Products Column in Allergens Table (SCHEMA DESIGNED)
+
+**Type:** Feature Extension
+**Status:** SCHEMA READY (10%)
+**Date:** 2025-12-24
+
+#### What Was Done
+
+**Database Schema:**
+- Created `product_allergens` junction table
+- Composite unique constraint (product_id, allergen_id)
+- RLS policies (ADR-013 pattern)
+- Indexes for performance (product, allergen, org, composite)
+- Created `get_allergen_product_count(UUID)` RPC function
+- Created `get_all_allergen_product_counts()` RPC function (batch)
+- Created `get_products_by_allergen(UUID)` RPC function
+- Auto-set org_id trigger from product
+
+**Migration:** `supabase/migrations/032_create_product_allergens_table.sql`
+
+**API Contract:** `docs/3-ARCHITECTURE/api/settings/allergen-counts.md`
+
+#### Remaining Work
+
+- [ ] Apply migration 032 to database
+- [ ] Update allergen-service.ts with count methods
+- [ ] Implement API routes for counts
+- [ ] Update AllergensDataTable with Products column
+- [ ] Implement navigation to filtered products
+- [ ] Write tests (33 estimated)
+
+---
+
 ## Epic 01 Progress
 
 ### Stories Status
@@ -292,91 +356,244 @@
 - ✅ 01.13 (99%)
 - ✅ 01.15 (90% - pending migrations)
 - ✅ 01.16 (90% - pending migrations)
+- ⏳ TD-208 (10% - schema ready)
+- ⏳ TD-209 (10% - schema ready)
 
 **Progress:** 14.91/14 stories (106.5%) - **Epic 01 Effectively Complete!**
 
-*(01.15 and 01.16 were additional stories beyond original 14)*
+*(01.15, 01.16, TD-208, TD-209 were additional stories beyond original 14)*
 
 ---
 
-## Recent Session (2025-12-23)
+## Recent Session (2025-12-24)
 
-### ✅ STORIES 01.15 + 01.16 - DUAL-TRACK PARALLEL IMPLEMENTATION
+### TD-208 + TD-209 Database Schema Design
 
-**Type:** Full TDD Cycle (RED → GREEN → REFACTOR → REVIEW)
-**Status:** **IMPLEMENTATION COMPLETE** (90%)
-**Completion Date:** 2025-12-23
-**Duration:** ~8 hours (parallel execution)
-**Agents Used:** 6 (2× TEST-WRITER, 2× BACKEND-DEV, SENIOR-DEV, CODE-REVIEWER)
+**Type:** Architecture Design
+**Status:** **SCHEMA READY**
+**Date:** 2025-12-24
+**Duration:** ~1 hour
+**Agent:** ARCHITECT-AGENT
 
 #### Session Highlights
 
-**Parallel Execution:**
-- Track A (01.15) and Track B (01.16) executed simultaneously
-- 50% time savings vs sequential (8h vs 16h)
-- Successful coordination of 6 specialized agents
+**Analysis:**
+- Discovered `users.language` column already exists
+- Verified `products` table has org_id column
+- Confirmed `allergens` table is global (no org_id)
+- Identified missing junction table for product-allergen links
 
-**Comprehensive Testing:**
-- 367 tests written (206 + 161)
-- Unit, integration, and RLS tests
-- Security-critical areas: 95-100% coverage target
+**Schema Decisions:**
+1. User language preference: Use existing column + add validation
+2. Product-allergen junction: New table with RLS
 
-**Complete Implementation:**
-- 31 production files created
-- 4 database migrations
-- 15 API endpoints
-- 27 service methods
-- All 22 acceptance criteria covered
+**Files Created (4):**
+- `supabase/migrations/031_add_user_language_preference.sql`
+- `supabase/migrations/032_create_product_allergens_table.sql`
+- `docs/3-ARCHITECTURE/api/settings/user-preferences.md`
+- `docs/3-ARCHITECTURE/api/settings/allergen-counts.md`
 
-**Quality Assurance:**
-- 5 refactoring commits
-- Code review with 7/8 issues resolved
-- Security score: 8.5/10
-- Code quality score: 8/10
+#### Key Design Decisions
 
-#### Files Summary
+**TD-208 (Language Preference):**
+- Column: `users.language` (existing)
+- Constraint: CHECK (language IN ('en', 'pl', 'de', 'fr'))
+- Default: 'en'
+- Fallback chain: user.language -> organization.locale -> 'en'
+- RPC functions for get/set with validation
 
-**Total: 31 files**
-- Migrations: 4
-- Services: 4
-- Utils: 1
-- Types: 3
-- Validation: 3
-- API Routes: 15
-- Infrastructure: 1
-
-#### Dependencies Added
-
-```json
-{
-  "bcryptjs": "^3.0.3",
-  "ua-parser-js": "^2.0.6",
-  "resend": "^6.6.0"
-}
-```
-
-#### Next Steps
-
-**Immediate (Manual):**
-1. Run migrations in Supabase Studio
-2. Add RESEND_API_KEY to .env.local
-3. Run test suite: `pnpm test` (expect 367/367 PASSING)
-
-**Short-Term:**
-4. QA testing (validate all AC)
-5. Documentation (API docs, guides)
-6. Deployment preparation
+**TD-209 (Product-Allergen Junction):**
+- Table: `product_allergens`
+- Columns: id, product_id, allergen_id, org_id, created_at, created_by
+- Constraint: UNIQUE(product_id, allergen_id)
+- Cascade delete on product/allergen deletion
+- RLS: ADR-013 pattern (org_id lookup from users table)
+- Trigger: Auto-set org_id from product
+- RPC functions for count queries (single + batch)
 
 ---
 
 ## Last Major Achievement
 
-**Stories 01.15 + 01.16:** Complete dual-track parallel implementation
-**Session Date:** 2025-12-23
-**Next Story:** 01.7 (Module Toggles) or complete 01.6 fixes
+**TD-208 + TD-209:** Database schemas designed and documented
+**Session Date:** 2025-12-24
+**Next Story:** Apply migrations, implement services and API routes
 
 ---
 
-**Last Updated:** 2025-12-23
-**Epic 01 Status:** Effectively Complete (14/14 + 2 bonus stories)
+## Supabase Cloud Database Sync (2025-12-23)
+
+### ✅ CLOUD DATABASE FULLY SYNCED
+
+**Status:** **COMPLETE** ✅
+**Date:** 2025-12-23
+**Duration:** ~30 minutes
+
+#### What Was Done
+
+1. **Connection Established:**
+   - Project linked: `pgroxddbtaevdegnidaz`
+   - Access token configured from `.env`
+   - Connection verified successfully
+
+2. **Migration History Cleaned:**
+   - 175 old migrations marked as "reverted"
+   - Migration table reset to clean state
+   - Ready for new migrations
+
+3. **All Migrations Applied:**
+   - 26 migrations pushed to cloud (001-026)
+   - All tables created successfully
+   - All RLS policies activated
+   - All seed data inserted
+
+4. **Documentation Created:**
+   - `.claude/SUPABASE-CONNECTION.md` - Complete connection guide
+   - `cloud_database_setup.sql` - Backup of all migrations
+   - `cloud_cleanup.sql` - Safe cleanup script
+   - `verify_cloud_db.sql` - Verification queries
+
+#### Cloud Database Contents
+
+**Tables (12):**
+- organizations, roles, users
+- modules, organization_modules
+- warehouses, locations
+- machines, production_lines
+- allergens, tax_codes
+- user_sessions, password_history, user_invitations
+
+**System Data:**
+- 10 roles seeded (owner, admin, production_manager, etc.)
+- 11 modules seeded (settings, technical, planning, etc.)
+
+**Security:**
+- All RLS policies active
+- Multi-tenant isolation enforced
+- Permission-based access control
+
+#### Quick Reconnect
+
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_6be6d9c3e23b75aef1614dddb81f31b8665794a3
+npx supabase link --project-ref pgroxddbtaevdegnidaz
+npx supabase migration list  # Verify sync
+```
+
+**Full Guide:** See `.claude/SUPABASE-CONNECTION.md`
+
+---
+
+**Last Updated:** 2025-12-26
+**Epic 01 Status:** Effectively Complete (14/14 + 4 extension stories)
+**Epic 02 Status:** Story 02.4 Database Track A IMPLEMENTED
+**Cloud Database:** ✅ Synced (migrations 037-038 pending: boms table + triggers)
 **Overall Progress:** 92.5% (pending migrations and testing)
+
+---
+
+## Epic 02 Progress (Technical Module)
+
+### Stories Status
+
+| Story | Description | Status | Notes |
+|-------|-------------|--------|-------|
+| 02.1 | Products CRUD | 80% | Tables exist, API implemented |
+| 02.2 | Product Version History | 70% | Version trigger exists |
+| 02.3 | Product Allergens | 70% | Junction table exists |
+| 02.4 | BOMs Management | 30% | Database Track A done |
+| 02.5 | BOM Lines | 0% | Not started |
+| 02.6 | Routings | 0% | Not started |
+| 02.7 | Routing Operations | 0% | Not started |
+
+---
+
+## Recent Session (2025-12-26)
+
+### Story 02.4 - Track A Database Implementation
+
+**Type:** GREEN Phase - TDD
+**Agent:** BACKEND-DEV
+**Status:** IMPLEMENTED (pending network verification)
+**Date:** 2025-12-26
+**Duration:** ~1 hour
+
+#### Files Created (4)
+
+**Migrations:**
+1. `supabase/migrations/037_create_boms_table.sql`
+   - Full `boms` table schema
+   - 5 indexes
+   - 4 RLS policies (ADR-013 pattern)
+   - Unique constraint (org_id, product_id, version)
+
+2. `supabase/migrations/038_create_boms_date_overlap_trigger.sql`
+   - `check_bom_date_overlap()` function
+   - `update_boms_updated_at()` function
+   - 2 triggers for date validation and timestamp
+
+**Tests:**
+3. `supabase/tests/bom-date-overlap.test.sql` (updated)
+   - Fixed invalid UUIDs
+   - Added auth.users FK inserts
+   - 12 test scenarios
+
+**Documentation:**
+4. `docs/2-MANAGEMENT/epics/current/02-technical/context/02.4/green-phase-database-report.md`
+   - Full implementation report
+   - Verification steps
+   - Handoff notes
+
+#### Schema Summary
+
+```sql
+CREATE TABLE boms (
+  id UUID PRIMARY KEY,
+  org_id UUID NOT NULL REFERENCES organizations(id),
+  product_id UUID NOT NULL REFERENCES products(id),
+  version INTEGER NOT NULL DEFAULT 1,
+  bom_type TEXT DEFAULT 'standard',
+  routing_id UUID,
+  effective_from DATE NOT NULL,
+  effective_to DATE,
+  status TEXT NOT NULL DEFAULT 'draft',
+  output_qty DECIMAL(15,6) NOT NULL,
+  output_uom TEXT NOT NULL,
+  units_per_box INTEGER,
+  boxes_per_pallet INTEGER,
+  notes TEXT,
+  created_at, updated_at, created_by, updated_by,
+  UNIQUE(org_id, product_id, version)
+);
+```
+
+#### Trigger Logic
+
+- Prevents overlapping date ranges for same product
+- Prevents multiple BOMs with NULL effective_to
+- Allows adjacent dates (no overlap)
+- Cross-org isolation enforced
+
+#### Test Coverage
+
+| Test | Scenario | Expected |
+|------|----------|----------|
+| 01-07 | Various overlaps | FAIL (prevented) |
+| 08 | NULL overlap | FAIL (prevented) |
+| 09 | Cross-org | PASS (allowed) |
+| 10 | Update overlap | FAIL (prevented) |
+| 11 | Single-day BOM | PASS (allowed) |
+| 12 | After ongoing | FAIL (prevented) |
+
+#### Verification Blocked
+
+Network connection to Supabase cloud timed out (firewall/network issue).
+
+**To Verify:**
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_6be6d9c3e23b75aef1614dddb81f31b8665794a3
+npx supabase db push
+# Run test via Dashboard SQL Editor
+```
+
+---

@@ -49,10 +49,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ error: 'User not found' }, { status: 401 })
     }
 
-    const userRole = (userData.role as any)?.code
+    // Role can be object or array depending on Supabase query
+    const roleData = userData.role as any
+    const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
 
-    // Check role permissions (SUPER_ADMIN, ADMIN, PROD_MANAGER)
-    if (!['SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER'].includes(userRole)) {
+    // Check role permissions - use lowercase role codes
+    if (!['owner', 'admin', 'production_manager'].includes(userRole || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

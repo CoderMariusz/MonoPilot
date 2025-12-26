@@ -1,0 +1,284 @@
+================================================================================
+FINAL QA REPORT: Stories TD-206, TD-207
+Track C - Locations Types
+================================================================================
+
+Date: 2025-12-24
+QA Agent: QA-AGENT
+Decision: FAIL
+Confidence: 100%
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+TYPE VALIDATION FOR STORIES TD-206 (LP Count Column) AND TD-207 (Move Feature)
+HAS FAILED.
+
+The LocationNode interface is incomplete and four critical type definitions are
+missing. TypeScript compilation fails with 260+ errors, 29+ directly related to
+location types.
+
+All 6 acceptance criteria fail.
+5 CRITICAL + 1 HIGH issues identified.
+No workarounds available (all issues are blocking).
+
+Status: Cannot proceed with implementation until types are defined.
+
+================================================================================
+ACCEPTANCE CRITERIA RESULTS
+================================================================================
+
+AC 1: LocationStats interface defined
+  Status: FAIL
+  Evidence: grep found no "LocationStats" in location.ts
+  Requirement: Must define interface with location statistics fields
+  Impact: Statistics calculations blocked
+
+AC 2: MoveLocationRequest interface defined
+  Status: FAIL
+  Evidence: grep found no "MoveLocationRequest" in location.ts
+  Requirement: Must define interface for move request payloads
+  Impact: TD-207 Move Feature blocked
+
+AC 3: MoveValidationResult interface defined
+  Status: FAIL
+  Evidence: grep found no "MoveValidationResult" in location.ts
+  Requirement: Must define interface for move validation results
+  Impact: Move validation blocked
+
+AC 4: LPCountResponse interface defined
+  Status: FAIL
+  Evidence: grep found no "LPCountResponse" in location.ts
+  Requirement: Must define interface for LP count API responses
+  Impact: API endpoint responses cannot be typed
+
+AC 5: LocationNode has lp_count field
+  Status: FAIL
+  Evidence: TS2353 errors in 24 test fixture objects
+  Error: "Object literal may only specify known properties,
+         and 'lp_count' does not exist in type 'LocationNode'"
+  Requirement: LocationNode must have lp_count: number field
+  Impact: All location nodes fail type checking
+
+AC 6: All types properly exported
+  Status: FAIL
+  Evidence: Missing types cannot be exported
+  Requirement: All types must have export keyword
+  Impact: Types cannot be imported in other modules
+
+Result: 0/6 AC passing (0%)
+
+================================================================================
+TYPESCRIPT COMPILATION STATUS
+================================================================================
+
+Command: npm run type-check (from apps/frontend)
+Status: FAILED
+
+Errors:
+  Total Errors: 260
+  Location-Related: 24 TS2353 (lp_count field)
+            + 5 TS2339 (location-service.ts schema)
+  Other: 231 (unrelated to this story)
+
+Blocking: YES
+Cannot compile frontend application with these errors.
+
+================================================================================
+CRITICAL ISSUES FOUND
+================================================================================
+
+ISSUE 1: LocationNode missing lp_count field
+  Severity: CRITICAL
+  Type: Type Definition Incomplete
+  Impact: 24 compilation errors, blocks all location features
+  Location: apps/frontend/lib/types/location.ts (line 76-80)
+  Fix Time: 5 minutes
+  Workaround: None (type is required)
+  Status: Blocking
+
+ISSUE 2: LocationStats interface not defined
+  Severity: CRITICAL
+  Type: Type Definition Missing
+  Impact: Cannot create location statistics, blocks TD-206
+  Location: apps/frontend/lib/types/location.ts (doesn't exist)
+  Fix Time: 10 minutes
+  Workaround: None (type is required)
+  Status: Blocking
+
+ISSUE 3: MoveLocationRequest interface not defined
+  Severity: CRITICAL
+  Type: Type Definition Missing
+  Impact: Cannot implement move feature, blocks TD-207
+  Location: apps/frontend/lib/types/location.ts (doesn't exist)
+  Fix Time: 5 minutes
+  Workaround: None (type is required)
+  Status: Blocking
+
+ISSUE 4: MoveValidationResult interface not defined
+  Severity: CRITICAL
+  Type: Type Definition Missing
+  Impact: Cannot validate moves, blocks TD-207
+  Location: apps/frontend/lib/types/location.ts (doesn't exist)
+  Fix Time: 5 minutes
+  Workaround: None (type is required)
+  Status: Blocking
+
+ISSUE 5: LPCountResponse interface not defined
+  Severity: CRITICAL
+  Type: Type Definition Missing
+  Impact: Cannot type API responses for LP count
+  Location: apps/frontend/lib/types/location.ts (doesn't exist)
+  Fix Time: 5 minutes
+  Workaround: None (type is required)
+  Status: Blocking
+
+HIGH ISSUE 1: location-service.ts schema mismatch
+  Severity: HIGH
+  Type: Type Compatibility Error
+  Impact: 5 TypeScript compilation errors
+  Location: apps/frontend/lib/services/location-service.ts (line 282-283)
+  Issue: Schema defines zone/capacity fields not in Location interface
+  Fix Time: 20 minutes
+  Workaround: None (compilation required)
+  Status: Blocking
+
+Summary: 5 CRITICAL + 1 HIGH = 6 blocking issues
+
+================================================================================
+REQUIRED FIXES
+================================================================================
+
+PRIORITY 1 - Type Definitions (Required for PASS):
+
+1. Add lp_count field to LocationNode
+   File: apps/frontend/lib/types/location.ts
+   Add after line 79: lp_count: number
+   Time: 5 minutes
+
+2. Define LocationStats interface
+   File: apps/frontend/lib/types/location.ts
+   Time: 10 minutes
+
+3. Define MoveLocationRequest interface
+   File: apps/frontend/lib/types/location.ts
+   Time: 5 minutes
+
+4. Define MoveValidationResult interface
+   File: apps/frontend/lib/types/location.ts
+   Time: 5 minutes
+
+5. Define LPCountResponse interface
+   File: apps/frontend/lib/types/location.ts
+   Time: 5 minutes
+
+6. Verify type exports
+   File: apps/frontend/lib/types/location.ts
+   Ensure all types have export keyword
+   Time: 2 minutes
+
+Total Priority 1 Time: 32 minutes
+
+PRIORITY 2 - Schema Resolution:
+
+7. Resolve location-service.ts schema
+   File: apps/frontend/lib/services/location-service.ts
+   Fix zone/capacity field references (lines 282-283)
+   Time: 20 minutes
+
+PRIORITY 3 - Verification:
+
+8. Run TypeScript compilation
+   Command: npm run type-check
+   Expected: No location-related errors
+   Time: 2 minutes
+
+9. Verify fixture compilation
+   Verify all 24 location objects compile
+   Time: 2 minutes
+
+10. Verify unit tests can execute
+    Location LP count tests should be executable
+    Time: 5 minutes
+
+Total Estimated Fix Time: ~1 hour
+
+================================================================================
+HANDOFF TO DEVELOPMENT
+================================================================================
+
+Story: TD-206 (LP Count Column), TD-207 (Move Feature)
+Component: apps/frontend/lib/types/location.ts
+Status: FAIL - Type definitions incomplete
+
+Required Actions:
+  1. Define all 5 missing/incomplete types
+  2. Run npm run type-check to verify
+  3. Resolve location-service.ts schema issues
+  4. Resubmit for QA validation
+
+Acceptance Criteria for PASS:
+  - LocationStats interface defined and exported
+  - MoveLocationRequest interface defined and exported
+  - MoveValidationResult interface defined and exported
+  - LPCountResponse interface defined and exported
+  - LocationNode has lp_count: number field
+  - npm run type-check shows 0 location-related errors
+  - All 24 test fixtures compile
+  - location-service.ts schema resolved
+
+Blocking: YES
+Cannot proceed without these fixes.
+
+Time Estimate: 1 hour
+
+================================================================================
+QA REPORT ARTIFACTS
+================================================================================
+
+Generated Files:
+  1. docs/2-MANAGEMENT/qa/qa-report-story-TD-206-TD-207.md
+     Detailed 260+ line QA report with all AC analysis
+
+  2. docs/2-MANAGEMENT/qa/qa-summary-TD-206-TD-207.txt
+     Quick reference summary and required fixes
+
+  3. docs/2-MANAGEMENT/qa/QA-DECISION-TD-206-TD-207.md
+     Final decision document with blocking issues
+
+  4. docs/2-MANAGEMENT/qa/bugs/BUG-TD-206-MISSING-TYPES.md
+     Detailed bug report for lp_count issue
+
+  5. QA-FINAL-REPORT-TD-206-TD-207.txt
+     This comprehensive summary
+
+All reports available at: C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\docs\2-MANAGEMENT\qa\
+
+================================================================================
+FINAL DECISION
+================================================================================
+
+Decision: FAIL
+
+Story: TD-206, TD-207 (Track C - Locations Types)
+Component: apps/frontend/lib/types/location.ts
+Date: 2025-12-24
+QA Agent: QA-AGENT
+
+Confidence: 100% (clear type definition gaps)
+Reversibility: None (blocking implementation)
+
+Cannot proceed with implementation until:
+1. All 4 missing types are defined
+2. LocationNode.lp_count field is added
+3. TypeScript compilation passes
+4. Schema conflicts are resolved
+
+Estimated Development Time: 1 hour
+Estimated Re-test Time: 15 minutes
+
+Status: Type definitions incomplete
+Action: Return to development for type definition implementation
+
+================================================================================

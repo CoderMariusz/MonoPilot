@@ -151,13 +151,33 @@ output_artifacts:
 - `.claude/PROJECT-STATE.md` - Current project state after context clear
 - `.claude/PATTERNS.md` - Code patterns and conventions
 - `.claude/TABLES.md` - Database schema reference (43 tables)
+- `.claude/SUPABASE-CONNECTION.md` - **Cloud Supabase connection guide** 🔑
 - `docs/1-BASELINE/product/prd.md` - PRD index (11 modules)
 - `docs/0-DISCOVERY/FEATURE-GAP-ANALYSIS.md` - Competitive analysis
 
 ## Database
 - **43 tables** organized by module
 - **~100 RLS policies** for multi-tenancy
-- **42 migrations** in supabase/migrations/
+- **26 migrations** in supabase/migrations/ (renumbered 001-026)
+
+## Supabase Cloud Connection (2025-12-23)
+**Status**: ✅ Connected and Synced
+
+**Quick Connect**:
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_6be6d9c3e23b75aef1614dddb81f31b8665794a3
+npx supabase link --project-ref pgroxddbtaevdegnidaz
+npx supabase db push
+```
+
+**Important**: Always export `SUPABASE_ACCESS_TOKEN` from `.env` before any Supabase CLI commands.
+
+**Full Instructions**: See `.claude/SUPABASE-CONNECTION.md` for complete guide including:
+- Authentication credentials
+- Step-by-step connection
+- Troubleshooting common issues
+- Migration management
+- Database verification
 
 ## Cache System (Active)
 **Status**: Fully Operational (95% token savings)
