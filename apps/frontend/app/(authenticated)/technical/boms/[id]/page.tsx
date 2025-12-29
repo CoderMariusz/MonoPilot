@@ -42,12 +42,14 @@ import {
   Package,
   Plus,
   RefreshCw,
+  DollarSign,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { BOMFormModal } from '@/components/technical/BOMFormModal'
 import { BOMCloneModal } from '@/components/technical/BOMCloneModal'
 import { BOMCompareModal } from '@/components/technical/BOMCompareModal'
 import { BOMItemFormModal } from '@/components/technical/BOMItemFormModal'
+import { CostSummary } from '@/components/technical/bom/cost'
 import type { BOMWithProduct, BOMItem, BOMAllergens } from '@/lib/validation/bom-schemas'
 
 // Status config
@@ -287,6 +289,10 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
             <Package className="mr-2 h-4 w-4" />
             Items ({items.length})
           </TabsTrigger>
+          <TabsTrigger value="costing">
+            <DollarSign className="mr-2 h-4 w-4" />
+            Costing
+          </TabsTrigger>
           <TabsTrigger value="allergens">
             <AlertTriangle className="mr-2 h-4 w-4" />
             Allergens
@@ -429,6 +435,11 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Costing Tab (Story 02.9) */}
+        <TabsContent value="costing">
+          <CostSummary bomId={id} />
         </TabsContent>
 
         {/* Allergens Tab (Story 2.14) */}
