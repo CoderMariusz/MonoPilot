@@ -1,0 +1,336 @@
+# Code Review Handoff: Story 02.5b
+# Agent: CODE-REVIEWER → BACKEND-DEV / TEST-WRITER
+# Date: 2025-12-29
+# Decision: REQUEST_CHANGES
+
+story: "02.5b"
+decision: request_changes
+severity: critical
+blocking: true
+
+# Summary
+summary:
+  tests_passing: 227
+  tests_failing: 0
+  integration_tests_missing: 5
+  critical_issues: 3
+  major_issues: 3
+  quality_issues: 3
+  coverage_estimate: "72%"
+
+# Critical Issues (BLOCKING)
+critical_issues:
+  - id: CRIT-1
+    title: "Missing Database Migration for Phase 1B Fields"
+    severity: critical
+    blocking: true
+    file: "supabase/migrations/ (missing migration 056)"
+    description: |
+      Phase 1B fields (consume_whole_lp, line_ids, is_by_product, yield_percent, condition_flags)
+      do not exist in bom_items table. Code expects these columns but migration was never created.
+    impact: |
+      - All Phase 1B API endpoints will FAIL in production
+      - Database inserts will throw "column does not exist" errors
+      - Complete feature failure at runtime
+    required_fix: |
+      Create supabase/migrations/056_add_phase1b_fields_to_bom_items.sql with:
+      - ALTER TABLE bom_items ADD COLUMN consume_whole_lp BOOLEAN DEFAULT false
+      - ALTER TABLE bom_items ADD COLUMN line_ids UUID[]
+      - ALTER TABLE bom_items ADD COLUMN is_by_product BOOLEAN DEFAULT false
+      - ALTER TABLE bom_items ADD COLUMN is_output BOOLEAN DEFAULT false
+      - ALTER TABLE bom_items ADD COLUMN yield_percent DECIMAL(5,2)
+      - ALTER TABLE bom_items ADD COLUMN condition_flags JSONB
+      - ADD CONSTRAINT bom_items_byproduct_yield_required
+      - CREATE INDEX idx_bom_items_byproduct (partial index)
+    assignee: BACKEND-DEV
+    estimated_hours: 0.5
+
+  - id: CRIT-2
+    title: "Missing API Route Tests for Bulk Import"
+    severity: critical
+    blocking: true
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/__tests__/route.test.ts"
+    description: |
+      Bulk import endpoint has ZERO integration tests. Critical business logic untested:
+      - 201 success response
+      - 207 partial success
+      - 500 item limit enforcement
+      - Authentication/authorization
+      - Yield percent auto-calculation
+      - Error reporting per row
+    impact: |
+      - Untested critical endpoint in production
+      - No verification of 207 Multi-Status behavior
+      - Security risks (auth not validated)
+      - Business logic bugs undetected
+    required_fix: |
+      Create integration test file with minimum 8 test cases:
+      - Full success (AC-05.2)
+      - Partial success with error report (AC-05.3, AC-05.4)
+      - 500+ items rejected (AC-05.5)
+      - 401 unauthorized
+      - 403 forbidden (role check)
+      - Sequence auto-increment
+      - Yield percent auto-calculation
+      - Validation errors per row
+    assignee: TEST-WRITER
+    estimated_hours: 2
+
+  - id: CRIT-3
+    title: "Database Schema Documentation Mismatch"
+    severity: critical
+    blocking: true
+    file: "docs/2-MANAGEMENT/epics/current/02-technical/context/02.5b/database.yaml"
+    description: |
+      database.yaml claims Phase 1B fields exist in migration 049, but they don't.
+      Migration 049 only contains UoM validation trigger, no Phase 1B columns.
+    impact: |
+      - Misleading documentation
+      - Future developers will be confused
+      - Incorrect onboarding for new team members
+    required_fix: |
+      Update database.yaml:
+      - Remove reference to migration 049 containing Phase 1B fields
+      - Add reference to migration 056 (once created)
+      - Update columns_added list
+    assignee: BACKEND-DEV
+    estimated_hours: 0.25
+
+# Major Issues (SHOULD FIX)
+major_issues:
+  - id: MAJ-1
+    title: "Inconsistent Yield Calculation Formula"
+    severity: major
+    blocking: false
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/route.ts:108"
+    description: |
+      Bulk import uses different rounding formula than service layer.
+      Current: Math.round((item.quantity / bom.output_qty) * 10000) / 100
+      Service: Math.round((byproductQty / bomOutputQty) * 100 * 100) / 100
+    fix: "Use consistent formula from bom-items-service.ts"
+    estimated_hours: 0.25
+
+  - id: MAJ-2
+    title: "Empty Condition Flags Not Normalized"
+    severity: major
+    blocking: false
+    file: "apps/frontend/lib/validation/bom-items.ts:50-54"
+    description: |
+      Empty object {} should be normalized to null for consistency.
+      Schema allows {} but doesn't transform it.
+    fix: "Add .transform() to conditionFlagsSchema to normalize {} → null"
+    estimated_hours: 0.25
+
+  - id: MAJ-3
+    title: "CSV Upload Missing File Size Limit (Security)"
+    severity: major
+    blocking: false
+    file: "apps/frontend/components/technical/bom/BOMBulkImportModal.tsx:135"
+    description: |
+      No file size check before parsing CSV. Vulnerable to DoS via large file upload.
+      User could upload 500MB CSV → memory exhaustion.
+    fix: |
+      Add file size check before parsing:
+      - Max 5MB file size
+      - Check line count early (max 501 lines)
+    estimated_hours: 0.5
+
+# Quality Issues (OPTIONAL)
+quality_issues:
+  - id: QUAL-1
+    title: "Technical Error Messages Not User-Friendly"
+    severity: minor
+    file: "apps/frontend/app/api/v1/technical/boms/[id]/items/bulk/route.ts:116"
+    fix: "Change 'yield_percent is required when is_by_product=true' → 'Byproduct yield percentage is required'"
+
+  - id: QUAL-2
+    title: "Generic Accessibility Labels"
+    severity: minor
+    file: "apps/frontend/components/technical/bom/BOMByproductsSection.tsx:184"
+    fix: "Change aria-label='Actions' → aria-label='Actions for {product_name}'"
+
+  - id: QUAL-3
+    title: "Hardcoded Default Flags in Component"
+    severity: minor
+    file: "apps/frontend/components/technical/bom/ConditionalFlagsSelect.tsx:42-48"
+    fix: "Fetch from API by default, use hardcoded as fallback only"
+
+# Positive Findings
+positive_findings:
+  - "EXCELLENT: Comprehensive Zod validation schemas with detailed error messages"
+  - "EXCELLENT: Clean service layer design with proper separation of concerns"
+  - "EXCELLENT: Bulk import modal UX with drag-drop, progress, error reporting"
+  - "EXCELLENT: Component composition and React best practices"
+  - "GOOD: Robust CSV parsing with quoted values, TSV support, JSON fallback"
+  - "GOOD: All 227 unit/validation tests passing"
+
+# Test Coverage
+test_coverage:
+  unit_tests:
+    total: 227
+    passing: 227
+    failing: 0
+    coverage: "90%+"
+    files:
+      - "lib/validation/__tests__/bom-items.test.ts: 63 tests ✅"
+      - "lib/validation/__tests__/bom-items-phase1b.test.ts: 71 tests ✅"
+      - "lib/services/__tests__/bom-items-service.test.ts: 36 tests ✅"
+      - "lib/services/__tests__/bom-items-service.phase1b.test.ts: 57 tests ✅"
+
+  component_tests:
+    status: "passing"
+    files:
+      - "BOMByproductsSection.test.tsx ✅"
+      - "ConditionalFlagsSelect.test.tsx ✅"
+      - "ProductionLinesCheckbox.test.tsx ✅"
+      - "BOMBulkImportModal.test.tsx ✅"
+      - "BOMItemsTable.test.tsx ✅ (40 tests)"
+
+  integration_tests:
+    total: 0
+    required: 5
+    missing:
+      - "app/api/v1/technical/boms/[id]/items/bulk/__tests__/route.test.ts (CRITICAL)"
+      - "Extended tests for GET /items (byproducts_only param)"
+      - "Extended tests for POST /items (Phase 1B fields)"
+
+# Acceptance Criteria Status
+acceptance_criteria:
+  total: 22
+  passing: 11
+  blocked: 7
+  failing: 4
+  details:
+    passing:
+      - "AC-01.1: Conditional flags multi-select"
+      - "AC-02.1: Byproduct modal form"
+      - "AC-02.2: Yield % auto-calculated"
+      - "AC-02.3: Byproduct separate section"
+      - "AC-02.5: Byproduct deletion"
+      - "AC-03.1: Production lines checkbox"
+      - "AC-03.2: Empty lines = NULL"
+      - "AC-04.1: Consume whole LP checkbox"
+      - "AC-05.1: CSV template download"
+      - "AC-05.5: 500 item limit"
+      - "AC-06.2: Two sections display"
+    blocked:
+      - "AC-01.2: Flags saved as JSONB (DB migration missing)"
+      - "AC-02.4: Byproducts grouped (DB migration missing)"
+      - "AC-03.3: Specific line IDs saved (DB migration missing)"
+      - "AC-04.2: consume_whole_lp saved (DB migration missing)"
+      - "AC-01.3: Flags display in table (untested)"
+      - "AC-03.4: Lines badge display (untested)"
+      - "AC-04.3: Whole LP indicator (untested)"
+    failing:
+      - "AC-05.2: Successful bulk import (no integration tests)"
+      - "AC-05.3: Invalid row error report (no integration tests)"
+      - "AC-05.4: Partial success 207 (no integration tests)"
+      - "AC-06.1: Enhanced display sub-row (untested)"
+
+# Security Review
+security:
+  authentication: "PASS - Proper auth.getUser() check"
+  authorization: "WARNING - Relies on RLS only, no explicit role check"
+  sql_injection: "SAFE - Parameterized queries"
+  csv_injection: "SAFE - No formula execution"
+  jsonb_injection: "SAFE - Zod validation"
+  file_upload: "WARNING - No size limit (MAJ-3)"
+
+# Performance Review
+performance:
+  bulk_insert: "COULD BE BETTER - Loop inserts instead of batch (500 round trips for 500 items)"
+  component_rerenders: "GOOD - Appropriate useState usage"
+
+# Required Fixes Summary
+required_fixes:
+  must_fix:
+    - title: "Create migration 056_add_phase1b_fields_to_bom_items.sql"
+      assignee: BACKEND-DEV
+      hours: 0.5
+      priority: P0
+    - title: "Create bulk import integration tests"
+      assignee: TEST-WRITER
+      hours: 2
+      priority: P0
+    - title: "Update database.yaml"
+      assignee: BACKEND-DEV
+      hours: 0.25
+      priority: P0
+    - title: "Run tests against real database"
+      assignee: QA-AGENT
+      hours: 0.5
+      priority: P0
+
+  should_fix:
+    - title: "Add file size limit to CSV upload (MAJ-3)"
+      assignee: FRONTEND-DEV
+      hours: 0.5
+      priority: P1
+    - title: "Normalize empty flags to null (MAJ-2)"
+      assignee: FRONTEND-DEV
+      hours: 0.25
+      priority: P1
+    - title: "Consistent yield calculation (MAJ-1)"
+      assignee: FRONTEND-DEV
+      hours: 0.25
+      priority: P1
+
+  could_fix:
+    - title: "Improve error messages (QUAL-1)"
+      hours: 0.25
+      priority: P2
+    - title: "Descriptive aria-labels (QUAL-2)"
+      hours: 0.25
+      priority: P2
+    - title: "Batch insert optimization (PERF-1)"
+      hours: 1
+      priority: P3
+
+# Total Estimated Effort
+estimated_effort:
+  must_fix_hours: 3.25
+  should_fix_hours: 1
+  total_blocking_hours: 3.25
+  eta: "4-5 hours"
+
+# Next Steps
+next_steps:
+  - step: 1
+    action: "BACKEND-DEV creates migration 056"
+    estimated: "30 minutes"
+  - step: 2
+    action: "TEST-WRITER writes bulk import integration tests"
+    estimated: "2 hours"
+  - step: 3
+    action: "BACKEND-DEV updates database.yaml"
+    estimated: "15 minutes"
+  - step: 4
+    action: "FRONTEND-DEV applies MAJ-1, MAJ-2, MAJ-3 fixes"
+    estimated: "1 hour"
+  - step: 5
+    action: "QA-AGENT re-runs full test suite against real database"
+    estimated: "30 minutes"
+  - step: 6
+    action: "CODE-REVIEWER re-reviews for approval"
+    estimated: "30 minutes"
+
+# Handoff
+handoff:
+  from: CODE-REVIEWER
+  to:
+    - BACKEND-DEV
+    - TEST-WRITER
+    - FRONTEND-DEV
+    - QA-AGENT
+  priority: HIGH
+  blocking_deployment: true
+  re_review_required: true
+
+# Metadata
+metadata:
+  reviewer: "CODE-REVIEWER Agent (Claude Sonnet 4.5)"
+  review_date: "2025-12-29"
+  review_duration_minutes: 35
+  files_reviewed: 12
+  lines_reviewed_estimate: 2500
+  report_location: "docs/2-MANAGEMENT/reviews/code-review-story-02.5b.md"

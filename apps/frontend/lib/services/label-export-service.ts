@@ -342,6 +342,36 @@ export default class LabelExportService {
   }
 
   /**
+   * Build FDA nutrient row HTML
+   */
+  private buildNutrientRow(
+    label: string,
+    value: string,
+    percentDV?: string,
+    indent: number = 0,
+    bold: boolean = true
+  ): string {
+    const indentStyle = indent > 0 ? `padding-left: ${indent}px;` : ''
+    const labelWeight = bold ? 'font-weight: bold;' : ''
+    const dvColumn = percentDV
+      ? `<span><strong>${percentDV}</strong></span>`
+      : ''
+
+    if (dvColumn) {
+      return `
+      <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0; ${indentStyle}">
+        <span style="${labelWeight}">${label} ${value}</span>
+        ${dvColumn}
+      </div>`
+    } else {
+      return `
+      <div style="border-bottom: 1px solid black; padding: 2px 0; ${indentStyle}">
+        <span style="${labelWeight}">${label} ${value}</span>
+      </div>`
+    }
+  }
+
+  /**
    * Build FDA 2016 label HTML
    */
   private buildFDALabelHtml(

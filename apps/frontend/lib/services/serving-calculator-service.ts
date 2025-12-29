@@ -32,6 +32,21 @@ import {
 /** Maximum variance percentage before warning */
 const RACC_VARIANCE_THRESHOLD = 20
 
+/**
+ * Product density table for volume to weight conversion
+ * Values are in g/ml
+ */
+const PRODUCT_DENSITIES: Record<string, number> = {
+  milk: 1.03,
+  cream: 1.01,
+  yogurt: 1.04,
+  juice: 1.04,
+  oil: 0.92,
+  honey: 1.42,
+  syrup: 1.35,
+  water: 1.0,
+}
+
 // ============================================
 // SERVING CALCULATOR SERVICE
 // ============================================
@@ -234,20 +249,7 @@ export default class ServingCalculatorService {
     if (!productType) return 1
 
     const type = productType.toLowerCase()
-
-    // Common product densities (g/ml)
-    const densities: Record<string, number> = {
-      milk: 1.03,
-      cream: 1.01,
-      yogurt: 1.04,
-      juice: 1.04,
-      oil: 0.92,
-      honey: 1.42,
-      syrup: 1.35,
-      water: 1.0,
-    }
-
-    return densities[type] || 1.0
+    return PRODUCT_DENSITIES[type] || 1.0
   }
 
   /**
