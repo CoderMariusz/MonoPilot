@@ -27,6 +27,11 @@ import {
   FDA_DAILY_VALUES,
   NutrientProfile,
 } from '../types/nutrition'
+import {
+  calculatePerServing,
+  calculatePercentDV,
+  formatPercentDV,
+} from '../utils/nutrition-calculator'
 
 // ============================================
 // TYPES
@@ -92,8 +97,7 @@ export default class LabelExportService {
     }
 
     // Calculate per serving values (nutrition is per 100g)
-    const servingFactor = nutrition.serving_size / 100
-    const perServing = this.calculatePerServing(nutrition, servingFactor)
+    const perServing = calculatePerServing(nutrition, nutrition.serving_size)
 
     // Build HTML label
     const html = this.buildFDALabelHtml(nutrition, perServing)
@@ -118,8 +122,7 @@ export default class LabelExportService {
       throw new Error('Serving size required for label')
     }
 
-    const servingFactor = nutrition.serving_size / 100
-    const perServing = this.calculatePerServing(nutrition, servingFactor)
+    const perServing = calculatePerServing(nutrition, nutrition.serving_size)
 
     // Build EU format HTML
     const html = this.buildEULabelHtml(nutrition, perServing)
@@ -289,59 +292,6 @@ export default class LabelExportService {
   // ============================================
 
   /**
-   * Calculate per serving values
-   */
-  private calculatePerServing(
-    nutrition: ProductNutrition,
-    servingFactor: number
-  ): NutrientProfile {
-    return {
-      energy_kcal: Math.round((nutrition.energy_kcal || 0) * servingFactor),
-      energy_kj: Math.round((nutrition.energy_kj || 0) * servingFactor),
-      protein_g: this.round((nutrition.protein_g || 0) * servingFactor, 1),
-      fat_g: this.round((nutrition.fat_g || 0) * servingFactor, 1),
-      saturated_fat_g: this.round((nutrition.saturated_fat_g || 0) * servingFactor, 1),
-      trans_fat_g: this.round((nutrition.trans_fat_g || 0) * servingFactor, 1),
-      carbohydrate_g: this.round((nutrition.carbohydrate_g || 0) * servingFactor, 1),
-      sugar_g: this.round((nutrition.sugar_g || 0) * servingFactor, 1),
-      added_sugar_g: this.round((nutrition.added_sugar_g || 0) * servingFactor, 1),
-      fiber_g: this.round((nutrition.fiber_g || 0) * servingFactor, 1),
-      sodium_mg: Math.round((nutrition.sodium_mg || 0) * servingFactor),
-      salt_g: this.round((nutrition.salt_g || 0) * servingFactor, 2),
-      cholesterol_mg: Math.round((nutrition.cholesterol_mg || 0) * servingFactor),
-      vitamin_d_mcg: this.round((nutrition.vitamin_d_mcg || 0) * servingFactor, 1),
-      calcium_mg: Math.round((nutrition.calcium_mg || 0) * servingFactor),
-      iron_mg: this.round((nutrition.iron_mg || 0) * servingFactor, 1),
-      potassium_mg: Math.round((nutrition.potassium_mg || 0) * servingFactor),
-    }
-  }
-
-  /**
-   * Calculate % Daily Value
-   */
-  private calculateDV(value: number, nutrient: string): number {
-    const dv = FDA_DAILY_VALUES[nutrient]
-    if (!dv || dv === 0) return 0
-    return Math.round((value / dv) * 100)
-  }
-
-  /**
-   * Format % DV display
-   */
-  private formatDV(percent: number): string {
-    if (percent < 1) return '<1%'
-    return `${percent}%`
-  }
-
-  /**
-   * Round to specified decimal places
-   */
-  private round(value: number, decimals: number): number {
-    const factor = Math.pow(10, decimals)
-    return Math.round(value * factor) / factor
-  }
-
-  /**
    * Build FDA nutrient row HTML
    */
   private buildNutrientRow(
@@ -415,13 +365,13 @@ export default class LabelExportService {
     <!-- Total Fat -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0;">
       <span><strong>Total Fat</strong> ${perServing.fat_g}g</span>
-      <span><strong>${this.formatDV(this.calculateDV(perServing.fat_g || 0, 'fat_g'))}</strong></span>
+      <span><strong>${formatPercentDV(calculatePercentDV(perServing.fat_g || 0, FDA_DAILY_VALUES.fat_g))}</strong></span>
     </div>
 
     <!-- Saturated Fat -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0; padding-left: 16px;">
       <span>Saturated Fat ${perServing.saturated_fat_g || 0}g</span>
-      <span><strong>${this.formatDV(this.calculateDV(perServing.saturated_fat_g || 0, 'saturated_fat_g'))}</strong></span>
+      <span><strong>${formatPercentDV(calculatePercentDV(perServing.saturated_fat_g || 0, FDA_DAILY_VALUES.saturated_fat_g))}</strong></span>
     </div>
 
     <!-- Trans Fat -->
@@ -432,25 +382,25 @@ export default class LabelExportService {
     <!-- Cholesterol -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0;">
       <span><strong>Cholesterol</strong> ${perServing.cholesterol_mg || 0}mg</span>
-      <span><strong>${this.formatDV(this.calculateDV(perServing.cholesterol_mg || 0, 'cholesterol_mg'))}</strong></span>
+      <span><strong>${formatPercentDV(calculatePercentDV(perServing.cholesterol_mg || 0, FDA_DAILY_VALUES.cholesterol_mg))}</strong></span>
     </div>
 
     <!-- Sodium -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0;">
       <span><strong>Sodium</strong> ${perServing.sodium_mg || 0}mg</span>
-      <span><strong>${this.formatDV(this.calculateDV(perServing.sodium_mg || 0, 'sodium_mg'))}</strong></span>
+      <span><strong>${formatPercentDV(calculatePercentDV(perServing.sodium_mg || 0, FDA_DAILY_VALUES.sodium_mg))}</strong></span>
     </div>
 
     <!-- Total Carbohydrate -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0;">
       <span><strong>Total Carbohydrate</strong> ${perServing.carbohydrate_g}g</span>
-      <span><strong>${this.formatDV(this.calculateDV(perServing.carbohydrate_g || 0, 'carbohydrate_g'))}</strong></span>
+      <span><strong>${formatPercentDV(calculatePercentDV(perServing.carbohydrate_g || 0, FDA_DAILY_VALUES.carbohydrate_g))}</strong></span>
     </div>
 
     <!-- Dietary Fiber -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0; padding-left: 16px;">
       <span>Dietary Fiber ${perServing.fiber_g || 0}g</span>
-      <span><strong>${this.formatDV(this.calculateDV(perServing.fiber_g || 0, 'fiber_g'))}</strong></span>
+      <span><strong>${formatPercentDV(calculatePercentDV(perServing.fiber_g || 0, FDA_DAILY_VALUES.fiber_g))}</strong></span>
     </div>
 
     <!-- Total Sugars -->
@@ -461,7 +411,7 @@ export default class LabelExportService {
     <!-- Added Sugars -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0; padding-left: 32px;">
       <span>Includes ${perServing.added_sugar_g || 0}g Added Sugars</span>
-      <span><strong>${this.formatDV(this.calculateDV(perServing.added_sugar_g || 0, 'sugar_g'))}</strong></span>
+      <span><strong>${formatPercentDV(calculatePercentDV(perServing.added_sugar_g || 0, FDA_DAILY_VALUES.sugar_g))}</strong></span>
     </div>
 
     <!-- Protein -->
@@ -475,25 +425,25 @@ export default class LabelExportService {
     <!-- Vitamin D -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0;">
       <span>Vitamin D ${perServing.vitamin_d_mcg || 0}mcg</span>
-      <span>${this.formatDV(this.calculateDV(perServing.vitamin_d_mcg || 0, 'vitamin_d_mcg'))}</span>
+      <span>${formatPercentDV(calculatePercentDV(perServing.vitamin_d_mcg || 0, FDA_DAILY_VALUES.vitamin_d_mcg))}</span>
     </div>
 
     <!-- Calcium -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0;">
       <span>Calcium ${perServing.calcium_mg || 0}mg</span>
-      <span>${this.formatDV(this.calculateDV(perServing.calcium_mg || 0, 'calcium_mg'))}</span>
+      <span>${formatPercentDV(calculatePercentDV(perServing.calcium_mg || 0, FDA_DAILY_VALUES.calcium_mg))}</span>
     </div>
 
     <!-- Iron -->
     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid black; padding: 2px 0;">
       <span>Iron ${perServing.iron_mg || 0}mg</span>
-      <span>${this.formatDV(this.calculateDV(perServing.iron_mg || 0, 'iron_mg'))}</span>
+      <span>${formatPercentDV(calculatePercentDV(perServing.iron_mg || 0, FDA_DAILY_VALUES.iron_mg))}</span>
     </div>
 
     <!-- Potassium -->
     <div style="display: flex; justify-content: space-between; padding: 2px 0;">
       <span>Potassium ${perServing.potassium_mg || 0}mg</span>
-      <span>${this.formatDV(this.calculateDV(perServing.potassium_mg || 0, 'potassium_mg'))}</span>
+      <span>${formatPercentDV(calculatePercentDV(perServing.potassium_mg || 0, FDA_DAILY_VALUES.potassium_mg))}</span>
     </div>
   </div>
 
