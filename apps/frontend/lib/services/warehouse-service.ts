@@ -210,12 +210,18 @@ export class WarehouseService {
   /**
    * Check if warehouse has active inventory
    * Returns true if any license plates with qty > 0 exist
-   * Note: This is checked server-side in the disable endpoint
+   * Uses dedicated server-side API endpoint for security
    */
   static async hasActiveInventory(id: string): Promise<boolean> {
-    const canDisableResult = await this.canDisable(id)
-    const hasInventoryReason = canDisableResult.reason?.includes('active inventory') ?? false
-    return !canDisableResult.allowed && hasInventoryReason
+    const response = await fetch(`/api/v1/settings/warehouses/${id}/has-inventory`)
+
+    if (!response.ok) {
+      // If endpoint fails, return false to allow checking via disable endpoint
+      return false
+    }
+
+    const data = await response.json()
+    return data.hasInventory ?? false
   }
 
   /**
@@ -225,8 +231,6 @@ export class WarehouseService {
    * - Cannot disable if is default warehouse
    */
   static async canDisable(id: string): Promise<CanDisableResult> {
-    // We can check this by attempting to get the warehouse and checking its properties
-    // The actual validation happens in the disable endpoint
     const warehouse = await this.getById(id)
 
     if (!warehouse) {
@@ -240,8 +244,15 @@ export class WarehouseService {
       }
     }
 
-    // For inventory check, we'd need a dedicated endpoint or the disable endpoint will check
-    // For now, return allowed: true and let the disable endpoint do the full validation
+    // Check for active inventory using server-side API endpoint
+    const hasInventory = await this.hasActiveInventory(id)
+    if (hasInventory) {
+      return {
+        allowed: false,
+        reason: 'Cannot disable warehouse with active inventory',
+      }
+    }
+
     return { allowed: true }
   }
 }
