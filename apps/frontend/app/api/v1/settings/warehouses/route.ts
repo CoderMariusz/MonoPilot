@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { createWarehouseSchema } from '@/lib/validation/warehouse-schemas'
 import { ZodError } from 'zod'
-import { getAuthContext, checkPermission } from '@/lib/api/auth-helpers'
+import { getAuthContext, checkPermission, validateOrigin } from '@/lib/api/auth-helpers'
 
 /**
  * Sanitize search input to prevent SQL injection via LIKE/ILIKE wildcards
@@ -133,6 +133,12 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // CSRF protection: validate request origin
+    const originError = validateOrigin(request)
+    if (originError) {
+      return originError
+    }
+
     const supabase = await createServerSupabase()
 
     // Get authenticated user context

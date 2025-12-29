@@ -3,7 +3,7 @@
  * Shared authentication and authorization utilities for API routes
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface AuthContext {
@@ -65,5 +65,34 @@ export function checkPermission(
       { status: 403 }
     )
   }
+  return null
+}
+
+/**
+ * Validate request origin for CSRF protection
+ * Checks that the Origin header matches the Host header for state-changing requests
+ * Returns 403 error response if origin validation fails
+ *
+ * Note: This provides defense-in-depth alongside SameSite cookie protection
+ */
+export function validateOrigin(request: NextRequest): NextResponse | null {
+  const origin = request.headers.get('origin')
+  const host = request.headers.get('host')
+
+  // If no origin header, request is likely same-origin (not from browser form/JS)
+  // This is acceptable for API calls from server components or curl
+  if (!origin) {
+    return null
+  }
+
+  // Validate that origin includes the host
+  // This prevents CSRF from malicious sites
+  if (host && !origin.includes(host)) {
+    return NextResponse.json(
+      { error: 'Invalid request origin', code: 'CSRF_VALIDATION_FAILED' },
+      { status: 403 }
+    )
+  }
+
   return null
 }

@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getAuthContext, checkPermission } from '@/lib/api/auth-helpers'
+import { getAuthContext, checkPermission, validateOrigin } from '@/lib/api/auth-helpers'
 
 /**
  * PATCH /api/v1/settings/warehouses/:id/set-default
@@ -25,6 +25,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // CSRF protection: validate request origin
+    const originError = validateOrigin(request)
+    if (originError) {
+      return originError
+    }
+
     const { id } = await params
     const supabase = await createServerSupabase()
 

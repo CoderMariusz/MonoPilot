@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { updateWarehouseSchema } from '@/lib/validation/warehouse-schemas'
 import { ZodError } from 'zod'
-import { getAuthContext, checkPermission } from '@/lib/api/auth-helpers'
+import { getAuthContext, checkPermission, validateOrigin } from '@/lib/api/auth-helpers'
 
 /**
  * GET /api/v1/settings/warehouses/:id
@@ -69,6 +69,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // CSRF protection: validate request origin
+    const originError = validateOrigin(request)
+    if (originError) {
+      return originError
+    }
+
     const { id } = await params
     const supabase = await createServerSupabase()
 
