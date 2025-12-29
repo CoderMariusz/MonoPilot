@@ -1,14 +1,57 @@
 # MonoPilot - Project State
 
-> Last Updated: 2025-12-28 (Epic 02: Stories 02.5a, 02.7, 02.8, 02.10a, 02.11, 02.12 COMPLETE)
+> Last Updated: 2025-12-29 (Story 02.13 REFACTOR Phase Complete)
 > Epic 01 Progress: 14.91/14 (106.5%) - **Epic Complete!** ✅
 > Epic 02 Progress: 7/7 (100%) - **7 Stories PRODUCTION-READY!** ✅
 
-## Current: **22 Stories Implemented** + **Epic 02 COMPLETE!** 🎉
+## Current: **22 Stories Implemented** + **Story 02.13 Refactored** 🎉
 
 ---
 
-## Recent Session (2025-12-28)
+## Recent Session (2025-12-29)
+
+### ✅ Story 02.13 - Nutrition Calculation (REFACTOR Phase Complete)
+
+**Type**: Code Optimization (Phase 4 of TDD)
+**Status**: REFACTOR Complete
+**Completion Date**: 2025-12-29
+**Duration**: ~2 hours
+**Quality Score**: A- (9/10)
+
+#### Refactoring Summary
+
+**Completed Refactorings**: 4 systematic improvements
+1. ✅ Extract NUTRIENT_KEYS constant (removed duplication)
+2. ✅ Extract UOM conversion to utility module (improved reusability)
+3. ✅ Extract PRODUCT_DENSITIES constant (easier maintenance)
+4. ✅ Extract nutrition calculation utilities (eliminated 50+ lines of duplication)
+
+**New Utility Modules Created**: 2
+- `lib/utils/uom-converter.ts` - UOM conversion logic (75 lines)
+- `lib/utils/nutrition-calculator.ts` - Nutrition calculation helpers (94 lines)
+
+**Code Quality Improvements**:
+- Duplicated code: 120 lines → 20 lines (83% reduction)
+- Magic numbers: 18 → 0 (all extracted to constants)
+- Shared utilities: 0 → 2 modules
+- Test status: 310+ tests still passing (no regression)
+
+**Performance Maintained**:
+- ✅ Calculation: < 2s for 20-ingredient BOM (AC-13.2)
+- ✅ Label Generation: < 1s
+- ✅ RACC Lookup: < 10ms
+
+**Commits**: 4
+- `51e7cbe` - Extract nutrient keys constant
+- `988d1fa` - Extract UOM conversion utility
+- `38de171` - Extract density constants and label row builder
+- `1c3b46c` - Extract nutrition calculation utilities
+
+**Status**: Ready for CODE-REVIEWER handoff
+
+---
+
+## Previous Session (2025-12-28)
 
 ### ✅ Story 02.11 - Shelf Life Calculation + Expiry Management (PRODUCTION-READY)
 
