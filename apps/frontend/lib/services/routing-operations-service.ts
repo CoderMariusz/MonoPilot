@@ -154,13 +154,30 @@ export function calculateSummary(operations: RoutingOperation[]): OperationsSumm
     }
   }
 
+  // Calculate weighted average yield from expected_yield_percent if available
+  let average_yield = null
+  if (operations.length > 0) {
+    // Sum of (yield * duration) for all operations
+    const totalWeightedYield = operations.reduce((sum, op) => {
+      const opDuration = (op.setup_time || 0) + op.duration + (op.cleanup_time || 0)
+      // Default yield to 100 if not specified
+      const yieldPercent = (op as any).expected_yield_percent ?? 100
+      return sum + (yieldPercent * opDuration)
+    }, 0)
+
+    // Weighted average: sum(yield * duration) / total_duration
+    average_yield = totalDuration > 0
+      ? Math.round((totalWeightedYield / totalDuration) * 100) / 100
+      : 100
+  }
+
   return {
     total_operations: operations.length,
     total_duration: totalDuration,
     total_setup_time: totalSetupTime,
     total_cleanup_time: totalCleanupTime,
     total_labor_cost: Math.round(totalLaborCost * 100) / 100,
-    average_yield: 100, // Placeholder - actual yield tracking would come from production
+    average_yield: average_yield,
   }
 }
 
@@ -216,6 +233,8 @@ export async function getOperations(
         expected_duration_minutes,
         expected_yield_percent,
         setup_time_minutes,
+        cleanup_time_minutes,
+        instructions,
         labor_cost,
         created_at,
         updated_at,
@@ -244,9 +263,9 @@ export async function getOperations(
       machine_code: op.machines?.code || null,
       setup_time: op.setup_time_minutes || 0,
       duration: op.expected_duration_minutes || 0,
-      cleanup_time: 0, // Not in current schema
+      cleanup_time: op.cleanup_time_minutes || 0,
       labor_cost_per_hour: op.labor_cost || 0,
-      instructions: null, // Not in current schema
+      instructions: op.instructions || null,
       attachment_count: 0, // Will be implemented with attachments table
       created_at: op.created_at,
       updated_at: op.updated_at,
