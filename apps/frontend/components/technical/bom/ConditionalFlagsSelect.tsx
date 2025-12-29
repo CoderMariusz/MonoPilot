@@ -8,12 +8,17 @@
  * - Supports custom flags
  * - Returns JSONB object with boolean values
  * - Returns null when no flags selected (not empty object)
+ *
+ * Performance: Wrapped with React.memo to prevent unnecessary re-renders
+ * when parent components update but props remain unchanged.
  */
 
+import { memo } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Loader2 } from 'lucide-react'
+import { DEFAULT_CONDITIONAL_FLAGS, getFlagColor, normalizeConditionFlags } from '@/lib/constants/bom-items'
 
 interface ConditionFlags {
   organic?: boolean
@@ -38,31 +43,14 @@ interface ConditionalFlagsSelectProps {
   loading?: boolean
 }
 
-// Default flags with colors
-const DEFAULT_FLAGS: AvailableFlag[] = [
-  { id: 'f-1', code: 'organic', name: 'Organic' },
-  { id: 'f-2', code: 'vegan', name: 'Vegan' },
-  { id: 'f-3', code: 'gluten_free', name: 'Gluten-Free' },
-  { id: 'f-4', code: 'kosher', name: 'Kosher' },
-  { id: 'f-5', code: 'halal', name: 'Halal' },
-]
-
-const FLAG_COLORS: Record<string, string> = {
-  organic: 'bg-green-100 text-green-800 border-green-200',
-  vegan: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  gluten_free: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  kosher: 'bg-blue-100 text-blue-800 border-blue-200',
-  halal: 'bg-purple-100 text-purple-800 border-purple-200',
-}
-
-export function ConditionalFlagsSelect({
+export const ConditionalFlagsSelect = memo(function ConditionalFlagsSelect({
   value,
   onChange,
   disabled = false,
-  availableFlags = DEFAULT_FLAGS,
+  availableFlags,
   loading = false,
 }: ConditionalFlagsSelectProps) {
-  // Handle flag toggle
+  // Handle flag toggle with normalization
   const handleToggle = (code: string, checked: boolean) => {
     if (disabled || loading) return
 
@@ -74,9 +62,8 @@ export function ConditionalFlagsSelect({
       delete newFlags[code]
     }
 
-    // Return null if no flags selected (not empty object)
-    const hasFlags = Object.keys(newFlags).some((key) => newFlags[key] === true)
-    onChange(hasFlags ? newFlags : null)
+    // Use helper to normalize (returns null if no flags)
+    onChange(normalizeConditionFlags(newFlags))
   }
 
   // Count selected flags
@@ -85,7 +72,9 @@ export function ConditionalFlagsSelect({
     : 0
 
   // Flags to display (use available or default)
-  const flags = availableFlags.length > 0 ? availableFlags : DEFAULT_FLAGS
+  const flags = availableFlags && availableFlags.length > 0
+    ? availableFlags
+    : (DEFAULT_CONDITIONAL_FLAGS as unknown as AvailableFlag[])
 
   return (
     <div className="space-y-2" role="group" aria-label="Conditional Flags">
@@ -101,7 +90,7 @@ export function ConditionalFlagsSelect({
           <div className="flex flex-wrap gap-3 p-3 border rounded-md">
             {flags.map((flag) => {
               const isChecked = value?.[flag.code] === true
-              const colorClass = FLAG_COLORS[flag.code] || 'bg-gray-100 text-gray-800'
+              const colorClass = getFlagColor(flag.code)
 
               return (
                 <div key={flag.id} className="flex items-center space-x-2">
@@ -146,4 +135,4 @@ export function ConditionalFlagsSelect({
       )}
     </div>
   )
-}
+})

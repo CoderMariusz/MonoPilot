@@ -8,12 +8,17 @@
  * - null value = item available on all lines
  * - Selected lines = item restricted to those lines
  * - Empty array is normalized to null
+ *
+ * Performance: Wrapped with React.memo to prevent unnecessary re-renders
+ * when parent components update but props remain unchanged.
  */
 
+import { memo, useCallback, useMemo } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
+import { normalizeLineIds } from '@/lib/constants/bom-items'
 
 interface ProductionLine {
   id: string
@@ -30,7 +35,12 @@ interface ProductionLinesCheckboxProps {
   loading?: boolean
 }
 
-export function ProductionLinesCheckbox({
+/**
+ * Threshold for showing Select All / Clear All buttons
+ */
+const SELECT_ALL_THRESHOLD = 3
+
+export const ProductionLinesCheckbox = memo(function ProductionLinesCheckbox({
   value,
   onChange,
   disabled = false,
@@ -38,50 +48,63 @@ export function ProductionLinesCheckbox({
   loading = false,
 }: ProductionLinesCheckboxProps) {
   // Filter only active lines
-  const activeLines = productionLines.filter((line) => line.is_active)
+  const activeLines = useMemo(
+    () => productionLines.filter((line) => line.is_active),
+    [productionLines]
+  )
 
   // Check if all lines are available (null or undefined)
   const isAllLines = value === null || value === undefined
 
   // Handle line toggle
-  const handleToggle = (lineId: string, checked: boolean) => {
-    if (disabled || loading) return
+  const handleToggle = useCallback(
+    (lineId: string, checked: boolean) => {
+      if (disabled || loading) return
 
-    const current = value || []
-    let newValue: string[]
+      const current = value || []
+      let newValue: string[]
 
-    if (checked) {
-      newValue = [...current, lineId]
-    } else {
-      newValue = current.filter((id) => id !== lineId)
-    }
+      if (checked) {
+        newValue = [...current, lineId]
+      } else {
+        newValue = current.filter((id) => id !== lineId)
+      }
 
-    // Normalize empty array to null
-    onChange(newValue.length > 0 ? newValue : null)
-  }
+      // Use helper to normalize empty array to null
+      onChange(normalizeLineIds(newValue))
+    },
+    [disabled, loading, value, onChange]
+  )
 
   // Select all lines
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (disabled || loading) return
     onChange(activeLines.map((line) => line.id))
-  }
+  }, [disabled, loading, activeLines, onChange])
 
   // Clear all selections (set to null = all lines available)
-  const handleClearAll = () => {
+  const handleClearAll = useCallback(() => {
     if (disabled || loading) return
     onChange(null)
-  }
+  }, [disabled, loading, onChange])
 
   // Get selected line names for display
-  const selectedLineNames = activeLines
-    .filter((line) => value?.includes(line.id))
-    .map((line) => line.name)
+  const selectedLineNames = useMemo(
+    () =>
+      activeLines
+        .filter((line) => value?.includes(line.id))
+        .map((line) => line.name),
+    [activeLines, value]
+  )
+
+  // Show select/clear buttons only when more than threshold lines
+  const showBulkActions = activeLines.length > SELECT_ALL_THRESHOLD
 
   return (
     <div className="space-y-2" role="group" aria-label="Production Lines">
       <div className="flex items-center justify-between">
         <Label>Production Lines (Optional)</Label>
-        {activeLines.length > 3 && (
+        {showBulkActions && (
           <div className="flex gap-2">
             <Button
               type="button"
@@ -119,32 +142,15 @@ export function ProductionLinesCheckbox({
       ) : (
         <>
           <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto">
-            {activeLines.map((line) => {
-              const isChecked = value?.includes(line.id) ?? false
-
-              return (
-                <div key={line.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`line-${line.id}`}
-                    checked={isChecked}
-                    onCheckedChange={(checked) =>
-                      handleToggle(line.id, !!checked)
-                    }
-                    disabled={disabled || loading}
-                    aria-label={`${line.code} - ${line.name}`}
-                  />
-                  <Label
-                    htmlFor={`line-${line.id}`}
-                    className="text-sm font-normal cursor-pointer flex-1"
-                  >
-                    <span className="font-medium">{line.code}</span>
-                    <span className="text-muted-foreground ml-2">
-                      {line.name}
-                    </span>
-                  </Label>
-                </div>
-              )
-            })}
+            {activeLines.map((line) => (
+              <ProductionLineItem
+                key={line.id}
+                line={line}
+                isChecked={value?.includes(line.id) ?? false}
+                disabled={disabled || loading}
+                onToggle={handleToggle}
+              />
+            ))}
           </div>
 
           <p className="text-xs text-muted-foreground">
@@ -169,4 +175,41 @@ export function ProductionLinesCheckbox({
       )}
     </div>
   )
+})
+
+/**
+ * Individual production line checkbox item
+ * Extracted as memoized sub-component for better performance
+ */
+interface ProductionLineItemProps {
+  line: ProductionLine
+  isChecked: boolean
+  disabled: boolean
+  onToggle: (lineId: string, checked: boolean) => void
 }
+
+const ProductionLineItem = memo(function ProductionLineItem({
+  line,
+  isChecked,
+  disabled,
+  onToggle,
+}: ProductionLineItemProps) {
+  return (
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id={`line-${line.id}`}
+        checked={isChecked}
+        onCheckedChange={(checked) => onToggle(line.id, !!checked)}
+        disabled={disabled}
+        aria-label={`${line.code} - ${line.name}`}
+      />
+      <Label
+        htmlFor={`line-${line.id}`}
+        className="text-sm font-normal cursor-pointer flex-1"
+      >
+        <span className="font-medium">{line.code}</span>
+        <span className="text-muted-foreground ml-2">{line.name}</span>
+      </Label>
+    </div>
+  )
+})
