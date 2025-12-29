@@ -38,7 +38,6 @@ import type {
   ProductionLineListParams,
   ProductionLineStatus,
 } from '@/lib/types/production-line'
-import type { Warehouse } from '@/lib/types/warehouse'
 import { MoreVertical, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 
 interface ProductionLineDataTableProps {
@@ -51,7 +50,6 @@ interface ProductionLineDataTableProps {
   onFilter: (filters: Partial<ProductionLineListParams>) => void
   onEdit: (line: ProductionLine) => void
   onDelete: (line: ProductionLine) => void
-  warehouses: Warehouse[]
   isLoading?: boolean
   error?: string
   readOnly?: boolean
@@ -67,13 +65,11 @@ export function ProductionLineDataTable({
   onFilter,
   onEdit,
   onDelete,
-  warehouses,
   isLoading = false,
   error,
   readOnly = false,
 }: ProductionLineDataTableProps) {
   const [searchValue, setSearchValue] = useState('')
-  const [warehouseFilter, setWarehouseFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -100,10 +96,9 @@ export function ProductionLineDataTable({
   // Handle filter changes
   useEffect(() => {
     const filters: Partial<ProductionLineListParams> = {}
-    if (warehouseFilter) filters.warehouse_id = warehouseFilter
     if (statusFilter) filters.status = statusFilter as ProductionLineStatus
     onFilter(filters)
-  }, [warehouseFilter, statusFilter, onFilter])
+  }, [statusFilter, onFilter])
 
   // Calculate pagination
   const totalPages = Math.ceil(total / limit)
@@ -170,19 +165,6 @@ export function ProductionLineDataTable({
           onChange={(e) => setSearchValue(e.target.value)}
           className="flex-1"
         />
-        <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="All Warehouses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Warehouses</SelectItem>
-            {warehouses.map((warehouse) => (
-              <SelectItem key={warehouse.id} value={warehouse.id}>
-                {warehouse.code} - {warehouse.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Statuses" />
@@ -204,7 +186,7 @@ export function ProductionLineDataTable({
             No production lines found
           </p>
           <p className="text-sm text-muted-foreground">
-            {searchValue || warehouseFilter || statusFilter
+            {searchValue || statusFilter
               ? 'Try adjusting your filters'
               : 'Create your first production line to get started'}
           </p>
@@ -216,7 +198,6 @@ export function ProductionLineDataTable({
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Warehouse</TableHead>
                 <TableHead className="text-center">Machine Count</TableHead>
                 <TableHead>Capacity</TableHead>
                 <TableHead>Status</TableHead>
@@ -236,16 +217,6 @@ export function ProductionLineDataTable({
                         </p>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {line.warehouse ? (
-                      <>
-                        <span className="font-medium">{line.warehouse.code}</span>
-                        <span className="text-muted-foreground"> - {line.warehouse.name}</span>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Unknown</span>
-                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     {line.machines?.length || 0}

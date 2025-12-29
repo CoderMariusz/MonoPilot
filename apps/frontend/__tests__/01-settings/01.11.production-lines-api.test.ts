@@ -716,12 +716,12 @@ describe('Production Line API Integration Tests', () => {
         bottleneck_machine: {
           id: 'machine-002-uuid',
           code: 'FILL-001',
-          capacity_per_hour: 500,
+          units_per_hour: 500,
         },
         machines: [
-          { id: 'machine-001', code: 'MIX-001', name: 'Mixer', capacity_per_hour: 1000, sequence_order: 1 },
-          { id: 'machine-002', code: 'FILL-001', name: 'Filler', capacity_per_hour: 500, sequence_order: 2 },
-          { id: 'machine-003', code: 'PKG-001', name: 'Packager', capacity_per_hour: 800, sequence_order: 3 },
+          { id: 'machine-001', code: 'MIX-001', name: 'Mixer', units_per_hour: 1000, sequence_order: 1 },
+          { id: 'machine-002', code: 'FILL-001', name: 'Filler', units_per_hour: 500, sequence_order: 2 },
+          { id: 'machine-003', code: 'PKG-001', name: 'Packager', units_per_hour: 800, sequence_order: 3 },
         ],
         compatible_products: [],
       }

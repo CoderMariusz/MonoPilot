@@ -1,7 +1,9 @@
 /**
  * Create Operation Modal
- * Story: 2.24 Routing Restructure
+ * Story: 2.24 Routing Restructure, Story 02.8 Routing Operations
  * AC-2.24.6: Add operation with labor_cost_per_hour
+ * AC-15-17: Instructions textarea
+ * AC-18-21: Attachments upload (added after creation)
  */
 
 'use client'
@@ -36,7 +38,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Info } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface CreateOperationModalProps {
@@ -44,6 +48,10 @@ interface CreateOperationModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Existing sequences for parallel operations detection */
+  existingSequences?: number[]
+  /** Next available sequence number */
+  nextSequence?: number
 }
 
 interface Machine {
@@ -52,22 +60,68 @@ interface Machine {
   name: string
 }
 
-export function CreateOperationModal({ routingId, open, onClose, onSuccess }: CreateOperationModalProps) {
+// Extended schema to include setup_time, cleanup_time, instructions
+interface ExtendedCreateOperationInput extends CreateOperationInput {
+  setup_time_minutes?: number
+  cleanup_time_minutes?: number
+  instructions?: string
+}
+
+export function CreateOperationModal({
+  routingId,
+  open,
+  onClose,
+  onSuccess,
+  existingSequences = [],
+  nextSequence = 1,
+}: CreateOperationModalProps) {
   const [submitting, setSubmitting] = useState(false)
   const [machines, setMachines] = useState<Machine[]>([])
+  const [showParallelInfo, setShowParallelInfo] = useState(false)
   const { toast } = useToast()
 
-  const form = useForm<CreateOperationInput>({
+  const form = useForm<ExtendedCreateOperationInput>({
     resolver: zodResolver(createOperationSchema),
     defaultValues: {
-      sequence: 1,
+      sequence: nextSequence,
       name: '',
       description: '',
       machine_id: undefined,
       estimated_duration_minutes: undefined,
       labor_cost_per_hour: undefined,
+      setup_time_minutes: 0,
+      cleanup_time_minutes: 0,
+      instructions: '',
     },
   })
+
+  // Watch sequence field for parallel ops info
+  const watchedSequence = form.watch('sequence')
+
+  useEffect(() => {
+    if (watchedSequence && existingSequences.includes(watchedSequence)) {
+      setShowParallelInfo(true)
+    } else {
+      setShowParallelInfo(false)
+    }
+  }, [watchedSequence, existingSequences])
+
+  // Reset form when modal opens with correct next sequence
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        sequence: nextSequence,
+        name: '',
+        description: '',
+        machine_id: undefined,
+        estimated_duration_minutes: undefined,
+        labor_cost_per_hour: undefined,
+        setup_time_minutes: 0,
+        cleanup_time_minutes: 0,
+        instructions: '',
+      })
+    }
+  }, [open, nextSequence, form])
 
   // Fetch machines for dropdown
   useEffect(() => {
@@ -163,12 +217,23 @@ export function CreateOperationModal({ routingId, open, onClose, onSuccess }: Cr
                     />
                   </FormControl>
                   <FormDescription>
-                    Execution order (1, 2, 3...). Must be unique within this routing.
+                    Order of operation. Use same sequence for parallel operations.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Parallel operations info (AC-23) */}
+            {showParallelInfo && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Sequence {watchedSequence} is already used. This operation will run in parallel
+                  with existing operations at this sequence.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Operation Name Field */}
             <FormField
@@ -243,7 +308,7 @@ export function CreateOperationModal({ routingId, open, onClose, onSuccess }: Cr
                 name="estimated_duration_minutes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Estimated Duration (min)</FormLabel>
+                    <FormLabel>Expected Duration (min) *</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -252,7 +317,7 @@ export function CreateOperationModal({ routingId, open, onClose, onSuccess }: Cr
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                       />
                     </FormControl>
-                    <FormDescription>0-10000 minutes</FormDescription>
+                    <FormDescription>How long this operation takes</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -276,12 +341,80 @@ export function CreateOperationModal({ routingId, open, onClose, onSuccess }: Cr
                         }
                       />
                     </FormControl>
-                    <FormDescription>0-9999.99</FormDescription>
+                    <FormDescription>Hourly labor rate</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Setup Time */}
+              <FormField
+                control={form.control}
+                name="setup_time_minutes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Setup Time (min)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>Time to prepare equipment (default: 0)</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Cleanup Time */}
+              <FormField
+                control={form.control}
+                name="cleanup_time_minutes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cleanup Time (min)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>Time to clean after operation (default: 0)</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Instructions (AC-15-17) */}
+            <FormField
+              control={form.control}
+              name="instructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Instructions</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ''}
+                      placeholder="Step-by-step instructions for operators..."
+                      rows={4}
+                      maxLength={2000}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Optional, max 2000 characters ({(field.value?.length || 0)}/2000)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose}>

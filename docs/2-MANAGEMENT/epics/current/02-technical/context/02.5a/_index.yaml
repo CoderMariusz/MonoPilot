@@ -66,8 +66,12 @@ files_to_read:
   story:
     path: "docs/2-MANAGEMENT/epics/current/02-technical/02.5a.bom-items-core.md"
   wireframes:
-    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-bom-items-detail.md"
+    - id: "TEC-006a-MVP"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006a-mvp-bom-items.md"
+      description: "BOM Items MVP Wireframe (core CRUD only, no Phase 1+ features)"
       relevance: "BOM Items Table, Add/Edit Item Modal (MVP subset)"
+      status: "ready_for_approval"
+      created: "2025-12-28"
   patterns:
     - path: "apps/frontend/lib/services/bom-service.ts"
       relevance: "Existing BOM service pattern"

@@ -59,7 +59,7 @@ export function SettingsNav() {
   const navigation = buildSettingsNavigation(context)
 
   return (
-    <nav className="w-64 border-r bg-muted/10 p-4">
+    <nav className="w-52 border-r bg-muted/10 p-4">
       {navigation.map((section) => (
         <div key={section.section} className="mb-6">
           <h3 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">

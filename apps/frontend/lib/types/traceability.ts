@@ -1,5 +1,97 @@
 // TypeScript types for Traceability (Epic 2 Batch 2D)
 
+// ============================================================================
+// Traceability Configuration Types (Story 02.10a)
+// ============================================================================
+
+/**
+ * Traceability configuration stored in product_traceability_config table
+ */
+export interface TraceabilityConfig {
+  id: string
+  org_id: string
+  product_id: string
+  lot_number_format: string
+  lot_number_prefix: string
+  lot_number_sequence_length: number
+  traceability_level: TraceabilityLevel
+  standard_batch_size: number | null
+  min_batch_size: number | null
+  max_batch_size: number | null
+  expiry_calculation_method: ExpiryCalculationMethod
+  processing_buffer_days: number
+  gs1_lot_encoding_enabled: boolean
+  gs1_expiry_encoding_enabled: boolean
+  gs1_sscc_enabled: boolean
+  created_at: string
+  updated_at: string
+  created_by?: string
+  updated_by?: string
+  _isDefault?: boolean // Flag indicating default values (not saved in DB)
+}
+
+/**
+ * Input type for creating/updating traceability configuration
+ */
+export interface TraceabilityConfigInput {
+  lot_number_format?: string
+  lot_number_prefix?: string
+  lot_number_sequence_length?: number
+  traceability_level?: TraceabilityLevel
+  standard_batch_size?: number | null
+  min_batch_size?: number | null
+  max_batch_size?: number | null
+  expiry_calculation_method?: ExpiryCalculationMethod
+  processing_buffer_days?: number
+  gs1_lot_encoding_enabled?: boolean
+  gs1_expiry_encoding_enabled?: boolean
+  gs1_sscc_enabled?: boolean
+}
+
+/**
+ * Parsed lot format components
+ */
+export interface LotFormatParts {
+  prefix: string
+  placeholders: LotFormatPlaceholder[]
+  separators: string[]
+}
+
+/**
+ * Individual placeholder in lot format
+ */
+export interface LotFormatPlaceholder {
+  type: 'YYYY' | 'YY' | 'MM' | 'DD' | 'SEQ' | 'JULIAN' | 'PROD' | 'LINE' | 'YYMMDD'
+  length?: number // For SEQ:N
+  position: number
+}
+
+/**
+ * GS1 data structure for barcode generation
+ */
+export interface GS1Data {
+  gtin?: string
+  lotNumber?: string
+  expiryDate?: Date
+  sscc?: string
+  serialNumber?: string
+  quantity?: number
+}
+
+/**
+ * Traceability tracking granularity levels
+ */
+export type TraceabilityLevel = 'lot' | 'batch' | 'serial'
+
+/**
+ * Methods for calculating expiry dates
+ */
+export type ExpiryCalculationMethod = 'fixed_days' | 'rolling' | 'manual'
+
+// ============================================================================
+// License Plate Types (Epic 05)
+// ============================================================================
+
 export interface LicensePlate {
   id: string
   lp_number: string

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateTaxCode, deleteTaxCode } from '@/lib/services/tax-code-service'
 import { updateTaxCodeSchema } from '@/lib/validation/tax-code-schemas'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 
 /**
  * PUT /api/settings/tax-codes/[id]
@@ -33,14 +33,37 @@ export async function PUT(
       )
     }
 
-    // Check admin role
-    const { data: userData } = await supabase
+    // Check admin role using admin client to bypass RLS
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
-      .select('role')
+      .select('role:roles(code)')
       .eq('id', user.id)
       .single()
 
-    if (!userData || userData.role !== 'admin') {
+    if (userError || !userData) {
+      console.error('[Tax Code ID API PUT] User not found:', { userId: user.id, userError })
+      return NextResponse.json(
+        {
+          error: 'User role not found',
+          details: userError?.message || 'No user record found in public.users',
+          code: userError?.code
+        },
+        { status: 403 }
+      )
+    }
+
+    const roleData = userData.role as any
+    const role = (
+      typeof roleData === 'string'
+        ? roleData
+        : Array.isArray(roleData)
+          ? roleData[0]?.code
+          : roleData?.code
+    )?.toLowerCase()
+    const allowedRoles = ['admin', 'owner', 'super_admin', 'superadmin']
+
+    if (!role || !allowedRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }
@@ -128,14 +151,37 @@ export async function DELETE(
       )
     }
 
-    // Check admin role
-    const { data: userData } = await supabase
+    // Check admin role using admin client to bypass RLS
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
-      .select('role')
+      .select('role:roles(code)')
       .eq('id', user.id)
       .single()
 
-    if (!userData || userData.role !== 'admin') {
+    if (userError || !userData) {
+      console.error('[Tax Code ID API DELETE] User not found:', { userId: user.id, userError })
+      return NextResponse.json(
+        {
+          error: 'User role not found',
+          details: userError?.message || 'No user record found in public.users',
+          code: userError?.code
+        },
+        { status: 403 }
+      )
+    }
+
+    const roleData = userData.role as any
+    const role = (
+      typeof roleData === 'string'
+        ? roleData
+        : Array.isArray(roleData)
+          ? roleData[0]?.code
+          : roleData?.code
+    )?.toLowerCase()
+    const allowedRoles = ['admin', 'owner', 'super_admin', 'superadmin']
+
+    if (!role || !allowedRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }

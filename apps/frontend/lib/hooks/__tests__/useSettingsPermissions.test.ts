@@ -26,15 +26,15 @@ describe('useSettingsPermissions', () => {
     vi.clearAllMocks()
   })
 
-  // Test 1: Admin has full permissions
-  it('should return full CRUD permissions for admin user', () => {
+  // Test 1: Admin has CRU permissions on settings (no Delete per RBAC matrix)
+  it('should return CRU permissions for admin user (no delete on settings)', () => {
     vi.mocked(useOrgContext).mockReturnValue({
       data: {
         org_id: 'org-123',
         user_id: 'user-123',
         role_code: 'admin',
         role_name: 'Administrator',
-        permissions: { settings: 'CRUD' },
+        permissions: { settings: 'CRU' },
         organization: {
           id: 'org-123',
           name: 'Test Org',
@@ -54,10 +54,11 @@ describe('useSettingsPermissions', () => {
 
     const { result } = renderHook(() => useSettingsPermissions())
 
+    // Per Story 01.6 RBAC matrix: admin has CRU on settings (no Delete)
     expect(result.current).toEqual({
       canRead: true,
       canWrite: true,
-      canDelete: true,
+      canDelete: false,
       loading: false,
     })
   })

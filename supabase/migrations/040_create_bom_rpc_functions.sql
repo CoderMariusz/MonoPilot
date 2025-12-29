@@ -212,11 +212,11 @@ GRANT EXECUTE ON FUNCTION get_bom_timeline(UUID, UUID) TO authenticated;
 -- Comments
 -- ============================================================================
 
-COMMENT ON FUNCTION check_bom_date_overlap(UUID, DATE, DATE, UUID) IS
+COMMENT ON FUNCTION check_bom_date_overlap(UUID, DATE, DATE, UUID, UUID) IS
   'RPC: Check if date range overlaps with existing BOMs for a product. Returns conflicting BOMs. (Story 02.4, AC-18 to AC-20)';
 
-COMMENT ON FUNCTION get_work_orders_for_bom(UUID) IS
+COMMENT ON FUNCTION get_work_orders_for_bom(UUID, UUID) IS
   'RPC: Get work orders referencing a BOM for delete validation. Returns empty until work_orders table exists. (Story 02.4, AC-31 to AC-33)';
 
-COMMENT ON FUNCTION get_bom_timeline(UUID) IS
+COMMENT ON FUNCTION get_bom_timeline(UUID, UUID) IS
   'RPC: Get BOM version timeline with is_currently_active and has_overlap flags for visualization. (Story 02.4, AC-24 to AC-30)';

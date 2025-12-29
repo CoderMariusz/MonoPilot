@@ -1,7 +1,9 @@
 /**
  * Edit Operation Drawer
- * Story: 2.24 Routing Restructure
+ * Story: 2.24 Routing Restructure, Story 02.8 Routing Operations
  * AC-2.24.6: Edit operation with labor_cost_per_hour
+ * AC-15-17: Instructions textarea
+ * AC-18-21: Attachments upload
  */
 
 'use client'
@@ -10,7 +12,9 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { updateOperationSchema, type UpdateOperationInput } from '@/lib/validation/routing-schemas'
-import type { RoutingOperation } from '@/lib/services/routing-service'
+import type { RoutingOperation } from '@/lib/types/routing-operation'
+import type { Attachment } from './attachment-upload'
+import { AttachmentUpload } from './attachment-upload'
 import {
   Sheet,
   SheetContent,
@@ -30,6 +34,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -37,7 +42,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Info } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface EditOperationDrawerProps {
@@ -46,6 +53,8 @@ interface EditOperationDrawerProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Existing sequences for parallel operations detection */
+  existingSequences?: number[]
 }
 
 interface Machine {
@@ -54,28 +63,57 @@ interface Machine {
   name: string
 }
 
+// Extended schema for edit form
+interface ExtendedUpdateOperationInput extends UpdateOperationInput {
+  setup_time_minutes?: number
+  cleanup_time_minutes?: number
+  instructions?: string
+}
+
 export function EditOperationDrawer({
   routingId,
   operation,
   open,
   onClose,
   onSuccess,
+  existingSequences = [],
 }: EditOperationDrawerProps) {
   const [submitting, setSubmitting] = useState(false)
   const [machines, setMachines] = useState<Machine[]>([])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [showParallelInfo, setShowParallelInfo] = useState(false)
   const { toast } = useToast()
 
-  const form = useForm<UpdateOperationInput>({
+  const form = useForm<ExtendedUpdateOperationInput>({
     resolver: zodResolver(updateOperationSchema),
     defaultValues: {
       sequence: operation.sequence,
       name: operation.name,
       description: operation.description || '',
       machine_id: operation.machine_id || undefined,
-      estimated_duration_minutes: operation.estimated_duration_minutes ?? undefined,
+      estimated_duration_minutes: operation.duration ?? undefined,
       labor_cost_per_hour: operation.labor_cost_per_hour ?? undefined,
+      setup_time_minutes: operation.setup_time ?? 0,
+      cleanup_time_minutes: operation.cleanup_time ?? 0,
+      instructions: operation.instructions ?? '',
     },
   })
+
+  // Watch sequence field for parallel ops info
+  const watchedSequence = form.watch('sequence')
+
+  useEffect(() => {
+    // Show info if sequence is used by another operation (not this one)
+    const otherSeqs = existingSequences.filter((_, idx) => {
+      const ops = existingSequences
+      return ops.filter(s => s === watchedSequence).length > 0 &&
+             watchedSequence !== operation.sequence
+    })
+    setShowParallelInfo(
+      watchedSequence !== operation.sequence &&
+      existingSequences.includes(watchedSequence as number)
+    )
+  }, [watchedSequence, existingSequences, operation.sequence])
 
   // Fetch machines
   useEffect(() => {
@@ -103,10 +141,34 @@ export function EditOperationDrawer({
       name: operation.name,
       description: operation.description || '',
       machine_id: operation.machine_id || undefined,
-      estimated_duration_minutes: operation.estimated_duration_minutes ?? undefined,
+      estimated_duration_minutes: operation.duration ?? undefined,
       labor_cost_per_hour: operation.labor_cost_per_hour ?? undefined,
+      setup_time_minutes: operation.setup_time ?? 0,
+      cleanup_time_minutes: operation.cleanup_time ?? 0,
+      instructions: operation.instructions ?? '',
     })
+    // Reset attachments
+    setAttachments(operation.attachments || [])
   }, [operation, form])
+
+  // Fetch attachments when drawer opens
+  useEffect(() => {
+    const fetchAttachments = async () => {
+      if (!open || !operation.id) return
+      try {
+        const response = await fetch(
+          `/api/v1/technical/routings/${routingId}/operations/${operation.id}/attachments`
+        )
+        if (response.ok) {
+          const data = await response.json()
+          setAttachments(data.data || [])
+        }
+      } catch (error) {
+        console.error('Error fetching attachments:', error)
+      }
+    }
+    fetchAttachments()
+  }, [open, routingId, operation.id])
 
   const onSubmit = async (data: UpdateOperationInput) => {
     try {
@@ -176,12 +238,23 @@ export function EditOperationDrawer({
                     />
                   </FormControl>
                   <FormDescription>
-                    Execution order (1, 2, 3...). Must be unique within this routing.
+                    Order of operation. Use same sequence for parallel operations.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Parallel operations info (AC-23) */}
+            {showParallelInfo && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Sequence {watchedSequence} is already used. This operation will run in parallel
+                  with existing operations at this sequence.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Operation Name */}
             <FormField
@@ -257,7 +330,7 @@ export function EditOperationDrawer({
                 name="estimated_duration_minutes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Estimated Duration (min)</FormLabel>
+                    <FormLabel>Expected Duration (min) *</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -266,7 +339,7 @@ export function EditOperationDrawer({
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
                       />
                     </FormControl>
-                    <FormDescription>0-10000 minutes</FormDescription>
+                    <FormDescription>How long this operation takes</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -290,12 +363,92 @@ export function EditOperationDrawer({
                         }
                       />
                     </FormControl>
-                    <FormDescription>0-9999.99</FormDescription>
+                    <FormDescription>Hourly labor rate</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Setup Time */}
+              <FormField
+                control={form.control}
+                name="setup_time_minutes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Setup Time (min)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>Time to prepare equipment</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Cleanup Time */}
+              <FormField
+                control={form.control}
+                name="cleanup_time_minutes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cleanup Time (min)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>Time to clean after operation</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Instructions (AC-15-17) */}
+            <FormField
+              control={form.control}
+              name="instructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Instructions</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ''}
+                      placeholder="Step-by-step instructions for operators..."
+                      rows={4}
+                      maxLength={2000}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Optional, max 2000 characters ({(field.value?.length || 0)}/2000)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Attachments Section (AC-18-21) */}
+            <Separator className="my-6" />
+
+            <AttachmentUpload
+              routingId={routingId}
+              operationId={operation.id}
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+            />
+
+            <Separator className="my-6" />
 
             <SheetFooter>
               <Button type="button" variant="outline" onClick={onClose}>

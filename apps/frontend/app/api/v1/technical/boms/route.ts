@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { z } from 'zod'
 import type { BOMsListResponse, BOMWithProduct, CreateBOMRequest } from '@/lib/types/bom'
+import { API_TO_DB_STATUS } from '@/lib/validation/bom-schema'
 
 // Validation schema for create BOM
 const createBOMSchema = z.object({
@@ -114,14 +115,8 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (status) {
-      // Map lowercase API status to database values (capitalized)
-      const statusMap: Record<string, string> = {
-        'draft': 'Draft',
-        'active': 'Active',
-        'phased_out': 'Phased Out',
-        'inactive': 'Inactive',
-      }
-      query = query.eq('status', statusMap[status] || status)
+      // Use shared status mapping constant (DRY)
+      query = query.eq('status', API_TO_DB_STATUS[status] || status)
     }
 
     if (product_id) {
@@ -339,7 +334,7 @@ export async function POST(request: NextRequest) {
         bom_type: 'standard',
         effective_from: data.effective_from,
         effective_to: data.effective_to || null,
-        status: data.status === 'active' ? 'Active' : 'Draft',
+        status: API_TO_DB_STATUS[data.status] || 'Draft',
         output_qty: data.output_qty,
         output_uom: data.output_uom,
         notes: data.notes || null,

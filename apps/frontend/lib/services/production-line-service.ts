@@ -4,6 +4,7 @@
  * Purpose: CRUD operations, machine assignment, capacity calculation, sequence management
  */
 
+import { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type {
   ProductionLine,
@@ -14,6 +15,7 @@ import type {
   CapacityResult,
   MachineOrder,
   LineMachine,
+  Product,
 } from '@/lib/types/production-line'
 
 export class ProductionLineService {
@@ -21,10 +23,11 @@ export class ProductionLineService {
    * List production lines with filters, search, and pagination
    */
   static async list(
-    params: ProductionLineListParams = {}
+    params: ProductionLineListParams = {},
+    supabaseClient?: SupabaseClient
   ): Promise<{ success: boolean; data?: ProductionLine[]; total?: number; page?: number; limit?: number; error?: string }> {
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
       const {
         warehouse_id,
         status,
@@ -45,12 +48,12 @@ export class ProductionLineService {
               code,
               name,
               status,
-              capacity_per_hour
+              units_per_hour
             ),
             sequence_order
           ),
           compatible_products:production_line_products(
-            product:products(id, code, name, category)
+            product:products(id, code, name)
           )
         `, { count: 'exact' })
 
@@ -115,9 +118,9 @@ export class ProductionLineService {
   /**
    * Get production line by ID with machines and capacity
    */
-  static async getById(id: string): Promise<{ success: boolean; data?: ProductionLine; error?: string }> {
+  static async getById(id: string, supabaseClient?: SupabaseClient): Promise<{ success: boolean; data?: ProductionLine; error?: string }> {
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
 
       const { data, error } = await supabase
         .from('production_lines')
@@ -130,12 +133,12 @@ export class ProductionLineService {
               code,
               name,
               status,
-              capacity_per_hour
+              units_per_hour
             ),
             sequence_order
           ),
           compatible_products:production_line_products(
-            product:products(id, code, name, category)
+            product:products(id, code, name)
           )
         `)
         .eq('id', id)
@@ -180,10 +183,11 @@ export class ProductionLineService {
    * Create new production line with machines and products
    */
   static async create(
-    input: CreateProductionLineInput
+    input: CreateProductionLineInput,
+    supabaseClient?: SupabaseClient
   ): Promise<{ success: boolean; data?: ProductionLine; error?: string }> {
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
 
       // Get current user's org_id
       const { data: { user } } = await supabase.auth.getUser()
@@ -200,7 +204,7 @@ export class ProductionLineService {
       const org_id = userData.org_id
 
       // Check code uniqueness
-      const isUnique = await this.isCodeUnique(input.code.toUpperCase())
+      const isUnique = await this.isCodeUnique(input.code.toUpperCase(), undefined, supabase)
       if (!isUnique) {
         throw new Error('Line code must be unique')
       }
@@ -270,10 +274,11 @@ export class ProductionLineService {
    */
   static async update(
     id: string,
-    input: UpdateProductionLineInput
+    input: UpdateProductionLineInput,
+    supabaseClient?: SupabaseClient
   ): Promise<{ success: boolean; data?: ProductionLine; error?: string }> {
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
 
       // Get current user
       const { data: { user } } = await supabase.auth.getUser()
@@ -290,13 +295,13 @@ export class ProductionLineService {
 
       // Check code change with work orders
       if (input.code && input.code.toUpperCase() !== currentLine.code) {
-        const hasWorkOrders = await this.hasWorkOrders(id)
+        const hasWorkOrders = await this.hasWorkOrders(id, supabase)
         if (hasWorkOrders) {
           throw new Error('Code cannot be changed while work orders exist')
         }
 
         // Check uniqueness
-        const isUnique = await this.isCodeUnique(input.code.toUpperCase(), id)
+        const isUnique = await this.isCodeUnique(input.code.toUpperCase(), id, supabase)
         if (!isUnique) {
           throw new Error('Line code must be unique')
         }
@@ -382,12 +387,12 @@ export class ProductionLineService {
   /**
    * Delete production line (blocked if work orders exist)
    */
-  static async delete(id: string): Promise<{ success: boolean; error?: string }> {
+  static async delete(id: string, supabaseClient?: SupabaseClient): Promise<{ success: boolean; error?: string }> {
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
 
       // Check work orders
-      const hasWorkOrders = await this.hasWorkOrders(id)
+      const hasWorkOrders = await this.hasWorkOrders(id, supabase)
       if (hasWorkOrders) {
         throw new Error('Line has active work orders')
       }
@@ -419,7 +424,8 @@ export class ProductionLineService {
    */
   static async reorderMachines(
     lineId: string,
-    machineOrders: MachineOrder[]
+    machineOrders: MachineOrder[],
+    supabaseClient?: SupabaseClient
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Validate sequences (no gaps, no duplicates)
@@ -430,7 +436,7 @@ export class ProductionLineService {
         throw new Error('Invalid sequence (gaps or duplicates)')
       }
 
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
 
       // Update each machine's sequence
       for (const order of machineOrders) {
@@ -455,9 +461,9 @@ export class ProductionLineService {
   /**
    * Check if code is unique (org-scoped)
    */
-  static async isCodeUnique(code: string, excludeId?: string): Promise<boolean> {
+  static async isCodeUnique(code: string, excludeId?: string, supabaseClient?: SupabaseClient): Promise<boolean> {
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
 
       let query = supabase
         .from('production_lines')
@@ -482,7 +488,7 @@ export class ProductionLineService {
    */
   static calculateBottleneckCapacity(machines: LineMachine[]): CapacityResult {
     const machinesWithCapacity = machines.filter(
-      (m) => m.capacity_per_hour !== null && m.capacity_per_hour > 0
+      (m) => m.units_per_hour !== null && m.units_per_hour > 0
     )
 
     if (machinesWithCapacity.length === 0) {
@@ -495,15 +501,15 @@ export class ProductionLineService {
     }
 
     const bottleneck = machinesWithCapacity.reduce((min, m) =>
-      m.capacity_per_hour! < min.capacity_per_hour! ? m : min
+      m.units_per_hour! < min.units_per_hour! ? m : min
     )
 
     return {
-      capacity: bottleneck.capacity_per_hour,
+      capacity: bottleneck.units_per_hour,
       bottleneck_machine_id: bottleneck.id,
       bottleneck_machine_code: bottleneck.code,
       machines_without_capacity: machines
-        .filter((m) => !m.capacity_per_hour || m.capacity_per_hour <= 0)
+        .filter((m) => !m.units_per_hour || m.units_per_hour <= 0)
         .map((m) => m.code),
     }
   }
@@ -522,9 +528,9 @@ export class ProductionLineService {
    * Check if production line has work orders
    * @private
    */
-  private static async hasWorkOrders(lineId: string): Promise<boolean> {
+  private static async hasWorkOrders(lineId: string, supabaseClient?: SupabaseClient): Promise<boolean> {
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient || createClient()
 
       // Check work_orders table (will be created in Epic 04)
       // For now, return false (no work orders)

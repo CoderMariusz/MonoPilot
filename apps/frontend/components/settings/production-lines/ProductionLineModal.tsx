@@ -43,7 +43,6 @@ import type {
   LineMachine,
   Product,
 } from '@/lib/types/production-line'
-import type { Warehouse } from '@/lib/types/warehouse'
 import type { MachineStatus } from '@/lib/types/machine'
 import { productionLineCreateSchema } from '@/lib/validation/production-line-schemas'
 import { PRODUCTION_LINE_STATUS_LABELS } from '@/lib/types/production-line'
@@ -54,13 +53,12 @@ interface ProductionLineModalProps {
   open: boolean
   onClose: () => void
   onSubmit: (data: any) => Promise<void>
-  warehouses: Warehouse[]
   availableMachines: Array<{
     id: string
     code: string
     name: string
     status: MachineStatus
-    capacity_per_hour: number | null
+    units_per_hour: number | null
   }>
   availableProducts: Product[]
 }
@@ -69,7 +67,6 @@ interface FormData {
   code: string
   name: string
   description: string
-  warehouse_id: string
   status: ProductionLineStatus
 }
 
@@ -81,7 +78,6 @@ export function ProductionLineModal({
   open,
   onClose,
   onSubmit,
-  warehouses,
   availableMachines,
   availableProducts,
 }: ProductionLineModalProps) {
@@ -89,7 +85,6 @@ export function ProductionLineModal({
     code: productionLine?.code || '',
     name: productionLine?.name || '',
     description: productionLine?.description || '',
-    warehouse_id: productionLine?.warehouse_id || '',
     status: productionLine?.status || 'active',
   })
   const [machines, setMachines] = useState<LineMachine[]>(productionLine?.machines || [])
@@ -111,7 +106,6 @@ export function ProductionLineModal({
         code: productionLine.code || '',
         name: productionLine.name || '',
         description: productionLine.description || '',
-        warehouse_id: productionLine.warehouse_id || '',
         status: productionLine.status || 'active',
       })
       setMachines(productionLine.machines || [])
@@ -121,12 +115,16 @@ export function ProductionLineModal({
         code: '',
         name: '',
         description: '',
-        warehouse_id: '',
         status: 'active',
       })
       setMachines([])
       setSelectedProductIds([])
     }
+    console.log('[ProductionLineModal] Props data:', {
+      machinesCount: availableMachines?.length,
+      mode,
+      hasProductionLine: !!productionLine
+    })
     setErrors({})
     setCodeAvailable(null)
     setCodeValidating(false)
@@ -168,7 +166,7 @@ export function ProductionLineModal({
           const data = await response.json()
 
           if (response.ok) {
-            setCodeAvailable(data.available)
+            setCodeAvailable(data.valid)
           }
         } catch (error) {
           console.error('Code validation error:', error)
@@ -195,7 +193,6 @@ export function ProductionLineModal({
         code: formData.code,
         name: formData.name,
         description: formData.description || null,
-        warehouse_id: formData.warehouse_id,
         status: formData.status,
         machine_ids: machines.map((m) => m.id),
         product_ids: selectedProductIds,
@@ -240,7 +237,6 @@ export function ProductionLineModal({
         code: formData.code.toUpperCase(),
         name: formData.name,
         description: formData.description || null,
-        warehouse_id: formData.warehouse_id,
         status: formData.status,
         machine_ids: machines.map((m) => m.id),
         product_ids: selectedProductIds,
@@ -348,31 +344,6 @@ export function ProductionLineModal({
                 />
                 {errors.description && (
                   <p className="text-sm text-destructive">{errors.description}</p>
-                )}
-              </div>
-
-              {/* Warehouse field */}
-              <div className="space-y-2">
-                <Label htmlFor="warehouse_id">
-                  Warehouse <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.warehouse_id}
-                  onValueChange={(value) => handleChange('warehouse_id', value)}
-                >
-                  <SelectTrigger className={errors.warehouse_id ? 'border-destructive' : ''}>
-                    <SelectValue placeholder="Select warehouse" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((warehouse) => (
-                      <SelectItem key={warehouse.id} value={warehouse.id}>
-                        {warehouse.code} - {warehouse.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.warehouse_id && (
-                  <p className="text-sm text-destructive">{errors.warehouse_id}</p>
                 )}
               </div>
 

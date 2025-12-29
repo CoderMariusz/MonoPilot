@@ -9,7 +9,7 @@
 -- - Multi-tenant with org_id
 -- - Status: active, maintenance, inactive, setup
 -- - Code immutability when work orders exist
--- - Capacity calculation (bottleneck = MIN(machine.capacity_per_hour))
+-- - Capacity calculation (bottleneck = MIN(machine.units_per_hour))
 -- - Audit fields (created_at, updated_at, created_by, updated_by)
 
 -- =============================================================================

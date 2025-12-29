@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
 
     const result = await getRecentActivity(orgId, query)
 
-    return NextResponse.json(result)
+    const response = NextResponse.json(result)
+    response.headers.set('Cache-Control', 'private, max-age=30')
+    return response
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message },

@@ -4,7 +4,6 @@
  * Purpose: TypeScript types and interfaces for production line management
  */
 
-import type { Warehouse } from './warehouse'
 import type { MachineStatus } from './machine'
 
 // Production Line Status Enum (4 states)
@@ -35,7 +34,7 @@ export interface LineMachine {
   code: string
   name: string
   status: MachineStatus
-  capacity_per_hour: number | null
+  units_per_hour: number | null
   sequence_order: number
 }
 
@@ -54,8 +53,6 @@ export interface ProductionLine {
   code: string
   name: string
   description: string | null
-  warehouse_id: string
-  warehouse?: Warehouse
   default_output_location_id: string | null
   status: ProductionLineStatus
   calculated_capacity: number | null
@@ -72,7 +69,6 @@ export interface CreateProductionLineInput {
   code: string
   name: string
   description?: string | null
-  warehouse_id: string
   default_output_location_id?: string | null
   status?: ProductionLineStatus
   machine_ids?: string[]
@@ -84,7 +80,6 @@ export interface UpdateProductionLineInput {
   code?: string
   name?: string
   description?: string | null
-  warehouse_id?: string
   default_output_location_id?: string | null
   status?: ProductionLineStatus
   machine_ids?: string[]
@@ -104,9 +99,8 @@ export interface UpdateProductCompatibilityInput {
 // Production Line List Parameters
 export interface ProductionLineListParams {
   search?: string
-  warehouse_id?: string
   status?: ProductionLineStatus
-  sortBy?: 'code' | 'name' | 'warehouse' | 'capacity' | 'created_at'
+  sortBy?: 'code' | 'name' | 'capacity' | 'created_at'
   sortOrder?: 'asc' | 'desc'
   page?: number
   limit?: number

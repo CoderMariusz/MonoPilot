@@ -436,3 +436,561 @@ function isEuMandatoryAllergen(name: string): boolean {
   ]
   return euMandatory.some(term => name.toLowerCase().includes(term))
 }
+
+// ============================================================================
+// Story 02.12 - Technical Dashboard Functions
+// ============================================================================
+
+import type {
+  DashboardStatsResponse,
+  TechnicalAllergenMatrixResponse,
+  BomTimelineResponse,
+  TechnicalRecentActivityResponse,
+  CostTrendsResponse,
+  TrendDirection,
+  ActivityType,
+  EntityType,
+  AllergenRelation
+} from '../types/dashboard'
+
+/**
+ * Format relative time from timestamp
+ * Implements AC-12.18
+ */
+export function formatRelativeTime(timestamp: string): string {
+  const now = new Date()
+  const date = new Date(timestamp)
+  const diffMs = now.getTime() - date.getTime()
+
+  // Handle future timestamps
+  if (diffMs < 0) {
+    return 'just now'
+  }
+
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/**
+ * Fetch dashboard stats - Products, BOMs, Routings counts with trends
+ * Implements AC-12.01 to AC-12.05, AC-12.23
+ */
+export async function fetchDashboardStats(orgId: string): Promise<DashboardStatsResponse> {
+  const supabase = createAdminClient()
+
+  // Parallel queries for stats
+  const [productsResult, bomsResult, routingsResult, costsResult] = await Promise.all([
+    // Products stats
+    supabase
+      .from('products')
+      .select('id, status', { count: 'exact' })
+      .eq('org_id', orgId),
+
+    // BOMs stats
+    supabase
+      .from('boms')
+      .select('id, status', { count: 'exact' })
+      .eq('org_id', orgId),
+
+    // Routings stats
+    supabase
+      .from('routings')
+      .select('id, is_reusable', { count: 'exact' })
+      .eq('org_id', orgId),
+
+    // Cost data - product costs from last 2 months for trend
+    supabase
+      .from('product_costs')
+      .select('total_cost, calculated_at')
+      .eq('org_id', orgId)
+      .gte('calculated_at', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+      .order('calculated_at', { ascending: false })
+  ])
+
+  // Process products
+  const products = productsResult.data || []
+  const activeProducts = products.filter((p: any) => p.status === 'active').length
+  const inactiveProducts = products.filter((p: any) => p.status !== 'active').length
+
+  // Process BOMs
+  const boms = bomsResult.data || []
+  const activeBoms = boms.filter((b: any) => b.status === 'Active').length
+  const phasedBoms = boms.filter((b: any) => b.status === 'Phased Out').length
+
+  // Process Routings
+  const routings = routingsResult.data || []
+  const reusableRoutings = routings.filter((r: any) => r.is_reusable).length
+
+  // Calculate cost trend
+  const costs = costsResult.data || []
+  let avgCost = 0
+  let trendPercent = 0
+  let trendDirection: TrendDirection = 'neutral'
+
+  if (costs.length > 0) {
+    // Current month costs
+    const now = new Date()
+    const currentMonth = costs.filter((c: any) => {
+      const date = new Date(c.calculated_at)
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+    })
+
+    // Previous month costs
+    const prevMonth = costs.filter((c: any) => {
+      const date = new Date(c.calculated_at)
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1)
+      return date.getMonth() === prev.getMonth() && date.getFullYear() === prev.getFullYear()
+    })
+
+    const currentAvg = currentMonth.length > 0
+      ? currentMonth.reduce((sum: number, c: any) => sum + (c.total_cost || 0), 0) / currentMonth.length
+      : 0
+
+    const prevAvg = prevMonth.length > 0
+      ? prevMonth.reduce((sum: number, c: any) => sum + (c.total_cost || 0), 0) / prevMonth.length
+      : 0
+
+    avgCost = currentAvg > 0 ? currentAvg : prevAvg
+
+    if (prevAvg > 0 && currentAvg > 0) {
+      trendPercent = Math.round(((currentAvg - prevAvg) / prevAvg) * 100 * 10) / 10
+      trendDirection = trendPercent > 0 ? 'up' : trendPercent < 0 ? 'down' : 'neutral'
+    }
+  }
+
+  return {
+    products: {
+      total: products.length,
+      active: activeProducts,
+      inactive: inactiveProducts
+    },
+    boms: {
+      total: boms.length,
+      active: activeBoms,
+      phased: phasedBoms
+    },
+    routings: {
+      total: routings.length,
+      reusable: reusableRoutings
+    },
+    avg_cost: {
+      value: Math.round(avgCost * 100) / 100,
+      currency: 'PLN',
+      trend_percent: Math.abs(trendPercent),
+      trend_direction: trendDirection
+    }
+  }
+}
+
+/**
+ * Fetch allergen matrix - Products x Allergens heatmap
+ * Implements AC-12.06 to AC-12.12
+ */
+export async function fetchAllergenMatrix(
+  orgId: string,
+  productType?: string
+): Promise<TechnicalAllergenMatrixResponse> {
+  const supabase = createAdminClient()
+
+  // Get all allergens
+  const { data: allergens } = await supabase
+    .from('allergens')
+    .select('id, code, name')
+    .order('name')
+
+  // Get products with allergen relations
+  let productsQuery = supabase
+    .from('products')
+    .select(`
+      id, code, name, type,
+      product_allergens (allergen_id, relation_type)
+    `)
+    .eq('org_id', orgId)
+    .eq('status', 'active')
+    .order('code')
+    .limit(50)
+
+  if (productType) {
+    productsQuery = productsQuery.eq('type', productType)
+  }
+
+  const { data: products } = await productsQuery
+
+  // Build matrix
+  const matrixProducts = (products || []).map((p: any) => {
+    const relations: Record<string, AllergenRelation> = {}
+
+    allergens?.forEach(a => {
+      const relation = p.product_allergens?.find((pa: any) => pa.allergen_id === a.id)
+      if (relation) {
+        relations[a.id] = relation.relation_type === 'contains' ? 'contains'
+          : relation.relation_type === 'may_contain' ? 'may_contain'
+          : null
+      } else {
+        relations[a.id] = null
+      }
+    })
+
+    return {
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      allergen_relations: relations
+    }
+  })
+
+  return {
+    allergens: (allergens || []).map(a => ({
+      id: a.id,
+      code: a.code,
+      name: a.name
+    })),
+    products: matrixProducts
+  }
+}
+
+/**
+ * Fetch BOM timeline - Version changes over time
+ * Implements AC-12.13 to AC-12.16
+ */
+export async function fetchBomTimeline(
+  orgId: string,
+  options: { productId?: string; months?: number; limit?: number } = {}
+): Promise<BomTimelineResponse> {
+  const { productId, months = 6, limit = 50 } = options
+  const supabase = createAdminClient()
+
+  // Calculate date cutoff
+  const cutoffDate = new Date()
+  cutoffDate.setMonth(cutoffDate.getMonth() - months)
+
+  let query = supabase
+    .from('boms')
+    .select(`
+      id,
+      version,
+      effective_from,
+      created_at,
+      created_by,
+      product:products!product_id (id, code, name),
+      creator:users!created_by (id, first_name, last_name)
+    `)
+    .eq('org_id', orgId)
+    .gte('created_at', cutoffDate.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(limit + 1) // +1 to check if limit reached
+
+  if (productId) {
+    query = query.eq('product_id', productId)
+  }
+
+  const { data } = await query
+
+  const timeline = (data || []).slice(0, limit).map((b: any) => ({
+    bom_id: b.id,
+    product_id: b.product?.id || '',
+    product_code: b.product?.code || '',
+    product_name: b.product?.name || '',
+    version: parseFloat(b.version) || 1,
+    effective_from: b.effective_from,
+    changed_by: b.created_by || '',
+    changed_by_name: b.creator ? `${b.creator.first_name || ''} ${b.creator.last_name || ''}`.trim() : 'Unknown',
+    changed_at: b.created_at
+  }))
+
+  return {
+    timeline,
+    limit_reached: (data || []).length > limit
+  }
+}
+
+/**
+ * Fetch recent activity - Last N events across products, BOMs, routings
+ * Implements AC-12.17 to AC-12.19
+ */
+export async function fetchRecentActivity(
+  orgId: string,
+  limit: number = 10
+): Promise<TechnicalRecentActivityResponse> {
+  const supabase = createAdminClient()
+
+  // Parallelize all 3 queries for optimal performance
+  const [productsResult, bomsResult, routingsResult] = await Promise.all([
+    // Query recent products
+    supabase
+      .from('products')
+      .select('id, code, name, created_at, updated_at, created_by, users!created_by(first_name, last_name)')
+      .eq('org_id', orgId)
+      .order('updated_at', { ascending: false })
+      .limit(limit),
+
+    // Query recent BOMs
+    supabase
+      .from('boms')
+      .select(`
+        id, version, status, created_at, updated_at, created_by,
+        product:products!product_id(code, name),
+        creator:users!created_by(first_name, last_name)
+      `)
+      .eq('org_id', orgId)
+      .order('updated_at', { ascending: false })
+      .limit(limit),
+
+    // Query recent routings
+    supabase
+      .from('routings')
+      .select('id, name, created_at, updated_at, created_by, users!created_by(first_name, last_name)')
+      .eq('org_id', orgId)
+      .order('updated_at', { ascending: false })
+      .limit(limit)
+  ])
+
+  const products = productsResult.data
+  const boms = bomsResult.data
+  const routings = routingsResult.data
+
+  // Combine and sort all activities
+  const allActivities: TechnicalRecentActivityResponse['activities'] = []
+
+  // Process products
+  (products || []).forEach((p: any) => {
+    const isCreated = new Date(p.created_at).getTime() === new Date(p.updated_at).getTime()
+    const userName = p.users ? `${p.users.first_name || ''} ${p.users.last_name || ''}`.trim() : 'Unknown'
+
+    allActivities.push({
+      id: `product-${p.id}`,
+      type: isCreated ? 'product_created' : 'product_updated',
+      entity_type: 'product',
+      entity_id: p.id,
+      description: `Product ${p.code} ${isCreated ? 'created' : 'updated'}`,
+      user_id: p.created_by || '',
+      user_name: userName,
+      timestamp: p.updated_at,
+      relative_time: formatRelativeTime(p.updated_at),
+      link: `/technical/products/${p.id}`
+    })
+  })
+
+  // Process BOMs
+  (boms || []).forEach((b: any) => {
+    const isCreated = new Date(b.created_at).getTime() === new Date(b.updated_at).getTime()
+    const userName = b.creator ? `${b.creator.first_name || ''} ${b.creator.last_name || ''}`.trim() : 'Unknown'
+    const productCode = b.product?.code || 'Unknown'
+
+    allActivities.push({
+      id: `bom-${b.id}`,
+      type: isCreated ? 'bom_created' : (b.status === 'Active' ? 'bom_activated' : 'bom_created'),
+      entity_type: 'bom',
+      entity_id: b.id,
+      description: `BOM v${b.version} for ${productCode} ${isCreated ? 'created' : 'updated'}`,
+      user_id: b.created_by || '',
+      user_name: userName,
+      timestamp: b.updated_at,
+      relative_time: formatRelativeTime(b.updated_at),
+      link: `/technical/boms/${b.id}`
+    })
+  })
+
+  // Process routings
+  (routings || []).forEach((r: any) => {
+    const isCreated = new Date(r.created_at).getTime() === new Date(r.updated_at).getTime()
+    const userName = r.users ? `${r.users.first_name || ''} ${r.users.last_name || ''}`.trim() : 'Unknown'
+
+    allActivities.push({
+      id: `routing-${r.id}`,
+      type: isCreated ? 'routing_created' : 'routing_updated',
+      entity_type: 'routing',
+      entity_id: r.id,
+      description: `Routing "${r.name}" ${isCreated ? 'created' : 'updated'}`,
+      user_id: r.created_by || '',
+      user_name: userName,
+      timestamp: r.updated_at,
+      relative_time: formatRelativeTime(r.updated_at),
+      link: `/technical/routings/${r.id}`
+    })
+  })
+
+  // Sort by timestamp descending and take top N
+  allActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+  return {
+    activities: allActivities.slice(0, limit)
+  }
+}
+
+/**
+ * Fetch cost trends - Monthly cost averages
+ * Implements AC-12.20 to AC-12.22
+ */
+export async function fetchCostTrends(
+  orgId: string,
+  months: number = 6
+): Promise<CostTrendsResponse> {
+  const supabase = createAdminClient()
+
+  // Calculate date range
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setMonth(startDate.getMonth() - months)
+
+  const { data: costs } = await supabase
+    .from('product_costs')
+    .select('material_cost, labor_cost, overhead_cost, total_cost, calculated_at')
+    .eq('org_id', orgId)
+    .gte('calculated_at', startDate.toISOString())
+    .lte('calculated_at', endDate.toISOString())
+    .order('calculated_at', { ascending: true })
+
+  // Group by month
+  const monthlyData: Record<string, {
+    material_costs: number[]
+    labor_costs: number[]
+    overhead_costs: number[]
+    total_costs: number[]
+  }> = {}
+
+  // Initialize months
+  const monthLabels: string[] = []
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    monthLabels.push(key)
+    monthlyData[key] = { material_costs: [], labor_costs: [], overhead_costs: [], total_costs: [] }
+  }
+
+  // Aggregate costs
+  (costs || []).forEach((c: any) => {
+    const date = new Date(c.calculated_at)
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+
+    if (monthlyData[key]) {
+      monthlyData[key].material_costs.push(c.material_cost || 0)
+      monthlyData[key].labor_costs.push(c.labor_cost || 0)
+      monthlyData[key].overhead_costs.push(c.overhead_cost || 0)
+      monthlyData[key].total_costs.push(c.total_cost || 0)
+    }
+  })
+
+  // Calculate averages
+  const data = monthLabels.map(month => {
+    const d = monthlyData[month]
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
+
+    return {
+      month,
+      material_cost: Math.round(avg(d.material_costs) * 100) / 100,
+      labor_cost: Math.round(avg(d.labor_costs) * 100) / 100,
+      overhead_cost: Math.round(avg(d.overhead_costs) * 100) / 100,
+      total_cost: Math.round(avg(d.total_costs) * 100) / 100
+    }
+  })
+
+  return {
+    months: monthLabels,
+    data,
+    currency: 'PLN'
+  }
+}
+
+/**
+ * Export allergen matrix as PDF
+ * Implements AC-12.11
+ */
+export async function exportAllergenMatrixPdf(
+  data: TechnicalAllergenMatrixResponse,
+  orgId: string
+): Promise<Blob> {
+  // Dynamic import of jsPDF for code splitting
+  const { jsPDF } = await import('jspdf')
+
+  const doc = new jsPDF({ orientation: 'landscape' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+
+  // Title
+  doc.setFontSize(18)
+  doc.text('Allergen Matrix', pageWidth / 2, 15, { align: 'center' })
+
+  // Timestamp
+  doc.setFontSize(10)
+  doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 22, { align: 'center' })
+
+  // Legend
+  doc.setFontSize(8)
+  let legendY = 30
+  doc.setFillColor(239, 68, 68) // Red
+  doc.rect(14, legendY, 5, 5, 'F')
+  doc.text('Contains', 21, legendY + 4)
+
+  doc.setFillColor(251, 191, 36) // Yellow
+  doc.rect(50, legendY, 5, 5, 'F')
+  doc.text('May Contain', 57, legendY + 4)
+
+  doc.setFillColor(16, 185, 129) // Green
+  doc.rect(100, legendY, 5, 5, 'F')
+  doc.text('Free From', 107, legendY + 4)
+
+  // Table header
+  let y = 45
+  const startX = 14
+  const colWidth = 20
+  const rowHeight = 8
+  const productColWidth = 50
+
+  // Allergen headers
+  doc.setFontSize(7)
+  doc.setFont(undefined, 'bold')
+  doc.text('Product', startX, y)
+
+  data.allergens.slice(0, 10).forEach((allergen, i) => {
+    doc.text(allergen.code.substring(0, 8), startX + productColWidth + (i * colWidth), y)
+  })
+
+  y += 5
+  doc.line(startX, y, pageWidth - 14, y)
+  y += 3
+
+  // Product rows
+  doc.setFont(undefined, 'normal')
+  data.products.slice(0, 25).forEach((product, rowIndex) => {
+    if (y > 180) {
+      doc.addPage()
+      y = 20
+    }
+
+    doc.text(product.code.substring(0, 20), startX, y)
+
+    data.allergens.slice(0, 10).forEach((allergen, colIndex) => {
+      const relation = product.allergen_relations[allergen.id]
+      const cellX = startX + productColWidth + (colIndex * colWidth) - 2
+      const cellY = y - 5
+
+      if (relation === 'contains') {
+        doc.setFillColor(239, 68, 68)
+        doc.rect(cellX, cellY, colWidth - 2, rowHeight - 1, 'F')
+      } else if (relation === 'may_contain') {
+        doc.setFillColor(251, 191, 36)
+        doc.rect(cellX, cellY, colWidth - 2, rowHeight - 1, 'F')
+      } else {
+        doc.setFillColor(16, 185, 129)
+        doc.rect(cellX, cellY, colWidth - 2, rowHeight - 1, 'F')
+      }
+    })
+
+    y += rowHeight
+  })
+
+  // Generate filename
+  const today = new Date().toISOString().split('T')[0]
+  const filename = `allergen-matrix-${orgId}-${today}.pdf`
+
+  return doc.output('blob')
+}

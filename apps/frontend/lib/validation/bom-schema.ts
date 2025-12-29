@@ -18,6 +18,34 @@ export const MAX_NOTES_LENGTH = 2000
 /** Maximum allowed length for unit of measure field */
 export const MAX_UOM_LENGTH = 20
 
+/**
+ * Maps API status values (lowercase) to database status values (capitalized)
+ * Used for INSERT/UPDATE operations
+ *
+ * @example
+ * const dbStatus = API_TO_DB_STATUS['draft'] // 'Draft'
+ */
+export const API_TO_DB_STATUS: Record<string, string> = {
+  draft: 'Draft',
+  active: 'Active',
+  phased_out: 'Phased Out',
+  inactive: 'Inactive',
+} as const
+
+/**
+ * Maps database status values (capitalized) to API status values (lowercase)
+ * Used for SELECT operations and response formatting
+ *
+ * @example
+ * const apiStatus = DB_TO_API_STATUS['Draft'] // 'draft'
+ */
+export const DB_TO_API_STATUS: Record<string, string> = {
+  Draft: 'draft',
+  Active: 'active',
+  'Phased Out': 'phased_out',
+  Inactive: 'inactive',
+} as const
+
 // ============================================
 // VALIDATION HELPERS
 // ============================================

@@ -1,0 +1,249 @@
+# CODE REVIEW HANDOFF: Story 02.11 - RE-REVIEW AFTER CRITICAL FIXES
+# Date: 2025-12-28
+# Reviewer: CODE-REVIEWER (AI Agent)
+# Decision: REQUEST_CHANGES (Incomplete fixes)
+
+story: "02.11"
+name: "Shelf Life Calculation + Expiry Management"
+epic: "02-technical"
+phase: "Code Review (Post-CRITICAL-FIXES Attempt)"
+review_iteration: 2
+
+decision: "request_changes"
+overall_score: 7.5
+overall_status: "90% complete - CRITICAL-1 fix incomplete (2 locations missed)"
+
+# SCORES BY CATEGORY
+scores:
+  security: 7
+  business_logic: 7  # Improved from 6 (CRITICAL-2 fixed)
+  code_quality: 8
+  performance: 8
+  testing: 9
+
+# RE-REVIEW SUMMARY
+re_review_summary:
+  critical_1_status: "PARTIALLY FIXED (2 of 4 locations still broken)"
+  critical_2_status: "FIXED ✅"
+  tests_status: "ALL PASSING (340/340) ✅"
+  regression_check: "NO REGRESSIONS ✅"
+
+# CRITICAL ISSUES REMAINING
+critical_issues_remaining:
+  - id: "CRITICAL-1-INCOMPLETE"
+    title: "Database Trigger Case-Sensitivity - Incomplete Fix"
+    severity: "CRITICAL"
+    category: "Business Logic"
+    ac_violated: "AC-11.16"
+    description: "Fix applied to trigger (line 30) and service line 133, but MISSED lines 415 and 693"
+    impact: "getShelfLifeConfig() and calculateShelfLife() still query wrong BOM status"
+
+    locations_fixed:
+      - file: "supabase/migrations/054_shelf_life_recalc_trigger.sql"
+        line: 30
+        status: "FIXED ✅"
+        current: "AND b.status = 'active'"
+
+      - file: "apps/frontend/lib/services/shelf-life-service.ts"
+        line: 133
+        status: "FIXED ✅"
+        current: ".eq('status', 'active')"
+
+    locations_still_broken:
+      - file: "apps/frontend/lib/services/shelf-life-service.ts"
+        line: 415
+        status: "NOT FIXED ❌"
+        current: ".eq('status', 'Active')"
+        function: "getShelfLifeConfig()"
+        impact: "Cannot retrieve config for products with active BOMs"
+
+      - file: "apps/frontend/lib/services/shelf-life-service.ts"
+        line: 693
+        status: "NOT FIXED ❌"
+        current: ".eq('status', 'Active')"
+        function: "calculateShelfLife()"
+        impact: "Cannot calculate shelf life (AC-11.16 broken)"
+
+    fix_required: "Change lines 415 and 693 from 'Active' to 'active'"
+    estimated_time: "5 minutes"
+
+# VERIFIED FIXES
+verified_fixes:
+  - id: "CRITICAL-2"
+    title: "Final Days Calculation Logic"
+    status: "FIXED ✅"
+    file: "apps/frontend/lib/services/shelf-life-service.ts"
+    line: 771-773
+    verification: |
+      BEFORE:
+        final_days: existingConfig?.processing_impact_days !== undefined
+          ? calculatedDays
+          : calculatedDays,
+
+      AFTER (CORRECT):
+        final_days: existingConfig?.override_days
+          ? existingConfig.override_days  // Keep override if set
+          : calculatedDays,  // Otherwise use calculated
+    ac_status: "AC-11.02 NOW PASSING ✅"
+
+# TEST RESULTS (RE-RUN)
+tests:
+  total: 340
+  passing: 340
+  failing: 0
+  coverage_percent: 90
+  status: "EXCELLENT - NO REGRESSIONS ✅"
+
+  test_breakdown:
+    validation: 110
+    service: 93
+    api_routes: 97
+    database_rls: 40
+
+  note: |
+    All shelf-life tests passing:
+    ✅ lib/validation/__tests__/shelf-life.test.ts (110 tests) - PASS
+    ✅ lib/services/__tests__/shelf-life-service.test.ts (93 tests) - PASS
+    ✅ app/api/technical/shelf-life/__tests__/route.test.ts (97 tests) - PASS
+
+# ACCEPTANCE CRITERIA COVERAGE (UPDATED)
+ac_coverage:
+  total: 19
+  passing: 15  # Improved from 14 (AC-11.02 now passing)
+  failing: 4   # Reduced from 5
+  percentage: 79  # Improved from 73%
+
+ac_status_changes:
+  - id: "AC-11.02"
+    status: "PASS ✅"
+    description: "Safety buffer application"
+    previous_status: "CRITICAL-2"
+    note: "Fixed - final_days now correctly uses override_days when present"
+
+  - id: "AC-11.04"
+    status: "PARTIALLY BROKEN ⚠️"
+    description: "Error when no active BOM"
+    previous_status: "CRITICAL-1"
+    note: "Line 133 fixed, but line 693 still broken"
+
+  - id: "AC-11.16"
+    status: "PARTIALLY BROKEN ⚠️"
+    description: "Recalc trigger on ingredient"
+    previous_status: "CRITICAL-1"
+    note: "Trigger fixed, but calculateShelfLife() still queries wrong status"
+
+# MAJOR/MINOR ISSUES (UNCHANGED)
+major_issues:
+  - id: "MAJOR-1"
+    title: "Missing 404 vs 403 Enforcement in Service Layer"
+    status: "NOT ADDRESSED"
+    severity: "MAJOR"
+
+  - id: "MAJOR-2"
+    title: "No Input Sanitization for Audit Log JSON"
+    status: "NOT ADDRESSED"
+    severity: "MAJOR"
+
+  - id: "MAJOR-3"
+    title: "Race Condition in Bulk Recalculation"
+    status: "NOT ADDRESSED"
+    severity: "MAJOR"
+
+  - id: "MAJOR-4"
+    title: "Incomplete Best Before Date Calculation"
+    status: "NOT ADDRESSED"
+    severity: "MAJOR"
+
+  - id: "MAJOR-5"
+    title: "Missing Index on Audit Log"
+    status: "NOT ADDRESSED"
+    severity: "MAJOR"
+
+minor_issues:
+  count: 5
+  status: "NOT ADDRESSED (expected - optional improvements)"
+
+# DECISION CRITERIA
+decision_criteria:
+  all_ac_implemented: false  # 15/19 = 79% (improved from 73%)
+  tests_pass: true  # 340/340 ✅
+  no_critical_security: false  # 1 CRITICAL issue remaining
+  no_blocking_quality: false  # CRITICAL-1-INCOMPLETE blocks approval
+
+decision_result: "REQUEST_CHANGES"
+
+# REQUIRED FIXES (UPDATED)
+required_fixes:
+  - fix: "CRITICAL-1-INCOMPLETE: Fix remaining case-sensitivity bugs"
+    files:
+      - "apps/frontend/lib/services/shelf-life-service.ts:415"
+      - "apps/frontend/lib/services/shelf-life-service.ts:693"
+    change: "Replace .eq('status', 'Active') with .eq('status', 'active')"
+    estimated_time: "5 minutes"
+    note: "Simple find-replace, missed in previous fix"
+
+# POSITIVE FEEDBACK
+strengths:
+  - "CRITICAL-2 fix correctly implemented ✅"
+  - "All 340 tests still passing (no regressions) ✅"
+  - "Trigger fix (line 30) correctly applied ✅"
+  - "Service line 133 fix correctly applied ✅"
+  - "Good progress - 1 of 2 CRITICAL issues resolved"
+  - "Code quality remains high"
+
+# HANDOFF INFORMATION
+handoff:
+  to: "DEV"
+  priority: "P0"
+  estimated_fix_time: "5 minutes"
+  next_reviewer: "CODE-REVIEWER"
+  next_action: "Fix 2 remaining lines → Re-submit for review"
+
+  blockers:
+    - "CRITICAL-1-INCOMPLETE: Lines 415 and 693 still have 'Active' instead of 'active'"
+
+  success_criteria:
+    - "All 4 locations using lowercase 'active'"
+    - "All 340 tests still passing"
+    - "Manual verification: grep for 'Active' in shelf-life-service.ts returns 0 results"
+
+# RECOMMENDATION
+recommendation: |
+  ALMOST THERE! CRITICAL-2 is fully fixed and working correctly.
+
+  CRITICAL-1 was partially fixed (2 of 4 locations), but developer missed:
+  - Line 415: getShelfLifeConfig() still queries 'Active'
+  - Line 693: calculateShelfLife() still queries 'Active'
+
+  This is a 5-minute fix. Run this command to find all occurrences:
+
+  grep -n "status.*'Active'" apps/frontend/lib/services/shelf-life-service.ts
+
+  Once these 2 lines are fixed → APPROVED (no other blockers).
+
+# METADATA
+review_metadata:
+  reviewer: "CODE-REVIEWER"
+  review_type: "Re-Review After CRITICAL Fixes"
+  review_date: "2025-12-28"
+  review_iteration: 2
+  previous_decision: "REQUEST_CHANGES (2 CRITICAL issues)"
+  current_decision: "REQUEST_CHANGES (1 CRITICAL issue - incomplete fix)"
+  story_phase: "Code Review (Post-FIX)"
+  next_phase: "Fix remaining 2 lines → Re-Review → APPROVED → QA"
+
+# NOTES
+notes: |
+  Good news: CRITICAL-2 is fully fixed! The final_days calculation now correctly
+  checks override_days first. This fixes AC-11.02.
+
+  Bad news: CRITICAL-1 fix was incomplete. The developer fixed the trigger (line 30)
+  and one service location (line 133), but missed two other service locations
+  (lines 415 and 693) that also query BOM status.
+
+  Impact: getShelfLifeConfig() and calculateShelfLife() will return empty results
+  because they still query for status = 'Active' instead of 'active'.
+
+  Estimated time to fix: 5 minutes (simple search-replace)
+
+  Once fixed → APPROVED (all CRITICAL issues resolved, MAJOR/MINOR non-blocking).

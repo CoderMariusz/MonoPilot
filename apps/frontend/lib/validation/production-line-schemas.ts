@@ -23,9 +23,6 @@ export const productionLineCreateSchema = z.object({
     .max(500, 'Description must be 500 characters or less')
     .optional()
     .nullable(),
-  warehouse_id: z
-    .string()
-    .uuid('Invalid warehouse ID format'),
   default_output_location_id: z
     .string()
     .uuid('Invalid location ID format')
@@ -67,16 +64,14 @@ export type MachineReorderInput = z.infer<typeof machineReorderSchema>
 // AC-007.4: Lines list view with filters
 export const productionLineFiltersSchema = z.object({
   search: z.string().optional(),
-  warehouse_id: z.string().uuid('Invalid warehouse ID').optional(),
-  sort_by: z.enum(['code', 'name', 'warehouse', 'created_at']).optional(),
+  sort_by: z.enum(['code', 'name', 'created_at']).optional(),
   sort_direction: z.enum(['asc', 'desc']).optional(),
 })
 
 // Production Line Filters (for list page)
 export interface ProductionLineFilters {
   search?: string
-  warehouse_id?: string
-  sort_by?: 'code' | 'name' | 'warehouse' | 'created_at'
+  sort_by?: 'code' | 'name' | 'created_at'
   sort_direction?: 'asc' | 'desc'
 }
 
@@ -84,7 +79,6 @@ export interface ProductionLineFilters {
 export interface ProductionLine {
   id: string
   org_id: string
-  warehouse_id: string
   code: string
   name: string
   default_output_location_id: string | null
@@ -93,11 +87,6 @@ export interface ProductionLine {
   created_by: string | null
   updated_by: string | null
   // Joined objects (when queried with joins)
-  warehouse?: {
-    id: string
-    code: string
-    name: string
-  }
   default_output_location?: {
     id: string
     code: string

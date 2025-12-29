@@ -43,7 +43,7 @@ export function useSettingsPermissions() {
   const { data: context, isLoading } = useOrgContext()
 
   return useMemo(() => {
-    if (!context) {
+    if (!context?.role_code) {
       return {
         canRead: false,
         canWrite: false,
@@ -52,12 +52,14 @@ export function useSettingsPermissions() {
       }
     }
 
+    const roleCode = context.role_code
+
     return {
-      canRead: hasPermission('settings', 'R', context.permissions),
+      canRead: hasPermission(roleCode, 'settings', 'read'),
       canWrite:
-        hasPermission('settings', 'U', context.permissions) ||
-        hasPermission('settings', 'C', context.permissions),
-      canDelete: hasPermission('settings', 'D', context.permissions),
+        hasPermission(roleCode, 'settings', 'update') ||
+        hasPermission(roleCode, 'settings', 'create'),
+      canDelete: hasPermission(roleCode, 'settings', 'delete'),
       loading: isLoading,
     }
   }, [context, isLoading])

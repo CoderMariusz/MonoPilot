@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getEnabledModules, toggleModule } from '@/lib/services/module-service'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 
 /**
  * GET /api/settings/modules
@@ -45,14 +45,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check admin role
-    const { data: userData } = await supabase
+    // Check admin role using admin client to bypass RLS
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
-      .select('role')
+      .select('role:roles(code)')
       .eq('id', user.id)
       .single()
 
-    if (!userData || userData.role !== 'admin') {
+    if (userError || !userData) {
+      console.error('[Modules API] Error fetching user role:', {
+        userId: user.id,
+        userError,
+        hasData: !!userData
+      })
+      return NextResponse.json(
+        {
+          error: 'User role not found',
+          details: userError?.message || 'No user record found in public.users',
+          code: userError?.code
+        },
+        { status: 403 }
+      )
+    }
+
+    // Role can be a string (denormalized), an object, or an array of objects (from relationship)
+    const roleData = userData.role as any
+    const role = (
+      typeof roleData === 'string'
+        ? roleData
+        : Array.isArray(roleData)
+          ? roleData[0]?.code
+          : roleData?.code
+    )?.toLowerCase()
+
+    const allowedRoles = ['admin', 'owner', 'super_admin', 'superadmin']
+
+    if (!role || !allowedRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }

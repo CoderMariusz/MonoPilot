@@ -21,18 +21,18 @@ const PERMISSION_MATRIX: Record<string, Record<string, string>> = {
     npd: 'CRUD', finance: 'CRUD', oee: 'CRUD', integrations: 'CRUD',
   },
   admin: {
-    settings: 'CRUD', users: 'CRUD', technical: 'CRUD', planning: 'CRUD',
+    settings: 'CRU', users: 'CRUD', technical: 'CRUD', planning: 'CRUD',
     production: 'CRUD', quality: 'CRUD', warehouse: 'CRUD', shipping: 'CRUD',
     npd: 'CRUD', finance: 'CRUD', oee: 'CRUD', integrations: 'CRUD',
   },
   production_manager: {
     settings: 'R', users: 'R', technical: 'RU', planning: 'CRUD',
-    production: 'CRUD', quality: 'CRUD', warehouse: 'R', shipping: 'R',
+    production: 'CRUD', quality: 'CRUD', warehouse: 'RU', shipping: 'R',
     npd: 'R', finance: 'R', oee: 'CRUD', integrations: 'R',
   },
   quality_manager: {
     settings: 'R', users: 'R', technical: 'R', planning: 'R',
-    production: 'R', quality: 'CRUD', warehouse: '-', shipping: '-',
+    production: 'RU', quality: 'CRUD', warehouse: 'R', shipping: 'R',
     npd: 'RU', finance: '-', oee: 'R', integrations: '-',
   },
   warehouse_manager: {
@@ -42,22 +42,22 @@ const PERMISSION_MATRIX: Record<string, Record<string, string>> = {
   },
   production_operator: {
     settings: '-', users: '-', technical: 'R', planning: 'R',
-    production: 'CRU', quality: 'R', warehouse: '-', shipping: '-',
+    production: 'RU', quality: 'CR', warehouse: 'R', shipping: '-',
     npd: '-', finance: '-', oee: 'R', integrations: '-',
   },
   quality_inspector: {
     settings: '-', users: '-', technical: 'R', planning: '-',
-    production: '-', quality: 'CRU', warehouse: '-', shipping: 'R',
+    production: 'R', quality: 'CRU', warehouse: 'R', shipping: 'R',
     npd: '-', finance: '-', oee: '-', integrations: '-',
   },
   warehouse_operator: {
     settings: '-', users: '-', technical: 'R', planning: '-',
-    production: '-', quality: '-', warehouse: 'CRU', shipping: 'CRU',
+    production: '-', quality: 'R', warehouse: 'CRU', shipping: 'RU',
     npd: '-', finance: '-', oee: '-', integrations: '-',
   },
   planner: {
     settings: 'R', users: 'R', technical: 'R', planning: 'CRUD',
-    production: 'R', quality: '-', warehouse: '-', shipping: 'R',
+    production: 'R', quality: 'R', warehouse: 'R', shipping: 'R',
     npd: 'R', finance: 'R', oee: 'R', integrations: '-',
   },
   viewer: {
@@ -151,34 +151,53 @@ export function isOwner(roleCode: string): boolean {
   return roleCode === 'owner'
 }
 
-export function canAssignRole(assignerRoleCode: string, targetRoleCode: string): boolean {
-  if (!assignerRoleCode || !targetRoleCode) return false
+/**
+ * Normalize role codes (handle both uppercase aliases and User objects)
+ */
+function normalizeRole(role: string | User | null | undefined): string {
+  if (!role) return ''
 
-  // Normalize test aliases to story role codes
-  const normalizeRole = (role: string): string => {
-    const roleMap: Record<string, string> = {
-      SUPER_ADMIN: 'owner',
-      ADMIN: 'admin',
-      PROD_MANAGER: 'production_manager',
-      QUAL_MANAGER: 'quality_manager',
-      WH_MANAGER: 'warehouse_manager',
-      PROD_OPERATOR: 'production_operator',
-      QUAL_INSPECTOR: 'quality_inspector',
-      WH_OPERATOR: 'warehouse_operator',
-      PLANNER: 'planner',
-      VIEWER: 'viewer',
-    }
-    return roleMap[role] || role.toLowerCase()
+  // Handle User objects - extract role code
+  if (typeof role === 'object' && role !== null) {
+    const roleCode = (role as User)?.role?.code
+    return roleCode ? normalizeRole(roleCode) : ''
   }
 
+  // Handle string role codes
+  if (typeof role !== 'string') return ''
+
+  const roleMap: Record<string, string> = {
+    SUPER_ADMIN: 'owner',
+    ADMIN: 'admin',
+    PROD_MANAGER: 'production_manager',
+    QUAL_MANAGER: 'quality_manager',
+    WH_MANAGER: 'warehouse_manager',
+    PROD_OPERATOR: 'production_operator',
+    QUAL_INSPECTOR: 'quality_inspector',
+    WH_OPERATOR: 'warehouse_operator',
+    PLANNER: 'planner',
+    VIEWER: 'viewer',
+  }
+  return roleMap[role] || role.toLowerCase()
+}
+
+export function canAssignRole(
+  assignerRoleCode: string | User | null,
+  targetRoleCode: string | User | null
+): boolean {
   const assigner = normalizeRole(assignerRoleCode)
   const target = normalizeRole(targetRoleCode)
+
+  if (!assigner || !target) return false
 
   // Only owner/admin can assign roles
   if (!['owner', 'admin'].includes(assigner)) return false
 
   // Only owner can assign owner role
   if (target === 'owner' && assigner !== 'owner') return false
+
+  // Validate target is a known role
+  if (!PERMISSION_MATRIX[target]) return false
 
   return true
 }
@@ -223,18 +242,46 @@ export function hasPermission(
   // Story 01.1: hasPermission(user, module, operation)
   const user = roleCodeOrUser as User | null
   const operation = actionOrOperation as 'C' | 'R' | 'U' | 'D'
-  if (!user?.role?.permissions) return false
-  const modulePermissions = user.role.permissions[module]
-  if (!modulePermissions || modulePermissions === '-') return false
-  return modulePermissions.includes(operation)
+
+  if (!user?.role?.code) return false
+
+  // Use PERMISSION_MATRIX for consistent permission checks
+  const roleCode = normalizeRole(user.role.code)
+  const rolePerms = PERMISSION_MATRIX[roleCode]
+  if (!rolePerms) return false
+
+  const modulePerms = rolePerms[module.toLowerCase()]
+  if (!modulePerms || modulePerms === '-') return false
+
+  return modulePerms.includes(operation)
 }
 
+/**
+ * Get all CRUD permissions for a module based on user's role
+ * Uses PERMISSION_MATRIX for consistent permission checks
+ */
 export function getModulePermissions(user: User | null, module: string) {
+  if (!user?.role?.code || !module) {
+    return { create: false, read: false, update: false, delete: false }
+  }
+
+  const roleCode = normalizeRole(user.role.code)
+  const rolePerms = PERMISSION_MATRIX[roleCode]
+
+  if (!rolePerms) {
+    return { create: false, read: false, update: false, delete: false }
+  }
+
+  const modulePerms = rolePerms[module.toLowerCase()]
+  if (!modulePerms || modulePerms === '-') {
+    return { create: false, read: false, update: false, delete: false }
+  }
+
   return {
-    create: hasPermission(user, module, 'C'),
-    read: hasPermission(user, module, 'R'),
-    update: hasPermission(user, module, 'U'),
-    delete: hasPermission(user, module, 'D'),
+    create: modulePerms.includes('C'),
+    read: modulePerms.includes('R'),
+    update: modulePerms.includes('U'),
+    delete: modulePerms.includes('D'),
   }
 }
 

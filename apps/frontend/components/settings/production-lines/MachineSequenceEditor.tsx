@@ -42,7 +42,7 @@ interface MachineForSelection {
   code: string
   name: string
   status: MachineStatus
-  capacity_per_hour: number | null
+  units_per_hour: number | null
 }
 
 interface MachineSequenceEditorProps {
@@ -86,9 +86,8 @@ function SortableMachineItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 p-3 bg-white border rounded-md ${
-        isDragging ? 'opacity-50 shadow-lg' : ''
-      } ${isBottleneck ? 'border-orange-500 border-2' : 'border-gray-200'}`}
+      className={`flex items-center gap-3 p-3 bg-white border rounded-md ${isDragging ? 'opacity-50 shadow-lg' : ''
+        } ${isBottleneck ? 'border-orange-500 border-2' : 'border-gray-200'}`}
       data-testid={machine.id}
     >
       {/* Drag Handle */}
@@ -128,7 +127,7 @@ function SortableMachineItem({
 
       {/* Capacity */}
       <div className="text-sm text-muted-foreground whitespace-nowrap">
-        {machine.capacity_per_hour !== null ? `${machine.capacity_per_hour} u/hr` : '--'}
+        {machine.units_per_hour !== null ? `${machine.units_per_hour} u/hr` : '--'}
       </div>
 
       {/* Remove Button */}
@@ -166,9 +165,9 @@ export function MachineSequenceEditor({
   const bottleneckMachineId =
     machines.length > 0
       ? machines
-          .filter((m) => m.capacity_per_hour !== null)
-          .reduce((min, m) =>
-            !min || (m.capacity_per_hour! < min.capacity_per_hour!) ? m : min
+        .filter((m) => m.units_per_hour !== null)
+        .reduce((min, m) =>
+          !min || (m.units_per_hour! < min.units_per_hour!) ? m : min
           , machines[0] as LineMachine | undefined)?.id
       : undefined
 
@@ -224,7 +223,7 @@ export function MachineSequenceEditor({
       code: machineToAdd.code,
       name: machineToAdd.name,
       status: machineToAdd.status,
-      capacity_per_hour: machineToAdd.capacity_per_hour,
+      units_per_hour: machineToAdd.units_per_hour,
       sequence_order: machines.length + 1,
     }
 
@@ -248,7 +247,7 @@ export function MachineSequenceEditor({
 
   // Filter available machines (exclude already assigned + inactive)
   const selectableMachines = availableMachines.filter(
-    (m) => !assignedMachineIds.has(m.id) && m.status !== 'INACTIVE'
+    (m) => !assignedMachineIds.has(m.id) && m.status !== 'OFFLINE'
   )
 
   const isMaxReached = machines.length >= maxMachines
@@ -272,9 +271,9 @@ export function MachineSequenceEditor({
                   <span className="font-medium">{machine.code}</span>
                   <span className="text-muted-foreground">-</span>
                   <span>{machine.name}</span>
-                  {machine.capacity_per_hour && (
+                  {machine.units_per_hour && (
                     <span className="text-xs text-muted-foreground">
-                      ({machine.capacity_per_hour}/hr)
+                      ({machine.units_per_hour}/hr)
                     </span>
                   )}
                 </div>

@@ -238,8 +238,8 @@ export default function ModulesPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Module Status</p>
-                  <p className="text-2xl font-bold">
+                  <div className="text-sm font-medium text-muted-foreground">Module Status</div>
+                  <div className="text-2xl font-bold">
                     {loading ? (
                       <Skeleton className="h-8 w-32" />
                     ) : (
@@ -250,7 +250,7 @@ export default function ModulesPage() {
                         {' '}disabled
                       </>
                     )}
-                  </p>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -432,18 +432,18 @@ export default function ModulesPage() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-              <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleToggleConfirm}
-                disabled={submitting}
-                className={confirmToggle.newState ? 'bg-green-600 hover:bg-green-700' : 'bg-destructive hover:bg-destructive/90'}
-              >
-                {submitting ? 'Updating...' : confirmToggle.newState ? 'Enable Module' : 'Disable Module'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+                <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleToggleConfirm}
+                  disabled={submitting}
+                  className={confirmToggle.newState ? 'bg-green-600 hover:bg-green-700' : 'bg-destructive hover:bg-destructive/90'}
+                >
+                  {submitting ? 'Updating...' : confirmToggle.newState ? 'Enable Module' : 'Disable Module'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </div>
   )

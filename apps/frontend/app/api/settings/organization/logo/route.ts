@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,18 +21,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin
-    const { data: userData, error: userError } = await supabase
+    // Check admin role using admin client to bypass RLS
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
-      .select('org_id, role')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
     if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'User not found', details: userError?.message }, { status: 404 })
     }
 
-    if (userData.role !== 'admin') {
+    const roleData = userData.role as any
+    const role = (typeof roleData === 'string' ? roleData : roleData?.code)?.toLowerCase()
+    const allowedRoles = ['admin', 'owner', 'super_admin', 'superadmin']
+
+    if (!role || !allowedRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin access required' },
         { status: 403 }
@@ -134,18 +139,22 @@ export async function DELETE() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin
-    const { data: userData, error: userError } = await supabase
+    // Check admin role using admin client to bypass RLS
+    const { data: userData, error: userError } = await createServerSupabaseAdmin()
       .from('users')
-      .select('org_id, role')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
     if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'User not found', details: userError?.message }, { status: 404 })
     }
 
-    if (userData.role !== 'admin') {
+    const roleData = userData.role as any
+    const role = (typeof roleData === 'string' ? roleData : roleData?.code)?.toLowerCase()
+    const allowedRoles = ['admin', 'owner', 'super_admin', 'superadmin']
+
+    if (!role || !allowedRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin access required' },
         { status: 403 }

@@ -19,7 +19,7 @@ export interface TaxCode {
   id: string
   org_id: string
   code: string
-  description: string
+  name: string
   rate: number // Stored as 23.00 for 23%
   created_at: string
   updated_at: string
@@ -29,19 +29,19 @@ export interface TaxCode {
 
 export interface CreateTaxCodeInput {
   code: string
-  description: string
+  name: string
   rate: number
 }
 
 export interface UpdateTaxCodeInput {
   code?: string
-  description?: string
+  name?: string
   rate?: number
 }
 
 export interface TaxCodeFilters {
   search?: string
-  sort_by?: 'code' | 'description' | 'rate'
+  sort_by?: 'code' | 'name' | 'rate'
   sort_direction?: 'asc' | 'desc'
 }
 
@@ -66,7 +66,7 @@ export interface TaxCodeListResult {
  */
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return null
@@ -190,7 +190,7 @@ export async function createTaxCode(
       .insert({
         org_id: orgId,
         code: input.code.toUpperCase(),
-        description: input.description,
+        name: input.name,
         rate: input.rate,
       })
       .select()
@@ -304,12 +304,12 @@ export async function updateTaxCode(
     // Build update payload
     const updatePayload: {
       code?: string
-      description?: string
+      name?: string
       rate?: number
     } = {}
 
     if (input.code) updatePayload.code = input.code.toUpperCase()
-    if (input.description !== undefined) updatePayload.description = input.description
+    if (input.name !== undefined) updatePayload.name = input.name
     if (input.rate !== undefined) updatePayload.rate = input.rate
 
     // Update tax code
@@ -395,7 +395,7 @@ export async function listTaxCodes(
         .replace(/%/g, '\\%')
         .replace(/_/g, '\\_')
 
-      query = query.or(`code.ilike.%${escapedSearch}%,description.ilike.%${escapedSearch}%`)
+      query = query.or(`code.ilike.%${escapedSearch}%,name.ilike.%${escapedSearch}%`)
     }
 
     // Dynamic sorting (AC-009.3)

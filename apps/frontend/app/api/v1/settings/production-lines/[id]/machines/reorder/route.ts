@@ -65,7 +65,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // Call service to reorder machines
     const result = await ProductionLineService.reorderMachines(
       params.id,
-      validatedData.machine_orders
+      validatedData.machine_orders,
+      supabase
     )
 
     if (!result.success) {

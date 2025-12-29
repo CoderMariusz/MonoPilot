@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { z } from 'zod'
 import type { BOMWithProduct, UpdateBOMRequest } from '@/lib/types/bom'
+import { API_TO_DB_STATUS } from '@/lib/validation/bom-schema'
 
 // Validation schema for update BOM
 const updateBOMSchema = z.object({
@@ -199,15 +200,9 @@ export async function PUT(
     if (data.output_uom !== undefined) updateData.output_uom = data.output_uom
     if (data.notes !== undefined) updateData.notes = data.notes
 
-    // Map status to database format
+    // Map status to database format using shared constant (DRY)
     if (data.status !== undefined) {
-      const statusMap: Record<string, string> = {
-        'draft': 'Draft',
-        'active': 'Active',
-        'phased_out': 'Phased Out',
-        'inactive': 'Inactive',
-      }
-      updateData.status = statusMap[data.status] || data.status
+      updateData.status = API_TO_DB_STATUS[data.status] || data.status
     }
 
     // Update BOM

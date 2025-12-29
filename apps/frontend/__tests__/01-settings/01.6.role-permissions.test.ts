@@ -63,8 +63,8 @@ describe('hasPermission - Core Permission Logic', () => {
 
   describe('ADMIN role - Full CRUD except sensitive actions', () => {
     const role: Role = 'ADMIN'
+    // Per Story 01.6 RBAC matrix: ADMIN has full CRUD on most modules
     const fullAccessModules: Module[] = [
-      'settings',
       'users',
       'production',
       'quality',
@@ -81,6 +81,14 @@ describe('hasPermission - Core Permission Logic', () => {
       )
     )('should allow ADMIN $action on $module', ({ module, action }) => {
       expect(hasPermission(role, module, action)).toBe(true)
+    })
+
+    // Per Story 01.6: ADMIN has CRU (no Delete) on settings module
+    it('should allow ADMIN CRU on settings (no delete)', () => {
+      expect(hasPermission(role, 'settings', 'create')).toBe(true)
+      expect(hasPermission(role, 'settings', 'read')).toBe(true)
+      expect(hasPermission(role, 'settings', 'update')).toBe(true)
+      expect(hasPermission(role, 'settings', 'delete')).toBe(false)
     })
   })
 

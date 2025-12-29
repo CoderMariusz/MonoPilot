@@ -8,11 +8,9 @@ import {
   Wrench,
   Calendar,
   Factory,
-  Warehouse,
   ShieldCheck,
   Truck,
   Lightbulb,
-  ScanBarcode,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -59,13 +57,6 @@ const allModules: SidebarModule[] = [
     color: 'text-green-600',
   },
   {
-    key: 'warehouse',
-    name: 'Warehouse',
-    icon: Warehouse,
-    href: '/warehouse',
-    color: 'text-orange-600',
-  },
-  {
     key: 'quality',
     name: 'Quality',
     icon: ShieldCheck,
@@ -85,13 +76,6 @@ const allModules: SidebarModule[] = [
     icon: Lightbulb,
     href: '/npd',
     color: 'text-pink-600',
-  },
-  {
-    key: 'scanner',
-    name: 'Scanner',
-    icon: ScanBarcode,
-    href: '/scanner',
-    color: 'text-cyan-600',
   },
 ]
 
@@ -115,9 +99,8 @@ export function Sidebar({ enabledModules = [] }: SidebarProps) {
 
   return (
     <aside
-      className={`${
-        collapsed ? 'w-16' : 'w-64'
-      } transition-all duration-200 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col relative`}
+      className={`${collapsed ? 'w-16' : 'w-48'
+        } transition-all duration-200 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col relative`}
     >
       {/* Collapse Toggle Button */}
       <div className="absolute -right-3 top-4 z-10">
@@ -138,24 +121,21 @@ export function Sidebar({ enabledModules = [] }: SidebarProps) {
       <nav className="flex-1 pt-8 px-2">
         <Link
           href="/dashboard"
-          className={`flex items-center h-12 px-3 rounded-lg transition-colors mb-1 ${
-            isActive('/dashboard')
-              ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
-              : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-          }`}
+          className={`flex items-center h-12 px-3 rounded-lg transition-colors mb-1 ${isActive('/dashboard')
+            ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
+            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
         >
           <Lightbulb
-            className={`h-6 w-6 flex-shrink-0 ${
-              isActive('/dashboard') ? 'text-blue-600' : 'text-gray-600'
-            }`}
+            className={`h-6 w-6 flex-shrink-0 ${isActive('/dashboard') ? 'text-blue-600' : 'text-gray-600'
+              }`}
           />
           {!collapsed && (
             <span
-              className={`ml-3 text-sm font-medium ${
-                isActive('/dashboard')
-                  ? 'text-blue-600'
-                  : 'text-gray-900 dark:text-white'
-              }`}
+              className={`ml-3 text-sm font-medium ${isActive('/dashboard')
+                ? 'text-blue-600'
+                : 'text-gray-900 dark:text-white'
+                }`}
             >
               Dashboard
             </span>
@@ -175,24 +155,21 @@ export function Sidebar({ enabledModules = [] }: SidebarProps) {
               <Link
                 key={module.key}
                 href={module.href}
-                className={`flex items-center h-12 px-3 rounded-lg transition-colors ${
-                  active
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
+                className={`flex items-center h-12 px-3 rounded-lg transition-colors ${active
+                  ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
               >
                 <Icon
-                  className={`h-6 w-6 flex-shrink-0 ${
-                    active ? 'text-blue-600' : module.color
-                  }`}
+                  className={`h-6 w-6 flex-shrink-0 ${active ? 'text-blue-600' : module.color
+                    }`}
                 />
                 {!collapsed && (
                   <span
-                    className={`ml-3 text-sm font-medium ${
-                      active
-                        ? 'text-blue-600'
-                        : 'text-gray-900 dark:text-white'
-                    }`}
+                    className={`ml-3 text-sm font-medium ${active
+                      ? 'text-blue-600'
+                      : 'text-gray-900 dark:text-white'
+                      }`}
                   >
                     {module.name}
                   </span>

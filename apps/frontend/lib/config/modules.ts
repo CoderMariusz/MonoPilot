@@ -68,7 +68,7 @@ export const MODULES: Module[] = [
     epic: 1,
     group: 'core',
     pricing: 'Free',
-    required_for: ['technical', 'planning', 'production', 'warehouse', 'quality', 'shipping'],
+    required_for: ['technical', 'planning', 'production', 'quality', 'shipping'],
   },
   {
     code: 'technical',
@@ -103,17 +103,6 @@ export const MODULES: Module[] = [
     dependencies: ['planning'],
   },
   {
-    code: 'warehouse',
-    name: 'Warehouse',
-    description: 'LPs, Moves, Pallets',
-    defaultEnabled: true,
-    epic: 5,
-    group: 'core',
-    pricing: 'Free',
-    dependencies: ['settings'],
-    required_for: ['shipping'],
-  },
-  {
     code: 'quality',
     name: 'Quality',
     description: 'QA Workflows',
@@ -131,7 +120,7 @@ export const MODULES: Module[] = [
     epic: 7,
     group: 'core',
     pricing: 'Free',
-    dependencies: ['warehouse'],
+    dependencies: ['settings'],
   },
   // PREMIUM MODULES
   {
@@ -172,16 +161,6 @@ export const MODULES: Module[] = [
     group: 'new',
     pricing: 'TBD',
     status: 'coming_soon',
-  },
-  {
-    code: 'scanner',
-    name: 'Scanner',
-    description: 'Barcode Terminal',
-    defaultEnabled: true,
-    epic: null,
-    group: 'core',
-    pricing: 'Free',
-    dependencies: ['warehouse'],
   },
 ]
 

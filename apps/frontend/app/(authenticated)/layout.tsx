@@ -70,7 +70,7 @@ export default async function AuthenticatedLayout({
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header with User Menu */}
       <header className="border-b bg-white z-10">
-        <div className="flex h-16 items-center justify-between px-4">
+        <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-primary">MonoPilot</h1>
           </div>

@@ -81,12 +81,6 @@ const mockNavItems = [
     module: 'quality',
   },
   {
-    name: 'Warehouse',
-    href: '/warehouse',
-    icon: 'Package',
-    module: 'warehouse',
-  },
-  {
     name: 'Shipping',
     href: '/shipping',
     icon: 'Truck',
@@ -114,7 +108,6 @@ describe('useEnabledModules() hook', () => {
                     { module_code: 'planning', enabled: false },
                     { module_code: 'production', enabled: false },
                     { module_code: 'quality', enabled: false },
-                    { module_code: 'warehouse', enabled: false },
                     { module_code: 'shipping', enabled: false },
                   ],
                   error: null,
@@ -304,7 +297,6 @@ describe('NavigationSidebar - Module Filtering', () => {
                 { module_code: 'planning', enabled: false },
                 { module_code: 'production', enabled: false },
                 { module_code: 'quality', enabled: false },
-                { module_code: 'warehouse', enabled: false },
                 { module_code: 'shipping', enabled: false },
               ],
               error: null,
@@ -320,7 +312,6 @@ describe('NavigationSidebar - Module Filtering', () => {
       expect(screen.queryByText('Planning')).not.toBeInTheDocument()
       expect(screen.queryByText('Production')).not.toBeInTheDocument()
       expect(screen.queryByText('Quality')).not.toBeInTheDocument()
-      expect(screen.queryByText('Warehouse')).not.toBeInTheDocument()
       expect(screen.queryByText('Shipping')).not.toBeInTheDocument()
     })
   })
@@ -337,7 +328,6 @@ describe('NavigationSidebar - Module Filtering', () => {
                 { module_code: 'planning', enabled: true },
                 { module_code: 'production', enabled: true },
                 { module_code: 'quality', enabled: true },
-                { module_code: 'warehouse', enabled: true },
                 { module_code: 'shipping', enabled: true },
               ],
               error: null,
@@ -355,7 +345,6 @@ describe('NavigationSidebar - Module Filtering', () => {
       expect(screen.getByText('Planning')).toBeInTheDocument()
       expect(screen.getByText('Production')).toBeInTheDocument()
       expect(screen.getByText('Quality')).toBeInTheDocument()
-      expect(screen.getByText('Warehouse')).toBeInTheDocument()
       expect(screen.getByText('Shipping')).toBeInTheDocument()
     })
   })
@@ -404,7 +393,7 @@ describe('NavigationSidebar - Module Filtering', () => {
     let moduleData = [
       { module_code: 'settings', enabled: true },
       { module_code: 'technical', enabled: true },
-      { module_code: 'warehouse', enabled: true },
+      { module_code: 'quality', enabled: true },
     ]
 
     mockSupabaseClient.from = vi.fn(() => ({
@@ -423,20 +412,20 @@ describe('NavigationSidebar - Module Filtering', () => {
     const { rerender } = render(<NavigationSidebar navItems={mockNavItems} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Warehouse')).toBeInTheDocument()
+      expect(screen.getByText('Quality')).toBeInTheDocument()
     })
 
-    // Simulate disabling warehouse
+    // Simulate disabling quality
     moduleData = [
       { module_code: 'settings', enabled: true },
       { module_code: 'technical', enabled: true },
-      { module_code: 'warehouse', enabled: false },
+      { module_code: 'quality', enabled: false },
     ]
 
     rerender(<NavigationSidebar navItems={mockNavItems} />)
 
     await waitFor(() => {
-      expect(screen.queryByText('Warehouse')).not.toBeInTheDocument()
+      expect(screen.queryByText('Quality')).not.toBeInTheDocument()
     })
   })
 })
@@ -458,7 +447,6 @@ describe('Navigation Filtering - Edge Cases', () => {
                 { module_code: 'planning', enabled: false },
                 { module_code: 'production', enabled: false },
                 { module_code: 'quality', enabled: false },
-                { module_code: 'warehouse', enabled: false },
                 { module_code: 'shipping', enabled: false },
               ],
               error: null,

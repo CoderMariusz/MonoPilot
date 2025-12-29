@@ -42,16 +42,31 @@ export async function GET(request: NextRequest) {
     // Get current user to check role and org_id
     const { data: currentUser, error: userError } = await supabaseAdmin
       .from('users')
-      .select('role, org_id')
+      .select('role:roles(code), org_id')
       .eq('id', user.id)
       .single()
 
     if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      console.error('[Users API GET] User not found:', { userId: user.id, userError })
+      return NextResponse.json({
+        error: 'User not found',
+        details: userError?.message || 'No user record found in public.users',
+        code: userError?.code
+      }, { status: 404 })
     }
 
+    const roleData = currentUser.role as any
+    const currentRole = (
+      typeof roleData === 'string'
+        ? roleData
+        : Array.isArray(roleData)
+          ? roleData[0]?.code
+          : roleData?.code
+    )?.toLowerCase()
+    const allowedRoles = ['admin', 'owner', 'manager', 'super_admin', 'superadmin']
+
     // Check authorization: Admin or Manager only (AC-002.2)
-    if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
+    if (!currentRole || !allowedRoles.includes(currentRole)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Manager role required' },
         { status: 403 }
@@ -150,16 +165,31 @@ export async function POST(request: NextRequest) {
     // Get current user to check role and org_id
     const { data: currentUser, error: userError } = await supabaseAdmin
       .from('users')
-      .select('role, org_id')
+      .select('role:roles(code), org_id')
       .eq('id', user.id)
       .single()
 
     if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      console.error('[Users API POST] User not found:', { userId: user.id, userError })
+      return NextResponse.json({
+        error: 'User not found',
+        details: userError?.message || 'No user record found in public.users',
+        code: userError?.code
+      }, { status: 404 })
     }
 
+    const roleData = currentUser.role as any
+    const currentRole = (
+      typeof roleData === 'string'
+        ? roleData
+        : Array.isArray(roleData)
+          ? roleData[0]?.code
+          : roleData?.code
+    )?.toLowerCase()
+    const adminRoles = ['admin', 'owner', 'super_admin', 'superadmin']
+
     // Check authorization: Admin only (AC-002.1)
-    if (currentUser.role !== 'admin') {
+    if (!currentRole || !adminRoles.includes(currentRole)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }
@@ -219,7 +249,7 @@ export async function POST(request: NextRequest) {
       email: validatedData.email,
       first_name: validatedData.first_name,
       last_name: validatedData.last_name,
-      role: validatedData.role,
+      role: validatedData.role as User['role'],
       status: 'invited', // AC-002.1: Default status
       created_by: user.id, // AC-002.8: Audit trail
       updated_by: user.id,

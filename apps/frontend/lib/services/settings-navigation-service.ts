@@ -16,7 +16,6 @@ import {
   Users,
   Shield,
   Mail,
-  Warehouse,
   Cpu,
   Factory,
   AlertTriangle,
@@ -112,14 +111,6 @@ const NAVIGATION_SCHEMA: NavigationSection[] = [
   {
     section: 'Infrastructure',
     items: [
-      {
-        name: 'Warehouses',
-        path: '/settings/warehouses',
-        icon: Warehouse,
-        implemented: true,
-        roles: ['owner', 'admin', 'warehouse_manager'],
-        module: 'warehouse',
-      },
       {
         name: 'Machines',
         path: '/settings/machines',

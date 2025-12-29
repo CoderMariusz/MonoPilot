@@ -66,21 +66,21 @@ const mockMachines = [
     code: 'MIX-001',
     name: 'Primary Mixer',
     status: 'ACTIVE',
-    capacity_per_hour: 1000,
+    units_per_hour: 1000,
   },
   {
     id: 'machine-002-uuid',
     code: 'FILL-001',
     name: 'Filling Machine',
     status: 'ACTIVE',
-    capacity_per_hour: 500,
+    units_per_hour: 500,
   },
   {
     id: 'machine-003-uuid',
     code: 'PKG-001',
     name: 'Packaging Machine',
     status: 'ACTIVE',
-    capacity_per_hour: 800,
+    units_per_hour: 800,
   },
 ]
 
@@ -90,7 +90,7 @@ const mockAvailableMachines = [
     code: 'OVEN-001',
     name: 'Industrial Oven',
     status: 'ACTIVE',
-    capacity_per_hour: 200,
+    units_per_hour: 200,
   },
 ]
 
@@ -456,7 +456,7 @@ describe('MachineSequenceEditor', () => {
     it('should display "--" for machines without capacity', () => {
       // GIVEN machine with null capacity
       const machinesWithNull = [
-        { ...mockMachines[0], capacity_per_hour: null },
+        { ...mockMachines[0], units_per_hour: null },
       ]
 
       // render(<MachineSequenceEditor {...defaultProps} machines={machinesWithNull} />)
@@ -514,7 +514,7 @@ describe('MachineSequenceEditor', () => {
     it('should disable add for machines in inactive status', async () => {
       // GIVEN available machine is inactive
       const inactiveMachines = [
-        { ...mockAvailableMachines[0], status: 'INACTIVE' },
+        { ...mockAvailableMachines[0], status: 'OFFLINE' },
       ]
 
       // render(<MachineSequenceEditor {...defaultProps} availableMachines={inactiveMachines} />)
@@ -575,7 +575,7 @@ describe('MachineSequenceEditor', () => {
         code: `MACH-${i}`,
         name: `Machine ${i}`,
         status: 'ACTIVE' as const,
-        capacity_per_hour: 100,
+        units_per_hour: 100,
       }))
 
       // render(<MachineSequenceEditor {...defaultProps} machines={maxMachines} />)
@@ -594,7 +594,7 @@ describe('MachineSequenceEditor', () => {
         code: `MACH-${i}`,
         name: `Machine ${i}`,
         status: 'ACTIVE' as const,
-        capacity_per_hour: 100,
+        units_per_hour: 100,
       }))
 
       // render(<MachineSequenceEditor {...defaultProps} machines={maxMachines} />)

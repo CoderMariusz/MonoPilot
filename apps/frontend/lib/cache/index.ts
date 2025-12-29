@@ -12,11 +12,6 @@
 // REDIS CACHE (existing)
 // ═══════════════════════════════════════════════════════════════════════════
 export { getRedis, isRedisAvailable, safeRedisOperation } from './redis-client'
-export {
-  getCachedWarehouses,
-  setCachedWarehouses,
-  invalidateWarehouseCache,
-} from './warehouse-cache'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AGENT CACHE SYSTEM (new)

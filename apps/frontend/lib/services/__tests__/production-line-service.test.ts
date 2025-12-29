@@ -73,21 +73,21 @@ const mockMachines = [
     code: 'MIX-001',
     name: 'Primary Mixer',
     status: 'ACTIVE',
-    capacity_per_hour: 1000,
+    units_per_hour: 1000,
   },
   {
     id: 'machine-002-uuid',
     code: 'FILL-001',
     name: 'Filling Machine',
     status: 'ACTIVE',
-    capacity_per_hour: 500, // Bottleneck
+    units_per_hour: 500, // Bottleneck
   },
   {
     id: 'machine-003-uuid',
     code: 'PKG-001',
     name: 'Packaging Machine',
     status: 'ACTIVE',
-    capacity_per_hour: 800,
+    units_per_hour: 800,
   },
 ]
 
@@ -137,9 +137,9 @@ describe('ProductionLineService', () => {
     it('should calculate bottleneck as minimum capacity (AC-CC-01)', () => {
       // GIVEN line has machines: MIX-001 (1000/hr), FILL-001 (500/hr), PKG-001 (800/hr)
       const machines = [
-        { id: 'machine-001', code: 'MIX-001', capacity_per_hour: 1000 },
-        { id: 'machine-002', code: 'FILL-001', capacity_per_hour: 500 },
-        { id: 'machine-003', code: 'PKG-001', capacity_per_hour: 800 },
+        { id: 'machine-001', code: 'MIX-001', units_per_hour: 1000 },
+        { id: 'machine-002', code: 'FILL-001', units_per_hour: 500 },
+        { id: 'machine-003', code: 'PKG-001', units_per_hour: 800 },
       ]
 
       // WHEN calculating capacity
@@ -173,9 +173,9 @@ describe('ProductionLineService', () => {
     it('should exclude machines with null capacity', () => {
       // GIVEN line has machines, one with null capacity
       const machines = [
-        { id: 'machine-001', code: 'MIX-001', capacity_per_hour: 1000 },
-        { id: 'machine-002', code: 'FILL-001', capacity_per_hour: null },
-        { id: 'machine-003', code: 'PKG-001', capacity_per_hour: 800 },
+        { id: 'machine-001', code: 'MIX-001', units_per_hour: 1000 },
+        { id: 'machine-002', code: 'FILL-001', units_per_hour: null },
+        { id: 'machine-003', code: 'PKG-001', units_per_hour: 800 },
       ]
 
       // WHEN calculating capacity
@@ -193,8 +193,8 @@ describe('ProductionLineService', () => {
     it('should return null when all machines have null capacity', () => {
       // GIVEN all machines have null capacity
       const machines = [
-        { id: 'machine-001', code: 'MIX-001', capacity_per_hour: null },
-        { id: 'machine-002', code: 'FILL-001', capacity_per_hour: null },
+        { id: 'machine-001', code: 'MIX-001', units_per_hour: null },
+        { id: 'machine-002', code: 'FILL-001', units_per_hour: null },
       ]
 
       // WHEN calculating capacity
@@ -211,9 +211,9 @@ describe('ProductionLineService', () => {
     it('should exclude machines with zero capacity', () => {
       // GIVEN line has machine with 0 capacity
       const machines = [
-        { id: 'machine-001', code: 'MIX-001', capacity_per_hour: 1000 },
-        { id: 'machine-002', code: 'FILL-001', capacity_per_hour: 0 },
-        { id: 'machine-003', code: 'PKG-001', capacity_per_hour: 800 },
+        { id: 'machine-001', code: 'MIX-001', units_per_hour: 1000 },
+        { id: 'machine-002', code: 'FILL-001', units_per_hour: 0 },
+        { id: 'machine-003', code: 'PKG-001', units_per_hour: 800 },
       ]
 
       // WHEN calculating capacity
@@ -230,7 +230,7 @@ describe('ProductionLineService', () => {
     it('should handle single machine', () => {
       // GIVEN line has one machine
       const machines = [
-        { id: 'machine-001', code: 'MIX-001', capacity_per_hour: 1000 },
+        { id: 'machine-001', code: 'MIX-001', units_per_hour: 1000 },
       ]
 
       // WHEN calculating capacity
@@ -247,8 +247,8 @@ describe('ProductionLineService', () => {
     it('should handle multiple machines with same capacity', () => {
       // GIVEN multiple machines with identical capacity
       const machines = [
-        { id: 'machine-001', code: 'MIX-001', capacity_per_hour: 500 },
-        { id: 'machine-002', code: 'FILL-001', capacity_per_hour: 500 },
+        { id: 'machine-001', code: 'MIX-001', units_per_hour: 500 },
+        { id: 'machine-002', code: 'FILL-001', units_per_hour: 500 },
       ]
 
       // WHEN calculating capacity

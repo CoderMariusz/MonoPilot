@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 export function SettingsNavSkeleton() {
   return (
     <div
-      className="w-64 border-r bg-muted/10 p-4 space-y-6"
+      className="w-52 border-r bg-muted/10 p-4 space-y-6"
       data-testid="settings-nav-skeleton"
     >
       {[1, 2, 3].map((section) => (

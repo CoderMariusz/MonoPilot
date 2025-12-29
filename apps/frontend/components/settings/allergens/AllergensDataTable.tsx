@@ -33,7 +33,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AllergenIcon } from './AllergenIcon'
 import type { Allergen } from '@/lib/types/allergen'
 import { getAllergenName } from '@/lib/types/allergen'
-import { fetchAllergenProductCounts, type AllergenProductCount } from '@/lib/services/allergen-service-v2'
+import { fetchAllergenProductCounts } from '@/lib/services/allergen-client-service'
+import type { AllergenProductCount } from '@/lib/services/allergen-service-v2'
 import { cn } from '@/lib/utils'
 
 interface AllergensDataTableProps {

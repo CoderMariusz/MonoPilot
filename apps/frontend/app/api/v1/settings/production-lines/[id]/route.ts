@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Call service to get line by ID
-    const result = await ProductionLineService.getById(params.id)
+    const result = await ProductionLineService.getById(params.id, supabase)
 
     if (!result.success || !result.data) {
       return NextResponse.json({ error: 'Line not found' }, { status: 404 })
@@ -111,7 +111,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const validatedData = productionLineUpdateSchema.parse(body)
 
     // Call service to update line
-    const result = await ProductionLineService.update(params.id, validatedData)
+    const result = await ProductionLineService.update(params.id, validatedData, supabase)
 
     if (!result.success) {
       // Check for specific error types
@@ -187,7 +187,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     // Call service to delete line
-    const result = await ProductionLineService.delete(params.id)
+    const result = await ProductionLineService.delete(params.id, supabase)
 
     if (!result.success) {
       // Check for specific error types

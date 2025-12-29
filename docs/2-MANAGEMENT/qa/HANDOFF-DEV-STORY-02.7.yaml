@@ -1,0 +1,156 @@
+# QA Handoff to DEV: Story 02.7 - Routings CRUD
+# Date: 2025-12-28
+# Decision: FAIL (3 blocking issues found)
+
+story:
+  id: "02.7"
+  name: "Routings CRUD + Header Management"
+  epic: "02-technical"
+  phase: "QA Validation"
+
+qa_decision: FAIL
+
+qa_report: docs/2-MANAGEMENT/qa/qa-report-story-02.7.md
+
+blocking_bugs:
+  - id: "BUG-027.1"
+    severity: CRITICAL
+    title: "Database Code Immutability Missing"
+    description: "Code field can be mutated via direct database access, violating FR-2.54"
+    impact: "Data integrity compromised, API protection can be bypassed"
+
+  - id: "BUG-027.2"
+    severity: MAJOR
+    title: "Currency Constraint Missing"
+    description: "No CHECK constraint on currency field, allows invalid values"
+    impact: "ADR-009 compliance incomplete, data integrity risk"
+
+  - id: "BUG-027.3"
+    severity: CRITICAL
+    title: "Test Environment Broken"
+    description: "All 46 component tests failing in OperationsTable.test.tsx"
+    impact: "Cannot execute automated QA, blocks validation"
+
+required_fixes:
+  database:
+    - file: "supabase/migrations/046_create_routings_table.sql"
+      issue: "CRITICAL-02: Code immutability not enforced at DB level"
+      fix: |
+        Add to increment_routing_version() function:
+
+        IF OLD.code IS DISTINCT FROM NEW.code THEN
+          RAISE EXCEPTION 'Code cannot be changed after creation';
+        END IF;
+      location: "Lines 110-129"
+      priority: P0
+
+    - file: "supabase/migrations/047_fix_routings_constraints.sql (NEW)"
+      issue: "MAJOR-04: Currency constraint missing"
+      fix: |
+        CREATE migration 047:
+
+        ALTER TABLE routings
+        ADD CONSTRAINT chk_routings_currency_valid
+        CHECK (currency IN ('PLN', 'EUR', 'USD', 'GBP'));
+      priority: P1
+
+  tests:
+    - file: "components/technical/routings/__tests__/OperationsTable.test.tsx"
+      issue: "All 46 tests failing"
+      fix: "Debug component imports, verify test setup"
+      priority: P0
+
+code_review_compliance:
+  critical_issues:
+    - name: "CRITICAL-01: Code immutability on UPDATE"
+      status: FIXED
+      evidence: "Lines 150-156 in [id]/route.ts - API rejects code changes"
+
+    - name: "CRITICAL-02: Code immutability at DB level"
+      status: NOT_FIXED
+      blocker: true
+
+  major_issues:
+    - name: "MAJOR-01: BOM usage endpoint"
+      status: FIXED
+      evidence: "File exists: [id]/boms/route.ts"
+
+    - name: "MAJOR-02: Clone endpoint"
+      status: FIXED
+      evidence: "File exists: [id]/clone/route.ts"
+
+    - name: "MAJOR-03: Update schema code rejection"
+      status: NOT_VERIFIED
+
+    - name: "MAJOR-04: Currency constraint"
+      status: NOT_FIXED
+      blocker: true
+
+acceptance_criteria:
+  total: 30
+  tested: 0
+  passed: 0
+  failed: 0
+  blocked: 30
+  coverage: "0% (environment broken)"
+
+  critical_ac:
+    - id: "AC-14"
+      name: "Code immutability"
+      status: PARTIAL
+      api_level: PASS
+      db_level: FAIL
+
+test_results:
+  automated:
+    component_tests: "0/46 PASS (100% failure)"
+    unit_tests: "Not executed"
+    integration_tests: "Not executed"
+    e2e_tests: "Not executed"
+
+  manual:
+    security:
+      rls_policies: PASS
+      permission_checks: PASS
+      code_immutability_api: PASS
+      code_immutability_db: FAIL
+      currency_validation_db: FAIL
+
+estimated_fix_time:
+  bug_027_1: "1 hour (database trigger)"
+  bug_027_2: "30 minutes (constraint)"
+  bug_027_3: "2-4 hours (test environment debug)"
+  total: "4-6 hours"
+
+next_steps:
+  dev_team:
+    - "Fix database code immutability trigger (P0)"
+    - "Add currency CHECK constraint (P1)"
+    - "Fix test environment (P0)"
+    - "Re-run test suite (verify 90/90 PASS)"
+    - "Re-submit to QA"
+
+  qa_team:
+    - "Wait for fixes"
+    - "Re-execute test suite"
+    - "Perform full AC validation (30 tests)"
+    - "Execute edge case testing"
+    - "Performance benchmarks"
+
+re_test_eta:
+  dev_fix_time: "4-6 hours"
+  qa_test_time: "90-120 minutes"
+  total: "1 business day"
+
+positive_findings:
+  - "API-level code immutability correctly implemented (CRITICAL-01)"
+  - "BOM usage endpoint fully functional (MAJOR-01)"
+  - "Clone endpoint with operations copy working (MAJOR-02)"
+  - "RLS policies secure and correct (Security)"
+  - "Permission enforcement working (Security)"
+  - "ADR-009 cost fields implemented in schema"
+
+contact:
+  qa_agent: "QA-AGENT"
+  report_date: "2025-12-28"
+  report_location: "docs/2-MANAGEMENT/qa/qa-report-story-02.7.md"

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { listTaxCodes, createTaxCode } from '@/lib/services/tax-code-service'
-import { createTaxCodeSchema } from '@/lib/validation/tax-code-schemas'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { taxCodeCreateSchema } from '@/lib/validation/tax-code-schemas'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 
 /**
  * GET /api/settings/tax-codes
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const filters = {
       search: searchParams.get('search') || undefined,
-      sort_by: (searchParams.get('sort_by') as 'code' | 'description' | 'rate') || undefined,
+      sort_by: (searchParams.get('sort_by') as 'code' | 'name' | 'rate') || undefined,
       sort_direction: (searchParams.get('sort_direction') as 'asc' | 'desc') || undefined,
     }
 
@@ -81,14 +81,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check admin role
-    const { data: userData } = await supabase
+    // Check admin role using admin client to bypass RLS
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
-      .select('role')
+      .select('role:roles(code)')
       .eq('id', user.id)
       .single()
 
-    if (!userData || userData.role !== 'admin') {
+    if (userError || !userData) {
+      console.error('[Tax Codes API POST] User not found:', { userId: user.id, userError })
+      return NextResponse.json(
+        {
+          error: 'Forbidden - User role not found',
+          details: userError?.message || 'No user record found in public.users',
+          code: userError?.code
+        },
+        { status: 403 }
+      )
+    }
+
+    const roleData = userData.role as any
+    const role = (
+      typeof roleData === 'string'
+        ? roleData
+        : Array.isArray(roleData)
+          ? roleData[0]?.code
+          : roleData?.code
+    )?.toLowerCase()
+    const allowedRoles = ['admin', 'owner', 'super_admin', 'superadmin']
+
+    if (!role || !allowedRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }
@@ -97,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json()
-    const validationResult = createTaxCodeSchema.safeParse(body)
+    const validationResult = taxCodeCreateSchema.safeParse(body)
 
     if (!validationResult.success) {
       return NextResponse.json(

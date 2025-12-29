@@ -155,3 +155,98 @@ export interface ExportResponse {
   file_url: string
   filename: string
 }
+
+// ============================================================================
+// Story 02.12 - Technical Dashboard Types
+// ============================================================================
+
+export type TrendDirection = 'up' | 'down' | 'neutral'
+export type ActivityType = 'product_created' | 'product_updated' | 'bom_created' | 'bom_activated' | 'routing_created' | 'routing_updated'
+export type EntityType = 'product' | 'bom' | 'routing'
+export type AllergenRelation = 'contains' | 'may_contain' | null
+
+// Stats Cards Response (AC-12.01 to AC-12.05)
+export interface DashboardStatsResponse {
+  products: {
+    total: number
+    active: number
+    inactive: number
+  }
+  boms: {
+    total: number
+    active: number
+    phased: number
+  }
+  routings: {
+    total: number
+    reusable: number
+  }
+  avg_cost: {
+    value: number
+    currency: string
+    trend_percent: number
+    trend_direction: TrendDirection
+  }
+}
+
+// Allergen Matrix Response (AC-12.06 to AC-12.12)
+export interface TechnicalAllergenMatrixResponse {
+  allergens: Array<{
+    id: string
+    code: string
+    name: string
+  }>
+  products: Array<{
+    id: string
+    code: string
+    name: string
+    allergen_relations: Record<string, AllergenRelation>
+  }>
+}
+
+// BOM Timeline Response (AC-12.13 to AC-12.16)
+export interface BomTimelineResponse {
+  timeline: Array<{
+    bom_id: string
+    product_id: string
+    product_code: string
+    product_name: string
+    version: number
+    effective_from: string
+    changed_by: string
+    changed_by_name: string
+    changed_at: string
+  }>
+  limit_reached: boolean
+}
+
+// Recent Activity Response for Technical Dashboard (AC-12.17 to AC-12.19)
+export interface TechnicalActivityItem {
+  id: string
+  type: ActivityType
+  entity_type: EntityType
+  entity_id: string
+  description: string
+  user_id: string
+  user_name: string
+  timestamp: string
+  relative_time: string
+  link: string
+}
+
+export interface TechnicalRecentActivityResponse {
+  activities: TechnicalActivityItem[]
+}
+
+// Cost Trends Response (AC-12.20 to AC-12.22)
+export interface CostTrendsResponse {
+  months: string[]
+  data: Array<{
+    month: string
+    material_cost: number
+    labor_cost: number
+    overhead_cost: number
+    total_cost: number
+  }>
+  currency: string
+}

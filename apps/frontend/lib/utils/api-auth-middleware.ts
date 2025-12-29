@@ -41,11 +41,11 @@ export async function requireAuth(): Promise<AuthResult> {
 
     // Check authentication
     const {
-      data: { session },
+      data: { user },
       error: authError,
-    } = await supabase.auth.getSession()
+    } = await supabase.auth.getUser()
 
-    if (authError || !session) {
+    if (authError || !user) {
       return {
         success: false,
         error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
@@ -56,7 +56,7 @@ export async function requireAuth(): Promise<AuthResult> {
     const { data: currentUser, error: userError } = await supabase
       .from('users')
       .select('role, org_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single()
 
     if (userError || !currentUser) {
@@ -69,8 +69,8 @@ export async function requireAuth(): Promise<AuthResult> {
     return {
       success: true,
       user: {
-        id: session.user.id,
-        email: session.user.email || '',
+        id: user.id,
+        email: user.email || '',
         role: currentUser.role as UserRole,
         org_id: currentUser.org_id,
       },

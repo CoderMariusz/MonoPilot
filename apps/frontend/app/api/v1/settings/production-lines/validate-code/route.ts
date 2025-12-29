@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Call service to check code uniqueness
-    const isUnique = await ProductionLineService.isCodeUnique(code, exclude_id)
+    const isUnique = await ProductionLineService.isCodeUnique(code, exclude_id, supabase)
 
     return NextResponse.json({
       valid: isUnique,

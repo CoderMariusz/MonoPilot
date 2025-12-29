@@ -126,7 +126,7 @@ describe('Machines API Integration Tests', () => {
           code: 'MIX-01',
           name: 'Mixer Machine 1',
           status: 'active',
-          capacity_per_hour: 1000.5,
+          units_per_hour: 1000.5,
           created_by: testUserId,
           updated_by: testUserId,
         })
@@ -137,7 +137,7 @@ describe('Machines API Integration Tests', () => {
       expect(data).toBeDefined()
       expect(data?.code).toBe('MIX-01')
       expect(data?.status).toBe('active')
-      expect(data?.capacity_per_hour).toBe(1000.5)
+      expect(data?.units_per_hour).toBe(1000.5)
     })
 
     it('should reject duplicate code in same org', async () => {
@@ -412,7 +412,7 @@ describe('Machines API Integration Tests', () => {
           code: 'UPDATE-01',
           name: 'Original Name',
           status: 'active',
-          capacity_per_hour: 100,
+          units_per_hour: 100,
           created_by: testUserId,
           updated_by: testUserId,
         })
@@ -424,7 +424,7 @@ describe('Machines API Integration Tests', () => {
         .update({
           name: 'Updated Name',
           status: 'maintenance',
-          capacity_per_hour: 200,
+          units_per_hour: 200,
           updated_by: testUserId,
         })
         .eq('id', machine!.id)
@@ -434,7 +434,7 @@ describe('Machines API Integration Tests', () => {
       expect(error).toBeNull()
       expect(updated?.name).toBe('Updated Name')
       expect(updated?.status).toBe('maintenance')
-      expect(updated?.capacity_per_hour).toBe(200)
+      expect(updated?.units_per_hour).toBe(200)
     })
   })
 

@@ -1,7 +1,8 @@
 /**
  * Routing Detail Page
- * Story: 2.24 Routing Restructure
+ * Story: 2.24 Routing Restructure, Story 02.8 Routing Operations
  * Routings are now independent templates (no product binding)
+ * AC-32: Permission enforcement for operations CRUD
  */
 
 'use client'
@@ -27,6 +28,7 @@ export default function RoutingDetailPage() {
   const [routing, setRouting] = useState<Routing | null>(null)
   const [loading, setLoading] = useState(true)
   const [showEditDrawer, setShowEditDrawer] = useState(false)
+  const [canEdit, setCanEdit] = useState(true) // Default true, updated from permissions
 
   // Fetch routing details with operations
   const fetchRouting = async () => {
@@ -53,8 +55,26 @@ export default function RoutingDetailPage() {
     }
   }
 
+  // Fetch user permissions (AC-32)
+  const fetchPermissions = async () => {
+    try {
+      const response = await fetch('/api/v1/settings/users/me/permissions')
+      if (response.ok) {
+        const data = await response.json()
+        // Check for technical module update permission
+        const technicalPerm = data.permissions?.technical || ''
+        const hasEditPerm = technicalPerm.includes('U') || technicalPerm.includes('C')
+        setCanEdit(hasEditPerm)
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error)
+      // Default to true if permission check fails
+    }
+  }
+
   useEffect(() => {
     fetchRouting()
+    fetchPermissions()
   }, [routingId])
 
   // Delete routing
@@ -127,16 +147,18 @@ export default function RoutingDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowEditDrawer(true)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          <Button variant="destructive" onClick={handleDelete}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowEditDrawer(true)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Details Section */}
@@ -168,8 +190,8 @@ export default function RoutingDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Operations Section */}
-      <OperationsTable routingId={routingId} />
+      {/* Operations Section (AC-32: canEdit prop for permission enforcement) */}
+      <OperationsTable routingId={routingId} canEdit={canEdit} />
 
       {/* Edit Drawer */}
       <EditRoutingDrawer

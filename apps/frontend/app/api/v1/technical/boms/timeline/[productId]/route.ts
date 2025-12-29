@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import type { BOMTimelineResponse, BOMTimelineVersion } from '@/lib/types/bom'
+import { DB_TO_API_STATUS } from '@/lib/validation/bom-schema'
 
 /**
  * GET /api/v1/technical/boms/timeline/:productId
@@ -98,14 +99,8 @@ export async function GET(
       // Check if currently active: effective_from <= today AND (effective_to IS NULL OR effective_to >= today)
       const isCurrentlyActive = effectiveFrom <= today && (!effectiveTo || effectiveTo >= today)
 
-      // Map database status to API format
-      const statusMap: Record<string, string> = {
-        'Draft': 'draft',
-        'Active': 'active',
-        'Phased Out': 'phased_out',
-        'Inactive': 'inactive',
-      }
-      const status = statusMap[bom.status] || bom.status.toLowerCase().replace(' ', '_')
+      // Map database status to API format using shared constant (DRY)
+      const status = DB_TO_API_STATUS[bom.status] || bom.status.toLowerCase().replace(' ', '_')
 
       return {
         id: bom.id,
