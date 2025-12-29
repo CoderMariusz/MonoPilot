@@ -11,6 +11,14 @@ import { ZodError } from 'zod'
 import { getAuthContext, checkPermission } from '@/lib/api/auth-helpers'
 
 /**
+ * Sanitize search input to prevent SQL injection via LIKE/ILIKE wildcards
+ * Escapes %, _, and \ characters which have special meaning in LIKE patterns
+ */
+function sanitizeSearchInput(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&')
+}
+
+/**
  * GET /api/v1/settings/warehouses
  * List warehouses with pagination, filtering, and search
  *
@@ -54,8 +62,10 @@ export async function GET(request: NextRequest) {
       .eq('org_id', orgId)
 
     // Apply search filter (code or name)
+    // Sanitize input to prevent SQL injection via LIKE wildcards
     if (search && search.length >= 2) {
-      query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%`)
+      const sanitizedSearch = sanitizeSearchInput(search)
+      query = query.or(`code.ilike.%${sanitizedSearch}%,name.ilike.%${sanitizedSearch}%`)
     }
 
     // Apply type filter
