@@ -4,13 +4,10 @@
  * Purpose: TypeScript types and interfaces for warehouse management
  */
 
-// Warehouse Type Enum
-export type WarehouseType =
-  | 'GENERAL'
-  | 'RAW_MATERIALS'
-  | 'WIP'
-  | 'FINISHED_GOODS'
-  | 'QUARANTINE'
+import type { WarehouseType, CreateWarehouseInput, UpdateWarehouseInput } from '@/lib/validation/warehouse-schemas'
+
+// Re-export types from validation schemas for convenience
+export type { WarehouseType, CreateWarehouseInput, UpdateWarehouseInput }
 
 // Warehouse Type Labels (for UI display)
 export const WAREHOUSE_TYPE_LABELS: Record<WarehouseType, string> = {
@@ -58,28 +55,6 @@ export interface Warehouse {
   updated_at: string
   created_by: string
   updated_by: string
-}
-
-// Create Warehouse Input
-export interface CreateWarehouseInput {
-  code: string
-  name: string
-  type: WarehouseType
-  address?: string | null
-  contact_email?: string | null
-  contact_phone?: string | null
-  is_active?: boolean
-}
-
-// Update Warehouse Input
-export interface UpdateWarehouseInput {
-  code?: string
-  name?: string
-  type?: WarehouseType
-  address?: string | null
-  contact_email?: string | null
-  contact_phone?: string | null
-  is_active?: boolean
 }
 
 // Warehouse List Parameters
