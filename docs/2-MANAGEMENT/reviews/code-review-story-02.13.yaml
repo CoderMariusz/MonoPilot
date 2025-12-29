@@ -1,0 +1,382 @@
+---
+# Code Review Handoff: Story 02.13
+# Nutrition Calculation: Facts Panel & Label Generation
+# Date: 2025-12-29
+# Reviewer: CODE-REVIEWER (AI Agent)
+
+story:
+  id: "02.13"
+  name: "Nutrition Calculation: Facts Panel & Label Generation"
+  epic: "02-technical"
+  phase: "5-code-review"
+
+decision: "REQUEST_CHANGES"
+
+summary: |
+  Well-architected implementation with strong type safety and good service design.
+  Contains CRITICAL calculation and FDA compliance issues that MUST be fixed.
+  Core logic is sound but lacks validation that could produce incorrect labels.
+  RACC table incomplete (99/139 categories).
+
+issues:
+  critical:
+    count: 2
+    blocking: true
+    items:
+      - id: "CRITICAL-1"
+        title: "Incorrect Weighted Average Calculation Formula"
+        file: "apps/frontend/lib/services/nutrition-service.ts"
+        lines: "208-223"
+        severity: "CRITICAL"
+        impact: "FDA Compliance - incorrect nutrition values on labels"
+        description: |
+          UOM conversion assumes BOM quantities in kg, but no database constraint.
+          Documentation inconsistent with implementation.
+          Missing runtime validation for UOM values.
+        required_fix: |
+          1. Add database constraint: CHECK (uom IN ('kg', 'g', 'lb', 'oz', 'l', 'ml'))
+          2. Add runtime validation before calculation
+          3. Fix documentation comments to match implementation
+        estimate_hours: 2
+
+      - id: "CRITICAL-2"
+        title: "Missing RACC Table Entry Count Verification"
+        file: "apps/frontend/lib/types/nutrition.ts"
+        lines: "308-448"
+        severity: "CRITICAL"
+        impact: "FDA Compliance - 99/139 required categories"
+        description: |
+          AC-13.15 requires 139 RACC categories per 21 CFR 101.12(b).
+          Current table has only 99 categories (verified via grep).
+          Missing ~40 categories including infant formulas, medical foods, ethnic foods.
+        required_fix: |
+          1. Cross-reference 21 CFR 101.12(b) for all 139 required categories
+          2. Add missing categories to FDA_RACC_TABLE
+          3. Add unit test to verify count equals 139
+        estimate_hours: 3
+
+  major:
+    count: 3
+    blocking: false
+    items:
+      - id: "MAJOR-1"
+        title: "FDA 2016 Label Typography Not Fully Specified"
+        file: "apps/frontend/lib/services/label-export-service.ts"
+        lines: "347-480"
+        severity: "MAJOR"
+        impact: "FDA Compliance - label may not meet typography requirements"
+        description: |
+          Border widths use 'px' instead of 'pt' (FDA requires pt).
+          No minimum width constraint (should be at least 3 inches).
+          No print scaling specified (should be 72 DPI).
+        required_fix: |
+          1. Convert all border widths from px to pt
+          2. Add minimum width constraint (3 inches = 216pt)
+          3. Add CSS @page rule for print media
+          4. Add unit test to verify typography matches FDA spec
+        estimate_hours: 1.5
+
+      - id: "MAJOR-2"
+        title: "Missing Negative Value Validation in Calculation"
+        file: "apps/frontend/lib/services/nutrition-service.ts"
+        lines: "208-268"
+        severity: "MAJOR"
+        impact: "Data Integrity - could produce negative nutrition values"
+        description: |
+          Calculation doesn't validate ingredient nutrition values are non-negative.
+          Validation schemas enforce on INPUT, but not during CALCULATION.
+          Corrupted data could produce "Fat: -12g" on labels.
+        required_fix: |
+          Add validation before calculation:
+          if (valuePer100g < 0) {
+            throw new NutritionError('INVALID_INGREDIENT_DATA', ...)
+          }
+        estimate_hours: 1
+
+      - id: "MAJOR-3"
+        title: "Insufficient RLS Test Coverage"
+        file: "supabase/migrations/057_create_nutrition_tables.sql"
+        lines: "172-211"
+        severity: "MAJOR"
+        impact: "Security - potential cross-tenant data leak"
+        description: |
+          RLS policies correct, but no test file to verify isolation.
+          Missing: supabase/tests/nutrition-rls.test.sql
+          Cannot confirm cross-tenant protection without tests.
+        required_fix: |
+          Create supabase/tests/nutrition-rls.test.sql with tests for:
+          1. SELECT isolation (AC-13.31)
+          2. INSERT isolation
+          3. UPDATE isolation
+          4. DELETE isolation
+        estimate_hours: 1.5
+
+  minor:
+    count: 4
+    blocking: false
+    items:
+      - id: "MINOR-1"
+        title: "Inconsistent Rounding Precision"
+        file: "apps/frontend/lib/services/label-export-service.ts"
+        lines: "299-316"
+        severity: "MINOR"
+        impact: "Consistency - slight inconsistency in label display"
+
+      - id: "MINOR-2"
+        title: "Magic Number for RACC Variance Threshold"
+        file: "apps/frontend/lib/services/serving-calculator-service.ts"
+        lines: "33"
+        severity: "MINOR"
+        impact: "Maintainability - missing FDA citation"
+
+      - id: "MINOR-3"
+        title: "Missing Energy kJ Auto-Calculation Documentation"
+        file: "apps/frontend/lib/services/nutrition-service.ts"
+        lines: "376"
+        severity: "MINOR"
+        impact: "UX - users may not know kJ is auto-calculated"
+
+      - id: "MINOR-4"
+        title: "No Cache Invalidation on BOM Change"
+        file: "N/A"
+        severity: "MINOR"
+        impact: "Data Freshness - stale nutrition after BOM update"
+
+positive_findings:
+  - title: "Excellent Type Safety and Validation"
+    files: "All validation schemas"
+    quality: "A+"
+    description: "Zod schemas comprehensive with conditional requirements and clear errors"
+
+  - title: "Excellent Audit Trail Implementation"
+    file: "apps/frontend/lib/services/nutrition-service.ts"
+    lines: "315-409"
+    quality: "A+"
+    description: "Meets FDA 21 CFR 117.155(a) record keeping requirements"
+
+  - title: "Good Service Architecture"
+    files: "All service files"
+    quality: "B+"
+    description: "Clear separation, dependency injection, comprehensive JSDoc"
+
+  - title: "FDA Daily Values Accuracy"
+    file: "apps/frontend/lib/types/nutrition.ts"
+    lines: "284-298"
+    quality: "A"
+    description: "All values correct per 21 CFR 101.9(c)(9)"
+
+  - title: "Good RLS Policy Structure"
+    file: "supabase/migrations/057_create_nutrition_tables.sql"
+    lines: "172-211"
+    quality: "B+"
+    description: "Correctly enforces org isolation, but needs tests"
+
+test_status:
+  unit_tests:
+    status: "EXISTS"
+    files:
+      - "nutrition-service.test.ts"
+      - "serving-calculator-service.test.ts"
+      - "label-export-service.test.ts"
+      - "nutrition-schema.test.ts"
+      - "ingredient-nutrition-schema.test.ts"
+    note: "Cannot verify pass status - test execution blocked"
+
+  integration_tests:
+    status: "MISSING"
+    missing_files:
+      - "apps/frontend/app/api/technical/nutrition/__tests__/calculate.test.ts"
+      - "apps/frontend/app/api/technical/nutrition/__tests__/override.test.ts"
+
+  rls_tests:
+    status: "MISSING"
+    missing_files:
+      - "supabase/tests/nutrition-rls.test.sql"
+    severity: "MAJOR-3"
+
+  e2e_tests:
+    status: "MISSING"
+    missing_files:
+      - "apps/frontend/e2e/nutrition-panel.spec.ts"
+
+  overall:
+    status: "INCOMPLETE"
+    recommendation: "Create missing integration, RLS, and E2E tests"
+
+fda_compliance:
+  checklist:
+    - requirement: "FDA 2016 required nutrients (Vit D, Ca, Fe, K)"
+      status: "PASS"
+      location: "label-export-service.ts:442-467"
+
+    - requirement: "NOT Vitamin A, C"
+      status: "PASS"
+      location: "label-export-service.ts:442-467"
+
+    - requirement: "Typography (18pt title, 16pt calories, 8pt nutrients)"
+      status: "PARTIAL"
+      issue: "MAJOR-1"
+      note: "Correct font sizes, but border widths use px not pt"
+
+    - requirement: "% Daily Value calculation"
+      status: "PASS"
+      location: "label-export-service.ts:322-326"
+
+    - requirement: "RACC table (139 categories)"
+      status: "FAIL"
+      issue: "CRITICAL-2"
+      note: "Only 99 categories"
+
+    - requirement: "Serving size > 0 validation"
+      status: "PASS"
+      location: "057_create_nutrition_tables.sql:69"
+
+    - requirement: "Allergen labeling"
+      status: "PASS"
+      location: "label-export-service.ts:217-244"
+
+    - requirement: "Audit trail for manual override"
+      status: "PASS"
+      location: "nutrition-service.ts:360-393"
+
+    - requirement: "Reference required for lab_test/supplier_coa"
+      status: "PASS"
+      location: "nutrition-schema.ts:184-196"
+
+  overall_score: "6/9 PASS (67%)"
+  verdict: "NEEDS IMPROVEMENT"
+
+security:
+  sql_injection: "PASS - parameterized queries"
+  cross_tenant_isolation: "PASS - RLS policies correct (needs test verification)"
+  audit_trail_immutability: "PASS - override fields set once"
+
+performance:
+  calculation_under_2s: "PASS - estimated <500ms for 8-20 ingredients"
+  optimization: "PASS - batch query for ingredient nutrition"
+
+coverage:
+  issues_found: 9
+  critical: 2
+  major: 3
+  minor: 4
+  positive: 5
+
+required_fixes:
+  blocking:
+    - "CRITICAL-1: Add UOM validation to BOM items"
+    - "CRITICAL-2: Complete RACC table to 139 categories"
+    - "MAJOR-1: Fix FDA label typography (px to pt)"
+    - "MAJOR-2: Add negative value validation"
+    - "MAJOR-3: Create RLS isolation tests"
+
+  recommended:
+    - "MINOR-1: Document rounding precision rules"
+    - "MINOR-2: Add FDA citation for RACC threshold"
+    - "MINOR-3: Document kJ auto-calculation"
+    - "MINOR-4: Implement cache invalidation on BOM change"
+
+  test_coverage:
+    - "Verify all unit tests pass (85%+ coverage)"
+    - "Create integration tests for API endpoints"
+    - "Create E2E test for nutrition panel workflow"
+
+estimate:
+  critical_fixes: "4-6 hours"
+  major_fixes: "2-3 hours"
+  minor_fixes: "1-2 hours"
+  total: "7-11 hours"
+
+next_steps:
+  - step: 1
+    agent: "DEV"
+    task: "Fix CRITICAL-1 (UOM validation)"
+    estimate: "2 hours"
+
+  - step: 2
+    agent: "DEV"
+    task: "Fix CRITICAL-2 (complete RACC table)"
+    estimate: "3 hours"
+
+  - step: 3
+    agent: "DEV"
+    task: "Fix MAJOR-1 (typography px to pt)"
+    estimate: "1.5 hours"
+
+  - step: 4
+    agent: "DEV"
+    task: "Fix MAJOR-2 (negative value validation)"
+    estimate: "1 hour"
+
+  - step: 5
+    agent: "TEST-WRITER"
+    task: "Create MAJOR-3 (RLS tests)"
+    estimate: "1.5 hours"
+
+  - step: 6
+    agent: "QA"
+    task: "Run all tests, verify 310+ pass"
+    estimate: "1 hour"
+
+  - step: 7
+    agent: "CODE-REVIEWER"
+    task: "Re-review after fixes"
+    estimate: "1 hour"
+
+handoff:
+  to: "DEV"
+  priority: "P0"
+  message: |
+    Story 02.13 has CRITICAL FDA compliance issues that must be fixed.
+
+    Two critical issues:
+    1. CRITICAL-1: UOM validation missing (2 hours fix)
+    2. CRITICAL-2: RACC table incomplete - 99/139 categories (3 hours fix)
+
+    Three major issues:
+    1. MAJOR-1: Typography uses px not pt (1.5 hours)
+    2. MAJOR-2: Missing negative value validation (1 hour)
+    3. MAJOR-3: No RLS tests (needs TEST-WRITER, 1.5 hours)
+
+    Total estimate: 7-11 hours to fix all blocking issues.
+
+    After fixes, request re-review from CODE-REVIEWER.
+
+files_reviewed:
+  services:
+    - "apps/frontend/lib/services/nutrition-service.ts"
+    - "apps/frontend/lib/services/serving-calculator-service.ts"
+    - "apps/frontend/lib/services/label-export-service.ts"
+
+  validation:
+    - "apps/frontend/lib/validation/nutrition-schema.ts"
+    - "apps/frontend/lib/validation/ingredient-nutrition-schema.ts"
+
+  types:
+    - "apps/frontend/lib/types/nutrition.ts"
+
+  migration:
+    - "supabase/migrations/057_create_nutrition_tables.sql"
+
+  tests:
+    - "apps/frontend/lib/services/__tests__/nutrition-service.test.ts (partial)"
+    - "apps/frontend/lib/validation/__tests__/nutrition-schema.test.ts"
+    - "apps/frontend/lib/validation/__tests__/ingredient-nutrition-schema.test.ts"
+
+metadata:
+  reviewer: "CODE-REVIEWER (AI Agent)"
+  review_date: "2025-12-29"
+  review_type: "Comprehensive FDA Compliance Review"
+  phase: "5-code-review"
+  model: "claude-sonnet-4-5-20250929"
+
+approval_conditions:
+  - "Fix CRITICAL-1 and CRITICAL-2"
+  - "Fix MAJOR-1, MAJOR-2, MAJOR-3"
+  - "All unit tests pass (85%+ coverage)"
+  - "RLS tests created and passing"
+  - "Re-review by CODE-REVIEWER"
+
+status_after_fixes: "APPROVED (conditional on test pass)"
+
+---

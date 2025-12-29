@@ -35,6 +35,7 @@ import {
   MissingIngredient,
 } from '../types/nutrition'
 import { nutritionOverrideSchema } from '../validation/nutrition-schema'
+import { convertToKg } from '../utils/uom-converter'
 
 // Type for Supabase client (can be real or mock)
 type SupabaseClient = ReturnType<typeof createClient>
@@ -230,7 +231,7 @@ export default class NutritionService {
       const product = (item as any).products
 
       // Convert quantity to grams (assuming kg input)
-      const quantityKg = this.convertToKg(item.quantity, item.uom)
+      const quantityKg = convertToKg(item.quantity, item.uom)
       const quantityG = quantityKg * 1000
       totalInputKg += quantityKg
 
@@ -296,7 +297,7 @@ export default class NutritionService {
     const totalEnergy = totalNutrients.energy_kcal || 0
     for (const contrib of ingredientContributions) {
       if (contrib.nutrients.energy_kcal && totalEnergy > 0) {
-        const ingredientQtyG = this.convertToKg(contrib.quantity, contrib.unit) * 1000
+        const ingredientQtyG = convertToKg(contrib.quantity, contrib.unit) * 1000
         const ingredientEnergy = ((contrib.nutrients.energy_kcal || 0) / 100) * ingredientQtyG
         contrib.contribution_percent = (ingredientEnergy / totalEnergy) * 100
       }
@@ -583,34 +584,6 @@ export default class NutritionService {
     }
     const percentDV = (value / dailyValue) * 100
     return Math.round(percentDV)
-  }
-
-  /**
-   * Convert quantity to kilograms based on UOM
-   */
-  private convertToKg(quantity: number, uom: string): number {
-    const uomLower = uom.toLowerCase()
-    switch (uomLower) {
-      case 'kg':
-        return quantity
-      case 'g':
-        return quantity / 1000
-      case 'mg':
-        return quantity / 1000000
-      case 'lb':
-      case 'lbs':
-        return quantity * 0.453592
-      case 'oz':
-        return quantity * 0.0283495
-      case 'l':
-      case 'liter':
-      case 'litre':
-        return quantity // Assuming 1L = 1kg for liquids
-      case 'ml':
-        return quantity / 1000
-      default:
-        return quantity // Default to kg
-    }
   }
 }
 
