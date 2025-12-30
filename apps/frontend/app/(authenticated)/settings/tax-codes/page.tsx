@@ -219,7 +219,7 @@ export default function TaxCodesPage() {
       {/* Create/Edit Modal */}
       <TaxCodeModal
         mode={modalMode}
-        taxCode={selectedTaxCode}
+        taxCode={selectedTaxCode ?? undefined}
         open={showModal}
         onClose={() => {
           setShowModal(false)
