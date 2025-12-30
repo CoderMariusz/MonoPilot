@@ -16,8 +16,10 @@ import { ZodError } from 'zod'
  *
  * Returns 404 for cross-org access (not 403)
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Call service to get line by ID
-    const result = await ProductionLineService.getById(params.id, supabase)
+    const result = await ProductionLineService.getById(id, supabase)
 
     if (!result.success || !result.data) {
       return NextResponse.json({ error: 'Line not found' }, { status: 404 })
@@ -72,8 +74,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
  *
  * Permission: PROD_MANAGER+
  */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -111,7 +115,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const validatedData = productionLineUpdateSchema.parse(body)
 
     // Call service to update line
-    const result = await ProductionLineService.update(params.id, validatedData, supabase)
+    const result = await ProductionLineService.update(id, validatedData, supabase)
 
     if (!result.success) {
       // Check for specific error types
@@ -152,8 +156,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
  * Performance Target: < 500ms
  * Permission: ADMIN+ only (not PROD_MANAGER)
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -187,7 +193,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     // Call service to delete line
-    const result = await ProductionLineService.delete(params.id, supabase)
+    const result = await ProductionLineService.delete(id, supabase)
 
     if (!result.success) {
       // Check for specific error types

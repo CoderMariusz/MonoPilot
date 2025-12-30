@@ -18,8 +18,10 @@ import { ZodError } from 'zod'
  *
  * Permission: PROD_MANAGER+
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -57,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { data: existingMachine, error: fetchError } = await supabase
       .from('machines')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -78,7 +80,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .select()
       .single()

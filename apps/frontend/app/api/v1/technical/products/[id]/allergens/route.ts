@@ -28,7 +28,7 @@ import { ZodError } from 'zod'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -46,7 +46,7 @@ export async function GET(
     // Get product allergens using service
     const response = await ProductAllergenService.getProductAllergens(
       supabase,
-      params.id
+      (await params).id
     )
 
     return NextResponse.json(response, { status: 200 })
@@ -87,7 +87,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -134,7 +134,7 @@ export async function POST(
     // Add allergen using service
     const allergen = await ProductAllergenService.addProductAllergen(
       supabase,
-      params.id,
+      (await params).id,
       userData.org_id,
       user.id,
       validated
@@ -195,7 +195,7 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -248,7 +248,7 @@ export async function DELETE(
     // Remove allergen using service
     await ProductAllergenService.removeProductAllergen(
       supabase,
-      params.id,
+      (await params).id,
       allergenRecordId,
       relationType
     )

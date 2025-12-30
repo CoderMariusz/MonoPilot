@@ -11,7 +11,7 @@ import { InvitationService } from '@/lib/services/invitation-service'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -50,7 +50,7 @@ export async function DELETE(
     }
 
     // 4. Cancel invitation
-    await InvitationService.cancelInvitation(params.id, userData.org_id)
+    await InvitationService.cancelInvitation((await params).id, userData.org_id)
 
     // 5. Return success (204 No Content)
     return new NextResponse(null, { status: 204 })

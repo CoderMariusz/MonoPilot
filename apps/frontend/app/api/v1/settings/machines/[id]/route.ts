@@ -15,8 +15,9 @@ import { ZodError } from 'zod'
  *
  * Returns 404 for cross-org access (not 403)
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         )
       `
       )
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -80,8 +81,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
  * Request Body: Partial<CreateMachineInput>
  * Permission: PROD_MANAGER+
  */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -119,7 +121,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const { data: existingMachine, error: fetchError } = await supabase
       .from('machines')
       .select('id, code')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -140,7 +142,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         .eq('org_id', orgId)
         .eq('code', validatedData.code)
         .eq('is_deleted', false)
-        .neq('id', params.id)
+        .neq('id', id)
         .single()
 
       if (codeCheck) {
@@ -156,7 +158,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .select()
       .single()
@@ -195,8 +197,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
  * Performance Target: < 500ms
  * Permission: ADMIN+ only
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -234,7 +237,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const { data: existingMachine, error: fetchError } = await supabase
       .from('machines')
       .select('id, code')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -253,7 +256,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         production_line:production_lines(code)
       `
       )
-      .eq('machine_id', params.id)
+      .eq('machine_id', id)
       .limit(10)
 
     // If table doesn't exist (42P01), allow deletion
@@ -285,7 +288,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         deleted_at: new Date().toISOString(),
         updated_by: user.id,
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', orgId)
 
     if (deleteError) {

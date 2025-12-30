@@ -34,7 +34,7 @@ import { ProductAllergenService } from '@/lib/services/product-allergen-service'
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -78,7 +78,7 @@ export async function POST(
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select('id, product_id, version')
-      .eq('id', params.id)
+      .eq('id', (await params).id)
       .single()
 
     if (bomError || !bom) {
@@ -88,7 +88,7 @@ export async function POST(
     // Recalculate allergen inheritance using service
     const response = await ProductAllergenService.calculateAllergenInheritance(
       supabase,
-      params.id,
+      (await params).id,
       bom.product_id,
       userData.org_id
     )

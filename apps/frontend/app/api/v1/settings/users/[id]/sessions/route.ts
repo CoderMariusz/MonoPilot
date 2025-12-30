@@ -22,7 +22,7 @@ import { ZodError } from 'zod'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -38,7 +38,7 @@ export async function GET(
     }
 
     const currentUserId = session.user.id
-    const targetUserId = params.id
+    const targetUserId = (await params).id
 
     // Get current user's role and org
     const { data: currentUser } = await supabase
@@ -80,7 +80,7 @@ export async function GET(
 
     return NextResponse.json({ sessions }, { status: 200 })
   } catch (error) {
-    console.error(`[API] Error in GET /api/v1/settings/users/${params.id}/sessions:`, error)
+    console.error(`[API] Error in GET /api/v1/settings/users/${(await params).id}/sessions:`, error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(
@@ -104,7 +104,7 @@ export async function GET(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -120,7 +120,7 @@ export async function DELETE(
     }
 
     const currentUserId = session.user.id
-    const targetUserId = params.id
+    const targetUserId = (await params).id
 
     // Get current user's role and org
     const { data: currentUser } = await supabase
@@ -168,7 +168,7 @@ export async function DELETE(
       { status: 200 }
     )
   } catch (error) {
-    console.error(`[API] Error in DELETE /api/v1/settings/users/${params.id}/sessions:`, error)
+    console.error(`[API] Error in DELETE /api/v1/settings/users/${(await params).id}/sessions:`, error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(

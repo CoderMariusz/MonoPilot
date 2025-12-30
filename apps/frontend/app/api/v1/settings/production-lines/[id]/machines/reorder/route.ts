@@ -24,8 +24,10 @@ import { ZodError } from 'zod'
  *
  * Permission: PROD_MANAGER+
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const supabase = await createServerSupabase()
 
     // Get authenticated user
@@ -64,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     // Call service to reorder machines
     const result = await ProductionLineService.reorderMachines(
-      params.id,
+      id,
       validatedData.machine_orders,
       supabase
     )

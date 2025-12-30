@@ -11,7 +11,7 @@ import { InvitationService } from '@/lib/services/invitation-service'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -50,7 +50,7 @@ export async function POST(
     }
 
     // 4. Resend invitation
-    const invitation = await InvitationService.resendInvitation(params.id, userData.org_id)
+    const invitation = await InvitationService.resendInvitation((await params).id, userData.org_id)
 
     // 5. Return success response
     return NextResponse.json(

@@ -9,6 +9,8 @@ import { resumeWorkOrder, WOPauseError } from '@/lib/services/wo-pause-service'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const { id: woId } = await params
     const supabase = await createServerSupabase()
 

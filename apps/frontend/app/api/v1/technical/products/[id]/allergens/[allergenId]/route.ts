@@ -28,7 +28,7 @@ import { ProductAllergenService } from '@/lib/services/product-allergen-service'
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; allergenId: string } }
+  { params }: { params: Promise<{ id: string; allergenId: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -77,8 +77,8 @@ export async function DELETE(
     // Remove allergen using service
     await ProductAllergenService.removeProductAllergen(
       supabase,
-      params.id,
-      params.allergenId,
+      (await params).id,
+      (await params).allergenId,
       relationType
     )
 

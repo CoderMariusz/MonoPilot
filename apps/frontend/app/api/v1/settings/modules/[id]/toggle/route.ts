@@ -10,7 +10,7 @@ import { ModuleSettingsService } from '@/lib/services/module-settings-service'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -56,7 +56,7 @@ export async function PATCH(
     const allModules = await ModuleSettingsService.getModules(supabase, userData.org_id)
 
     // Find the module being toggled
-    const targetModule = allModules.find(m => m.id === params.id)
+    const targetModule = allModules.find(m => m.id === (await params).id)
     if (!targetModule) {
       return NextResponse.json({ error: 'Module not found' }, { status: 404 })
     }
@@ -128,7 +128,7 @@ export async function PATCH(
     const result = await ModuleSettingsService.toggleModule(
       supabase,
       userData.org_id,
-      params.id,
+      (await params).id,
       enabled
     )
 

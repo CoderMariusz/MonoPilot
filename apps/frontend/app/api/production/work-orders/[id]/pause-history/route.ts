@@ -9,6 +9,8 @@ import { getPauseHistory, getDowntimeSummary } from '@/lib/services/wo-pause-ser
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
+
     const { id: woId } = await params
     const supabase = await createServerSupabase()
 
