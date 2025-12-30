@@ -42,6 +42,7 @@ export async function GET(
     }
 
     const orgId = userData.org_id
+    const { id } = await params
 
     // Fetch tax code
     const { data: taxCode, error } = await supabase
@@ -100,6 +101,7 @@ export async function PUT(
     }
 
     const orgId = userData.org_id
+    const { id } = await params
     // Role can be object or array depending on Supabase query
     const roleData = userData.role as any
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
@@ -253,6 +255,7 @@ export async function DELETE(
     }
 
     const orgId = userData.org_id
+    const { id } = await params
     // Role can be object or array depending on Supabase query
     const roleData = userData.role as any
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code

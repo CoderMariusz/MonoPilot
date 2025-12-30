@@ -7,7 +7,7 @@
 import { z } from 'zod'
 
 // Create Production Line Schema
-export const productionLineCreateSchema = z.object({
+export const createProductionLineSchema = z.object({
   code: z
     .string()
     .min(2, 'Line code must be at least 2 characters')
@@ -43,7 +43,11 @@ export const productionLineCreateSchema = z.object({
 })
 
 // Update Production Line Schema (partial)
-export const productionLineUpdateSchema = productionLineCreateSchema.partial()
+export const productionLineUpdateSchema = createProductionLineSchema.partial()
+export const updateProductionLineSchema = productionLineUpdateSchema // Alias for API routes
+
+// Alias for backward compatibility
+export const productionLineCreateSchema = createProductionLineSchema
 
 // Machine Reorder Schema
 export const machineReorderSchema = z.object({

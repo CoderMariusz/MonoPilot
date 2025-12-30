@@ -38,6 +38,7 @@ export async function POST(
 ) {
   try {
     const supabase = await createServerSupabase()
+    const { id } = await params
 
     // Check authentication
     const {

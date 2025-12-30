@@ -36,6 +36,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const userId = session.user.id
     const sessionId = id
 
@@ -107,7 +108,7 @@ export async function DELETE(
       { status: 200 }
     )
   } catch (error) {
-    console.error(`[API] Error in DELETE /api/v1/settings/sessions/${id}:`, error)
+    console.error('[API] Error in DELETE /api/v1/settings/sessions/:id:', error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(

@@ -119,7 +119,7 @@ export async function PUT(
 
     // If user was deactivated, terminate all sessions
     if (validatedData.status === 'inactive') {
-      await terminateAllSessions(userId)
+      await terminateAllSessions(supabase, userId)
     }
 
     return NextResponse.json(
@@ -240,10 +240,11 @@ export async function DELETE(
 
     // AC-002.4: Terminate all active sessions (JWT blacklist)
     // AC-002.4: User logged out immediately on all devices
-    const sessionResult = await terminateAllSessions(userId)
-
-    if (!sessionResult.success) {
-      console.error('Failed to terminate sessions:', sessionResult.error)
+    try {
+      const terminatedCount = await terminateAllSessions(supabaseAdmin, userId)
+      console.log(`Terminated ${terminatedCount} sessions for user ${userId}`)
+    } catch (sessionError) {
+      console.error('Failed to terminate sessions:', sessionError)
       // User is deactivated but sessions might still be active
       // This is not a fatal error, but should be logged
     }

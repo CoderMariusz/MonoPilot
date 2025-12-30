@@ -171,7 +171,7 @@ export async function GET(
       )
     }
 
-    const routing = (bom as { routing?: unknown }).routing
+    const routing = (bom as { routing?: { id?: string; code?: string; currency?: string; setup_cost?: number; working_cost_per_unit?: number; overhead_percent?: number } | null }).routing
     const product = (bom as { product?: unknown }).product
     const batchSize = Number(bom.output_qty) || 1
     const currency = routing?.currency || 'PLN'
@@ -181,7 +181,9 @@ export async function GET(
     const materials: MaterialCostBreakdown[] = []
 
     for (const item of bom.items || []) {
-      const component = (item as { component?: { code?: string; name?: string; cost_per_unit?: number } }).component
+      const component = (item as { component?: { id?: string; code?: string; name?: string; cost_per_unit?: number; uom?: string } }).component
+      if (!component) continue // Skip items without component
+
       const quantity = Number(item.quantity) || 0
       const scrapPercent = Number(item.scrap_percent) || 0
       const unitCost = Number(component.cost_per_unit) || 0
@@ -193,11 +195,11 @@ export async function GET(
       totalMaterialCost += lineCost
 
       materials.push({
-        ingredient_id: component.id,
-        ingredient_code: component.code,
-        ingredient_name: component.name,
+        ingredient_id: component.id || '',
+        ingredient_code: component.code || '',
+        ingredient_name: component.name || '',
         quantity: quantity,
-        uom: component.uom,
+        uom: component.uom || '',
         unit_cost: unitCost,
         scrap_percent: scrapPercent,
         scrap_cost: scrapCost,
@@ -268,14 +270,14 @@ export async function GET(
     totalLaborCost = roundCurrency(totalLaborCost)
 
     // 6. Calculate routing-level costs
-    const setupCost = roundCurrency(Number(routing.setup_cost) || 0)
-    const workingCostPerUnit = Number(routing.working_cost_per_unit) || 0
+    const setupCost = roundCurrency(Number(routing?.setup_cost) || 0)
+    const workingCostPerUnit = Number(routing?.working_cost_per_unit) || 0
     const totalWorkingCost = roundCurrency(workingCostPerUnit * batchSize)
     const totalRoutingCost = roundCurrency(setupCost + totalWorkingCost)
 
     const routingBreakdown: RoutingCostBreakdown = {
-      routing_id: routing.id,
-      routing_code: routing.code,
+      routing_id: routing?.id || '',
+      routing_code: routing?.code || '',
       setup_cost: setupCost,
       working_cost_per_unit: workingCostPerUnit,
       total_working_cost: totalWorkingCost,
@@ -286,7 +288,7 @@ export async function GET(
     const subtotalBeforeOverhead = roundCurrency(
       totalMaterialCost + totalLaborCost + totalRoutingCost
     )
-    const overheadPercent = Number(routing.overhead_percent) || 0
+    const overheadPercent = Number(routing?.overhead_percent) || 0
     const overheadCost = roundCurrency((subtotalBeforeOverhead * overheadPercent) / 100)
 
     const overhead: OverheadBreakdown = {

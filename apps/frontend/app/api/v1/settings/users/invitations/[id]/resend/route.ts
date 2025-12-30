@@ -49,6 +49,7 @@ export async function POST(
       )
     }
 
+    const { id } = await params
     // 4. Resend invitation
     const invitation = await InvitationService.resendInvitation(id, userData.org_id)
 

@@ -114,3 +114,8 @@ export const locationListParamsSchema = z.object({
 })
 
 export type LocationListParams = z.infer<typeof locationListParamsSchema>
+
+// Aliases for API routes (PascalCase)
+export const CreateLocationSchema = createLocationSchema
+export const UpdateLocationSchema = updateLocationSchema
+export const LocationFiltersSchema = locationListParamsSchema

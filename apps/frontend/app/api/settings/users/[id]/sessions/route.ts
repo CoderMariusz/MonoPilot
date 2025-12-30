@@ -53,7 +53,7 @@ export async function GET(
     }
 
     // Get sessions
-    const sessions = await getSessions(userId, false)
+    const sessions = await getSessions(supabase, userId)
 
     return NextResponse.json({ sessions }, { status: 200 })
   } catch (error) {
@@ -114,32 +114,31 @@ export async function DELETE(
 
     // Extract JWT from header
     const token = authHeader.replace('Bearer ', '')
-    
+
     // Decode JWT to get jti and exp (without verification, just parsing)
     const payload = JSON.parse(
       Buffer.from(token.split('.')[1], 'base64').toString()
     )
     const currentTokenId = payload.jti || payload.sub // Fallback to sub if jti not present
-    const tokenExpiry = payload.exp
 
     // Terminate all sessions except current
-    const result = await terminateAllSessions(userId, currentTokenId, tokenExpiry)
-
-    if (!result.success) {
+    try {
+      const terminatedCount = await terminateAllSessions(supabase, userId, currentTokenId)
       return NextResponse.json(
-        { error: result.error || 'Failed to terminate sessions' },
+        {
+          success: true,
+          message: `Logged out from ${terminatedCount} device(s)`,
+          terminated_count: terminatedCount,
+        },
+        { status: 200 }
+      )
+    } catch (terminateError) {
+      console.error('Failed to terminate sessions:', terminateError)
+      return NextResponse.json(
+        { error: 'Failed to terminate sessions' },
         { status: 500 }
       )
     }
-
-    return NextResponse.json(
-      {
-        success: true,
-        terminated_count: result.count || 0,
-        message: `Logged out from ${result.count || 0} device(s)`,
-      },
-      { status: 200 }
-    )
   } catch (error) {
     console.error('Error in DELETE /api/settings/users/:id/sessions:', error)
     return NextResponse.json(

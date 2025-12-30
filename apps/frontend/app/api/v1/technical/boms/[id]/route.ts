@@ -37,6 +37,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createServerSupabase()
+    const { id } = await params
 
     // Auth check
     const { data: { user }, error: authError } = await supabase.auth.getUser()

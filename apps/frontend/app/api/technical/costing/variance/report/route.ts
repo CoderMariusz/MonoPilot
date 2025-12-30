@@ -198,7 +198,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Build work order costs from variance records
-    workOrderCosts = varianceRecords.map((record: CostVarianceRecord) => ({
+    // Cast to CostVarianceRecord[] since Supabase types may not match exactly
+    const typedRecords = varianceRecords as unknown as CostVarianceRecord[]
+    workOrderCosts = typedRecords.map((record) => ({
       id: record.id,
       work_order_id: record.work_order_id,
       org_id: currentUser.org_id,
@@ -212,7 +214,7 @@ export async function GET(request: NextRequest) {
     }))
 
     // Build work order details
-    workOrderDetails = varianceRecords.map((record: CostVarianceRecord) => ({
+    workOrderDetails = typedRecords.map((record) => ({
       work_order_id: record.work_order_id,
       work_order_code: record.work_order?.code || '',
       standard_cost: record.standard_total || 0,
@@ -228,10 +230,10 @@ export async function GET(request: NextRequest) {
       product_id: productId,
       org_id: currentUser.org_id,
       cost_type: 'standard' as const,
-      material_cost: varianceRecords[0].standard_material || 0,
-      labor_cost: varianceRecords[0].standard_labor || 0,
-      overhead_cost: varianceRecords[0].standard_overhead || 0,
-      total_cost: varianceRecords[0].standard_total || 0,
+      material_cost: typedRecords[0].standard_material || 0,
+      labor_cost: typedRecords[0].standard_labor || 0,
+      overhead_cost: typedRecords[0].standard_overhead || 0,
+      total_cost: typedRecords[0].standard_total || 0,
       cost_per_unit: null,
       effective_from: new Date().toISOString(),
       effective_to: null,

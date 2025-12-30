@@ -34,7 +34,9 @@ export async function PATCH(
     }
 
     // Check permission (Admin or Owner only)
-    const roleCode = userData.roles?.code
+    // Type assertion: roles is an object due to !inner join, but TS infers array
+    const roles = userData.roles as unknown as { id: string; code: string } | null
+    const roleCode = roles?.code
     if (!roleCode || !['admin', 'owner'].includes(roleCode)) {
       return NextResponse.json(
         { error: 'Insufficient permissions. Admin or Owner role required.' },

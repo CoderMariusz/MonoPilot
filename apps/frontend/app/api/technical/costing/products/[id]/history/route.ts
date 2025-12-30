@@ -323,9 +323,10 @@ async function getCostDriversFromDB(
     }
 
     // Calculate cost drivers from BOM items
-    const drivers: CostDriver[] = bom.items
-      .filter((item: BomItemWithComponent) => item.component)
-      .map((item: BomItemWithComponent) => {
+    // Cast items to BomItemWithComponent[] since Supabase types may not match exactly
+    const drivers: CostDriver[] = (bom.items as unknown as BomItemWithComponent[])
+      .filter((item) => item.component)
+      .map((item) => {
         const currentCost = (item.component.cost_per_unit || 0) * item.quantity
         // For historical cost, we would need to look at historical ingredient prices
         // For now, use current cost as baseline

@@ -560,3 +560,9 @@ export const reorderMachines = ProductionLineService.reorderMachines.bind(Produc
 export const isCodeUnique = ProductionLineService.isCodeUnique.bind(ProductionLineService)
 export const calculateBottleneckCapacity = ProductionLineService.calculateBottleneckCapacity.bind(ProductionLineService)
 export const renumberSequences = ProductionLineService.renumberSequences.bind(ProductionLineService)
+
+// Aliases for API routes
+export const getProductionLineById = getById
+export const updateProductionLine = update
+export const createProductionLine = create
+export const listProductionLines = list

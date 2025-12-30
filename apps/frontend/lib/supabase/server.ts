@@ -1,6 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+
+// Alias for backward compatibility with routes using createClient
+export { createServerSupabase as createClient }
 
 export async function createServerSupabase() {
   const cookieStore = await cookies()
@@ -60,7 +63,7 @@ export function createServerSupabaseAdmin() {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set!')
   }
 
-  return createClient(
+  return createSupabaseClient(
     supabaseUrl,
     serviceRoleKey,
     {

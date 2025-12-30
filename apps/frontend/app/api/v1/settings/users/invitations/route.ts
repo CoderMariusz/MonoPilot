@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
 
     // 3. Get query parameters
     const { searchParams } = new URL(request.url)
-    const status = (searchParams.get('status') || 'pending') as 'pending' | 'all'
+    const statusParam = searchParams.get('status') || 'pending'
+    // Map 'all' to undefined (get all statuses), otherwise pass the specific status
+    const status = statusParam === 'all' ? undefined : statusParam as 'pending' | 'expired' | 'cancelled' | 'accepted'
 
     // 4. List invitations
     const invitations = await InvitationService.listInvitations(userData.org_id, status)

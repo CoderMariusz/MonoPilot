@@ -44,6 +44,7 @@ export async function PATCH(
     }
 
     const orgId = userData.org_id
+    const { id } = await params
     // Role can be object or array depending on Supabase query
     const roleData = userData.role as any
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code

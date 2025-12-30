@@ -78,7 +78,7 @@ export async function DELETE(
     }
 
     // Terminate session
-    await terminateSession(sessionId, userId, tokenExpiry)
+    await terminateSession(supabase, sessionId, 'manual_termination', user.id)
 
     return NextResponse.json(
       {

@@ -294,7 +294,7 @@ export function TechnicalDashboardPage() {
                   loading={matrixLoading}
                   error={matrixError?.message}
                   onRetry={() => refetchMatrix()}
-                  onProductTypeChange={setProductTypeFilter}
+                  onProductTypeChange={(type) => setProductTypeFilter(type ?? undefined)}
                   onExportPdf={handleExportPdf}
                 />
 
@@ -315,7 +315,7 @@ export function TechnicalDashboardPage() {
                   loading={timelineLoading}
                   error={timelineError?.message}
                   onRetry={() => refetchTimeline()}
-                  onProductFilterChange={setBomProductFilter}
+                  onProductFilterChange={(productId) => setBomProductFilter(productId ?? undefined)}
                 />
 
                 {/* Cost Trends Chart */}

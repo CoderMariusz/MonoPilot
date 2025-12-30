@@ -45,7 +45,7 @@ export async function GET(
     const result = await getProductionLineById(id)
 
     if (!result.success) {
-      if (result.code === 'NOT_FOUND') {
+      if (result.error?.includes('not found') || result.error?.includes('Line not found')) {
         return NextResponse.json(
           { error: 'Production line not found' },
           { status: 404 }
@@ -118,29 +118,29 @@ export async function PUT(
     const result = await updateProductionLine(id, validatedData)
 
     if (!result.success) {
-      // Handle specific error codes
-      if (result.code === 'NOT_FOUND') {
+      // Handle specific error messages
+      if (result.error?.includes('not found') || result.error?.includes('Line not found')) {
         return NextResponse.json(
           { error: 'Production line not found' },
           { status: 404 }
         )
       }
 
-      if (result.code === 'DUPLICATE_CODE') {
+      if (result.error?.includes('unique') || result.error?.includes('already exists')) {
         return NextResponse.json(
           { error: result.error || 'Production line code already exists' },
           { status: 409 }
         )
       }
 
-      if (result.code === 'LOCATION_WAREHOUSE_MISMATCH') {
+      if (result.error?.includes('warehouse') && result.error?.includes('location')) {
         return NextResponse.json(
           { error: result.error || 'Output location must be within the selected warehouse' },
           { status: 400 }
         )
       }
 
-      if (result.code === 'ACTIVE_WOS') {
+      if (result.error?.includes('work orders')) {
         return NextResponse.json(
           {
             error: result.error || 'Cannot change warehouse - line has active work orders',
@@ -160,7 +160,6 @@ export async function PUT(
       {
         line: result.data,
         message: 'Production line updated successfully',
-        warning: result.warning, // Pass through warning from service (e.g., warehouse change)
       },
       { status: 200 }
     )
@@ -227,15 +226,15 @@ export async function DELETE(
     const result = await deleteProductionLine(id)
 
     if (!result.success) {
-      // Handle specific error codes
-      if (result.code === 'NOT_FOUND') {
+      // Handle specific error messages
+      if (result.error?.includes('not found') || result.error?.includes('Line not found')) {
         return NextResponse.json(
           { error: 'Production line not found' },
           { status: 404 }
         )
       }
 
-      if (result.code === 'FOREIGN_KEY_CONSTRAINT') {
+      if (result.error?.includes('work orders') || result.error?.includes('active')) {
         return NextResponse.json(
           {
             error: result.error || 'Cannot delete production line - it has active work orders. Archive it instead.',

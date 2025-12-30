@@ -37,6 +37,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const currentUserId = session.user.id
     const targetUserId = id
 
@@ -80,7 +81,7 @@ export async function GET(
 
     return NextResponse.json({ sessions }, { status: 200 })
   } catch (error) {
-    console.error(`[API] Error in GET /api/v1/settings/users/${id}/sessions:`, error)
+    console.error('[API] Error in GET /api/v1/settings/users/:id/sessions:', error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(
@@ -119,6 +120,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const currentUserId = session.user.id
     const targetUserId = id
 
@@ -168,7 +170,7 @@ export async function DELETE(
       { status: 200 }
     )
   } catch (error) {
-    console.error(`[API] Error in DELETE /api/v1/settings/users/${id}/sessions:`, error)
+    console.error('[API] Error in DELETE /api/v1/settings/users/:id/sessions:', error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(

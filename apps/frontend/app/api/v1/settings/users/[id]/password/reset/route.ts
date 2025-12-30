@@ -45,6 +45,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const currentUserId = session.user.id
     const targetUserId = id
 
@@ -104,7 +105,7 @@ export async function POST(
       { status: 200 }
     )
   } catch (error) {
-    console.error(`[API] Error in POST /api/v1/settings/users/${id}/password/reset:`, error)
+    console.error('[API] Error in POST /api/v1/settings/users/:id/password/reset:', error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(

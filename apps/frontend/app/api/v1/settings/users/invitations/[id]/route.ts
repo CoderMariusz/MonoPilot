@@ -49,6 +49,7 @@ export async function DELETE(
       )
     }
 
+    const { id } = await params
     // 4. Cancel invitation
     await InvitationService.cancelInvitation(id, userData.org_id)
 

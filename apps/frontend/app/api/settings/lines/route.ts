@@ -168,22 +168,22 @@ export async function POST(request: NextRequest) {
     const result = await createProductionLine(validatedData)
 
     if (!result.success) {
-      // Handle specific error codes
-      if (result.code === 'DUPLICATE_CODE') {
+      // Handle specific error messages
+      if (result.error?.includes('unique') || result.error?.includes('already exists')) {
         return NextResponse.json(
           { error: result.error || 'Production line code already exists' },
           { status: 409 }
         )
       }
 
-      if (result.code === 'LOCATION_WAREHOUSE_MISMATCH') {
+      if (result.error?.includes('warehouse') && result.error?.includes('location')) {
         return NextResponse.json(
           { error: result.error || 'Output location must be within the selected warehouse' },
           { status: 400 }
         )
       }
 
-      if (result.code === 'INVALID_INPUT') {
+      if (result.error?.includes('Invalid') || result.error?.includes('invalid')) {
         return NextResponse.json(
           { error: result.error || 'Invalid input' },
           { status: 400 }

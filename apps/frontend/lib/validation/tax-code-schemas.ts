@@ -135,3 +135,6 @@ export type TaxCodeCreateInput = z.infer<typeof taxCodeCreateSchema>
  * Use for type-safe partial updates.
  */
 export type TaxCodeUpdateInput = z.infer<typeof taxCodeUpdateSchema>
+
+// Alias for API routes
+export const updateTaxCodeSchema = taxCodeUpdateSchema

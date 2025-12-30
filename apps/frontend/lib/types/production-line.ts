@@ -98,6 +98,7 @@ export interface UpdateProductCompatibilityInput {
 
 // Production Line List Parameters
 export interface ProductionLineListParams {
+  warehouse_id?: string
   search?: string
   status?: ProductionLineStatus
   sortBy?: 'code' | 'name' | 'capacity' | 'created_at'
