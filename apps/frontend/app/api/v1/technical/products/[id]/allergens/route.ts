@@ -46,7 +46,7 @@ export async function GET(
     // Get product allergens using service
     const response = await ProductAllergenService.getProductAllergens(
       supabase,
-      (await params).id
+      id
     )
 
     return NextResponse.json(response, { status: 200 })
@@ -134,7 +134,7 @@ export async function POST(
     // Add allergen using service
     const allergen = await ProductAllergenService.addProductAllergen(
       supabase,
-      (await params).id,
+      id,
       userData.org_id,
       user.id,
       validated
@@ -248,7 +248,7 @@ export async function DELETE(
     // Remove allergen using service
     await ProductAllergenService.removeProductAllergen(
       supabase,
-      (await params).id,
+      id,
       allergenRecordId,
       relationType
     )

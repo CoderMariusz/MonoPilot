@@ -50,7 +50,7 @@ export async function POST(
     }
 
     // 4. Resend invitation
-    const invitation = await InvitationService.resendInvitation((await params).id, userData.org_id)
+    const invitation = await InvitationService.resendInvitation(id, userData.org_id)
 
     // 5. Return success response
     return NextResponse.json(

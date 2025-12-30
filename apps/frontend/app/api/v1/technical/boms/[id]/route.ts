@@ -57,7 +57,7 @@ export async function GET(
           uom
         )
       `)
-      .eq('id', (await params).id)
+      .eq('id', id)
       .single()
 
     if (bomError || !bom) {
@@ -123,7 +123,7 @@ export async function PUT(
     const { data: existingBom, error: fetchError } = await supabase
       .from('boms')
       .select('id, product_id, effective_from, effective_to, version')
-      .eq('id', (await params).id)
+      .eq('id', id)
       .single()
 
     if (fetchError || !existingBom) {
@@ -162,7 +162,7 @@ export async function PUT(
       .from('boms')
       .select('id, version, effective_from, effective_to')
       .eq('product_id', existingBom.product_id)
-      .neq('id', (await params).id)
+      .neq('id', id)
 
     if (!overlapError && overlappingBOMs) {
       const newFrom = new Date(effectiveFrom)
@@ -209,7 +209,7 @@ export async function PUT(
     const { data: updatedBom, error: updateError } = await supabase
       .from('boms')
       .update(updateData)
-      .eq('id', (await params).id)
+      .eq('id', id)
       .select(`
         *,
         product:products!product_id (
@@ -281,7 +281,7 @@ export async function DELETE(
     const { data: existingBom, error: fetchError } = await supabase
       .from('boms')
       .select('id')
-      .eq('id', (await params).id)
+      .eq('id', id)
       .single()
 
     if (fetchError || !existingBom) {
@@ -295,7 +295,7 @@ export async function DELETE(
     const { data: workOrders, error: woError } = await supabase
       .from('work_orders')
       .select('id, wo_number')
-      .eq('bom_id', (await params).id)
+      .eq('bom_id', id)
       .limit(10)
 
     if (!woError && workOrders && workOrders.length > 0) {
@@ -313,7 +313,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('boms')
       .delete()
-      .eq('id', (await params).id)
+      .eq('id', id)
 
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 })

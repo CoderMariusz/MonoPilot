@@ -78,7 +78,7 @@ export async function POST(
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select('id, product_id, version')
-      .eq('id', (await params).id)
+      .eq('id', id)
       .single()
 
     if (bomError || !bom) {
@@ -88,7 +88,7 @@ export async function POST(
     // Recalculate allergen inheritance using service
     const response = await ProductAllergenService.calculateAllergenInheritance(
       supabase,
-      (await params).id,
+      id,
       bom.product_id,
       userData.org_id
     )

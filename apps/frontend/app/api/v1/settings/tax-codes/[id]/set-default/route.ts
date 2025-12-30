@@ -57,7 +57,7 @@ export async function PATCH(
     const { data: existingTaxCode, error: fetchError } = await supabase
       .from('tax_codes')
       .select('*')
-      .eq('id', (await params).id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -74,7 +74,7 @@ export async function PATCH(
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', (await params).id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .select()
       .single()

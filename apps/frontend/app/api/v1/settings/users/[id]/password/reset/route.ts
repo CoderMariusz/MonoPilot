@@ -46,7 +46,7 @@ export async function POST(
     }
 
     const currentUserId = session.user.id
-    const targetUserId = (await params).id
+    const targetUserId = id
 
     // Get current user's role and org
     const { data: currentUser } = await supabase
@@ -104,7 +104,7 @@ export async function POST(
       { status: 200 }
     )
   } catch (error) {
-    console.error(`[API] Error in POST /api/v1/settings/users/${(await params).id}/password/reset:`, error)
+    console.error(`[API] Error in POST /api/v1/settings/users/${id}/password/reset:`, error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(

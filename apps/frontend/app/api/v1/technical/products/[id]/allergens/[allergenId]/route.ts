@@ -77,8 +77,8 @@ export async function DELETE(
     // Remove allergen using service
     await ProductAllergenService.removeProductAllergen(
       supabase,
-      (await params).id,
-      (await params).allergenId,
+      id,
+      allergenId,
       relationType
     )
 

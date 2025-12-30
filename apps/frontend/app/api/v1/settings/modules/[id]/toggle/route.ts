@@ -13,6 +13,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createClient()
 
     // Auth check
@@ -56,7 +57,7 @@ export async function PATCH(
     const allModules = await ModuleSettingsService.getModules(supabase, userData.org_id)
 
     // Find the module being toggled
-    const targetModule = allModules.find(m => m.id === (await params).id)
+    const targetModule = allModules.find(m => m.id === id)
     if (!targetModule) {
       return NextResponse.json({ error: 'Module not found' }, { status: 404 })
     }
@@ -128,7 +129,7 @@ export async function PATCH(
     const result = await ModuleSettingsService.toggleModule(
       supabase,
       userData.org_id,
-      (await params).id,
+      id,
       enabled
     )
 

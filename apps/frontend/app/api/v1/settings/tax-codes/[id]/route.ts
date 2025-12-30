@@ -47,7 +47,7 @@ export async function GET(
     const { data: taxCode, error } = await supabase
       .from('tax_codes')
       .select('*')
-      .eq('id', (await params).id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -113,7 +113,7 @@ export async function PUT(
     const { data: existingTaxCode, error: fetchError } = await supabase
       .from('tax_codes')
       .select('*')
-      .eq('id', (await params).id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -151,7 +151,7 @@ export async function PUT(
     ) {
       // Check if tax code is referenced
       const { data: refCount, error: refError } = await supabase.rpc('get_tax_code_reference_count', {
-        tax_code_id: (await params).id,
+        tax_code_id: id,
       })
 
       if (refError) {
@@ -199,7 +199,7 @@ export async function PUT(
     const { data: taxCode, error: updateError } = await supabase
       .from('tax_codes')
       .update(updatePayload)
-      .eq('id', (await params).id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .select()
       .single()
@@ -266,7 +266,7 @@ export async function DELETE(
     const { data: existingTaxCode, error: fetchError } = await supabase
       .from('tax_codes')
       .select('*')
-      .eq('id', (await params).id)
+      .eq('id', id)
       .eq('org_id', orgId)
       .eq('is_deleted', false)
       .single()
@@ -277,7 +277,7 @@ export async function DELETE(
 
     // Check for references
     const { data: refCount, error: refError } = await supabase.rpc('get_tax_code_reference_count', {
-      tax_code_id: (await params).id,
+      tax_code_id: id,
     })
 
     if (refError) {
@@ -300,7 +300,7 @@ export async function DELETE(
         deleted_at: new Date().toISOString(),
         deleted_by: user.id,
       })
-      .eq('id', (await params).id)
+      .eq('id', id)
       .eq('org_id', orgId)
 
     if (deleteError) {

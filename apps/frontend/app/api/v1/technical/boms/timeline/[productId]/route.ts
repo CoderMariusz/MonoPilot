@@ -65,7 +65,7 @@ export async function GET(
     const { data: product, error: productError } = await supabase
       .from('products')
       .select('id, code, name')
-      .eq('id', (await params).productId)
+      .eq('id', productId)
       .eq('org_id', userData.org_id)
       .single()
 
@@ -80,7 +80,7 @@ export async function GET(
     const { data: boms, error: bomsError } = await supabase
       .from('boms')
       .select('id, version, status, effective_from, effective_to, output_qty, output_uom, notes')
-      .eq('product_id', (await params).productId)
+      .eq('product_id', productId)
       .eq('org_id', userData.org_id)
       .order('version', { ascending: true })
 

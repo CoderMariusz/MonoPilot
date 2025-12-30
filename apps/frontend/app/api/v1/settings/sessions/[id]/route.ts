@@ -37,7 +37,7 @@ export async function DELETE(
     }
 
     const userId = session.user.id
-    const sessionId = (await params).id
+    const sessionId = id
 
     // Get current session token to prevent deleting current session
     const currentToken = request.headers.get('x-session-token')
@@ -107,7 +107,7 @@ export async function DELETE(
       { status: 200 }
     )
   } catch (error) {
-    console.error(`[API] Error in DELETE /api/v1/settings/sessions/${(await params).id}:`, error)
+    console.error(`[API] Error in DELETE /api/v1/settings/sessions/${id}:`, error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(

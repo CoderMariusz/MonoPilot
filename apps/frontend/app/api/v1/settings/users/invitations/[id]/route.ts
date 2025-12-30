@@ -50,7 +50,7 @@ export async function DELETE(
     }
 
     // 4. Cancel invitation
-    await InvitationService.cancelInvitation((await params).id, userData.org_id)
+    await InvitationService.cancelInvitation(id, userData.org_id)
 
     // 5. Return success (204 No Content)
     return new NextResponse(null, { status: 204 })
