@@ -27,16 +27,16 @@
  * }
  */
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { historyQuerySchema } from '@/lib/validation/product-history'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createRouteHandlerClient({ cookies })
+  const { id } = await params
+  const supabase = await createServerSupabase()
 
   // =============================================================================
   // AUTH CHECK
@@ -82,7 +82,7 @@ export async function GET(
   const { data: product, error: productError } = await supabase
     .from('products')
     .select('id')
-    .eq('id', params.id)
+    .eq('id', id)
     .is('deleted_at', null)
     .single()
 
@@ -106,7 +106,7 @@ export async function GET(
     `,
       { count: 'exact' }
     )
-    .eq('product_id', params.id)
+    .eq('product_id', id)
     .order('version', { ascending: false })
 
   // Apply date filters
