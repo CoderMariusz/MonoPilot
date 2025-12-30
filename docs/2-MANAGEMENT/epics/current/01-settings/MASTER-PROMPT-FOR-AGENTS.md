@@ -28,10 +28,10 @@ Source: `.claude/setting.local.json`
 
 ## 🎯 STORIES TO IMPLEMENT
 ```
-story_ids: 02.05a 02.11
+**Story_ids** 02.14 02.15 
 ```
 **Epic:** `02-technical`
-**Mode:** `dual-track` (parallel stories)
+**Mode:** `multi-track` (parallel stories)
 
 ---
 
@@ -48,7 +48,7 @@ UX Wireframes: docs/3-ARCHITECTURE/ux/wireframes/TEC{XXXX}/
 
 | Phase | Agent | Model | Gate |
 |-------|-------|-------|------|
-| 1. UX | ux-designer | Sonnet | Wireframes verified |
+| 1. UX | ux-designer | **Opus** | Wireframes verified |
 | 2. RED | test-writer | **Haiku** | Tests FAIL |
 | 3. GREEN | backend/frontend-dev | **Opus** | Tests PASS |
 | 4. REFACTOR | senior-dev | Sonnet | ∥ with P5 |
@@ -57,6 +57,7 @@ UX Wireframes: docs/3-ARCHITECTURE/ux/wireframes/TEC{XXXX}/
 | 7. DOCS | tech-writer | **Haiku** | Docs complete |
 
 **Failed review → back to GREEN → repeat all phases**
+**If no UX wireframes are not provided, do phase 1 and give them to approv**
 
 ---
 
@@ -100,7 +101,8 @@ Next: {action for next agent}
 ```
 ✅ PARALLEL:
 - Independent stories (different files)
-- Phase 4 + Phase 5 (always)
+- green phase max 4 agents
+- Phase 4 + Phase 5 if can do it in time
 - Frontend + Backend tracks
 
 ❌ SEQUENTIAL:

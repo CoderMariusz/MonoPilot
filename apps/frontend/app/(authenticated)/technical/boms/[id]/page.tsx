@@ -2,6 +2,7 @@
  * BOM Detail Page
  * Story: 2.6 BOM CRUD - AC-2.6.5: Detail View
  * Story: 2.7 BOM Items Management - AC-2.7.5: Items Management UI
+ * Story: 2.14 BOM Advanced Features - Comparison, Explosion, Yield, Scale
  * Story: 2.14 Allergen Inheritance - AC-2.14.5: Allergen Display
  */
 
@@ -43,6 +44,9 @@ import {
   Plus,
   RefreshCw,
   DollarSign,
+  Scale,
+  Layers,
+  TrendingUp,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { BOMFormModal } from '@/components/technical/BOMFormModal'
@@ -50,6 +54,11 @@ import { BOMCloneModal } from '@/components/technical/BOMCloneModal'
 import { BOMCompareModal } from '@/components/technical/BOMCompareModal'
 import { BOMItemFormModal } from '@/components/technical/BOMItemFormModal'
 import { CostSummary } from '@/components/technical/bom/cost'
+// Story 02.14 - BOM Advanced Features
+import { BOMComparisonModal } from '@/components/technical/bom/BOMComparisonModal'
+import { BOMScaleModal } from '@/components/technical/bom/BOMScaleModal'
+import { MultiLevelExplosion } from '@/components/technical/bom/MultiLevelExplosion'
+import { YieldAnalysisPanel } from '@/components/technical/bom/YieldAnalysisPanel'
 import type { BOMWithProduct, BOMItem, BOMAllergens } from '@/lib/validation/bom-schemas'
 
 // Status config
@@ -75,6 +84,8 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showCloneModal, setShowCloneModal] = useState(false)
   const [showCompareModal, setShowCompareModal] = useState(false)
+  const [showAdvancedCompareModal, setShowAdvancedCompareModal] = useState(false)
+  const [showScaleModal, setShowScaleModal] = useState(false)
   const [showItemModal, setShowItemModal] = useState(false)
   const [editingItem, setEditingItem] = useState<BOMItem | null>(null)
   const [deletingItem, setDeletingItem] = useState<BOMItem | null>(null)
@@ -256,12 +267,16 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
               {bom.notes && <p className="text-sm text-gray-500 mt-2">{bom.notes}</p>}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" onClick={() => setShowScaleModal(true)}>
+                <Scale className="mr-2 h-4 w-4" />
+                Scale
+              </Button>
               <Button variant="outline" onClick={() => setShowCloneModal(true)}>
                 <Copy className="mr-2 h-4 w-4" />
                 Clone
               </Button>
-              <Button variant="outline" onClick={() => setShowCompareModal(true)}>
+              <Button variant="outline" onClick={() => setShowAdvancedCompareModal(true)}>
                 <GitCompare className="mr-2 h-4 w-4" />
                 Compare
               </Button>
@@ -284,14 +299,22 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap">
           <TabsTrigger value="items">
             <Package className="mr-2 h-4 w-4" />
             Items ({items.length})
           </TabsTrigger>
+          <TabsTrigger value="explosion">
+            <Layers className="mr-2 h-4 w-4" />
+            Explosion
+          </TabsTrigger>
           <TabsTrigger value="costing">
             <DollarSign className="mr-2 h-4 w-4" />
             Costing
+          </TabsTrigger>
+          <TabsTrigger value="yield">
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Yield
           </TabsTrigger>
           <TabsTrigger value="allergens">
             <AlertTriangle className="mr-2 h-4 w-4" />
@@ -437,9 +460,19 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
           </Card>
         </TabsContent>
 
+        {/* Explosion Tab (Story 02.14) */}
+        <TabsContent value="explosion">
+          <MultiLevelExplosion bomId={id} />
+        </TabsContent>
+
         {/* Costing Tab (Story 02.9) */}
         <TabsContent value="costing">
           <CostSummary bomId={id} />
+        </TabsContent>
+
+        {/* Yield Tab (Story 02.14) */}
+        <TabsContent value="yield">
+          <YieldAnalysisPanel bomId={id} />
         </TabsContent>
 
         {/* Allergens Tab (Story 2.14) */}
@@ -519,6 +552,33 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
 
       {showCompareModal && (
         <BOMCompareModal productId={bom.product_id} currentBomId={id} onClose={() => setShowCompareModal(false)} />
+      )}
+
+      {showAdvancedCompareModal && (
+        <BOMComparisonModal
+          bomId1={id}
+          bomId2=""
+          productId={bom.product_id}
+          isOpen={showAdvancedCompareModal}
+          onClose={() => setShowAdvancedCompareModal(false)}
+        />
+      )}
+
+      {showScaleModal && (
+        <BOMScaleModal
+          bomId={id}
+          currentBatchSize={bom.output_qty}
+          currentUom={bom.output_uom}
+          isOpen={showScaleModal}
+          onClose={() => setShowScaleModal(false)}
+          onApply={(result) => {
+            setShowScaleModal(false)
+            if (result.applied) {
+              fetchBOM()
+              fetchItems()
+            }
+          }}
+        />
       )}
 
       {showItemModal && (

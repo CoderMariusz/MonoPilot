@@ -167,3 +167,5 @@ KOLEJNOŚĆ IMPLEMENTACJI
 
   Kolejność krytyczna:
   Epic 01 (fix) → Epic 02 (all) → Epic 03 (MVP) → Epic 04 → Epic 05
+
+  

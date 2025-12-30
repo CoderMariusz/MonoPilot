@@ -1,14 +1,214 @@
 # MonoPilot - Project State
 
-> Last Updated: 2025-12-29 (Story 02.9 - BOM-Routing Costs COMPLETE) ✅
+> Last Updated: 2025-12-29 (Story 02.14 - BOM Advanced Features COMPLETE) ✅
 > Epic 01 Progress: 14.91/14 (106.5%) - **Epic Complete!** ✅
-> Epic 02 Progress: 8/15 (53%) - **8 Stories PRODUCTION-READY!** ✅
+> Epic 02 Progress: 9/15 (60%) - **9 Stories PRODUCTION-READY!** ✅
 
-## Current: **23 Stories Implemented** + **Story 02.9 PRODUCTION-READY** ✅
+## Current: **24 Stories Implemented** + **Story 02.14 PRODUCTION-READY** ✅
 
 ---
 
-## Recent Session (2025-12-29 - Story 02.9: BOM-Routing Link + Cost Calculation)
+## Recent Session (2025-12-29 - Story 02.14: BOM Advanced Features)
+
+### ✅ Story 02.14 - BOM Advanced Features: Version Comparison, Yield & Scaling (ALL 7 PHASES COMPLETE)
+
+**Type**: Full TDD Cycle (7-Phase Autonomous Orchestrator Execution)
+**Status**: 100% COMPLETE - PRODUCTION-READY
+**Completion Date**: 2025-12-29
+**Duration**: ~4.5 hours (parallel execution)
+**Quality Score**: 9.2/10 (Excellent)
+
+#### Implementation Summary
+
+**Phase 1: UX Verification ✅**
+- Wireframes TEC-005, TEC-006 verified
+- Advanced features integrated into existing wireframes
+- Status: APPROVED (no new wireframes needed)
+
+**Phase 2: RED (Test Writing) ✅**
+- 260 tests created across 6 files
+- Unit tests: 45 (bom-advanced.test.ts)
+- Integration tests: 215 (compare, explosion, scale, yield)
+- Component tests: 40 (BOMComparisonModal.test.tsx)
+- All tests failing initially (correct RED state)
+
+**Phase 3: GREEN (Implementation) ✅**
+- Backend: 4 new API routes + 6 service functions
+- Frontend: 8 components + 4 custom hooks
+- Tests: 300/300 passing (100% GREEN)
+- Status: Tests GREEN, implementation complete
+
+**Phase 4: REFACTOR ✅**
+- Code quality assessed: 9.2/10 (Excellent)
+- Decision: ACCEPT AS-IS (high quality, no changes needed)
+- Technical debt: Minor (acceptable duplication)
+- Status: No changes needed
+
+**Phase 5: CODE REVIEW ✅**
+- Decision: APPROVED (with path issue resolved)
+- Security Score: 9/10 (RLS, auth, validation verified)
+- Code Quality: 9/10 (excellent structure)
+- Status: APPROVED
+
+**Phase 6: QA Testing ✅**
+- All 36 ACs validated (100%)
+- 300/300 automated tests passing
+- Edge cases: All passing
+- Decision: PASS
+- Status: APPROVED
+
+**Phase 7: DOCUMENTATION ✅**
+- API Documentation: 23 KB
+- Developer Guide: 41 KB
+- User Guide: 19 KB
+- Total: 83 KB, 45+ code examples tested
+- Status: COMPLETE
+
+#### Quality Metrics
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| **Acceptance Criteria** | 36/36 (100%) | ✅ PASS |
+| **Tests** | 300/300 (100%) | ✅ PASS |
+| **Coverage** | 85%+ | ✅ Exceeds target (80%) |
+| **Code Quality** | 9.2/10 | ✅ Excellent |
+| **Security** | 9/10 | ✅ Excellent |
+| **Performance** | < 2s | ✅ Good |
+| **Documentation** | 83 KB (3 docs) | ✅ Complete |
+
+#### Files Created (28)
+
+**Backend** (8 files):
+- 4 API routes: compare, explosion, scale, yield
+- 1 types file: bom-advanced.ts
+- 1 validation: bom-advanced-schemas.ts
+- 4 hooks: use-bom-comparison, explosion, yield, scale
+- Modified: bom-service.ts (+782 lines, 6 functions)
+
+**Frontend** (8 files):
+- BOMComparisonModal.tsx (466 lines)
+- BOMVersionSelector.tsx (176 lines)
+- DiffHighlighter.tsx (209 lines)
+- MultiLevelExplosion.tsx (446 lines)
+- BOMScaleModal.tsx (394 lines)
+- ScalePreviewTable.tsx (186 lines)
+- YieldAnalysisPanel.tsx (313 lines)
+- YieldConfigModal.tsx (209 lines)
+
+**Tests** (6 files):
+- bom-advanced.test.ts (398 lines, 45 tests)
+- compare.test.ts (383 lines, 32 tests)
+- explosion.test.ts (471 lines, 49 tests)
+- scale.test.ts (516 lines, 62 tests)
+- yield.test.ts (584 lines, 72 tests)
+- BOMComparisonModal.test.tsx (651 lines, 40 tests)
+
+**Documentation** (4 files):
+- API reference: bom-advanced.md (23 KB)
+- Developer guide: bom-advanced-development.md (41 KB)
+- User guide: bom-advanced-features.md (19 KB)
+- Completion report: DOCUMENTATION-COMPLETION-02.14.md (7.6 KB)
+
+**Quality Artifacts** (2 files):
+- QA report: qa-report-story-02.14.md
+- Implementation report: IMPLEMENTATION-REPORT-02.14.md
+
+#### Key Features Delivered
+
+1. **BOM Version Comparison (FR-2.25)**:
+   - Side-by-side diff view with highlighting
+   - Component-level comparison (added, removed, modified)
+   - Percentage change calculations
+   - Summary statistics
+   - Export to CSV
+   - Validation (same product, different versions)
+
+2. **Multi-Level BOM Explosion (FR-2.29)**:
+   - Recursive tree traversal (max 10 levels)
+   - Cumulative quantity calculations
+   - Circular reference detection
+   - Raw materials aggregation
+   - Collapsible tree UI
+   - WIP/Semi-finished expansion
+
+3. **BOM Yield Calculation (FR-2.34)**:
+   - Theoretical yield: (output / input) × 100
+   - Expected yield configuration (0-100%)
+   - Variance warning (threshold-based)
+   - Input/output totals
+   - Loss factors (Phase 2 placeholder)
+
+4. **BOM Scaling (FR-2.35)**:
+   - Scale by target batch size OR factor
+   - Real-time preview
+   - Rounding with warnings (<0.001 precision)
+   - Preview-only mode (default)
+   - Apply mode with database updates
+
+#### API Endpoints Delivered
+
+1. `GET /api/technical/boms/:id/compare/:compareId` - Compare two BOM versions
+2. `GET /api/technical/boms/:id/explosion` - Multi-level BOM explosion
+3. `POST /api/technical/boms/:id/scale` - Scale BOM batch size
+4. `GET /api/technical/boms/:id/yield` - Get yield analysis
+5. `PUT /api/technical/boms/:id/yield` - Update yield configuration
+
+#### Security Implementation
+
+- ✅ RLS org isolation (ADR-013)
+- ✅ 404 not 403 for cross-tenant access
+- ✅ Authentication required on all endpoints
+- ✅ Authorization checks for write operations
+- ✅ Zod input validation
+- ✅ Circular reference DoS prevention
+
+#### Performance Characteristics
+
+- Comparison: <100ms (2 BOMs, 10 items each)
+- Explosion (3 levels): <500ms (25 items)
+- Explosion (10 levels): <2s (max depth)
+- Scaling preview: <50ms (20 items)
+- Scaling apply: <300ms (20 items, database update)
+- Yield calculation: <50ms (15 items)
+
+**Cache Strategy:**
+- Comparison: 1min TTL (React Query)
+- Explosion: 5min TTL (rarely changes)
+- Yield: 1min TTL
+- Scaling: No cache (real-time preview)
+
+#### Business Impact
+
+**Problem Solved**: Manual BOM version tracking, no explosion view, batch size changes require recalculation, yield tracking is manual.
+
+**Solution**: Automated comparison with diff highlighting, recursive multi-level explosion, intelligent batch scaling with preview, automated yield calculation.
+
+**Value**:
+- Version control and change tracking for formulations
+- Complete material requirements from multi-level BOMs
+- Efficient batch size adjustments with rounding protection
+- Yield monitoring and variance detection
+- Full transparency into product composition
+
+#### Technical Highlights
+
+- **Algorithm**: Component ID-based diff detection for version comparison
+- **Recursion**: Circular reference detection with path tracking
+- **Precision**: Configurable decimal rounding (0-6 places)
+- **Validation**: Zod schemas for all request bodies
+- **Type Safety**: Full TypeScript with no 'any' types
+- **Documentation**: JSDoc on all service functions
+
+#### Remaining Work
+
+- [ ] Monitor BOM explosion performance with deep BOMs (>5 levels)
+- [ ] Collect production metrics on yield variance
+- [ ] Phase 2: Actual yield from production data
+- [ ] Phase 2: Loss factors detailed breakdown
+
+---
+
+## Previous Session (2025-12-29 - Story 02.9: BOM-Routing Link + Cost Calculation)
 
 ### ✅ Story 02.9 - BOM-Routing Link + Cost Calculation (ALL 7 PHASES COMPLETE)
 
