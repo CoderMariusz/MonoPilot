@@ -27,7 +27,7 @@ import { createServerSupabase } from '@/lib/supabase/server'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -41,7 +41,7 @@ export async function GET(
       )
     }
 
-    const { id } = params
+    const { id } = await params
 
     // Validate ID format (basic UUID check)
     if (!id || id.length === 0) {

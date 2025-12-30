@@ -40,8 +40,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import {
-  CreateLocationSchema,
-  UpdateLocationSchema,
+  createLocationSchema,
+  updateLocationSchema,
   LocationTypeEnum,
   type CreateLocationInput,
   type UpdateLocationInput,
@@ -88,7 +88,7 @@ export function LocationForm({
   const isEditMode = !!location
 
   const form = useForm<CreateLocationInput>({
-    resolver: zodResolver(isEditMode ? UpdateLocationSchema : CreateLocationSchema),
+    resolver: zodResolver(isEditMode ? updateLocationSchema : createLocationSchema),
     defaultValues: {
       warehouse_id: location?.warehouse_id || '',
       code: location?.code || '',
