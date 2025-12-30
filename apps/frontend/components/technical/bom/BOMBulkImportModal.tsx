@@ -115,7 +115,7 @@ function parseBOMItemFromCSV(
 
   // Validate required fields
   if (item.product_id && item.quantity && item.uom) {
-    return item as CreateBOMItemRequest
+    return item as unknown as CreateBOMItemRequest
   }
 
   return null

@@ -21,8 +21,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import type { TaxCode } from '@/lib/validation/tax-code-schemas'
-import { createTaxCodeSchema, updateTaxCodeSchema } from '@/lib/validation/tax-code-schemas'
+import type { TaxCode } from '@/lib/types/tax-code'
+import { taxCodeCreateSchema, taxCodeUpdateSchema } from '@/lib/validation/tax-code-schemas'
 import { ZodError } from 'zod'
 
 interface TaxCodeFormModalProps {
@@ -34,7 +34,7 @@ interface TaxCodeFormModalProps {
 export function TaxCodeFormModal({ taxCode, onClose, onSuccess }: TaxCodeFormModalProps) {
   const [formData, setFormData] = useState({
     code: taxCode?.code || '',
-    description: taxCode?.description || '',
+    description: taxCode?.name || '', // Maps to 'name' field in TaxCode type
     rate: taxCode?.rate?.toString() || '', // AC-009.2: rate as string for input
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -59,7 +59,7 @@ export function TaxCodeFormModal({ taxCode, onClose, onSuccess }: TaxCodeFormMod
   // Validate form
   const validateForm = () => {
     try {
-      const schema = isEditMode ? updateTaxCodeSchema : createTaxCodeSchema
+      const schema = isEditMode ? taxCodeUpdateSchema : taxCodeCreateSchema
 
       // Prepare data for validation
       const dataToValidate: any = {

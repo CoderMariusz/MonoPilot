@@ -43,6 +43,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     // Get product allergens using service
     const response = await ProductAllergenService.getProductAllergens(
       supabase,
@@ -126,6 +128,8 @@ export async function POST(
     if (!techPerm.includes('C') && !techPerm.includes('U')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    const { id } = await params
 
     // Parse and validate request body
     const body = await request.json()
@@ -233,6 +237,8 @@ export async function DELETE(
     if (!techPerm.includes('D')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    const { id } = await params
 
     // Get allergenId from URL path (parse manually)
     const urlParts = request.nextUrl.pathname.split('/')

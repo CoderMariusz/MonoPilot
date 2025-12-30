@@ -69,6 +69,7 @@ export interface CreateProductionLineInput {
   code: string
   name: string
   description?: string | null
+  warehouse_id?: string | null
   default_output_location_id?: string | null
   status?: ProductionLineStatus
   machine_ids?: string[]
@@ -80,6 +81,7 @@ export interface UpdateProductionLineInput {
   code?: string
   name?: string
   description?: string | null
+  warehouse_id?: string | null
   default_output_location_id?: string | null
   status?: ProductionLineStatus
   machine_ids?: string[]

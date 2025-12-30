@@ -5,11 +5,27 @@
  * Custom tooltip for cost trend chart hover
  */
 
-import type { TooltipProps } from 'recharts'
 import { Card, CardContent } from '@/components/ui/card'
 import { CostTrendIndicator } from './CostTrendIndicator'
 
-export interface CostChartTooltipProps extends TooltipProps<number, string> {
+interface CostDataPoint {
+  total_cost?: number
+  material_cost?: number
+  labor_cost?: number
+  overhead_cost?: number
+  cost_per_unit?: number
+  effective_from?: string
+  change_amount?: number
+  change_percent?: number
+  bom_version?: string
+  created_by?: string
+  id?: string
+}
+
+export interface CostChartTooltipProps {
+  active?: boolean
+  payload?: Array<{ payload: CostDataPoint }>
+  label?: string
   /** Handler for clicking "View Detail" */
   onDetailClick?: (id: string) => void
 }
@@ -52,11 +68,11 @@ export function CostChartTooltip({
     <Card
       className="bg-white shadow-lg border border-gray-200"
       role="tooltip"
-      aria-label={`Cost breakdown for ${formatDate(label || data.effective_from)}`}
+      aria-label={`Cost breakdown for ${formatDate(label || data.effective_from || '')}`}
     >
       <CardContent className="p-4 space-y-3">
         <div className="font-semibold text-sm border-b pb-2">
-          Cost Breakdown - {formatDate(label || data.effective_from)}
+          Cost Breakdown - {formatDate(label || data.effective_from || '')}
         </div>
 
         <div className="space-y-2 text-sm">
@@ -111,7 +127,7 @@ export function CostChartTooltip({
 
         {onDetailClick && data.id && (
           <button
-            onClick={() => onDetailClick(data.id)}
+            onClick={() => onDetailClick(data.id!)}
             className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
             aria-label="Click for full detail"
           >

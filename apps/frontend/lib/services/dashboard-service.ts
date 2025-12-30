@@ -446,6 +446,7 @@ import type {
   TechnicalAllergenMatrixResponse,
   BomTimelineResponse,
   TechnicalRecentActivityResponse,
+  TechnicalActivityItem,
   CostTrendsResponse,
   TrendDirection,
   ActivityType,
@@ -753,22 +754,22 @@ export async function fetchRecentActivity(
       .limit(limit)
   ])
 
-  const products = productsResult.data
-  const boms = bomsResult.data
-  const routings = routingsResult.data
+  const products = productsResult.data as Array<{ id: string; code: string; name: string; created_at: string; updated_at: string; created_by: string | null; users?: { first_name: string | null; last_name: string | null } }> | null
+  const boms = bomsResult.data as Array<{ id: string; version: number; status: string; created_at: string; updated_at: string; created_by: string | null; product?: { code: string; name: string }; creator?: { first_name: string | null; last_name: string | null } }> | null
+  const routings = routingsResult.data as Array<{ id: string; name: string; created_at: string; updated_at: string; created_by: string | null; users?: { first_name: string | null; last_name: string | null } }> | null
 
   // Combine and sort all activities
-  const allActivities: TechnicalRecentActivityResponse['activities'] = []
+  const allActivities = [] as TechnicalActivityItem[]
 
   // Process products
-  (products || []).forEach((p: any) => {
+  for (const p of products || []) {
     const isCreated = new Date(p.created_at).getTime() === new Date(p.updated_at).getTime()
     const userName = p.users ? `${p.users.first_name || ''} ${p.users.last_name || ''}`.trim() : 'Unknown'
 
     allActivities.push({
       id: `product-${p.id}`,
-      type: isCreated ? 'product_created' : 'product_updated',
-      entity_type: 'product',
+      type: (isCreated ? 'product_created' : 'product_updated') as ActivityType,
+      entity_type: 'product' as EntityType,
       entity_id: p.id,
       description: `Product ${p.code} ${isCreated ? 'created' : 'updated'}`,
       user_id: p.created_by || '',
@@ -777,18 +778,18 @@ export async function fetchRecentActivity(
       relative_time: formatRelativeTime(p.updated_at),
       link: `/technical/products/${p.id}`
     })
-  })
+  }
 
   // Process BOMs
-  (boms || []).forEach((b: any) => {
+  for (const b of boms || []) {
     const isCreated = new Date(b.created_at).getTime() === new Date(b.updated_at).getTime()
     const userName = b.creator ? `${b.creator.first_name || ''} ${b.creator.last_name || ''}`.trim() : 'Unknown'
     const productCode = b.product?.code || 'Unknown'
 
     allActivities.push({
       id: `bom-${b.id}`,
-      type: isCreated ? 'bom_created' : (b.status === 'Active' ? 'bom_activated' : 'bom_created'),
-      entity_type: 'bom',
+      type: (isCreated ? 'bom_created' : (b.status === 'Active' ? 'bom_activated' : 'bom_created')) as ActivityType,
+      entity_type: 'bom' as EntityType,
       entity_id: b.id,
       description: `BOM v${b.version} for ${productCode} ${isCreated ? 'created' : 'updated'}`,
       user_id: b.created_by || '',
@@ -797,17 +798,17 @@ export async function fetchRecentActivity(
       relative_time: formatRelativeTime(b.updated_at),
       link: `/technical/boms/${b.id}`
     })
-  })
+  }
 
   // Process routings
-  (routings || []).forEach((r: any) => {
+  for (const r of routings || []) {
     const isCreated = new Date(r.created_at).getTime() === new Date(r.updated_at).getTime()
     const userName = r.users ? `${r.users.first_name || ''} ${r.users.last_name || ''}`.trim() : 'Unknown'
 
     allActivities.push({
       id: `routing-${r.id}`,
-      type: isCreated ? 'routing_created' : 'routing_updated',
-      entity_type: 'routing',
+      type: (isCreated ? 'routing_created' : 'routing_updated') as ActivityType,
+      entity_type: 'routing' as EntityType,
       entity_id: r.id,
       description: `Routing "${r.name}" ${isCreated ? 'created' : 'updated'}`,
       user_id: r.created_by || '',
@@ -816,7 +817,7 @@ export async function fetchRecentActivity(
       relative_time: formatRelativeTime(r.updated_at),
       link: `/technical/routings/${r.id}`
     })
-  })
+  }
 
   // Sort by timestamp descending and take top N
   allActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -947,7 +948,7 @@ export async function exportAllergenMatrixPdf(
 
   // Allergen headers
   doc.setFontSize(7)
-  doc.setFont(undefined, 'bold')
+  doc.setFont('helvetica', 'bold')
   doc.text('Product', startX, y)
 
   data.allergens.slice(0, 10).forEach((allergen, i) => {
@@ -959,7 +960,7 @@ export async function exportAllergenMatrixPdf(
   y += 3
 
   // Product rows
-  doc.setFont(undefined, 'normal')
+  doc.setFont('helvetica', 'normal')
   data.products.slice(0, 25).forEach((product, rowIndex) => {
     if (y > 180) {
       doc.addPage()

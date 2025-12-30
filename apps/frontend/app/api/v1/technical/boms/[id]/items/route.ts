@@ -104,6 +104,14 @@ export async function GET(
       notes: item.notes,
       created_at: item.created_at,
       updated_at: item.updated_at,
+      // Phase 1B fields (defaults until DB migration)
+      consume_whole_lp: item.consume_whole_lp ?? false,
+      line_ids: item.line_ids ?? null,
+      line_names: item.line_names ?? null,
+      is_by_product: item.is_by_product ?? false,
+      is_output: item.is_output ?? false,
+      yield_percent: item.yield_percent ?? null,
+      condition_flags: item.condition_flags ?? null,
     }))
 
     const response: BOMItemsListResponse = {
@@ -294,6 +302,14 @@ export async function POST(
       notes: item.notes,
       created_at: item.created_at,
       updated_at: item.updated_at,
+      // Phase 1B fields (defaults until DB migration)
+      consume_whole_lp: item.consume_whole_lp ?? false,
+      line_ids: item.line_ids ?? null,
+      line_names: item.line_names ?? null,
+      is_by_product: item.is_by_product ?? false,
+      is_output: item.is_output ?? false,
+      yield_percent: item.yield_percent ?? null,
+      condition_flags: item.condition_flags ?? null,
     }
 
     const response: BOMItemResponse = {

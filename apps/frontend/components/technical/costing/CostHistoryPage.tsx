@@ -21,7 +21,7 @@ import { ComponentBreakdownTable } from './ComponentBreakdownTable'
 import { CostDriversPanel } from './CostDriversPanel'
 import { CostHistoryTable } from './CostHistoryTable'
 import { VarianceAnalysisSection } from './VarianceAnalysisSection'
-import { ExportOptionsModal } from './ExportOptionsModal'
+import { ExportOptionsModal, type ExportConfig } from './ExportOptionsModal'
 import type { CostHistoryItem } from '@/lib/types/cost-history'
 
 export interface CostHistoryPageProps {
@@ -132,7 +132,7 @@ export function CostHistoryPage({ productId }: CostHistoryPageProps) {
     setShowExportModal(true)
   }, [])
 
-  const handleExportAction = useCallback((config: { format: string; includeChart: boolean }) => {
+  const handleExportAction = useCallback((_config: ExportConfig) => {
     // TODO: Implement export functionality in Phase 2C-3
     // For now, just close the modal - actual export will be implemented later
   }, [])

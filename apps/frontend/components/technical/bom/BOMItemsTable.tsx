@@ -395,7 +395,7 @@ export function BOMItemsTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <ProductTypeBadge type={item.product_type} />
+                    <ProductTypeBadge type={item.product_type as BOMItemProductType} />
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatQuantity(item.quantity)}

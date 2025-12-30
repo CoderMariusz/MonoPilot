@@ -1,9 +1,36 @@
 import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 import type {
-  CreateLocationInput,
-  UpdateLocationInput,
-  LocationFilters,
+  CreateLocationInput as BaseCreateLocationInput,
+  UpdateLocationInput as BaseUpdateLocationInput,
+  LocationListParams as BaseLocationFilters,
 } from '../validation/location-schemas'
+
+// Extended filters type with additional fields
+type LocationFilters = BaseLocationFilters & {
+  warehouse_id?: string
+  is_active?: boolean
+}
+
+// Extended input type with additional fields for service operations
+type CreateLocationInput = BaseCreateLocationInput & {
+  warehouse_id: string
+  barcode?: string
+  type?: string
+  zone?: string
+  zone_enabled?: boolean
+  capacity?: number
+  capacity_enabled?: boolean
+}
+
+// Extended update input type with additional fields
+type UpdateLocationInput = BaseUpdateLocationInput & {
+  code?: string
+  barcode?: string
+  zone?: string
+  zone_enabled?: boolean
+  capacity?: number
+  capacity_enabled?: boolean
+}
 import {
   generateLocationBarcode,
   generateQRCode,

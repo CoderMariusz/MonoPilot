@@ -67,6 +67,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { id, allergenId } = await params
+
     // Get optional relation_type filter from query params
     const searchParams = request.nextUrl.searchParams
     const relationType = searchParams.get('relation_type') as

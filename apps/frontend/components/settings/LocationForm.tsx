@@ -10,7 +10,6 @@
 
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Dialog,
   DialogContent,
@@ -39,13 +38,21 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
-import {
-  createLocationSchema,
-  updateLocationSchema,
-  LocationTypeEnum,
-  type CreateLocationInput,
-  type UpdateLocationInput,
-} from '@/lib/validation/location-schemas'
+import { LocationTypeEnum } from '@/lib/validation/location-schemas'
+
+// Form values interface matches actual form structure
+interface LocationFormValues {
+  warehouse_id: string
+  code: string
+  name: string
+  type: string
+  zone: string
+  zone_enabled: boolean
+  capacity: number | undefined
+  capacity_enabled: boolean
+  barcode: string
+  is_active: boolean
+}
 
 interface Warehouse {
   id: string
@@ -87,13 +94,12 @@ export function LocationForm({
 
   const isEditMode = !!location
 
-  const form = useForm<CreateLocationInput>({
-    resolver: zodResolver(isEditMode ? updateLocationSchema : createLocationSchema),
+  const form = useForm<LocationFormValues>({
     defaultValues: {
       warehouse_id: location?.warehouse_id || '',
       code: location?.code || '',
       name: location?.name || '',
-      type: (location?.type as any) || 'storage',
+      type: location?.type || 'storage',
       zone: location?.zone || '',
       zone_enabled: location?.zone_enabled || false,
       capacity: location?.capacity || undefined,
@@ -168,7 +174,7 @@ export function LocationForm({
     }
   }, [location, form])
 
-  const onSubmit = async (data: CreateLocationInput | UpdateLocationInput) => {
+  const onSubmit = async (data: LocationFormValues) => {
     try {
       setLoading(true)
 

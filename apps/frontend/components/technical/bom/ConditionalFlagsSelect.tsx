@@ -63,7 +63,7 @@ export const ConditionalFlagsSelect = memo(function ConditionalFlagsSelect({
     }
 
     // Use helper to normalize (returns null if no flags)
-    onChange(normalizeConditionFlags(newFlags))
+    onChange(normalizeConditionFlags(newFlags as Record<string, boolean>) as ConditionFlags | null)
   }
 
   // Count selected flags

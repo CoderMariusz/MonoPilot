@@ -42,7 +42,7 @@ export function ProductionLineFormModal({ line, onClose, onSuccess }: Production
   const [formData, setFormData] = useState({
     code: line?.code || '',
     name: line?.name || '',
-    warehouse_id: line?.warehouse_id || '',
+    warehouse_id: (line as { warehouse_id?: string })?.warehouse_id || '',
     default_output_location_id: line?.default_output_location_id || '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})

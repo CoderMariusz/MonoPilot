@@ -53,7 +53,7 @@ export function VarianceAnalysisSection({
     }).format(value)
   }
 
-  const hasVarianceData = variance?.components !== null && variance?.work_orders_analyzed > 0
+  const hasVarianceData = variance?.components !== null && (variance?.work_orders_analyzed ?? 0) > 0
 
   // Show empty state if no work orders
   if (!variance || (!hasVarianceData && !isLoading)) {

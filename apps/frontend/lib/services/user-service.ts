@@ -93,7 +93,7 @@ export class UserService {
     }
 
     return {
-      users: users as User[],
+      users: users as unknown as User[],
       total: count || 0,
       page,
       limit,
@@ -147,7 +147,7 @@ export class UserService {
       throw new Error(error.message)
     }
 
-    return newUser as User
+    return newUser as unknown as User
   }
 
   /**
@@ -180,7 +180,7 @@ export class UserService {
       throw new Error(error.message)
     }
 
-    return updatedUser as User
+    return updatedUser as unknown as User
   }
 
   /**
@@ -270,12 +270,14 @@ export class UserService {
       return { allowed: true }
     }
 
-    if (user.role?.code === 'owner' || user.role?.code === 'SUPER_ADMIN') {
+    // Cast role to correct type (Supabase returns object for single relation)
+    const role = user.role as unknown as { id: string; code: string } | null
+    if (role?.code === 'owner' || role?.code === 'SUPER_ADMIN') {
       // Count active Super Admins (owner or SUPER_ADMIN role)
       const { count } = await supabase
         .from('users')
         .select('id', { count: 'exact', head: true })
-        .eq('role.code', user.role.code)
+        .eq('role.code', role.code)
         .eq('is_active', true)
 
       if (count === 1) {

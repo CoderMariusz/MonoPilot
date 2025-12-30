@@ -56,6 +56,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { productId } = await params
+
     // NOTE: No RBAC permission check here. This is INTENTIONAL (MAJ-3 resolution).
     // READ operations on BOMs are allowed for all authenticated users.
     // RLS policies enforce org_id isolation at the database level.

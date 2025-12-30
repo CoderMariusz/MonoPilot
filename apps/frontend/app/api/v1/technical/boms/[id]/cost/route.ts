@@ -172,7 +172,7 @@ export async function GET(
     }
 
     const routing = (bom as { routing?: { id?: string; code?: string; currency?: string; setup_cost?: number; working_cost_per_unit?: number; overhead_percent?: number } | null }).routing
-    const product = (bom as { product?: unknown }).product
+    const product = (bom as { product?: { id?: string; code?: string; name?: string; std_price?: number } | null }).product
     const batchSize = Number(bom.output_qty) || 1
     const currency = routing?.currency || 'PLN'
 

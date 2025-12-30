@@ -120,6 +120,8 @@ export async function PUT(
       return NextResponse.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, { status: 403 })
     }
 
+    const { id } = await params
+
     // Check if BOM exists
     const { data: existingBom, error: fetchError } = await supabase
       .from('boms')
@@ -277,6 +279,8 @@ export async function DELETE(
         { status: 403 }
       )
     }
+
+    const { id } = await params
 
     // Check if BOM exists
     const { data: existingBom, error: fetchError } = await supabase

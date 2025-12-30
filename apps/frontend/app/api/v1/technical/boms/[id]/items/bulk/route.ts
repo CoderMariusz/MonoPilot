@@ -53,13 +53,13 @@ async function processItem(
     uom: string
     sequence?: number
     scrap_percent?: number
-    operation_seq?: number
+    operation_seq?: number | null
     consume_whole_lp?: boolean
-    line_ids?: string[]
+    line_ids?: string[] | null
     is_by_product?: boolean
-    yield_percent?: number
-    condition_flags?: Record<string, boolean>
-    notes?: string
+    yield_percent?: number | null
+    condition_flags?: Record<string, boolean> | null
+    notes?: string | null
   },
   index: number,
   bomId: string,

@@ -129,9 +129,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = CreateLocationSchema.parse(body)
 
-    // Call service to create location
+    // Call service to create location (add warehouse_id from body)
     const result = await createLocation(
-      validatedData,
+      { ...validatedData, warehouse_id: body.warehouse_id } as Parameters<typeof createLocation>[0],
       session.user.id,
       currentUser.org_id
     )

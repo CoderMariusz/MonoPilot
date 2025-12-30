@@ -8,12 +8,14 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 
 export interface Toast {
   id: string
   title?: string
   description?: string
   variant?: 'default' | 'destructive'
+  action?: ReactNode
 }
 
 export function useToast() {

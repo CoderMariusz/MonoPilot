@@ -155,7 +155,7 @@ export function calculateSummary(operations: RoutingOperation[]): OperationsSumm
   }
 
   // Calculate weighted average yield from expected_yield_percent if available
-  let average_yield = null
+  let average_yield: number = 100
   if (operations.length > 0) {
     // Sum of (yield * duration) for all operations
     const totalWeightedYield = operations.reduce((sum, op) => {
@@ -252,15 +252,18 @@ export async function getOperations(
     }
 
     // Transform to match expected interface
-    const transformedOperations: RoutingOperation[] = (operations || []).map(op => ({
-      id: op.id,
-      routing_id: op.routing_id,
-      sequence: op.sequence,
-      name: op.operation_name,
-      description: null,
-      machine_id: op.machine_id,
-      machine_name: op.machines?.name || null,
-      machine_code: op.machines?.code || null,
+    const transformedOperations: RoutingOperation[] = (operations || []).map(op => {
+      // Cast machines to correct type (Supabase returns object for single relation)
+      const machine = op.machines as unknown as { id: string; code: string; name: string } | null
+      return {
+        id: op.id,
+        routing_id: op.routing_id,
+        sequence: op.sequence,
+        name: op.operation_name,
+        description: null,
+        machine_id: op.machine_id,
+        machine_name: machine?.name || null,
+        machine_code: machine?.code || null,
       setup_time: op.setup_time_minutes || 0,
       duration: op.expected_duration_minutes || 0,
       cleanup_time: op.cleanup_time_minutes || 0,
@@ -269,7 +272,8 @@ export async function getOperations(
       attachment_count: 0, // Will be implemented with attachments table
       created_at: op.created_at,
       updated_at: op.updated_at,
-    }))
+      }
+    })
 
     const summary = calculateSummary(transformedOperations)
 
@@ -393,8 +397,8 @@ export async function createOperation(
         name: operation.operation_name,
         description: null,
         machine_id: operation.machine_id,
-        machine_name: operation.machines?.name || null,
-        machine_code: operation.machines?.code || null,
+        machine_name: (operation.machines as unknown as { name: string } | null)?.name || null,
+        machine_code: (operation.machines as unknown as { code: string } | null)?.code || null,
         setup_time: operation.setup_time_minutes || 0,
         duration: operation.expected_duration_minutes || 0,
         cleanup_time: 0,
@@ -508,8 +512,8 @@ export async function updateOperation(
         name: operation.operation_name,
         description: null,
         machine_id: operation.machine_id,
-        machine_name: operation.machines?.name || null,
-        machine_code: operation.machines?.code || null,
+        machine_name: (operation.machines as unknown as { name: string } | null)?.name || null,
+        machine_code: (operation.machines as unknown as { code: string } | null)?.code || null,
         setup_time: operation.setup_time_minutes || 0,
         duration: operation.expected_duration_minutes || 0,
         cleanup_time: 0,

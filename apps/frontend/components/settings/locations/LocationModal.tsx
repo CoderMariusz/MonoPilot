@@ -212,10 +212,10 @@ export function LocationModal({
         // Update
         const payload = {
           name: formData.name,
-          description: formData.description || null,
+          description: formData.description || undefined,
           location_type: formData.location_type,
-          max_pallets: formData.max_pallets,
-          max_weight_kg: formData.max_weight_kg,
+          max_pallets: formData.max_pallets || undefined,
+          max_weight_kg: formData.max_weight_kg || undefined,
           is_active: formData.is_active,
         }
         result = await updateMutation.mutateAsync({ id: location.id, input: payload })

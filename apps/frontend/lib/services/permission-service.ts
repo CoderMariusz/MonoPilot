@@ -6,8 +6,13 @@
  * Supports both role-based and user-based permission checks.
  */
 
-import { ADMIN_ROLES, SYSTEM_ROLES } from '@/lib/constants/roles'
-import type { User, RoleCode } from '@/lib/types/role'
+import { ADMIN_ROLES, SYSTEM_ROLES, type SystemRole } from '@/lib/constants/roles'
+
+// Type aliases for compatibility
+type RoleCode = SystemRole
+interface User {
+  role?: { code?: string }
+}
 
 /**
  * Permission Matrix - Story 01.6
@@ -130,7 +135,7 @@ export class PermissionError extends Error {
 
 export function hasAdminAccess(roleCode: string): boolean {
   if (!roleCode) return false
-  return ADMIN_ROLES.includes(roleCode as RoleCode)
+  return (ADMIN_ROLES as readonly string[]).includes(roleCode)
 }
 
 export function canModifyOrganization(roleCode: string): boolean {
