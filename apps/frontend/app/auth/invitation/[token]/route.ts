@@ -10,11 +10,11 @@ import { InvitationService } from '@/lib/services/invitation-service'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
   try {
+    const { token } = await params
     // 1. Validate token format (64-char hex)
-    const token = params.token
     if (!token || token.length !== 64 || !/^[0-9a-f]{64}$/.test(token)) {
       return NextResponse.json({ error: 'Invalid invitation token format' }, { status: 400 })
     }
