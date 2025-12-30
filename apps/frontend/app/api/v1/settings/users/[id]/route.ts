@@ -12,9 +12,9 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { UpdateUserSchema } from '@/lib/validation/user-schemas'
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 /**
@@ -33,7 +33,7 @@ export async function PUT(
 ) {
   try {
     const supabase = await createServerSupabase()
-    const { id } = params
+    const { id } = await params
 
     // Get current user for org context
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()

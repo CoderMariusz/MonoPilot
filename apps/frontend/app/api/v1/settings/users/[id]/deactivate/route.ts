@@ -11,9 +11,9 @@ import { NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 /**
@@ -30,7 +30,7 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createServerSupabase()
-    const { id } = params
+    const { id } = await params
 
     // Get current user for org context
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
