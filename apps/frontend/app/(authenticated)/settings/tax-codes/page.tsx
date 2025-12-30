@@ -225,7 +225,7 @@ export default function TaxCodesPage() {
           setShowModal(false)
           setSelectedTaxCode(null)
         }}
-        onSubmit={handleModalSubmit}
+        onSubmit={handleModalSubmit as any}
         isSubmitting={createMutation.isPending || updateMutation.isPending}
       />
 
