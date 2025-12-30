@@ -179,8 +179,8 @@ export function AddAllergenModal({
         <DialogHeader>
           <DialogTitle>Add Allergen Declaration</DialogTitle>
           <DialogDescription>
-            Manually declare an allergen for this product. Allergens marked as "Contains" indicate
-            direct presence, while "May Contain" indicates potential cross-contamination.
+            Manually declare an allergen for this product. Allergens marked as &quot;Contains&quot; indicate
+            direct presence, while &quot;May Contain&quot; indicates potential cross-contamination.
           </DialogDescription>
         </DialogHeader>
 

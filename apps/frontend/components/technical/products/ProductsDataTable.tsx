@@ -161,7 +161,7 @@ export function ProductsDataTable({
                 No Products Found
               </h2>
               <p className="mt-2 max-w-md text-slate-600">
-                You haven't created any products yet. Products are the foundation
+                You haven&apos;t created any products yet. Products are the foundation
                 of your manufacturing process - raw materials, finished goods,
                 WIP, and packaging items.
               </p>

@@ -460,7 +460,7 @@ export function BOMScaleModal({
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Warning</AlertTitle>
                 <AlertDescription>
-                  Clicking "Apply Scaling" will permanently update all BOM item quantities.
+                  Clicking &quot;Apply Scaling&quot; will permanently update all BOM item quantities.
                   This action cannot be undone.
                 </AlertDescription>
               </Alert>

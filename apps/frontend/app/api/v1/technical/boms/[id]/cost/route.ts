@@ -154,8 +154,7 @@ export async function GET(
     // 3. Check for missing ingredient costs
     const missingCosts: string[] = []
     for (const item of bom.items || []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const component = (item as any).component
+      const component = (item as { component?: { code?: string; name?: string; cost_per_unit?: number } }).component
       if (!component?.cost_per_unit) {
         missingCosts.push(`${component?.code || 'Unknown'} (${component?.name || 'Unknown'})`)
       }
@@ -172,10 +171,8 @@ export async function GET(
       )
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const routing = (bom as any).routing
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const product = (bom as any).product
+    const routing = (bom as { routing?: unknown }).routing
+    const product = (bom as { product?: unknown }).product
     const batchSize = Number(bom.output_qty) || 1
     const currency = routing?.currency || 'PLN'
 
@@ -184,8 +181,7 @@ export async function GET(
     const materials: MaterialCostBreakdown[] = []
 
     for (const item of bom.items || []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const component = (item as any).component
+      const component = (item as { component?: { code?: string; name?: string; cost_per_unit?: number } }).component
       const quantity = Number(item.quantity) || 0
       const scrapPercent = Number(item.scrap_percent) || 0
       const unitCost = Number(component.cost_per_unit) || 0
@@ -242,7 +238,7 @@ export async function GET(
         const cleanupTime = Number(op.cleanup_time_minutes) || 0
         // labor_cost is stored as hourly rate in the DB
         const laborRate = Number(op.labor_cost) || 0
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const machine = (op as any).machine
 
         const setupCost = roundCurrency((setupTime / 60) * laborRate)

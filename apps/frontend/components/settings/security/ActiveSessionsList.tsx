@@ -228,7 +228,7 @@ export function ActiveSessionsList({ initialSessions = [] }: ActiveSessionsListP
       >
         <ShieldCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" aria-hidden="true" />
         <p className="font-medium">No Active Sessions</p>
-        <p className="text-sm mt-1">You don't have any active sessions at the moment.</p>
+        <p className="text-sm mt-1">You don&apos;t have any active sessions at the moment.</p>
         <Button variant="outline" size="sm" onClick={fetchSessions} className="mt-4">
           <RefreshCw className="h-4 w-4 mr-1" aria-hidden="true" />
           Refresh
@@ -353,7 +353,7 @@ export function ActiveSessionsList({ initialSessions = [] }: ActiveSessionsListP
                     <AlertDialogHeader>
                       <AlertDialogTitle>Terminate This Session?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will log out the device "{session.device_name || session.browser || 'Unknown'}".
+                        This will log out the device &quot;{session.device_name || session.browser || 'Unknown'}&quot;.
                         They will need to log in again to access the application.
                       </AlertDialogDescription>
                     </AlertDialogHeader>

@@ -142,7 +142,7 @@ export function BOMTimelineModal({
                 No BOM Versions
               </h3>
               <p className="text-sm text-muted-foreground mt-2 text-center max-w-md">
-                This product doesn't have any BOM versions yet. Create a BOM to
+                This product doesn&apos;t have any BOM versions yet. Create a BOM to
                 start managing the bill of materials.
               </p>
               <Button

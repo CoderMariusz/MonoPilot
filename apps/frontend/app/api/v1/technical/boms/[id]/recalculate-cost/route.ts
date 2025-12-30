@@ -155,7 +155,7 @@ export async function POST(
     // 3. Check for missing ingredient costs
     const missingCosts: string[] = []
     for (const item of bom.items || []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const component = (item as any).component
       if (!component?.cost_per_unit) {
         missingCosts.push(`${component?.code || 'Unknown'} (${component?.name || 'Unknown'})`)
@@ -173,9 +173,9 @@ export async function POST(
       )
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const routing = (bom as any).routing
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const product = (bom as any).product
     const batchSize = Number(bom.output_qty) || 1
     const currency = routing?.currency || 'PLN'
@@ -186,7 +186,7 @@ export async function POST(
     const warnings: string[] = []
 
     for (const item of bom.items || []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const component = (item as any).component
       const quantity = Number(item.quantity) || 0
       const scrapPercent = Number(item.scrap_percent) || 0
@@ -244,7 +244,7 @@ export async function POST(
         const cleanupTime = Number(op.cleanup_time_minutes) || 0
         // labor_cost is stored as hourly rate in the DB
         const laborRate = Number(op.labor_cost) || 0
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const machine = (op as any).machine
 
         // Warn if labor rate is 0

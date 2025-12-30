@@ -192,9 +192,9 @@ export function getDependentModules(moduleCode: string): Module[] {
  * Get modules required by a given module (TD-104)
  */
 export function getRequiredModules(moduleCode: string): Module[] {
-  const module = getModuleByCode(moduleCode)
-  if (!module?.dependencies) return []
-  return module.dependencies
+  const targetModule = getModuleByCode(moduleCode)
+  if (!targetModule?.dependencies) return []
+  return targetModule.dependencies
     .map(code => getModuleByCode(code))
     .filter((m): m is Module => m !== undefined)
 }
