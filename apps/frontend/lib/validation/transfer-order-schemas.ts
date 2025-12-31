@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { normalizeDateToMidnight } from '@/lib/utils/date-utils'
 
 // ===== Transfer Order Schemas (Story 3.6) =====
 
@@ -26,10 +27,8 @@ export const createTransferOrderSchema = z
   )
   .refine(
     (data) => {
-      const shipDate = new Date(data.planned_ship_date)
-      const receiveDate = new Date(data.planned_receive_date)
-      shipDate.setHours(0, 0, 0, 0)
-      receiveDate.setHours(0, 0, 0, 0)
+      const shipDate = normalizeDateToMidnight(data.planned_ship_date)
+      const receiveDate = normalizeDateToMidnight(data.planned_receive_date)
       return receiveDate >= shipDate
     },
     {
@@ -63,10 +62,8 @@ export const updateTransferOrderSchema = z
   .refine(
     (data) => {
       if (data.planned_ship_date && data.planned_receive_date) {
-        const shipDate = new Date(data.planned_ship_date)
-        const receiveDate = new Date(data.planned_receive_date)
-        shipDate.setHours(0, 0, 0, 0)
-        receiveDate.setHours(0, 0, 0, 0)
+        const shipDate = normalizeDateToMidnight(data.planned_ship_date)
+        const receiveDate = normalizeDateToMidnight(data.planned_receive_date)
         return receiveDate >= shipDate
       }
       return true
@@ -150,10 +147,8 @@ export const receiveTORequestSchema = z
   .refine(
     (data) => {
       // Validate receipt_date is not in the future
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const receiptDate = new Date(data.receipt_date)
-      receiptDate.setHours(0, 0, 0, 0)
+      const today = normalizeDateToMidnight(new Date())
+      const receiptDate = normalizeDateToMidnight(data.receipt_date)
       return receiptDate <= today
     },
     {
