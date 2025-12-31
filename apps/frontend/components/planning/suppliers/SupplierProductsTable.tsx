@@ -54,6 +54,9 @@ import { useToast } from '@/hooks/use-toast'
 import { isLeadTimeOverride } from '@/lib/types/supplier-product'
 import type { SupplierProductWithProduct } from '@/lib/types/supplier-product'
 
+// Debounce delay for search input (in milliseconds)
+const DEBOUNCE_DELAY_MS = 300
+
 interface SupplierProductsTableProps {
   supplierId: string
   supplierCurrency?: string
@@ -88,7 +91,7 @@ export function SupplierProductsTable({
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search)
-    }, 300)
+    }, DEBOUNCE_DELAY_MS)
     return () => clearTimeout(timer)
   }, [search])
 
@@ -370,6 +373,7 @@ export function SupplierProductsTable({
                             size="icon"
                             onClick={() => onEdit(sp)}
                             aria-label={`Edit ${sp.product?.name}`}
+                            className="focus-visible:ring-2 focus-visible:ring-offset-2"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -387,7 +391,7 @@ export function SupplierProductsTable({
                             variant="ghost"
                             size="icon"
                             onClick={() => handleRemoveClick(sp)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-600"
                             aria-label={`Remove ${sp.product?.name}`}
                           >
                             <Trash2 className="h-4 w-4" />

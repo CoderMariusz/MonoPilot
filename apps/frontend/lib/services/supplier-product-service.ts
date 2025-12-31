@@ -44,8 +44,8 @@ export async function getSupplierProducts(
 
   const data = await response.json()
 
-  // Transform the response to match our expected format
-  const assignments = data.assignments || data.supplier_products || data.data || []
+  // Transform the response to match our expected format (standardized to data.data)
+  const assignments = data.data || data.assignments || data.supplier_products || []
 
   return assignments.map((sp: SupplierProduct & { products?: any; product?: any }) => ({
     ...sp,

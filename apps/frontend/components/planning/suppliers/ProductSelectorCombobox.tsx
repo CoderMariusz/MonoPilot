@@ -25,6 +25,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 
+// Debounce delay for search input (in milliseconds)
+const DEBOUNCE_DELAY_MS = 300
+
 interface Product {
   id: string
   code: string
@@ -94,7 +97,7 @@ export function ProductSelectorCombobox({
       }
     }
 
-    const debounce = setTimeout(fetchProducts, 300)
+    const debounce = setTimeout(fetchProducts, DEBOUNCE_DELAY_MS)
     return () => clearTimeout(debounce)
   }, [search, excludeIds])
 

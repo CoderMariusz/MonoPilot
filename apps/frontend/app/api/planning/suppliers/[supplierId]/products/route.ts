@@ -99,8 +99,10 @@ export async function GET(
 
     // Apply search filter on product code or name
     if (search) {
-      // We need to filter after fetching since the search is on joined table
-      // This is a limitation of PostgREST - we'll filter in memory
+      // Phase 1: Implement server-side full-text search
+      // Current limitation: PostgREST doesn't support full-text search on joined tables
+      // TODO: Phase 1: Implement server-side full-text search using PostgreSQL tsvector
+      // This would eliminate the need for in-memory filtering
     }
 
     // Apply sorting
