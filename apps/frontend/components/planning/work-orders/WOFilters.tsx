@@ -411,7 +411,7 @@ export function WOFilters({
           <span className="text-gray-500">Active Filters:</span>
           {filters.search && (
             <Badge variant="outline" className="gap-1">
-              Search: "{filters.search}"
+              Search: &quot;{filters.search}&quot;
               <button
                 onClick={() => {
                   setLocalSearch('')
