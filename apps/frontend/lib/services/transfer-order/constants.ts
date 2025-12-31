@@ -35,6 +35,10 @@ export const SHIPPABLE_STATUSES: string[] = ['draft', 'planned', 'partially_ship
 
 export const NON_SHIPPABLE_STATUSES: string[] = ['cancelled', 'received']
 
+export const RECEIVABLE_STATUSES: string[] = ['shipped', 'partially_shipped', 'partially_received']
+
+export const NON_RECEIVABLE_STATUSES: string[] = ['draft', 'planned', 'received', 'cancelled']
+
 // ============================================================================
 // TO NUMBER FORMAT
 // ============================================================================

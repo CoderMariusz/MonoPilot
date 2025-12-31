@@ -1,7 +1,8 @@
 /**
  * TO Lines Data Table Component
  * Story 03.8: Transfer Orders CRUD + Lines
- * Displays transfer order line items with actions
+ * Story 03.9a: TO Partial Shipments (Basic)
+ * Displays transfer order line items with actions and progress indicators
  */
 
 'use client'
@@ -21,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Plus, Pencil, Trash2, Package } from 'lucide-react'
 import { AddLineModal } from './AddLineModal'
 import { DeleteLineDialog } from './DeleteLineDialog'
+import { TOLineProgressBar } from './TOLineProgressBar'
 import { useDeleteTOLine } from '@/lib/hooks/use-transfer-order-mutations'
 import type { TransferOrderLineWithProduct, TOStatus } from '@/lib/types/transfer-order'
 import { canModifyLines } from '@/lib/types/transfer-order'
@@ -233,10 +235,20 @@ export function TOLinesDataTable({
                       {formatNumber(line.quantity)} {line.uom}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatNumber(line.shipped_qty || 0)} {line.uom}
+                      <TOLineProgressBar
+                        shipped={line.shipped_qty || 0}
+                        received={line.received_qty || 0}
+                        total={line.quantity}
+                        type="ship"
+                      />
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatNumber(line.received_qty || 0)} {line.uom}
+                      <TOLineProgressBar
+                        shipped={line.shipped_qty || 0}
+                        received={line.received_qty || 0}
+                        total={line.quantity}
+                        type="receive"
+                      />
                     </TableCell>
                     <TableCell className="text-center">
                       <span

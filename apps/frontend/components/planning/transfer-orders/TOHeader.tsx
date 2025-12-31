@@ -197,7 +197,7 @@ export function TOHeader({ transferOrder }: TOHeaderProps) {
                   Actual Ship Date
                 </p>
                 <p className="text-sm font-medium text-gray-900">
-                  {formatDate(transferOrder.actual_ship_date)}
+                  Actual Ship Date: {transferOrder.actual_ship_date}
                 </p>
               </div>
             )}
@@ -207,7 +207,7 @@ export function TOHeader({ transferOrder }: TOHeaderProps) {
                   Actual Receive Date
                 </p>
                 <p className="text-sm font-medium text-gray-900">
-                  {formatDate(transferOrder.actual_receive_date)}
+                  Actual Receive Date: {transferOrder.actual_receive_date}
                 </p>
               </div>
             )}

@@ -1,37 +1,38 @@
 /**
- * WO Operations API
- * Story 3.14: Routing Copy to WO
+ * API Route: /api/planning/work-orders/[id]/operations
+ * Story 03.12: WO Operations (Routing Copy)
  *
- * GET /api/planning/work-orders/[id]/operations
+ * GET /api/planning/work-orders/:id/operations - List WO operations ordered by sequence
+ *
+ * NOTE: This route uses [id] parameter. The [wo_id] version is also available.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getWOOperations } from '@/lib/services/work-order-service'
+import { NextRequest } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { WOOperationsService } from '@/lib/services/wo-operations-service'
+import { handleApiError, successResponse } from '@/lib/api/error-handler'
+import { getAuthContextOrThrow } from '@/lib/api/auth-helpers'
 
+// GET /api/planning/work-orders/[id]/operations
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const result = await getWOOperations(id)
+    const supabase = await createServerSupabase()
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Failed to fetch operations' },
-        { status: 500 }
-      )
-    }
+    // Check authentication (role check done via RLS)
+    await getAuthContextOrThrow(supabase)
 
-    return NextResponse.json({
-      data: result.data,
-      total: result.total || 0,
+    // Get operations for WO
+    const result = await WOOperationsService.getOperationsForWO(supabase, id)
+
+    return successResponse({
+      operations: result.operations,
+      total: result.total,
     })
   } catch (error) {
-    console.error('Error in GET /api/planning/work-orders/[id]/operations:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/planning/work-orders/[id]/operations')
   }
 }

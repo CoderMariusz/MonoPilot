@@ -9,12 +9,14 @@
 import { createServerSupabaseAdmin } from '@/lib/supabase/server'
 import type {
   TransferOrder,
+  ToLine,
   ToLineLp,
   ShipToInput,
+  ReceiveTOInput,
   SelectLpsInput,
 } from '@/lib/validation/transfer-order-schemas'
 import type { ServiceResult, ListResult } from './types'
-import { ErrorCode, EDITABLE_STATUSES, NON_SHIPPABLE_STATUSES } from './constants'
+import { ErrorCode, EDITABLE_STATUSES, NON_SHIPPABLE_STATUSES, NON_RECEIVABLE_STATUSES } from './constants'
 import { calculateToStatus, enrichWithWarehouses } from './helpers'
 
 // ============================================================================
@@ -38,7 +40,7 @@ export async function shipTransferOrder(
     // Check if TO exists and is shippable
     const { data: existingTo, error: toError } = await supabaseAdmin
       .from('transfer_orders')
-      .select('status, actual_ship_date')
+      .select('status, actual_ship_date, shipped_by')
       .eq('id', transferOrderId)
       .single()
 
@@ -115,10 +117,13 @@ export async function shipTransferOrder(
       }
     }
 
-    // Set actual_ship_date on FIRST shipment only (immutable)
-    const updateData: any = {}
+    // Set actual_ship_date and shipped_by on FIRST shipment only (immutable)
+    const updateData: Record<string, unknown> = {
+      updated_by: userId,
+    }
     if (!existingTo.actual_ship_date) {
       updateData.actual_ship_date = input.actual_ship_date || new Date().toISOString().split('T')[0]
+      updateData.shipped_by = userId
     }
 
     // Calculate and update status
@@ -404,4 +409,237 @@ export async function deleteToLineLp(lpSelectionId: string): Promise<ServiceResu
       code: ErrorCode.DATABASE_ERROR,
     }
   }
+}
+
+// ============================================================================
+// RECEIVE TRANSFER ORDER (Story 03.9a)
+// ============================================================================
+
+/**
+ * Receive Transfer Order (partial or full)
+ * Updates received_qty cumulatively
+ * Sets actual_receive_date on FIRST receipt only (immutable)
+ * Automatically updates TO status based on line quantities
+ */
+export async function receiveTransferOrder(
+  transferOrderId: string,
+  input: ReceiveTOInput,
+  userId: string
+): Promise<ServiceResult<TransferOrder>> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Check if TO exists and is receivable
+    const { data: existingTo, error: toError } = await supabaseAdmin
+      .from('transfer_orders')
+      .select('status, actual_receive_date, received_by')
+      .eq('id', transferOrderId)
+      .single()
+
+    if (toError || !existingTo) {
+      return {
+        success: false,
+        error: 'Transfer Order not found',
+        code: ErrorCode.NOT_FOUND,
+      }
+    }
+
+    if (NON_RECEIVABLE_STATUSES.includes(existingTo.status as any)) {
+      return {
+        success: false,
+        error: `Cannot receive Transfer Order with status: ${existingTo.status}`,
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
+    // Get all TO lines to validate receive quantities
+    const { data: lines, error: linesError } = await supabaseAdmin
+      .from('to_lines')
+      .select('id, quantity, shipped_qty, received_qty')
+      .eq('transfer_order_id', transferOrderId)
+
+    if (linesError || !lines) {
+      return {
+        success: false,
+        error: 'Failed to fetch TO lines',
+        code: ErrorCode.DATABASE_ERROR,
+      }
+    }
+
+    // Validate receive quantities
+    for (const lineItem of input.lines) {
+      const line = lines.find((l) => l.id === lineItem.line_id)
+      if (!line) {
+        return {
+          success: false,
+          error: `TO line ${lineItem.line_id} not found`,
+          code: ErrorCode.NOT_FOUND,
+        }
+      }
+
+      const newReceivedQty = line.received_qty + lineItem.receive_qty
+      if (newReceivedQty > line.shipped_qty) {
+        return {
+          success: false,
+          error: `Cannot receive more than shipped quantity for line ${lineItem.line_id}`,
+          code: ErrorCode.INVALID_QUANTITY,
+        }
+      }
+    }
+
+    // Update received_qty for each line (cumulative)
+    for (const lineItem of input.lines) {
+      const line = lines.find((l) => l.id === lineItem.line_id)!
+      const newReceivedQty = line.received_qty + lineItem.receive_qty
+
+      const { error: updateError } = await supabaseAdmin
+        .from('to_lines')
+        .update({
+          received_qty: newReceivedQty,
+        })
+        .eq('id', lineItem.line_id)
+
+      if (updateError) {
+        console.error('Error updating TO line received_qty:', updateError)
+        return {
+          success: false,
+          error: 'Failed to update TO line',
+          code: ErrorCode.DATABASE_ERROR,
+        }
+      }
+    }
+
+    // Set actual_receive_date and received_by on FIRST receipt only (immutable)
+    const updateData: Record<string, unknown> = {
+      updated_by: userId,
+    }
+    if (!existingTo.actual_receive_date) {
+      updateData.actual_receive_date = input.receipt_date
+      updateData.received_by = userId
+    }
+
+    // Calculate and update status
+    const newStatus = await calculateToStatus(transferOrderId)
+    updateData.status = newStatus
+
+    // Update transfer order
+    const { data, error } = await supabaseAdmin
+      .from('transfer_orders')
+      .update(updateData)
+      .eq('id', transferOrderId)
+      .select(
+        `
+        *,
+        lines:to_lines(
+          *,
+          product:products(code, name)
+        )
+      `
+      )
+      .single()
+
+    if (error) {
+      console.error('Error updating transfer order after receipt:', error)
+      return {
+        success: false,
+        error: 'Failed to update transfer order',
+        code: ErrorCode.DATABASE_ERROR,
+      }
+    }
+
+    // Enrich with warehouse info
+    const enriched = await enrichWithWarehouses(data)
+
+    return {
+      success: true,
+      data: enriched as TransferOrder,
+    }
+  } catch (error) {
+    console.error('Error in receiveTransferOrder:', error)
+    return {
+      success: false,
+      error: 'Internal server error',
+      code: ErrorCode.DATABASE_ERROR,
+    }
+  }
+}
+
+// ============================================================================
+// PROGRESS CALCULATION HELPERS (Story 03.9a)
+// ============================================================================
+
+/**
+ * Line progress result type
+ */
+export interface LineProgress {
+  shipped: number
+  received: number
+  total: number
+  percent: number
+  remaining: number
+}
+
+/**
+ * Calculate ship progress for a line
+ * Returns { shipped, total, percent, remaining }
+ */
+export function calculateLineShipProgress(line: ToLine): LineProgress {
+  const shipped = line.shipped_qty || 0
+  const total = line.quantity || 0
+  const percent = total > 0 ? Math.round((shipped / total) * 100) : 0
+  const remaining = Math.max(0, total - shipped)
+
+  return {
+    shipped,
+    received: line.received_qty || 0,
+    total,
+    percent,
+    remaining,
+  }
+}
+
+/**
+ * Calculate receive progress for a line
+ * Returns { received, total (shipped_qty), percent, remaining }
+ * Note: receive progress is based on shipped_qty, not quantity
+ */
+export function calculateLineReceiveProgress(line: ToLine): LineProgress {
+  const received = line.received_qty || 0
+  const shipped = line.shipped_qty || 0
+  const percent = shipped > 0 ? Math.round((received / shipped) * 100) : 0
+  const remaining = Math.max(0, shipped - received)
+
+  return {
+    shipped,
+    received,
+    total: shipped, // For receive progress, total is shipped_qty
+    percent,
+    remaining,
+  }
+}
+
+/**
+ * Determine status after ship operation based on line quantities
+ * Returns 'shipped' if all lines fully shipped, 'partially_shipped' otherwise
+ */
+export function determineStatusAfterShip(lines: ToLine[]): string {
+  if (!lines || lines.length === 0) {
+    return 'planned'
+  }
+
+  const allFullyShipped = lines.every((line) => (line.shipped_qty || 0) >= (line.quantity || 0))
+  return allFullyShipped ? 'shipped' : 'partially_shipped'
+}
+
+/**
+ * Determine status after receive operation based on line quantities
+ * Returns 'received' if all lines fully received, 'partially_received' otherwise
+ */
+export function determineStatusAfterReceive(lines: ToLine[]): string {
+  if (!lines || lines.length === 0) {
+    return 'shipped'
+  }
+
+  const allFullyReceived = lines.every((line) => (line.received_qty || 0) >= (line.shipped_qty || 0))
+  return allFullyReceived ? 'received' : 'partially_received'
 }

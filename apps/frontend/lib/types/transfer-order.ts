@@ -14,14 +14,16 @@ import type { Warehouse } from './warehouse'
 // STATUS & PRIORITY ENUMS
 // ============================================================================
 
-export type TOStatus = 'draft' | 'planned' | 'shipped' | 'received' | 'closed' | 'cancelled'
+export type TOStatus = 'draft' | 'planned' | 'partially_shipped' | 'shipped' | 'partially_received' | 'received' | 'closed' | 'cancelled'
 export type TOPriority = 'low' | 'normal' | 'high' | 'urgent'
 
 // Status display labels
 export const TO_STATUS_LABELS: Record<TOStatus, string> = {
   draft: 'Draft',
   planned: 'Planned',
+  partially_shipped: 'Partially Shipped',
   shipped: 'Shipped',
+  partially_received: 'Partially Received',
   received: 'Received',
   closed: 'Closed',
   cancelled: 'Cancelled',
@@ -31,8 +33,10 @@ export const TO_STATUS_LABELS: Record<TOStatus, string> = {
 export const TO_STATUS_COLORS: Record<TOStatus, { bg: string; text: string }> = {
   draft: { bg: 'bg-gray-100', text: 'text-gray-800' },
   planned: { bg: 'bg-blue-100', text: 'text-blue-800' },
-  shipped: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
-  received: { bg: 'bg-green-100', text: 'text-green-800' },
+  partially_shipped: { bg: 'bg-orange-100', text: 'text-orange-800' },
+  shipped: { bg: 'bg-green-100', text: 'text-green-800' },
+  partially_received: { bg: 'bg-cyan-100', text: 'text-cyan-800' },
+  received: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   closed: { bg: 'bg-purple-100', text: 'text-purple-800' },
   cancelled: { bg: 'bg-red-100', text: 'text-red-800' },
 }
@@ -235,8 +239,10 @@ export interface ValidationResult {
 
 export const VALID_STATUS_TRANSITIONS: Record<TOStatus, TOStatus[]> = {
   draft: ['planned', 'cancelled'],
-  planned: ['shipped', 'cancelled'],
-  shipped: ['received'],
+  planned: ['partially_shipped', 'shipped', 'cancelled'],
+  partially_shipped: ['shipped', 'partially_received', 'received'],
+  shipped: ['partially_received', 'received'],
+  partially_received: ['received'],
   received: ['closed'],
   closed: [],
   cancelled: [],
@@ -275,4 +281,20 @@ export function canRelease(status: TOStatus, linesCount: number): boolean {
  */
 export function canCancel(status: TOStatus): boolean {
   return ['draft', 'planned'].includes(status)
+}
+
+/**
+ * Check if Ship action is visible based on TO status
+ * AC-8: PLANNED, PARTIALLY_SHIPPED -> Ship visible
+ */
+export function canShipTO(status: TOStatus): boolean {
+  return ['planned', 'partially_shipped'].includes(status)
+}
+
+/**
+ * Check if Receive action is visible based on TO status
+ * AC-8: SHIPPED, PARTIALLY_SHIPPED, PARTIALLY_RECEIVED -> Receive visible
+ */
+export function canReceiveTO(status: TOStatus): boolean {
+  return ['shipped', 'partially_shipped', 'partially_received'].includes(status)
 }

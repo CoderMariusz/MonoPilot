@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { WorkOrderError } from '@/lib/services/work-order-service'
+import { WOOperationsError } from '@/lib/services/wo-operations-service'
 import { AuthError } from './auth-helpers'
 
 /**
@@ -80,6 +81,20 @@ export function handleApiError(error: unknown, context?: string): NextResponse<E
 
   // Business logic errors from WorkOrderService
   if (error instanceof WorkOrderError) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      },
+      { status: error.status }
+    )
+  }
+
+  // Business logic errors from WOOperationsService
+  if (error instanceof WOOperationsError) {
     return NextResponse.json(
       {
         success: false,

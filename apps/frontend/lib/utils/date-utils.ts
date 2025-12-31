@@ -29,3 +29,21 @@ export function formatLastLogin(lastLogin: string | null | undefined): string {
   if (diffDays < 7) return `${diffDays} days ago`
   return date.toLocaleDateString()
 }
+
+/**
+ * Normalizes a date to midnight (00:00:00.000) for comparison purposes.
+ * Useful for date-only comparisons without time component.
+ *
+ * @param date - Date object or date-like value to normalize
+ * @returns New Date object with time set to midnight
+ *
+ * @example
+ * const date1 = normalizeDateToMidnight(new Date('2024-01-15T14:30:00'))
+ * const date2 = normalizeDateToMidnight(new Date('2024-01-15T22:45:00'))
+ * date1.getTime() === date2.getTime() // => true (both are 2024-01-15 00:00:00)
+ */
+export function normalizeDateToMidnight(date: Date | string | number): Date {
+  const normalized = new Date(date)
+  normalized.setHours(0, 0, 0, 0)
+  return normalized
+}

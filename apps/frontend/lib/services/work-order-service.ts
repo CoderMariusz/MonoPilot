@@ -9,6 +9,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { copyRoutingToWO } from './wo-operations-service'
 
 // ============================================================================
 // TYPES
@@ -813,6 +814,18 @@ export async function release(
       changed_by: userId,
       notes,
     })
+  }
+
+  // 5. Copy routing operations to WO (Story 03.12)
+  // This is a non-blocking operation - log warning if it fails but don't block release
+  try {
+    const operationCount = await copyRoutingToWO(supabase, id, updatedWO.org_id)
+    if (operationCount > 0) {
+      console.log(`Copied ${operationCount} routing operations to WO ${updatedWO.wo_number}`)
+    }
+  } catch (copyError) {
+    console.warn(`Failed to copy routing operations for WO ${updatedWO.wo_number}:`, copyError)
+    // Don't block release - routing copy is optional
   }
 
   return updatedWO as WorkOrder

@@ -41,6 +41,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import { WOOperationsList } from '@/components/planning/WOOperationsList'
+import { WOMaterialsTable } from '@/components/planning/work-orders/WOMaterialsTable'
 import { MaterialReservationsTable } from '@/components/production/MaterialReservationsTable'
 import { ConsumptionHistoryTable } from '@/components/production/ConsumptionHistoryTable'
 import WOStartModal from '@/components/production/WOStartModal'
@@ -704,8 +705,18 @@ export default function WorkOrderDetailsPage({
             <WOOperationsList woId={wo.id} woStatus={wo.status} />
           </TabsContent>
 
-          {/* Materials Tab - Story 4.7, 4.10 */}
+          {/* Materials Tab - Story 03.11a: BOM Snapshot, Story 4.7, 4.10 */}
           <TabsContent value="materials" className="space-y-6">
+            {/* BOM Snapshot Materials - Story 03.11a */}
+            <div className="border rounded-lg p-6">
+              <WOMaterialsTable
+                woId={wo.id}
+                woStatus={wo.status}
+                onRefresh={() => fetchWO()}
+              />
+            </div>
+
+            {/* Material Reservations - Story 4.7 */}
             <div className="border rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Boxes className="h-5 w-5" />

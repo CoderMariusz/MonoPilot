@@ -130,6 +130,47 @@ export const shipToSchema = z
 
 export type ShipToInput = z.input<typeof shipToSchema>
 
+// ===== Partial Receipt Schemas (Story 3.9a) =====
+
+export const receiveToLineItemSchema = z.object({
+  line_id: z.string().uuid('Invalid TO line ID'),
+  receive_qty: z.number().nonnegative('Receive quantity must be >= 0').max(99999.9999, 'Receive quantity cannot exceed 99999.9999'),
+})
+
+export type ReceiveToLineItem = z.infer<typeof receiveToLineItemSchema>
+
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+
+export const receiveTORequestSchema = z
+  .object({
+    receipt_date: z.string().regex(dateRegex, 'Receipt date must be in YYYY-MM-DD format'),
+    lines: z.array(receiveToLineItemSchema).min(1, 'At least one line item required'),
+    notes: z.string().max(1000, 'Notes cannot exceed 1000 characters').optional(),
+  })
+  .refine(
+    (data) => {
+      // Validate receipt_date is not in the future
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const receiptDate = new Date(data.receipt_date)
+      receiptDate.setHours(0, 0, 0, 0)
+      return receiptDate <= today
+    },
+    {
+      message: 'Receipt date cannot be in the future',
+      path: ['receipt_date'],
+    }
+  )
+  .refine(
+    (data) => data.lines.some((item) => item.receive_qty > 0),
+    {
+      message: 'At least one line must have quantity > 0',
+      path: ['lines'],
+    }
+  )
+
+export type ReceiveTOInput = z.infer<typeof receiveTORequestSchema>
+
 // ===== LP Selection Schemas (Story 3.9) =====
 
 export const lpSelectionItemSchema = z.object({

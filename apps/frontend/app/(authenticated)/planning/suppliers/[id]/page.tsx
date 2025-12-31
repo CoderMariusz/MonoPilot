@@ -1,13 +1,14 @@
 /**
  * Supplier Detail Page
  * Story: 03.1 - Suppliers CRUD + Master Data
+ * Story: 03.2 - Supplier-Product Assignment
  *
- * Tabs: [Overview/Products] [Purchase Orders]
+ * Tabs: [Products] [Purchase Orders]
  */
 
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,14 +20,6 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,35 +39,36 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   ArrowLeft,
-  Building2,
   Package,
   ShoppingCart,
   Plus,
   Pencil,
   Trash2,
   Loader2,
-  Star,
   ChevronDown,
   Power,
   PowerOff,
   Download,
   Mail,
   Printer,
-  MoreHorizontal,
-  RefreshCw,
   AlertTriangle,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
-import { SupplierCreateEditModal } from '@/components/planning/suppliers'
+import {
+  SupplierCreateEditModal,
+  SupplierProductsTable,
+  AssignProductModal,
+} from '@/components/planning/suppliers'
 import {
   useSupplier,
-  useSupplierProducts,
   useDeactivateSupplier,
   useActivateSupplier,
   useDeleteSupplier,
 } from '@/lib/hooks/use-suppliers'
-import type { Supplier, SupplierProduct } from '@/lib/types/supplier'
+import { useSupplierProducts } from '@/lib/hooks/use-supplier-products'
+import type { Supplier } from '@/lib/types/supplier'
+import type { SupplierProductWithProduct } from '@/lib/types/supplier-product'
 
 interface SupplierDetailPageProps {
   params: Promise<{ id: string }>
@@ -89,19 +83,17 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('products')
+  const [assignProductModalOpen, setAssignProductModalOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<SupplierProductWithProduct | null>(null)
 
   // Hooks
   const {
     data: supplier,
     isLoading: loadingSupplier,
     error: supplierError,
-    refetch: refetchSupplier,
   } = useSupplier(id)
 
-  const {
-    data: products,
-    isLoading: loadingProducts,
-  } = useSupplierProducts(id)
+  const { data: products } = useSupplierProducts(id)
 
   const deactivate = useDeactivateSupplier()
   const activate = useActivateSupplier()
@@ -174,6 +166,20 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     [toast]
   )
 
+  const handleAddProduct = useCallback(() => {
+    setEditingProduct(null)
+    setAssignProductModalOpen(true)
+  }, [])
+
+  const handleEditProduct = useCallback((product: SupplierProductWithProduct) => {
+    setEditingProduct(product)
+    setAssignProductModalOpen(true)
+  }, [])
+
+  const handleAssignProductSuccess = useCallback(() => {
+    setEditingProduct(null)
+  }, [])
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -181,6 +187,9 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
       day: 'numeric',
     })
   }
+
+  // Get list of already assigned product IDs for exclusion
+  const excludeProductIds = products?.map((p) => p.product_id) || []
 
   // Loading state
   if (loadingSupplier) {
@@ -314,7 +323,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                   </DropdownMenuItem>
                 )}
 
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleAddProduct}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Product Assignment
                 </DropdownMenuItem>
@@ -337,7 +346,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" aria-label="Print">
               <Printer className="h-4 w-4" />
             </Button>
           </div>
@@ -485,94 +494,18 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Products ({products?.length || 0})</CardTitle>
-                <Button size="sm">
+                <Button size="sm" onClick={handleAddProduct}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Product
                 </Button>
               </CardHeader>
               <CardContent>
-                {loadingProducts ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-12 w-full" />
-                    ))}
-                  </div>
-                ) : !products || products.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold">No Products Assigned Yet</h3>
-                    <p className="text-muted-foreground mt-1">
-                      This supplier doesn&apos;t have any products assigned.
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      Add products to enable purchase order creation.
-                    </p>
-                    <Button className="mt-4">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Product
-                    </Button>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Supplier Code</TableHead>
-                        <TableHead>Default</TableHead>
-                        <TableHead className="text-right">Unit Price</TableHead>
-                        <TableHead className="text-right">Lead Time</TableHead>
-                        <TableHead className="text-right">MOQ</TableHead>
-                        <TableHead className="w-12">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {products.map((sp: SupplierProduct) => (
-                        <TableRow key={sp.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{sp.product?.name}</p>
-                              <p className="text-sm text-muted-foreground font-mono">
-                                {sp.product?.code}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono">
-                            {sp.supplier_product_code || '-'}
-                          </TableCell>
-                          <TableCell>
-                            {sp.is_default ? (
-                              <Badge className="bg-yellow-100 text-yellow-800">
-                                <Star className="h-3 w-3 mr-1" />
-                                Default
-                              </Badge>
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {sp.unit_price
-                              ? new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency: sp.currency || supplier.currency,
-                                }).format(sp.unit_price)
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {sp.lead_time_days ? `${sp.lead_time_days} days` : '-'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {sp.moq?.toLocaleString() || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                <SupplierProductsTable
+                  supplierId={id}
+                  supplierCurrency={supplier.currency}
+                  onEdit={handleEditProduct}
+                  onAddProduct={handleAddProduct}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -644,12 +577,22 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
         </Card>
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Supplier Modal */}
       <SupplierCreateEditModal
         open={editModalOpen}
         onClose={() => setEditModalOpen(false)}
         supplier={supplier}
         onSuccess={handleEditSuccess}
+      />
+
+      {/* Assign Product Modal */}
+      <AssignProductModal
+        supplierId={id}
+        open={assignProductModalOpen}
+        onOpenChange={setAssignProductModalOpen}
+        onSuccess={handleAssignProductSuccess}
+        excludeProductIds={excludeProductIds}
+        editingProduct={editingProduct}
       />
 
       {/* Delete Confirmation Dialog */}

@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getTransferOrder, changeToStatus } from '@/lib/services/transfer-order-service'
+import { ZodError } from 'zod'
+import {
+  receiveTORequestSchema,
+  type ReceiveTOInput,
+} from '@/lib/validation/transfer-order-schemas'
+import { receiveTransferOrder } from '@/lib/services/transfer-order-service'
 
 /**
- * Transfer Order Receive API Route (Stub for Epic 05)
- * Story: 03.8 - Ship/Receive stubs
+ * Transfer Order Receive API Route
+ * Story: 03.9a - TO Partial Shipments (Basic)
  *
- * POST /api/planning/transfer-orders/:id/receive
+ * POST /api/planning/transfer-orders/:id/receive - Receive transfer order (partial or full)
  *
- * MVP Stub - Full implementation in Epic 05 (Warehouse Module)
- *
- * Validation Rules:
- * - TO must be in 'shipped' status
- * - User must have ADMIN, WH_MANAGER, or WH_OPERATOR role
+ * Supports partial receipts:
+ * - receive_qty accumulates (does not replace)
+ * - actual_receive_date set on FIRST receipt only (immutable)
+ * - received_by set on FIRST receipt only (immutable)
+ * - Status transitions: shipped/partially_shipped -> partially_received/received
  */
+
+// ============================================================================
+// POST /api/planning/transfer-orders/:id/receive - Receive Transfer Order
+// ============================================================================
 
 export async function POST(
   request: NextRequest,
@@ -34,75 +43,59 @@ export async function POST(
 
     const { id } = await params
 
-    // Get the TO to check its current status
-    const toResult = await getTransferOrder(id)
+    // Parse and validate request body
+    const body = await request.json()
+    const validatedData: ReceiveTOInput = receiveTORequestSchema.parse(body)
 
-    if (!toResult.success || !toResult.data) {
-      return NextResponse.json(
-        { error: 'Transfer Order not found', code: 'TO_NOT_FOUND' },
-        { status: 404 }
-      )
-    }
-
-    // Check if TO can be received
-    const currentStatus = toResult.data.status
-    if (currentStatus !== 'shipped') {
-      return NextResponse.json(
-        {
-          error: 'TO must be in shipped status to receive',
-          code: 'INVALID_STATUS',
-        },
-        { status: 400 }
-      )
-    }
-
-    // Call service method to change status to 'received'
-    const result = await changeToStatus(id, 'received')
+    // Call service method
+    const result = await receiveTransferOrder(id, validatedData, session.user.id)
 
     if (!result.success) {
       if (result.code === 'NOT_FOUND') {
         return NextResponse.json(
-          { error: 'Transfer Order not found', code: 'TO_NOT_FOUND' },
+          { error: result.error || 'Transfer Order or TO line not found' },
           { status: 404 }
         )
       }
 
       if (result.code === 'INVALID_STATUS') {
         return NextResponse.json(
-          {
-            error: result.error || 'Cannot receive this Transfer Order',
-            code: 'INVALID_STATUS',
-          },
+          { error: result.error || 'Cannot receive this Transfer Order' },
+          { status: 400 }
+        )
+      }
+
+      if (result.code === 'INVALID_QUANTITY') {
+        return NextResponse.json(
+          { error: result.error || 'Invalid receive quantity' },
           { status: 400 }
         )
       }
 
       return NextResponse.json(
-        { error: result.error || 'Failed to receive Transfer Order' },
+        { error: result.error || 'Failed to receive transfer order' },
         { status: 500 }
       )
     }
 
-    // Get current date for actual_receive_date
-    const actualReceiveDate = new Date().toISOString().split('T')[0]
-
     return NextResponse.json(
       {
         success: true,
-        data: {
-          id: result.data?.id,
-          status: 'received',
-          actual_receive_date: actualReceiveDate,
-          received_by: {
-            id: session.user.id,
-            name: session.user.email,
-          },
-        },
+        transfer_order: result.data,
+        message: `Transfer Order ${result.data?.to_number} received successfully`,
       },
       { status: 200 }
     )
   } catch (error) {
     console.error('Error in POST /api/planning/transfer-orders/:id/receive:', error)
+
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.errors },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

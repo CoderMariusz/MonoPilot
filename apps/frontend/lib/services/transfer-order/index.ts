@@ -51,10 +51,17 @@ export {
 
 export {
   shipTransferOrder,
+  receiveTransferOrder,
   getToLineLps,
   selectLpsForToLine,
   deleteToLineLp,
+  calculateLineShipProgress,
+  calculateLineReceiveProgress,
+  determineStatusAfterShip,
+  determineStatusAfterReceive,
 } from './actions'
+
+export type { LineProgress } from './actions'
 
 // ============================================================================
 // HELPERS (for advanced use cases)

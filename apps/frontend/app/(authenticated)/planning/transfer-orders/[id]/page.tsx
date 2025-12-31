@@ -1,6 +1,7 @@
 /**
  * Transfer Order Detail Page
  * Story 03.8: Transfer Orders CRUD + Lines
+ * Story 03.9a: TO Partial Shipments (Basic)
  * Displays TO detail with header info and line items
  */
 
@@ -28,6 +29,8 @@ import {
   Printer,
   RefreshCw,
   AlertTriangle,
+  Truck,
+  PackageCheck,
 } from 'lucide-react'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import {
@@ -35,6 +38,8 @@ import {
   TOLinesDataTable,
   ReleaseConfirmDialog,
   CancelConfirmDialog,
+  ShipTOModal,
+  ReceiveTOModal,
 } from '@/components/planning/transfer-orders'
 import { TransferOrderFormModal } from '@/components/planning/TransferOrderFormModal'
 import { useTransferOrder } from '@/lib/hooks/use-transfer-order'
@@ -42,7 +47,7 @@ import {
   useReleaseTransferOrder,
   useCancelTransferOrder,
 } from '@/lib/hooks/use-transfer-order-mutations'
-import { canEditTO, canModifyLines, canRelease, canCancel } from '@/lib/types/transfer-order'
+import { canEditTO, canModifyLines, canRelease, canCancel, canShipTO, canReceiveTO } from '@/lib/types/transfer-order'
 import { useToast } from '@/hooks/use-toast'
 
 interface PageProps {
@@ -57,6 +62,8 @@ export default function TransferOrderDetailPage({ params }: PageProps) {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [shipModalOpen, setShipModalOpen] = useState(false)
+  const [receiveModalOpen, setReceiveModalOpen] = useState(false)
 
   // Data hooks
   const { data: transferOrder, isLoading, isError, refetch } = useTransferOrder(id)
@@ -71,6 +78,8 @@ export default function TransferOrderDetailPage({ params }: PageProps) {
     ? canRelease(transferOrder.status, transferOrder.lines?.length || 0)
     : false
   const canCancelTO = transferOrder ? canCancel(transferOrder.status) : false
+  const showShipButton = transferOrder ? canShipTO(transferOrder.status) : false
+  const showReceiveButton = transferOrder ? canReceiveTO(transferOrder.status) : false
 
   // Handle release
   const handleRelease = async () => {
@@ -211,6 +220,22 @@ export default function TransferOrderDetailPage({ params }: PageProps) {
               </Button>
             )}
 
+            {/* Ship button - visible for planned, partially_shipped (AC-8) */}
+            {showShipButton && (
+              <Button size="sm" onClick={() => setShipModalOpen(true)}>
+                <Truck className="mr-2 h-4 w-4" />
+                Ship
+              </Button>
+            )}
+
+            {/* Receive button - visible for shipped, partially_shipped, partially_received (AC-8) */}
+            {showReceiveButton && (
+              <Button size="sm" variant="outline" onClick={() => setReceiveModalOpen(true)}>
+                <PackageCheck className="mr-2 h-4 w-4" />
+                Receive
+              </Button>
+            )}
+
             {/* Actions dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -287,6 +312,26 @@ export default function TransferOrderDetailPage({ params }: PageProps) {
         onConfirm={handleCancel}
         isLoading={cancelMutation.isPending}
       />
+
+      {/* Ship Modal (Story 03.9a) */}
+      {shipModalOpen && (
+        <ShipTOModal
+          open={shipModalOpen}
+          onClose={() => setShipModalOpen(false)}
+          transferOrder={transferOrder}
+          onSuccess={refetch}
+        />
+      )}
+
+      {/* Receive Modal (Story 03.9a) */}
+      {receiveModalOpen && (
+        <ReceiveTOModal
+          open={receiveModalOpen}
+          onClose={() => setReceiveModalOpen(false)}
+          transferOrder={transferOrder}
+          onSuccess={refetch}
+        />
+      )}
     </div>
   )
 }

@@ -32,3 +32,19 @@ export { WOStatusTimeline } from './WOStatusTimeline'
 // States
 export { WOEmptyState } from './WOEmptyState'
 export { WOErrorState } from './WOErrorState'
+
+// Operations (Story 03.12)
+export { WOOperationsTimeline } from './WOOperationsTimeline'
+export { WOOperationCard } from './WOOperationCard'
+export { WOOperationStatusBadge } from './WOOperationStatusBadge'
+export { WOOperationDetailPanel } from './WOOperationDetailPanel'
+export { WOOperationProgressBar } from './WOOperationProgressBar'
+export { WOOperationsEmptyState } from './WOOperationsEmptyState'
+
+// Materials (Story 03.11a)
+export { WOMaterialsTable } from './WOMaterialsTable'
+export { WOMaterialRow } from './WOMaterialRow'
+export { WOMaterialCard } from './WOMaterialCard'
+export { RefreshSnapshotButton } from './RefreshSnapshotButton'
+export { MaterialProductTypeBadge } from './MaterialProductTypeBadge'
+export { ByProductBadge } from './ByProductBadge'
