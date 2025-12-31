@@ -1,12 +1,14 @@
 /**
  * React Query Hook: useWorkOrders
  * Story 03.10: Work Order CRUD - List Query
+ * Story 03.14: Work Order Scheduling - Schedule Mutation
  *
  * Fetches paginated work orders with filtering, sorting, and search
  */
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { WOListParams, PaginatedWOResult, WOListItem } from '@/lib/types/work-order'
+import type { ScheduleWOInput } from '@/lib/validation/work-order-schemas'
 
 // Query keys for cache management
 export const workOrderKeys = {
@@ -116,6 +118,38 @@ export function useWorkOrders(params: WOListParams = {}) {
     queryFn: () => fetchWorkOrders(queryParams),
     staleTime: 30 * 1000, // 30 seconds
     placeholderData: (previousData) => previousData,
+  })
+}
+
+/**
+ * Hook to schedule a work order (Story 03.14)
+ * Updates planned dates, scheduled times, line, and machine assignments
+ */
+export function useScheduleWorkOrder(woId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: ScheduleWOInput) => {
+      const response = await fetch(`/api/planning/work-orders/${woId}/schedule`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to schedule work order')
+      }
+
+      return response.json()
+    },
+    onSuccess: () => {
+      // Invalidate only list queries (more granular than .all)
+      queryClient.invalidateQueries({ queryKey: workOrderKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: workOrderKeys.detail(woId) })
+      // Invalidate Gantt data if exists
+      queryClient.invalidateQueries({ queryKey: ['work-orders-gantt'] })
+    },
   })
 }
 
