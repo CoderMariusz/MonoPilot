@@ -214,17 +214,17 @@ export type ExportSuppliersInput = z.infer<typeof exportSuppliersSchema>
  * Schema for list query parameters.
  */
 export const supplierListQuerySchema = z.object({
-  status: z.enum(['all', 'active', 'inactive']).optional().default('all'),
+  status: z.enum(['all', 'active', 'inactive']).default('all').optional(),
   currency: z
     .union([z.string(), z.array(z.string())])
     .optional()
     .transform((val) => (Array.isArray(val) ? val : val ? [val] : undefined)),
   payment_terms: z.string().optional(),
   search: z.string().optional(),
-  page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
-  sort: z.string().optional().default('code'),
-  order: z.enum(['asc', 'desc']).optional().default('asc'),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20).optional(),
+  sort: z.string().default('code').optional(),
+  order: z.enum(['asc', 'desc']).default('asc').optional(),
 })
 
 /**

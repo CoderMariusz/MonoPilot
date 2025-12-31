@@ -356,7 +356,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       setupUnauthenticatedUser()
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-001')
-      const response = await GET_SINGLE(request, { params: { id: 'bom-001' } })
+      const response = await GET_SINGLE(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(401)
     })
@@ -374,7 +374,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       })
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-nonexistent')
-      const response = await GET_SINGLE(request, { params: { id: 'bom-nonexistent' } })
+      const response = await GET_SINGLE(request, { params: Promise.resolve({ id: 'bom-nonexistent' }) })
 
       expect(response.status).toBe(404)
       const json = await response.json()
@@ -394,7 +394,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       })
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-001')
-      const response = await GET_SINGLE(request, { params: { id: 'bom-001' } })
+      const response = await GET_SINGLE(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(200)
       const json = (await response.json()) as BOMWithProduct
@@ -415,7 +415,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       })
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-other-org')
-      const response = await GET_SINGLE(request, { params: { id: 'bom-other-org' } })
+      const response = await GET_SINGLE(request, { params: Promise.resolve({ id: 'bom-other-org' }) })
 
       expect(response.status).toBe(404)
     })
@@ -719,7 +719,7 @@ describe('BOM API Routes (Story 02.4)', () => {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      const response = await PUT(request, { params: { id: 'bom-001' } })
+      const response = await PUT(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(401)
     })
@@ -750,7 +750,7 @@ describe('BOM API Routes (Story 02.4)', () => {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      const response = await PUT(request, { params: { id: 'bom-001' } })
+      const response = await PUT(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(403)
     })
@@ -777,7 +777,7 @@ describe('BOM API Routes (Story 02.4)', () => {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      const response = await PUT(request, { params: { id: 'bom-nonexistent' } })
+      const response = await PUT(request, { params: Promise.resolve({ id: 'bom-nonexistent' }) })
 
       expect(response.status).toBe(404)
     })
@@ -839,7 +839,7 @@ describe('BOM API Routes (Story 02.4)', () => {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      const response = await PUT(request, { params: { id: 'bom-001' } })
+      const response = await PUT(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(200)
       const json = (await response.json()) as BOMWithProduct
@@ -900,7 +900,7 @@ describe('BOM API Routes (Story 02.4)', () => {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      const response = await PUT(request, { params: { id: 'bom-001' } })
+      const response = await PUT(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(200)
       const json = (await response.json()) as BOMWithProduct
@@ -951,7 +951,7 @@ describe('BOM API Routes (Story 02.4)', () => {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      const response = await PUT(request, { params: { id: 'bom-001' } })
+      const response = await PUT(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(400)
       const json = await response.json()
@@ -1012,7 +1012,7 @@ describe('BOM API Routes (Story 02.4)', () => {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      const response = await PUT(request, { params: { id: 'bom-001' } })
+      const response = await PUT(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       const json = (await response.json()) as BOMWithProduct
       expect(json.updated_at).not.toBe(mockBOM.updated_at)
@@ -1029,7 +1029,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-001', {
         method: 'DELETE',
       })
-      const response = await DELETE(request, { params: { id: 'bom-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(401)
     })
@@ -1057,7 +1057,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-001', {
         method: 'DELETE',
       })
-      const response = await DELETE(request, { params: { id: 'bom-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(403)
     })
@@ -1081,7 +1081,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-nonexistent', {
         method: 'DELETE',
       })
-      const response = await DELETE(request, { params: { id: 'bom-nonexistent' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'bom-nonexistent' }) })
 
       expect(response.status).toBe(404)
     })
@@ -1128,7 +1128,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-001', {
         method: 'DELETE',
       })
-      const response = await DELETE(request, { params: { id: 'bom-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(400)
       const json = await response.json()
@@ -1175,7 +1175,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-001', {
         method: 'DELETE',
       })
-      const response = await DELETE(request, { params: { id: 'bom-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       expect(response.status).toBe(200)
       const json = await response.json()
@@ -1220,7 +1220,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       const request = new NextRequest('http://localhost/api/v1/technical/boms/bom-001', {
         method: 'DELETE',
       })
-      const response = await DELETE(request, { params: { id: 'bom-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       const json = await response.json()
       expect(json.message).toContain('deleted successfully')
@@ -1235,7 +1235,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       setupUnauthenticatedUser()
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/timeline/prod-001')
-      const response = await GET_TIMELINE(request, { params: { productId: 'prod-001' } })
+      const response = await GET_TIMELINE(request, { params: Promise.resolve({ productId: 'prod-001' }) })
 
       expect(response.status).toBe(401)
     })
@@ -1257,7 +1257,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       })
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/timeline/prod-nonexistent')
-      const response = await GET_TIMELINE(request, { params: { productId: 'prod-nonexistent' } })
+      const response = await GET_TIMELINE(request, { params: Promise.resolve({ productId: 'prod-nonexistent' }) })
 
       expect(response.status).toBe(404)
     })
@@ -1287,7 +1287,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       })
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/timeline/prod-001')
-      const response = await GET_TIMELINE(request, { params: { productId: 'prod-001' } })
+      const response = await GET_TIMELINE(request, { params: Promise.resolve({ productId: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const json = (await response.json()) as BOMTimelineResponse
@@ -1316,7 +1316,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       })
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/timeline/prod-001')
-      const response = await GET_TIMELINE(request, { params: { productId: 'prod-001' } })
+      const response = await GET_TIMELINE(request, { params: Promise.resolve({ productId: 'prod-001' }) })
 
       const json = (await response.json()) as BOMTimelineResponse
       expect(json.product.id).toBeDefined()
@@ -1344,7 +1344,7 @@ describe('BOM API Routes (Story 02.4)', () => {
       })
 
       const request = new NextRequest('http://localhost/api/v1/technical/boms/timeline/prod-001')
-      const response = await GET_TIMELINE(request, { params: { productId: 'prod-001' } })
+      const response = await GET_TIMELINE(request, { params: Promise.resolve({ productId: 'prod-001' }) })
 
       const json = (await response.json()) as BOMTimelineResponse
       expect(json.current_date).toBeDefined()

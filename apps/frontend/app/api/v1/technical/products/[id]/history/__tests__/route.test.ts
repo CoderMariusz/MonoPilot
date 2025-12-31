@@ -19,7 +19,11 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { GET } from '../route'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+
+/**
+ * Mock createServerClient from @supabase/ssr
+ */
+const createServerClient = vi.fn()
 
 /**
  * Mock Next.js cookies
@@ -28,14 +32,15 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn(() => ({
     get: vi.fn(),
     set: vi.fn(),
+    getAll: vi.fn(() => []),
   })),
 }))
 
 /**
- * Mock Supabase client
+ * Mock Supabase SSR client
  */
-vi.mock('@supabase/auth-helpers-nextjs', () => ({
-  createRouteHandlerClient: vi.fn(),
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: vi.fn(),
 }))
 
 describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
@@ -83,7 +88,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       auth: mockAuth,
     }
 
-    ;(createRouteHandlerClient as any).mockReturnValue(mockSupabase)
+    ;(createServerClient as any).mockReturnValue(mockSupabase)
   })
 
   describe('Authentication', () => {
@@ -94,7 +99,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(401)
       const body = await response.json()
@@ -110,7 +115,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/non-existent/history')
-      const response = await GET(request, { params: { id: 'non-existent' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'non-existent' }) })
 
       expect(response.status).toBe(404)
       const body = await response.json()
@@ -124,7 +129,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/other-org-product/history')
-      const response = await GET(request, { params: { id: 'other-org-product' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'other-org-product' }) })
 
       expect(response.status).toBe(404)
     })
@@ -162,7 +167,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -202,7 +207,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -242,7 +247,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -274,7 +279,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -304,7 +309,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -329,7 +334,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       const request = new Request(
         'http://localhost:3000/api/v1/technical/products/prod-001/history?from_date=2025-01-10T00:00:00Z'
       )
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       expect(mockQuery.gte).toHaveBeenCalledWith('changed_at', '2025-01-10T00:00:00Z')
@@ -350,7 +355,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       const request = new Request(
         'http://localhost:3000/api/v1/technical/products/prod-001/history?to_date=2025-01-20T00:00:00Z'
       )
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       expect(mockQuery.lte).toHaveBeenCalledWith('changed_at', '2025-01-20T00:00:00Z')
@@ -371,7 +376,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       const request = new Request(
         'http://localhost:3000/api/v1/technical/products/prod-001/history?from_date=2025-01-10T00:00:00Z&to_date=2025-01-20T00:00:00Z'
       )
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       expect(mockQuery.gte).toHaveBeenCalledWith('changed_at', '2025-01-10T00:00:00Z')
@@ -382,7 +387,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       const request = new Request(
         'http://localhost:3000/api/v1/technical/products/prod-001/history?from_date=2025-01-20T00:00:00Z&to_date=2025-01-10T00:00:00Z'
       )
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(400)
       const body = await response.json()
@@ -393,7 +398,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       const request = new Request(
         'http://localhost:3000/api/v1/technical/products/prod-001/history?from_date=invalid-date'
       )
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(400)
       const body = await response.json()
@@ -415,7 +420,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -438,7 +443,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history?page=2&limit=15')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -467,7 +472,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history?page=1&limit=20')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -497,7 +502,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -529,7 +534,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(200)
       const body = await response.json()
@@ -566,7 +571,7 @@ describe('GET /api/v1/technical/products/:id/history (Story 02.2)', () => {
       })
 
       const request = new Request('http://localhost:3000/api/v1/technical/products/prod-001/history')
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       expect(response.status).toBe(500)
       const body = await response.json()

@@ -16,7 +16,7 @@
  * Test Count: 25+ tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import userEvent from '@testing-library/user-event'
@@ -37,7 +37,10 @@ const mockUsers: User[] = [
     role: {
       id: 'role-2',
       code: 'admin',
-      name: 'Administrator'
+      name: 'Administrator',
+      permissions: {},
+      is_system: true,
+      created_at: '2025-12-01T00:00:00Z',
     },
     language: 'en',
     is_active: true,
@@ -56,7 +59,10 @@ const mockUsers: User[] = [
     role: {
       id: 'role-4',
       code: 'production_operator',
-      name: 'Production Operator'
+      name: 'Production Operator',
+      permissions: {},
+      is_system: true,
+      created_at: '2025-12-01T00:00:00Z',
     },
     language: 'en',
     is_active: false,

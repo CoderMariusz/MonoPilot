@@ -54,6 +54,7 @@ export const zoneRaw: LocationNode = {
   parent_id: null,
   code: 'ZONE-RAW',
   name: 'Raw Materials Zone',
+  description: null,
   level: 'zone',
   full_path: 'WH-001/ZONE-RAW',
   depth: 1,
@@ -67,6 +68,8 @@ export const zoneRaw: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Aisle A01 under ZONE-RAW
@@ -77,6 +80,7 @@ export const aisleA01: LocationNode = {
   parent_id: 'loc-zone-raw',
   code: 'A01',
   name: 'Aisle 01',
+  description: null,
   level: 'aisle',
   full_path: 'WH-001/ZONE-RAW/A01',
   depth: 2,
@@ -90,6 +94,8 @@ export const aisleA01: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Rack R01 under A01
@@ -100,6 +106,7 @@ export const rackR01: LocationNode = {
   parent_id: 'loc-aisle-a01',
   code: 'R01',
   name: 'Rack 01',
+  description: null,
   level: 'rack',
   full_path: 'WH-001/ZONE-RAW/A01/R01',
   depth: 3,
@@ -113,6 +120,8 @@ export const rackR01: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Bin B001 under R01
@@ -123,6 +132,7 @@ export const binB001: LocationNode = {
   parent_id: 'loc-rack-r01',
   code: 'B001',
   name: 'Bin 001',
+  description: null,
   level: 'bin',
   full_path: 'WH-001/ZONE-RAW/A01/R01/B001',
   depth: 4,
@@ -136,6 +146,8 @@ export const binB001: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Bin B002 under R01
@@ -146,6 +158,7 @@ export const binB002: LocationNode = {
   parent_id: 'loc-rack-r01',
   code: 'B002',
   name: 'Bin 002',
+  description: null,
   level: 'bin',
   full_path: 'WH-001/ZONE-RAW/A01/R01/B002',
   depth: 4,
@@ -159,6 +172,8 @@ export const binB002: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Rack R02 under A01
@@ -169,6 +184,7 @@ export const rackR02: LocationNode = {
   parent_id: 'loc-aisle-a01',
   code: 'R02',
   name: 'Rack 02',
+  description: null,
   level: 'rack',
   full_path: 'WH-001/ZONE-RAW/A01/R02',
   depth: 3,
@@ -182,6 +198,8 @@ export const rackR02: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Bin B003 under R02
@@ -192,6 +210,7 @@ export const binB003: LocationNode = {
   parent_id: 'loc-rack-r02',
   code: 'B003',
   name: 'Bin 003',
+  description: null,
   level: 'bin',
   full_path: 'WH-001/ZONE-RAW/A01/R02/B003',
   depth: 4,
@@ -205,6 +224,8 @@ export const binB003: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Bin B004 under R02
@@ -215,6 +236,7 @@ export const binB004: LocationNode = {
   parent_id: 'loc-rack-r02',
   code: 'B004',
   name: 'Bin 004',
+  description: null,
   level: 'bin',
   full_path: 'WH-001/ZONE-RAW/A01/R02/B004',
   depth: 4,
@@ -228,6 +250,8 @@ export const binB004: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Aisle A02 under ZONE-RAW
@@ -238,6 +262,7 @@ export const aisleA02: LocationNode = {
   parent_id: 'loc-zone-raw',
   code: 'A02',
   name: 'Aisle 02',
+  description: null,
   level: 'aisle',
   full_path: 'WH-001/ZONE-RAW/A02',
   depth: 2,
@@ -251,6 +276,8 @@ export const aisleA02: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Rack R03 under A02 (empty)
@@ -261,6 +288,7 @@ export const rackR03: LocationNode = {
   parent_id: 'loc-aisle-a02',
   code: 'R03',
   name: 'Rack 03',
+  description: null,
   level: 'rack',
   full_path: 'WH-001/ZONE-RAW/A02/R03',
   depth: 3,
@@ -274,6 +302,8 @@ export const rackR03: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Zone: Finished Goods
@@ -284,6 +314,7 @@ export const zoneFG: LocationNode = {
   parent_id: null,
   code: 'ZONE-FG',
   name: 'Finished Goods Zone',
+  description: null,
   level: 'zone',
   full_path: 'WH-001/ZONE-FG',
   depth: 1,
@@ -297,6 +328,8 @@ export const zoneFG: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Aisle A03 under ZONE-FG
@@ -307,6 +340,7 @@ export const aisleA03: LocationNode = {
   parent_id: 'loc-zone-fg',
   code: 'A03',
   name: 'Aisle 03',
+  description: null,
   level: 'aisle',
   full_path: 'WH-001/ZONE-FG/A03',
   depth: 2,
@@ -320,6 +354,8 @@ export const aisleA03: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Rack R04 under A03
@@ -330,6 +366,7 @@ export const rackR04: LocationNode = {
   parent_id: 'loc-aisle-a03',
   code: 'R04',
   name: 'Rack 04',
+  description: null,
   level: 'rack',
   full_path: 'WH-001/ZONE-FG/A03/R04',
   depth: 3,
@@ -343,6 +380,8 @@ export const rackR04: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Bin B005 under R04
@@ -353,6 +392,7 @@ export const binB005: LocationNode = {
   parent_id: 'loc-rack-r04',
   code: 'B005',
   name: 'Bin 005',
+  description: null,
   level: 'bin',
   full_path: 'WH-001/ZONE-FG/A03/R04/B005',
   depth: 4,
@@ -366,6 +406,8 @@ export const binB005: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Bin B006 under R04
@@ -376,6 +418,7 @@ export const binB006: LocationNode = {
   parent_id: 'loc-rack-r04',
   code: 'B006',
   name: 'Bin 006',
+  description: null,
   level: 'bin',
   full_path: 'WH-001/ZONE-FG/A03/R04/B006',
   depth: 4,
@@ -389,6 +432,8 @@ export const binB006: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Aisle A04 under ZONE-FG
@@ -399,6 +444,7 @@ export const aisleA04: LocationNode = {
   parent_id: 'loc-zone-fg',
   code: 'A04',
   name: 'Aisle 04',
+  description: null,
   level: 'aisle',
   full_path: 'WH-001/ZONE-FG/A04',
   depth: 2,
@@ -412,6 +458,8 @@ export const aisleA04: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Rack R05 under A04
@@ -422,6 +470,7 @@ export const rackR05: LocationNode = {
   parent_id: 'loc-aisle-a04',
   code: 'R05',
   name: 'Rack 05',
+  description: null,
   level: 'rack',
   full_path: 'WH-001/ZONE-FG/A04/R05',
   depth: 3,
@@ -435,6 +484,8 @@ export const rackR05: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Bin B007 under R05
@@ -445,6 +496,7 @@ export const binB007: LocationNode = {
   parent_id: 'loc-rack-r05',
   code: 'B007',
   name: 'Bin 007',
+  description: null,
   level: 'bin',
   full_path: 'WH-001/ZONE-FG/A04/R05/B007',
   depth: 4,
@@ -458,6 +510,8 @@ export const binB007: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Zone: Bulk Storage (no hierarchy, direct floor location)
@@ -468,6 +522,7 @@ export const zoneBulk: LocationNode = {
   parent_id: null,
   code: 'ZONE-BULK',
   name: 'Bulk Storage Zone',
+  description: null,
   level: 'zone',
   full_path: 'WH-001/ZONE-BULK',
   depth: 1,
@@ -481,6 +536,8 @@ export const zoneBulk: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Floor location under ZONE-BULK
@@ -491,6 +548,7 @@ export const floorLocation: LocationNode = {
   parent_id: 'loc-zone-bulk',
   code: 'FLOOR-01',
   name: 'Floor Location 01',
+  description: null,
   level: 'aisle', // Using aisle level for floor locations
   full_path: 'WH-001/ZONE-BULK/FLOOR-01',
   depth: 2,
@@ -504,6 +562,8 @@ export const floorLocation: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Zone: Shipping (empty staging area)
@@ -514,6 +574,7 @@ export const zoneShipping: LocationNode = {
   parent_id: null,
   code: 'ZONE-SHIPPING',
   name: 'Shipping Dock',
+  description: null,
   level: 'zone',
   full_path: 'WH-001/ZONE-SHIPPING',
   depth: 1,
@@ -527,6 +588,8 @@ export const zoneShipping: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 // Dock location under ZONE-SHIPPING
@@ -537,6 +600,7 @@ export const dockLocation: LocationNode = {
   parent_id: 'loc-zone-shipping',
   code: 'DOCK-01',
   name: 'Dock 01',
+  description: null,
   level: 'aisle',
   full_path: 'WH-001/ZONE-SHIPPING/DOCK-01',
   depth: 2,
@@ -550,6 +614,8 @@ export const dockLocation: LocationNode = {
   children: [],
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T00:00:00Z',
+  created_by: null,
+  updated_by: null,
 }
 
 /**

@@ -73,11 +73,16 @@ export interface Location {
   updated_by: string | null
 }
 
+/**
+ * LocationNode extends Location with tree structure and computed fields.
+ * Note: children_count, capacity_percent, and lp_count are computed/aggregated fields
+ * that may not be present in all contexts (e.g., test fixtures, partial data).
+ */
 export interface LocationNode extends Location {
   children: LocationNode[]
-  children_count: number
-  capacity_percent: number | null
-  lp_count: number
+  children_count?: number
+  capacity_percent?: number | null
+  lp_count?: number
 }
 
 export interface LocationTreeResponse {

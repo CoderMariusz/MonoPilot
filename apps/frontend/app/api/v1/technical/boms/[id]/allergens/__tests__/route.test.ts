@@ -158,7 +158,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN returns 401
       expect(response.status).toBe(401)
@@ -175,7 +175,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN returns 403 Forbidden
       expect(response.status).toBe(403)
@@ -196,7 +196,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN returns 200 with recalculation results
       expect(response.status).toBe(200)
@@ -218,7 +218,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN allergens fetched from all BOM ingredients
       expect(response.status).toBe(200)
@@ -257,7 +257,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN parent product inherits Gluten (contains) with source=auto
       expect(response.status).toBe(200)
@@ -281,7 +281,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN manual declarations preserved (not overwritten)
       expect(response.status).toBe(200)
@@ -322,7 +322,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN single Gluten allergen with multiple source products
       expect(response.status).toBe(200)
@@ -357,7 +357,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN stale Milk allergen removed
       expect(response.status).toBe(200)
@@ -392,7 +392,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN only Gluten inherited (contains), not Peanuts (may_contain)
       expect(response.status).toBe(200)
@@ -412,7 +412,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN BOM version included in response
       expect(response.status).toBe(200)
@@ -434,7 +434,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'non-existent' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'non-existent' }) })
 
       // THEN returns 404
       expect(response.status).toBe(404)
@@ -460,7 +460,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN returns 422 Unprocessable Entity
       expect(response.status).toBe(422)
@@ -481,7 +481,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-001' }) })
 
       // THEN returns 500
       expect(response.status).toBe(500)
@@ -506,7 +506,7 @@ describe('Story 02.3: POST /api/v1/technical/boms/:id/allergens - Recalculate Al
         method: 'POST',
       })
 
-      const response = await POST(request, { params: { id: 'bom-empty' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'bom-empty' }) })
 
       // THEN returns empty inherited_allergens
       expect(response.status).toBe(200)

@@ -150,7 +150,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 401
       expect(response.status).toBe(401)
@@ -169,7 +169,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 200 with allergens
       expect(response.status).toBe(200)
@@ -189,7 +189,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns allergens within 500ms
       expect(response.status).toBe(200)
@@ -210,7 +210,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN auto allergen shows source and ingredient names
       expect(response.status).toBe(200)
@@ -230,7 +230,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN manual allergen shows MANUAL badge
       expect(response.status).toBe(200)
@@ -249,7 +249,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns empty array
       expect(response.status).toBe(200)
@@ -267,7 +267,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN includes inheritance_status
       expect(response.status).toBe(200)
@@ -289,7 +289,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/non-existent/allergens')
 
-      const response = await GET(request, { params: { id: 'non-existent' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'non-existent' }) })
 
       // THEN returns 404
       expect(response.status).toBe(404)
@@ -308,7 +308,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/org-b-prod/allergens')
 
-      const response = await GET(request, { params: { id: 'org-b-prod' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'org-b-prod' }) })
 
       // THEN returns 404 (not 403)
       expect(response.status).toBe(404)
@@ -326,7 +326,7 @@ describe('Story 02.3: GET /api/v1/technical/products/:id/allergens - List Produc
       // WHEN GET request is made
       const request = new NextRequest('http://localhost/api/v1/technical/products/prod-001/allergens')
 
-      const response = await GET(request, { params: { id: 'prod-001' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 500
       expect(response.status).toBe(500)
@@ -356,7 +356,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 401
       expect(response.status).toBe(401)
@@ -375,7 +375,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 403 Forbidden
       expect(response.status).toBe(403)
@@ -405,7 +405,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 201 Created
       expect(response.status).toBe(201)
@@ -440,7 +440,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN allergen saved with relation_type=contains, source=manual
       expect(response.status).toBe(201)
@@ -476,7 +476,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN allergen saved with reason
       expect(response.status).toBe(201)
@@ -496,7 +496,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN validation error
       expect(response.status).toBe(400)
@@ -515,7 +515,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN validation error
       expect(response.status).toBe(400)
@@ -541,7 +541,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 409 Conflict
       expect(response.status).toBe(409)
@@ -559,7 +559,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 400 Bad Request
       expect(response.status).toBe(400)
@@ -577,7 +577,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 400 Bad Request
       expect(response.status).toBe(400)
@@ -594,7 +594,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 400 Bad Request
       expect(response.status).toBe(400)
@@ -618,7 +618,7 @@ describe('Story 02.3: POST /api/v1/technical/products/:id/allergens - Add Allerg
         }),
       })
 
-      const response = await POST(request, { params: { id: 'prod-001' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'prod-001' }) })
 
       // THEN returns 500
       expect(response.status).toBe(500)
@@ -642,7 +642,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         method: 'DELETE',
       })
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'pa-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'pa-001' }) })
 
       // THEN returns 401
       expect(response.status).toBe(401)
@@ -657,7 +657,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         method: 'DELETE',
       })
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'pa-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'pa-001' }) })
 
       // THEN returns 403 Forbidden
       expect(response.status).toBe(403)
@@ -678,7 +678,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         method: 'DELETE',
       })
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'pa-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'pa-001' }) })
 
       // THEN returns 204 No Content
       expect(response.status).toBe(204)
@@ -698,7 +698,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         method: 'DELETE',
       })
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'pa-002' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'pa-002' }) })
 
       // THEN allergen removed
       expect(response.status).toBe(204)
@@ -716,7 +716,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         method: 'DELETE',
       })
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'pa-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'pa-001' }) })
 
       // THEN allergen removed (with warning in UI)
       expect(response.status).toBe(204)
@@ -735,7 +735,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         { method: 'DELETE' }
       )
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'allergen-a01' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'allergen-a01' }) })
 
       // THEN allergen removed
       expect(response.status).toBe(204)
@@ -753,7 +753,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         method: 'DELETE',
       })
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'non-existent' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'non-existent' }) })
 
       // THEN returns 404
       expect(response.status).toBe(404)
@@ -775,7 +775,7 @@ describe('Story 02.3: DELETE /api/v1/technical/products/:id/allergens/:allergenI
         method: 'DELETE',
       })
 
-      const response = await DELETE(request, { params: { id: 'prod-001', allergenId: 'pa-001' } })
+      const response = await DELETE(request, { params: Promise.resolve({ id: 'prod-001', allergenId: 'pa-001' }) })
 
       // THEN returns 500
       expect(response.status).toBe(500)
