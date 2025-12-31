@@ -30,7 +30,7 @@ export async function DELETE(
     // Get current user
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
