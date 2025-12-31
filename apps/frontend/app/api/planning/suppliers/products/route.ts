@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { validateOrigin, createCsrfErrorResponse } from '@/lib/csrf'
 
 // GET /api/planning/suppliers/products - Get supplier-product assignments
 // Query params:
@@ -88,6 +89,11 @@ export async function GET(request: NextRequest) {
 // POST /api/planning/suppliers/products - Create supplier-product assignment
 export async function POST(request: NextRequest) {
   try {
+    // CSRF Protection: Validate request origin
+    if (!validateOrigin(request)) {
+      return NextResponse.json(createCsrfErrorResponse(), { status: 403 })
+    }
+
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -222,6 +228,11 @@ export async function POST(request: NextRequest) {
 // Query params: supplier_id and product_id (both required)
 export async function DELETE(request: NextRequest) {
   try {
+    // CSRF Protection: Validate request origin
+    if (!validateOrigin(request)) {
+      return NextResponse.json(createCsrfErrorResponse(), { status: 403 })
+    }
+
     const supabase = await createServerSupabase()
 
     // Check authentication

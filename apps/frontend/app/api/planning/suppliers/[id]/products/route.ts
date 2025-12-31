@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import { supplierProductSchema, type SupplierProductInput } from '@/lib/validation/planning-schemas'
 import { ZodError, z } from 'zod'
+import { validateOrigin, createCsrfErrorResponse } from '@/lib/csrf'
 
 // GET /api/planning/suppliers/:id/products - Get assigned products
 export async function GET(
@@ -72,6 +73,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // CSRF Protection: Validate request origin
+    if (!validateOrigin(request)) {
+      return NextResponse.json(createCsrfErrorResponse(), { status: 403 })
+    }
+
     const { id } = await params
     const supabase = await createServerSupabase()
 

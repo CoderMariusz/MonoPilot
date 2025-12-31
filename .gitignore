@@ -56,3 +56,15 @@ build/
 .next/
 .cache/
 node_modules/
+
+# TypeScript error monitoring cache
+apps/frontend/.type-check-cache/
+*.type-check-cache/
+
+# TypeScript incremental check temp files
+apps/frontend/tsconfig.incremental.json
+apps/frontend/tsconfig.incremental.tsbuildinfo
+
+# TypeScript reports
+typescript-report-*.html
+typescript-errors-*.json

@@ -1,8 +1,163 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+echo "Running pre-push checks..."
+echo ""
+
+# Run linting
 if command -v pnpm >/dev/null 2>&1; then
-  pnpm run pre-push
+  echo ">> Running linter..."
+  pnpm run lint || exit 1
+  echo "[OK] Linting passed"
+  echo ""
 else
-  echo "pnpm not found, skipping pre-push checks"
+  echo "[!] pnpm not found, skipping checks"
+  exit 0
 fi
+
+# ============================================
+# TypeScript Type-Checking with Soft Enforcement
+# ============================================
+
+# Source configuration (if available)
+SCRIPT_DIR="$(dirname "$0")/.."
+CONFIG_FILE="$SCRIPT_DIR/scripts/type-check-config.sh"
+
+# Default values (will be overridden by config if sourced)
+ENFORCEMENT_MODE="${ENFORCEMENT_MODE:-warn}"
+BASELINE_ERRORS="${BASELINE_ERRORS:-298}"
+STRICT_MODE_THRESHOLD="${STRICT_MODE_THRESHOLD:-50}"
+
+# Try to source config file
+if [ -f "$CONFIG_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$CONFIG_FILE" 2>/dev/null || true
+fi
+
+echo ">> Running TypeScript type-check..."
+echo "   Enforcement Mode: $ENFORCEMENT_MODE"
+echo ""
+
+# Run type-check and capture result
+TYPE_CHECK_OUTPUT=""
+TYPE_CHECK_EXIT=0
+
+# Use incremental check for fast feedback on staged files
+# This runs in ~3-10 seconds vs 2+ minutes for full check
+# Falls back to full check when config files change or >20 files staged
+if bash ./scripts/type-check-incremental.sh; then
+  TYPE_CHECK_EXIT=0
+else
+  TYPE_CHECK_EXIT=1
+fi
+
+# Get current error count from cache
+CACHE_DIR="apps/frontend/.type-check-cache"
+CURRENT_ERRORS=0
+
+if [ -f "$CACHE_DIR/error-trends.json" ]; then
+  # Extract last error count - compatible with sh
+  LAST_LINE=$(tail -1 "$CACHE_DIR/error-trends.json" 2>/dev/null || echo "")
+  if [ -n "$LAST_LINE" ]; then
+    CURRENT_ERRORS=$(echo "$LAST_LINE" | grep -o '"total":[0-9]*' | cut -d: -f2 | head -1 || echo "0")
+  fi
+fi
+
+# Handle based on enforcement mode
+case "$ENFORCEMENT_MODE" in
+  warn)
+    # Phase 1: Warning mode - don't block
+    if [ "$TYPE_CHECK_EXIT" -ne 0 ]; then
+      echo ""
+      echo "+-----------------------------------------------------------+"
+      echo "|  TypeScript Errors Found (WARNING ONLY)                   |"
+      echo "+-----------------------------------------------------------+"
+      echo ""
+      echo "  Current errors: $CURRENT_ERRORS"
+      echo "  Baseline: $BASELINE_ERRORS"
+      echo ""
+      echo "  This pre-push check will start BLOCKING after:"
+      echo "    - Phase 2: When error count increases (prevent regression)"
+      echo "    - Phase 3: When error count < $STRICT_MODE_THRESHOLD (strict mode)"
+      echo ""
+      echo "  Help fix errors: pnpm type-check:full"
+      echo "  Check status:    pnpm type-check:status"
+      echo ""
+      echo "  Proceeding with push (errors will be reported in CI/CD)..."
+      echo ""
+    fi
+    # Always exit 0 in warn mode
+    echo "[OK] Type-check completed (warning mode)"
+    ;;
+
+  prevent-regression)
+    # Phase 2: Block only if errors increased
+    if [ "$TYPE_CHECK_EXIT" -ne 0 ]; then
+      if [ "$CURRENT_ERRORS" -gt "$BASELINE_ERRORS" ]; then
+        echo ""
+        echo "+-----------------------------------------------------------+"
+        echo "|  [ERROR] TypeScript Error Count INCREASED                 |"
+        echo "+-----------------------------------------------------------+"
+        echo ""
+        echo "  Current errors: $CURRENT_ERRORS"
+        echo "  Baseline: $BASELINE_ERRORS"
+        echo "  Increase: +$((CURRENT_ERRORS - BASELINE_ERRORS))"
+        echo ""
+        echo "  Push BLOCKED: You've added new TypeScript errors."
+        echo ""
+        echo "  Options:"
+        echo "    1. Fix the new errors before pushing"
+        echo "    2. View details: pnpm type-check:full"
+        echo "    3. Emergency skip: git push --no-verify"
+        echo ""
+        exit 1
+      else
+        echo ""
+        echo "+-----------------------------------------------------------+"
+        echo "|  TypeScript Errors (No Regression)                        |"
+        echo "+-----------------------------------------------------------+"
+        echo ""
+        echo "  Current errors: $CURRENT_ERRORS"
+        echo "  Baseline: $BASELINE_ERRORS"
+        if [ "$CURRENT_ERRORS" -lt "$BASELINE_ERRORS" ]; then
+          echo "  Progress: $((BASELINE_ERRORS - CURRENT_ERRORS)) errors fixed!"
+        fi
+        echo ""
+        echo "  No new errors added. Proceeding with push..."
+        echo ""
+      fi
+    fi
+    echo "[OK] Type-check completed (prevent-regression mode)"
+    ;;
+
+  strict)
+    # Phase 3: Block all errors
+    if [ "$TYPE_CHECK_EXIT" -ne 0 ]; then
+      echo ""
+      echo "+-----------------------------------------------------------+"
+      echo "|  [ERROR] TypeScript Errors Found (STRICT MODE)            |"
+      echo "+-----------------------------------------------------------+"
+      echo ""
+      echo "  Current errors: $CURRENT_ERRORS"
+      echo ""
+      echo "  Push BLOCKED: Strict mode requires zero TypeScript errors."
+      echo ""
+      echo "  Options:"
+      echo "    1. Fix all errors before pushing"
+      echo "    2. View details: pnpm type-check:full"
+      echo "    3. Emergency skip: git push --no-verify"
+      echo ""
+      exit 1
+    fi
+    echo "[OK] Type-check passed (strict mode)"
+    ;;
+
+  *)
+    echo "[!] Unknown enforcement mode: $ENFORCEMENT_MODE"
+    echo "    Valid modes: warn, prevent-regression, strict"
+    echo "    Proceeding with push..."
+    ;;
+esac
+
+echo ""
+echo "[OK] All pre-push checks passed!"

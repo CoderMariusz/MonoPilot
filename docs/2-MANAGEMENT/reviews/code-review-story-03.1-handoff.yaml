@@ -1,0 +1,300 @@
+# Code Review Handoff: Story 03.1 - Suppliers CRUD
+# Date: 2025-12-30
+# From: CODE-REVIEWER
+# To: BACKEND-DEV
+# Status: REQUEST_CHANGES
+
+story:
+  id: "03.1"
+  name: "Suppliers CRUD + Master Data"
+  epic: "03-planning"
+  phase: "CODE_REVIEW"
+
+decision: REQUEST_CHANGES
+
+scores:
+  security: 5/10  # CRITICAL issues found
+  code_quality: 8/10  # Good, but blocked by security
+  overall: "BLOCKED - Must fix CRITICAL security issues"
+
+blocking_issues:
+  critical:
+    - id: CRITICAL-1
+      title: "Admin Bypass via SECURITY DEFINER in RPC Functions"
+      severity: CRITICAL
+      cvss: 7.5
+      cwe: CWE-269
+      impact: "RLS bypass allows cross-tenant data access"
+      files:
+        - supabase/migrations/060_create_suppliers_table.sql
+      lines: [74, 114, 156]
+      fix_required: "Remove SECURITY DEFINER, use SECURITY INVOKER"
+      estimated_time: "2 hours"
+
+    - id: CRITICAL-2
+      title: "Missing CSRF Protection on State-Changing Endpoints"
+      severity: CRITICAL
+      cvss: 8.1
+      cwe: CWE-352
+      impact: "Attackers can forge requests to modify/delete suppliers"
+      files:
+        - apps/frontend/app/api/planning/suppliers/route.ts
+        - apps/frontend/app/api/planning/suppliers/[id]/route.ts
+        - apps/frontend/app/api/planning/suppliers/bulk-deactivate/route.ts
+        - apps/frontend/app/api/planning/suppliers/bulk-activate/route.ts
+      fix_required: "Implement CSRF token validation middleware"
+      estimated_time: "3 hours"
+
+  major:
+    - id: MAJOR-3
+      title: "Information Disclosure via Error Messages"
+      severity: MAJOR
+      cwe: CWE-209
+      impact: "Error messages leak database structure and implementation details"
+      files: "All API routes (8 files)"
+      fix_required: "Sanitize errors in production, log details server-side only"
+      estimated_time: "1 hour"
+
+    - id: MAJOR-4
+      title: "Missing Rate Limiting"
+      severity: MAJOR
+      cwe: CWE-770
+      impact: "DoS, resource exhaustion, code enumeration attacks possible"
+      files: "All API routes"
+      fix_required: "Implement rate limiting middleware with Redis"
+      estimated_time: "2 hours"
+
+  minor:
+    - id: MINOR-5
+      title: "SQL Injection Risk in Search Filter"
+      severity: MINOR
+      cwe: CWE-89
+      files:
+        - apps/frontend/lib/services/supplier-service.ts
+      lines: [207]
+      fix_required: "Use Supabase built-in filtering instead of manual escaping"
+
+    - id: MINOR-6
+      title: "Weak Input Validation on Bulk Operations"
+      severity: MINOR
+      cwe: CWE-1284
+      files:
+        - apps/frontend/lib/validation/supplier-schema.ts
+      lines: [160, 178]
+      fix_required: "Add .max(100) to bulk operation schemas"
+
+    - id: MINOR-7
+      title: "Hardcoded Pagination Limits"
+      severity: MINOR
+      files:
+        - apps/frontend/lib/validation/supplier-schema.ts
+      lines: [219]
+      fix_required: "Use environment variable for MAX_PAGE_SIZE"
+
+acceptance_criteria_status:
+  total: 18
+  passed: 12
+  failed: 1
+  pending: 5
+
+  failures:
+    - ac: AC-16
+      title: "RLS Policy Enforcement"
+      reason: "SECURITY DEFINER bypasses RLS in RPC functions"
+      blocker: true
+
+  pending:
+    - AC-1: "Need to verify frontend components"
+    - AC-7: "Search escaping could be improved"
+    - AC-15: "Returns CSV not XLSX (acceptable for MVP)"
+    - AC-17: "Need to verify detail page"
+    - AC-18: "Need to verify responsive design"
+
+test_status:
+  unit_tests: 137
+  status: GREEN
+  note: "All backend tests passing, but security issues block approval"
+
+required_actions:
+  immediate:
+    - action: "Fix CRITICAL-1: Remove SECURITY DEFINER from RPC functions"
+      priority: P0
+      files:
+        - supabase/migrations/060_create_suppliers_table.sql
+      details: |
+        Change all three RPC functions from SECURITY DEFINER to SECURITY INVOKER:
+        - get_supplier_dependency_counts()
+        - get_next_supplier_code()
+        - validate_supplier_code()
+
+        Add proper RLS-aware queries that check org_id BEFORE accessing data.
+
+    - action: "Fix CRITICAL-2: Implement CSRF protection"
+      priority: P0
+      files:
+        - apps/frontend/middleware.ts (CREATE NEW)
+      details: |
+        Create middleware.ts with CSRF token validation for:
+        - POST /api/planning/suppliers
+        - PUT /api/planning/suppliers/[id]
+        - DELETE /api/planning/suppliers/[id]
+        - POST /api/planning/suppliers/bulk-*
+
+        Options:
+        1. CSRF token in custom header (X-CSRF-Token)
+        2. SameSite=Strict cookie attribute
+        3. Double-submit cookie pattern
+
+  high_priority:
+    - action: "Fix MAJOR-3: Sanitize error messages"
+      priority: P1
+      files: "All 8 API route files"
+      details: |
+        Replace all error responses like:
+        message: error instanceof Error ? error.message : 'Internal server error'
+
+        With:
+        message: 'An unexpected error occurred. Please try again later.'
+
+        Add development-only debug field:
+        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
+
+    - action: "Fix MAJOR-4: Add rate limiting"
+      priority: P1
+      files:
+        - lib/rate-limit.ts (CREATE NEW)
+      details: |
+        Implement rate limiting with @upstash/ratelimit:
+        - 10 requests per 10 seconds per user for validate-code
+        - 20 requests per minute for list/summary
+        - 5 requests per minute for bulk operations
+        - 3 requests per minute for export
+
+  medium_priority:
+    - action: "Fix MINOR-6: Add bulk operation limits"
+      priority: P2
+      files:
+        - apps/frontend/lib/validation/supplier-schema.ts
+      details: |
+        Add .max(100) to:
+        - bulkDeactivateSchema.supplier_ids
+        - bulkActivateSchema.supplier_ids
+
+    - action: "Fix MINOR-5: Improve search escaping"
+      priority: P2
+      files:
+        - apps/frontend/lib/services/supplier-service.ts
+      details: "Use Supabase built-in filtering instead of manual regex escaping"
+
+next_steps:
+  - step: "BACKEND-DEV fixes CRITICAL-1 and CRITICAL-2"
+    deadline: "4-6 hours"
+
+  - step: "BACKEND-DEV commits fixes and updates migration"
+    note: "May require new migration file if RPC functions change"
+
+  - step: "BACKEND-DEV re-runs all 137 tests to verify no regressions"
+    note: "Tests must remain GREEN"
+
+  - step: "CODE-REVIEWER re-reviews code"
+    note: "Security re-assessment required"
+
+  - step: "If APPROVED, handoff to QA-AGENT for security testing"
+    note: "QA must verify RLS, CSRF, rate limiting"
+
+handoff_artifacts:
+  review_document: "docs/2-MANAGEMENT/reviews/code-review-story-03.1.md"
+
+  files_to_modify:
+    critical:
+      - supabase/migrations/060_create_suppliers_table.sql
+      - apps/frontend/middleware.ts (NEW)
+
+    high_priority:
+      - apps/frontend/app/api/planning/suppliers/*.ts (8 files)
+      - apps/frontend/lib/rate-limit.ts (NEW)
+
+    medium_priority:
+      - apps/frontend/lib/validation/supplier-schema.ts
+      - apps/frontend/lib/services/supplier-service.ts
+
+estimated_fix_time:
+  critical_fixes: "4-6 hours"
+  high_priority_fixes: "3 hours"
+  medium_priority_fixes: "1 hour"
+  total: "8-10 hours"
+
+security_testing_required:
+  - RLS bypass testing with cross-tenant requests
+  - CSRF attack simulation
+  - Rate limiting stress tests
+  - Error message enumeration attempts
+  - SQL injection attempts in search
+
+positive_findings:
+  - Excellent Zod validation schemas (comprehensive and well-documented)
+  - Good separation of concerns (service/API/validation layers)
+  - Proper audit trail (created_by/updated_by)
+  - Strong TypeScript typing throughout
+  - Business logic well-implemented (canDelete/canDeactivate)
+  - 137 tests passing (GREEN phase)
+  - Follows project patterns consistently
+
+code_quality_highlights:
+  - architecture: 9/10
+  - type_safety: 9/10
+  - validation: 10/10
+  - testing: 9/10
+  - error_handling: 7/10
+  - documentation: 7/10
+
+references:
+  prd: "docs/1-BASELINE/product/modules/planning.md (FR-PLAN-001 to FR-PLAN-004)"
+  story: "docs/2-MANAGEMENT/epics/current/03-planning/03.1.suppliers-crud.md"
+  adr: "ADR-013 (Multi-tenancy RLS Policy)"
+  owasp: "A01:2021 (Broken Access Control), A03:2021 (Injection)"
+  cwe:
+    - CWE-269 (Improper Privilege Management)
+    - CWE-352 (CSRF)
+    - CWE-209 (Information Exposure)
+    - CWE-770 (Resource Allocation)
+
+qa_checklist_for_retest:
+  rls:
+    - "User from Org A cannot access Org B suppliers via API"
+    - "RPC functions respect RLS and org_id boundaries"
+    - "get_supplier_dependency_counts respects RLS"
+
+  csrf:
+    - "POST requests fail without CSRF token"
+    - "PUT/DELETE requests fail without CSRF token"
+    - "Valid CSRF token allows operations"
+
+  rate_limiting:
+    - "Validate-code endpoint rejects after limit exceeded"
+    - "Bulk operations have rate limits"
+    - "Rate limit headers present in responses"
+
+  error_handling:
+    - "500 errors don't leak stack traces"
+    - "404 errors don't reveal cross-tenant data"
+    - "Validation errors are clear and actionable"
+
+reviewer_notes: |
+  This is a well-architected implementation with good code quality, but
+  CRITICAL security issues block approval. The SECURITY DEFINER vulnerability
+  is especially concerning as it bypasses the fundamental RLS policy that
+  ensures multi-tenant isolation.
+
+  Once CRITICAL-1 and CRITICAL-2 are fixed, this should be APPROVED with
+  recommendations to address MAJOR issues before production deployment.
+
+  The code demonstrates good understanding of MonoPilot patterns and the
+  developer should be commended for comprehensive validation and clean
+  separation of concerns.
+
+contact:
+  reviewer: CODE-REVIEWER
+  developer: BACKEND-DEV
+  next_reviewer: CODE-REVIEWER (for re-review)
+  qa_agent: QA-AGENT (after approval)

@@ -1,15 +1,27 @@
-// API Route: Individual Supplier Operations
-// Epic 3 Batch 3A - Story 3.17: Supplier Management
-// GET /api/planning/suppliers/:id - Get supplier by ID
-// PUT /api/planning/suppliers/:id - Update supplier
-// DELETE /api/planning/suppliers/:id - Delete supplier
+/**
+ * API Route: Individual Supplier Operations
+ * Story: 03.1 - Suppliers CRUD + Master Data
+ *
+ * GET /api/planning/suppliers/:id - Get supplier by ID
+ * PUT /api/planning/suppliers/:id - Update supplier
+ * DELETE /api/planning/suppliers/:id - Delete supplier
+ */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
-import { updateSupplierSchema, type UpdateSupplierInput } from '@/lib/validation/planning-schemas'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { updateSupplierSchema } from '@/lib/validation/supplier-schema'
+import {
+  getSupplier,
+  updateSupplier,
+  deleteSupplier,
+} from '@/lib/services/supplier-service'
 import { ZodError } from 'zod'
+import { validateOrigin, createCsrfErrorResponse } from '@/lib/csrf'
 
-// GET /api/planning/suppliers/:id - Get supplier details
+/**
+ * GET /api/planning/suppliers/:id
+ * Get supplier details with tax code
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,47 +37,68 @@ export async function GET(
     } = await supabase.auth.getSession()
 
     if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
+        { status: 401 }
+      )
     }
 
-    // Get current user
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('role, org_id')
-      .eq('id', session.user.id)
-      .single()
+    // Fetch supplier
+    const supplier = await getSupplier(id)
 
-    if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!supplier) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'SUPPLIER_NOT_FOUND',
+            message: 'Supplier not found',
+          },
+        },
+        { status: 404 }
+      )
     }
 
-    const supabaseAdmin = createServerSupabaseAdmin()
-
-    // Fetch supplier with RLS (org_id check)
-    const { data, error } = await supabaseAdmin
-      .from('suppliers')
-      .select('*, tax_codes(code, description, rate)')
-      .eq('id', id)
-      .eq('org_id', currentUser.org_id)
-      .single()
-
-    if (error || !data) {
-      return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ supplier: data })
+    return NextResponse.json({
+      success: true,
+      data: supplier,
+    })
   } catch (error) {
     console.error('Error in GET /api/planning/suppliers/:id:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred. Please try again later.',
+          ...(process.env.NODE_ENV === 'development' && {
+            debug: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        },
+      },
+      { status: 500 }
+    )
   }
 }
 
-// PUT /api/planning/suppliers/:id - Update supplier
+/**
+ * PUT /api/planning/suppliers/:id
+ * Update supplier
+ */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // CSRF Protection: Validate request origin
+    if (!validateOrigin(request)) {
+      return NextResponse.json(
+        { success: false, ...createCsrfErrorResponse() },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     const supabase = await createServerSupabase()
 
@@ -76,88 +109,128 @@ export async function PUT(
     } = await supabase.auth.getSession()
 
     if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get current user
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('role, org_id')
-      .eq('id', session.user.id)
-      .single()
-
-    if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Authorization: Purchasing, Manager, Admin
-    if (!['purchasing', 'manager', 'admin'].includes(currentUser.role.toLowerCase())) {
       return NextResponse.json(
-        { error: 'Forbidden: Purchasing role or higher required' },
-        { status: 403 }
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
+        { status: 401 }
       )
     }
 
     // Parse and validate request body
     const body = await request.json()
-    const validatedData: UpdateSupplierInput = updateSupplierSchema.parse(body)
-
-    const supabaseAdmin = createServerSupabaseAdmin()
-
-    // Check if supplier exists and belongs to user's org
-    const { data: existingSupplier } = await supabaseAdmin
-      .from('suppliers')
-      .select('id')
-      .eq('id', id)
-      .eq('org_id', currentUser.org_id)
-      .single()
-
-    if (!existingSupplier) {
-      return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
-    }
+    const validatedData = updateSupplierSchema.parse(body)
 
     // Update supplier
-    const { data, error: updateError } = await supabaseAdmin
-      .from('suppliers')
-      .update({
-        ...validatedData,
-        updated_by: session.user.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .eq('org_id', currentUser.org_id)
-      .select()
-      .single()
-
-    if (updateError) {
-      console.error('Error updating supplier:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
+    const supplier = await updateSupplier(id, validatedData)
 
     return NextResponse.json({
-      supplier: data,
-      message: 'Supplier updated successfully',
+      success: true,
+      data: supplier,
     })
   } catch (error) {
     console.error('Error in PUT /api/planning/suppliers/:id:', error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Validation failed',
+            details: error.errors,
+          },
+        },
         { status: 400 }
       )
     }
 
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // Handle business rule errors
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+    if (errorMessage === 'SUPPLIER_NOT_FOUND') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'SUPPLIER_NOT_FOUND',
+            message: 'Supplier not found',
+          },
+        },
+        { status: 404 }
+      )
+    }
+
+    if (errorMessage === 'SUPPLIER_CODE_LOCKED') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'SUPPLIER_CODE_LOCKED',
+            message: 'Cannot change code - supplier has purchase orders',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (errorMessage === 'SUPPLIER_CODE_EXISTS') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'SUPPLIER_CODE_EXISTS',
+            message: 'Supplier code already exists in organization',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (errorMessage === 'TAX_CODE_NOT_FOUND') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'TAX_CODE_NOT_FOUND',
+            message: 'Tax code not found',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred. Please try again later.',
+          ...(process.env.NODE_ENV === 'development' && {
+            debug: errorMessage,
+          }),
+        },
+      },
+      { status: 500 }
+    )
   }
 }
 
-// DELETE /api/planning/suppliers/:id - Delete supplier
+/**
+ * DELETE /api/planning/suppliers/:id
+ * Delete supplier (if no POs or products)
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // CSRF Protection: Validate request origin
+    if (!validateOrigin(request)) {
+      return NextResponse.json(
+        { success: false, ...createCsrfErrorResponse() },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
     const supabase = await createServerSupabase()
 
@@ -168,61 +241,78 @@ export async function DELETE(
     } = await supabase.auth.getSession()
 
     if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get current user
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('role, org_id')
-      .eq('id', session.user.id)
-      .single()
-
-    if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Authorization: Manager, Admin only
-    if (!['manager', 'admin'].includes(currentUser.role.toLowerCase())) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager role or higher required' },
-        { status: 403 }
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
+        { status: 401 }
       )
     }
 
-    const supabaseAdmin = createServerSupabaseAdmin()
-
-    // Check if supplier has active purchase orders
-    // Note: This will fail with FK constraint if purchase_orders table doesn't exist yet
-    // We'll handle this error gracefully
-
-    // Try to delete supplier
-    const { error: deleteError } = await supabaseAdmin
-      .from('suppliers')
-      .delete()
-      .eq('id', id)
-      .eq('org_id', currentUser.org_id)
-
-    if (deleteError) {
-      console.error('Error deleting supplier:', deleteError)
-
-      // Handle foreign key constraint (has active POs)
-      if (deleteError.code === '23503') {
-        return NextResponse.json(
-          { error: 'Cannot delete supplier with active purchase orders' },
-          { status: 409 }
-        )
-      }
-
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
-    }
+    // Delete supplier
+    await deleteSupplier(id)
 
     return NextResponse.json({
       success: true,
-      message: 'Supplier deleted successfully',
+      data: {
+        id,
+        message: 'Supplier deleted successfully',
+      },
     })
   } catch (error) {
     console.error('Error in DELETE /api/planning/suppliers/:id:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+    if (errorMessage === 'SUPPLIER_NOT_FOUND') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'SUPPLIER_NOT_FOUND',
+            message: 'Supplier not found',
+          },
+        },
+        { status: 404 }
+      )
+    }
+
+    if (errorMessage === 'SUPPLIER_HAS_PURCHASE_ORDERS') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'SUPPLIER_HAS_PURCHASE_ORDERS',
+            message: 'Cannot delete supplier with existing purchase orders',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (errorMessage === 'SUPPLIER_HAS_PRODUCTS') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'SUPPLIER_HAS_PRODUCTS',
+            message: 'Cannot delete supplier with assigned products',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An unexpected error occurred. Please try again later.',
+          ...(process.env.NODE_ENV === 'development' && {
+            debug: errorMessage,
+          }),
+        },
+      },
+      { status: 500 }
+    )
   }
 }

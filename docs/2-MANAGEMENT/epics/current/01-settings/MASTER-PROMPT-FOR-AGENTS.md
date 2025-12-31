@@ -28,9 +28,9 @@ Source: `.claude/setting.local.json`
 
 ## 🎯 STORIES TO IMPLEMENT
 ```
-**Story_ids** 02.14 02.15 
+**Story_ids** 03.017
 ```
-**Epic:** `02-technical`
+**Epic:** `01-settings`
 **Mode:** `multi-track` (parallel stories)
 
 ---
@@ -73,6 +73,7 @@ Task(agent-name):
     - docs/.../context/{STORY_ID}/tests.yaml
   wireframe: docs/3-ARCHITECTURE/ux/wireframes/TEC{XXXX}/
   previous_summary: {MAX 50 WORDS}
+  additional_info: "czytaj caly pliki context, tests, gaps skup sie na calym funkcjonalnosci"
   exit_criteria:
     - {CONDITION_1}
     - {CONDITION_2}

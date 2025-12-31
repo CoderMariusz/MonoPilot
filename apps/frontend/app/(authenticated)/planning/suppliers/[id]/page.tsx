@@ -1,27 +1,18 @@
 /**
  * Supplier Detail Page
- * Story 3.17: Supplier Management
- * Story 3.18: Supplier-Product Assignments
+ * Story: 03.1 - Suppliers CRUD + Master Data
  *
- * Tabs: [Overview] [Products]
+ * Tabs: [Overview/Products] [Purchase Orders]
  */
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tabs,
   TabsContent,
@@ -37,13 +28,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,295 +48,132 @@ import {
   ArrowLeft,
   Building2,
   Package,
+  ShoppingCart,
   Plus,
   Pencil,
   Trash2,
   Loader2,
-  Save,
   Star,
+  ChevronDown,
+  Power,
+  PowerOff,
+  Download,
+  Mail,
+  Printer,
+  MoreHorizontal,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { PlanningHeader } from '@/components/planning/PlanningHeader'
+import { SupplierCreateEditModal } from '@/components/planning/suppliers'
+import {
+  useSupplier,
+  useSupplierProducts,
+  useDeactivateSupplier,
+  useActivateSupplier,
+  useDeleteSupplier,
+} from '@/lib/hooks/use-suppliers'
+import type { Supplier, SupplierProduct } from '@/lib/types/supplier'
 
-interface Supplier {
-  id: string
-  code: string
-  name: string
-  contact_person: string | null
-  email: string | null
-  phone: string | null
-  address: string | null
-  city: string | null
-  postal_code: string | null
-  country: string | null
-  currency: string
-  tax_code_id: string
-  payment_terms: string
-  lead_time_days: number
-  moq: number | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  tax_codes?: { code: string; rate: number }
-}
-
-interface TaxCode {
-  id: string
-  code: string
-  rate: number
-  description: string
-}
-
-interface Product {
-  id: string
-  code: string
-  name: string
-  uom: string
-}
-
-interface SupplierProduct {
-  id: string
-  product_id: string
-  is_default: boolean
-  supplier_product_code: string | null
-  unit_price: number | null
-  lead_time_days: number | null
-  moq: number | null
-  products?: Product
-}
-
-export default function SupplierDetailPage({
-  params,
-}: {
+interface SupplierDetailPageProps {
   params: Promise<{ id: string }>
-}) {
-  const [supplier, setSupplier] = useState<Supplier | null>(null)
-  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [paramsId, setParamsId] = useState<string>('')
-  const [assignModalOpen, setAssignModalOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<SupplierProduct | null>(null)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deletingProduct, setDeletingProduct] = useState<SupplierProduct | null>(null)
-  const [productForm, setProductForm] = useState({
-    product_id: '',
-    is_default: false,
-    supplier_product_code: '',
-    unit_price: '',
-    lead_time_days: '',
-    moq: '',
-  })
+}
+
+export default function SupplierDetailPage({ params }: SupplierDetailPageProps) {
+  const { id } = use(params)
   const router = useRouter()
   const { toast } = useToast()
 
-  // Unwrap params
-  useEffect(() => {
-    params.then((p) => setParamsId(p.id))
-  }, [params])
+  // State
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('products')
 
-  // Fetch supplier
-  const fetchSupplier = useCallback(async () => {
-    if (!paramsId) return
+  // Hooks
+  const {
+    data: supplier,
+    isLoading: loadingSupplier,
+    error: supplierError,
+    refetch: refetchSupplier,
+  } = useSupplier(id)
+
+  const {
+    data: products,
+    isLoading: loadingProducts,
+  } = useSupplierProducts(id)
+
+  const deactivate = useDeactivateSupplier()
+  const activate = useActivateSupplier()
+  const deleteSupplier = useDeleteSupplier()
+
+  // Handlers
+  const handleDeactivate = useCallback(async () => {
+    if (!supplier) return
 
     try {
-      setLoading(true)
-      const response = await fetch(`/api/planning/suppliers/${paramsId}`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch supplier')
-      }
-
-      const data = await response.json()
-      setSupplier(data.supplier)
+      await deactivate.mutateAsync({ id: supplier.id })
+      toast({
+        title: 'Success',
+        description: `Supplier ${supplier.code} deactivated`,
+      })
     } catch (error) {
-      console.error('Error fetching supplier:', error)
       toast({
         title: 'Error',
-        description: 'Failed to load supplier details',
+        description: error instanceof Error ? error.message : 'Failed to deactivate',
         variant: 'destructive',
+      })
+    }
+  }, [supplier, deactivate, toast])
+
+  const handleActivate = useCallback(async () => {
+    if (!supplier) return
+
+    try {
+      await activate.mutateAsync(supplier.id)
+      toast({
+        title: 'Success',
+        description: `Supplier ${supplier.code} activated`,
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to activate',
+        variant: 'destructive',
+      })
+    }
+  }, [supplier, activate, toast])
+
+  const handleDelete = useCallback(async () => {
+    if (!supplier) return
+
+    try {
+      await deleteSupplier.mutateAsync(supplier.id)
+      toast({
+        title: 'Success',
+        description: `Supplier ${supplier.code} deleted`,
       })
       router.push('/planning/suppliers')
-    } finally {
-      setLoading(false)
-    }
-  }, [paramsId, toast, router])
-
-  // Fetch supplier products
-  const fetchSupplierProducts = useCallback(async () => {
-    if (!paramsId) return
-
-    try {
-      const response = await fetch(`/api/planning/suppliers/${paramsId}/products`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch supplier products')
-      }
-
-      const data = await response.json()
-      setSupplierProducts(data.supplier_products || [])
     } catch (error) {
-      console.error('Error fetching supplier products:', error)
-    }
-  }, [paramsId])
-
-  // Fetch all products
-  const fetchProducts = useCallback(async () => {
-    try {
-      const response = await fetch('/api/products?status=active&limit=1000')
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch products')
-      }
-
-      const data = await response.json()
-      setProducts(data.products || [])
-    } catch (error) {
-      console.error('Error fetching products:', error)
-    }
-  }, [])
-
-  // Fetch tax codes
-  const fetchTaxCodes = useCallback(async () => {
-    try {
-      const response = await fetch('/api/settings/tax-codes')
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch tax codes')
-      }
-
-      const data = await response.json()
-      setTaxCodes(data.taxCodes || [])
-    } catch (error) {
-      console.error('Error fetching tax codes:', error)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchSupplier()
-    fetchSupplierProducts()
-    fetchProducts()
-    fetchTaxCodes()
-  }, [fetchSupplier, fetchSupplierProducts, fetchProducts, fetchTaxCodes])
-
-  // Open assign modal
-  const openAssignModal = () => {
-    setEditingProduct(null)
-    setProductForm({
-      product_id: '',
-      is_default: false,
-      supplier_product_code: '',
-      unit_price: '',
-      lead_time_days: '',
-      moq: '',
-    })
-    setAssignModalOpen(true)
-  }
-
-  // Open edit modal
-  const openEditModal = (sp: SupplierProduct) => {
-    setEditingProduct(sp)
-    setProductForm({
-      product_id: sp.product_id,
-      is_default: sp.is_default,
-      supplier_product_code: sp.supplier_product_code || '',
-      unit_price: sp.unit_price?.toString() || '',
-      lead_time_days: sp.lead_time_days?.toString() || '',
-      moq: sp.moq?.toString() || '',
-    })
-    setAssignModalOpen(true)
-  }
-
-  // Handle product assignment submit
-  const handleProductSubmit = async () => {
-    if (!paramsId || !productForm.product_id) return
-
-    setSaving(true)
-    try {
-      const payload = {
-        product_id: productForm.product_id,
-        is_default: productForm.is_default,
-        supplier_product_code: productForm.supplier_product_code || null,
-        unit_price: productForm.unit_price ? parseFloat(productForm.unit_price) : null,
-        lead_time_days: productForm.lead_time_days
-          ? parseInt(productForm.lead_time_days)
-          : null,
-        moq: productForm.moq ? parseFloat(productForm.moq) : null,
-      }
-
-      const response = await fetch(`/api/planning/suppliers/${paramsId}/products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to assign product')
-      }
-
-      toast({
-        title: 'Success',
-        description: editingProduct ? 'Product updated' : 'Product assigned',
-      })
-
-      setAssignModalOpen(false)
-      fetchSupplierProducts()
-    } catch (error) {
-      console.error('Error assigning product:', error)
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to assign product',
+        description: error instanceof Error ? error.message : 'Failed to delete',
         variant: 'destructive',
       })
-    } finally {
-      setSaving(false)
     }
-  }
+  }, [supplier, deleteSupplier, toast, router])
 
-  // Open delete dialog
-  const openDeleteDialog = (sp: SupplierProduct) => {
-    setDeletingProduct(sp)
-    setDeleteDialogOpen(true)
-  }
-
-  // Handle delete product
-  const handleDeleteProduct = async () => {
-    if (!paramsId || !deletingProduct) return
-
-    try {
-      const response = await fetch(
-        `/api/planning/suppliers/${paramsId}/products?product_id=${deletingProduct.product_id}`,
-        {
-          method: 'DELETE',
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error('Failed to remove product')
-      }
-
+  const handleEditSuccess = useCallback(
+    (updated: Supplier) => {
+      setEditModalOpen(false)
       toast({
         title: 'Success',
-        description: 'Product removed from supplier',
+        description: `Supplier ${updated.code} updated`,
       })
+    },
+    [toast]
+  )
 
-      fetchSupplierProducts()
-    } catch (error) {
-      console.error('Error removing product:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to remove product',
-        variant: 'destructive',
-      })
-    } finally {
-      setDeleteDialogOpen(false)
-      setDeletingProduct(null)
-    }
-  }
-
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -355,409 +182,504 @@ export default function SupplierDetailPage({
     })
   }
 
-  // Get available products (not already assigned)
-  const availableProducts = products.filter(
-    (p: Product) => !supplierProducts.some((sp: SupplierProduct) => sp.product_id === p.id)
-  )
-
-  if (loading) {
+  // Loading state
+  if (loadingSupplier) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading...</span>
+      <div>
+        <PlanningHeader currentPage="suppliers" />
+        <div className="container mx-auto py-6 space-y-6">
+          {/* Header skeleton */}
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-6 w-20" />
+          </div>
+
+          {/* Info cards skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <Skeleton className="h-4 w-24 mb-2" />
+                  <Skeleton className="h-6 w-32" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <p className="text-center text-muted-foreground">Loading supplier details...</p>
         </div>
       </div>
     )
   }
 
-  if (!supplier) {
+  // Error state
+  if (supplierError || !supplier) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">Supplier not found</div>
+      <div>
+        <PlanningHeader currentPage="suppliers" />
+        <div className="container mx-auto py-6">
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-xl font-semibold">Failed to Load Supplier</h2>
+            <p className="text-muted-foreground mt-2">
+              The supplier could not be found or you don't have permission to view it.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Error: SUPPLIER_NOT_FOUND</p>
+            <div className="flex gap-4 mt-6">
+              <Button onClick={() => router.push('/planning/suppliers')}>
+                Go Back to Supplier List
+              </Button>
+              <Button variant="outline">Contact Support</Button>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
+  const canDelete = !supplier.has_open_pos && !supplier.products_count && !supplier.purchase_orders_count
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/planning/suppliers')}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="text-3xl font-bold">{supplier.name}</h1>
-        <Badge variant="outline" className="font-mono">
-          {supplier.code}
-        </Badge>
-        {supplier.is_active ? (
-          <Badge className="bg-green-100 text-green-800">Active</Badge>
-        ) : (
-          <Badge variant="secondary">Inactive</Badge>
-        )}
+    <div>
+      <PlanningHeader currentPage="suppliers" />
+
+      <div className="container mx-auto py-6 space-y-6">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/planning/suppliers')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <div data-testid="heading-supplier-detail">
+              <h1 className="text-2xl font-bold">{supplier.name}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="font-mono">
+                  {supplier.code}
+                </Badge>
+                <Badge
+                  variant={supplier.is_active ? 'default' : 'secondary'}
+                  className={
+                    supplier.is_active
+                      ? 'bg-emerald-100 text-emerald-900'
+                      : 'bg-gray-100 text-gray-800'
+                  }
+                  role="status"
+                  aria-label={supplier.is_active ? 'Active' : 'Inactive'}
+                >
+                  {supplier.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditModalOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Actions
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Supplier
+                </DropdownMenuItem>
+
+                {supplier.is_active ? (
+                  <DropdownMenuItem
+                    onClick={handleDeactivate}
+                    disabled={supplier.has_open_pos}
+                  >
+                    <PowerOff className="mr-2 h-4 w-4" />
+                    Deactivate Supplier
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={handleActivate}>
+                    <Power className="mr-2 h-4 w-4" />
+                    Activate Supplier
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuItem>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Product Assignment
+                </DropdownMenuItem>
+
+                <DropdownMenuItem>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export to PDF
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={!canDelete}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Supplier
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button variant="outline" size="icon">
+              <Printer className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Master Data Section */}
+        <div data-testid="section-master-data">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Contact Person */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Contact Person</p>
+                <p className="font-medium mt-1">
+                  {supplier.contact_name || <span className="text-muted-foreground">-</span>}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Email */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium mt-1">
+                  {supplier.contact_email ? (
+                    <a
+                      href={`mailto:${supplier.contact_email}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {supplier.contact_email}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Phone */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Phone</p>
+                <p className="font-medium mt-1">
+                  {supplier.contact_phone || <span className="text-muted-foreground">-</span>}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Currency */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Currency</p>
+                <p className="font-medium mt-1">{supplier.currency}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            {/* Address */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Address</p>
+                <p className="font-medium mt-1">
+                  {supplier.address || <span className="text-muted-foreground">-</span>}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* City */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">City</p>
+                <p className="font-medium mt-1">
+                  {supplier.city || <span className="text-muted-foreground">-</span>}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Country */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Country</p>
+                <p className="font-medium mt-1">
+                  {supplier.country || <span className="text-muted-foreground">-</span>}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Postal Code */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Postal Code</p>
+                <p className="font-medium mt-1">
+                  {supplier.postal_code || <span className="text-muted-foreground">-</span>}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            {/* Payment Terms */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Payment Terms</p>
+                <p className="font-medium mt-1">{supplier.payment_terms}</p>
+              </CardContent>
+            </Card>
+
+            {/* Tax Code */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Tax Code</p>
+                <p className="font-medium mt-1">
+                  {supplier.tax_code?.code || supplier.tax_code_id || <span className="text-muted-foreground">-</span>}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Notes */}
+          {supplier.notes && (
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Notes</p>
+                <p className="mt-1">{supplier.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="products" className="gap-2">
+              <Package className="h-4 w-4" />
+              Products
+            </TabsTrigger>
+            <TabsTrigger value="purchase-orders" className="gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              Purchase Orders
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Products Tab */}
+          <TabsContent value="products" data-testid="section-products">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Products ({products?.length || 0})</CardTitle>
+                <Button size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Product
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {loadingProducts ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : !products || products.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">No Products Assigned Yet</h3>
+                    <p className="text-muted-foreground mt-1">
+                      This supplier doesn't have any products assigned.
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      Add products to enable purchase order creation.
+                    </p>
+                    <Button className="mt-4">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Product
+                    </Button>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Supplier Code</TableHead>
+                        <TableHead>Default</TableHead>
+                        <TableHead className="text-right">Unit Price</TableHead>
+                        <TableHead className="text-right">Lead Time</TableHead>
+                        <TableHead className="text-right">MOQ</TableHead>
+                        <TableHead className="w-12">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {products.map((sp: SupplierProduct) => (
+                        <TableRow key={sp.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{sp.product?.name}</p>
+                              <p className="text-sm text-muted-foreground font-mono">
+                                {sp.product?.code}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono">
+                            {sp.supplier_product_code || '-'}
+                          </TableCell>
+                          <TableCell>
+                            {sp.is_default ? (
+                              <Badge className="bg-yellow-100 text-yellow-800">
+                                <Star className="h-3 w-3 mr-1" />
+                                Default
+                              </Badge>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {sp.unit_price
+                              ? new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: sp.currency || supplier.currency,
+                                }).format(sp.unit_price)
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {sp.lead_time_days ? `${sp.lead_time_days} days` : '-'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {sp.moq?.toLocaleString() || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Purchase Orders Tab */}
+          <TabsContent value="purchase-orders" data-testid="section-po-history">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Recent Purchase Orders</CardTitle>
+                <Button size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create PO
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col items-center justify-center py-12">
+                  <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold">No Purchase Orders Yet</h3>
+                  <p className="text-muted-foreground mt-1">
+                    There are no purchase orders from this supplier.
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Create your first PO to start ordering.
+                  </p>
+                  <Button className="mt-4">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Purchase Order
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Quick Actions */}
+        <div className="flex flex-wrap gap-4">
+          <Button variant="outline">
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Create Purchase Order
+          </Button>
+          {supplier.contact_email && (
+            <Button variant="outline" asChild>
+              <a href={`mailto:${supplier.contact_email}`}>
+                <Mail className="mr-2 h-4 w-4" />
+                Email Supplier
+              </a>
+            </Button>
+          )}
+          <Button variant="outline">
+            <Package className="mr-2 h-4 w-4" />
+            View All Products
+          </Button>
+        </div>
+
+        {/* Timestamps */}
+        <Card>
+          <CardContent className="py-3 px-4">
+            <div className="flex flex-wrap gap-8 text-sm text-muted-foreground">
+              <div>
+                <span className="font-medium">Created:</span>{' '}
+                {formatDate(supplier.created_at)}
+              </div>
+              <div>
+                <span className="font-medium">Updated:</span>{' '}
+                {formatDate(supplier.updated_at)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview" className="gap-2">
-            <Building2 className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="products" className="gap-2">
-            <Package className="h-4 w-4" />
-            Products ({supplierProducts.length})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Basic Info */}
-            <div className="border rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4">Supplier Information</h2>
-              <dl className="space-y-3">
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Code:</dt>
-                  <dd className="font-mono font-medium">{supplier.code}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Name:</dt>
-                  <dd className="font-medium">{supplier.name}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Currency:</dt>
-                  <dd className="font-medium">{supplier.currency}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Tax Code:</dt>
-                  <dd className="font-medium">
-                    {supplier.tax_codes?.code} ({supplier.tax_codes?.rate}%)
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Payment Terms:</dt>
-                  <dd className="font-medium">{supplier.payment_terms}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Lead Time:</dt>
-                  <dd className="font-medium">{supplier.lead_time_days} days</dd>
-                </div>
-                {supplier.moq && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">MOQ:</dt>
-                    <dd className="font-medium">{supplier.moq}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-
-            {/* Contact Info */}
-            <div className="border rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-              <dl className="space-y-3">
-                {supplier.contact_person && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Contact:</dt>
-                    <dd className="font-medium">{supplier.contact_person}</dd>
-                  </div>
-                )}
-                {supplier.email && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Email:</dt>
-                    <dd className="font-medium">
-                      <a
-                        href={`mailto:${supplier.email}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {supplier.email}
-                      </a>
-                    </dd>
-                  </div>
-                )}
-                {supplier.phone && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Phone:</dt>
-                    <dd className="font-medium">{supplier.phone}</dd>
-                  </div>
-                )}
-                {supplier.address && (
-                  <div>
-                    <dt className="text-gray-600 mb-1">Address:</dt>
-                    <dd className="text-sm bg-gray-50 p-2 rounded">
-                      {supplier.address}
-                      {supplier.city && `, ${supplier.city}`}
-                      {supplier.postal_code && ` ${supplier.postal_code}`}
-                      {supplier.country && `, ${supplier.country}`}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-          </div>
-
-          {/* Timestamps */}
-          <div className="border rounded-lg p-6">
-            <dl className="flex gap-8 text-sm text-gray-500">
-              <div>
-                <dt className="inline">Created:</dt>
-                <dd className="inline ml-2">{formatDate(supplier.created_at)}</dd>
-              </div>
-              <div>
-                <dt className="inline">Updated:</dt>
-                <dd className="inline ml-2">{formatDate(supplier.updated_at)}</dd>
-              </div>
-            </dl>
-          </div>
-        </TabsContent>
-
-        {/* Products Tab */}
-        <TabsContent value="products" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Product Assignments</h2>
-            <Button onClick={openAssignModal} disabled={availableProducts.length === 0}>
-              <Plus className="mr-2 h-4 w-4" />
-              Assign Product
-            </Button>
-          </div>
-
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Default</TableHead>
-                  <TableHead>Supplier SKU</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Lead Time</TableHead>
-                  <TableHead className="text-right">MOQ</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {supplierProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      No products assigned to this supplier
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  supplierProducts.map((sp: SupplierProduct) => (
-                    <TableRow key={sp.id}>
-                      <TableCell>
-                        <div className="font-mono text-sm">{sp.products?.code}</div>
-                        <div className="text-sm text-gray-500">{sp.products?.name}</div>
-                      </TableCell>
-                      <TableCell>
-                        {sp.is_default ? (
-                          <Badge className="bg-yellow-100 text-yellow-800">
-                            <Star className="h-3 w-3 mr-1" />
-                            Default
-                          </Badge>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {sp.supplier_product_code || '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {sp.unit_price
-                          ? new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: supplier.currency,
-                            }).format(sp.unit_price)
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {sp.lead_time_days ? `${sp.lead_time_days} days` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {sp.moq ? sp.moq.toLocaleString() : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(sp)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openDeleteDialog(sp)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Assign/Edit Product Modal */}
-      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingProduct ? 'Edit Product Assignment' : 'Assign Product'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingProduct
-                ? 'Update the product assignment details'
-                : 'Assign a product to this supplier with optional pricing and lead time'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="product">Product</Label>
-              <Select
-                value={productForm.product_id}
-                onValueChange={(value) =>
-                  setProductForm((prev: typeof productForm) => ({ ...prev, product_id: value }))
-                }
-                disabled={!!editingProduct}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(editingProduct
-                    ? products.filter((p) => p.id === editingProduct.product_id)
-                    : availableProducts
-                  ).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.code} - {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="is-default">Default Supplier for this Product</Label>
-              <Switch
-                id="is-default"
-                checked={productForm.is_default}
-                onCheckedChange={(checked) =>
-                  setProductForm((prev) => ({ ...prev, is_default: checked }))
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="supplier-sku">Supplier SKU</Label>
-              <Input
-                id="supplier-sku"
-                value={productForm.supplier_product_code}
-                onChange={(e) =>
-                  setProductForm((prev) => ({
-                    ...prev,
-                    supplier_product_code: e.target.value,
-                  }))
-                }
-                placeholder="e.g., SKU-001"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="unit-price">Unit Price ({supplier.currency})</Label>
-                <Input
-                  id="unit-price"
-                  type="number"
-                  value={productForm.unit_price}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, unit_price: e.target.value }))
-                  }
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="lead-time">Lead Time (days)</Label>
-                <Input
-                  id="lead-time"
-                  type="number"
-                  value={productForm.lead_time_days}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({
-                      ...prev,
-                      lead_time_days: e.target.value,
-                    }))
-                  }
-                  placeholder="7"
-                  min="0"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="moq">MOQ</Label>
-                <Input
-                  id="moq"
-                  type="number"
-                  value={productForm.moq}
-                  onChange={(e) =>
-                    setProductForm((prev) => ({ ...prev, moq: e.target.value }))
-                  }
-                  placeholder="100"
-                  min="0"
-                />
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleProductSubmit} disabled={saving || !productForm.product_id}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Modal */}
+      <SupplierCreateEditModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        supplier={supplier}
+        onSuccess={handleEditSuccess}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Product</AlertDialogTitle>
+            <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove &quot;{deletingProduct?.products?.name}&quot; from
-              this supplier? The product will no longer be associated with this supplier.
+              Are you sure you want to delete supplier{' '}
+              <strong>
+                {supplier.code} ({supplier.name})
+              </strong>
+              ? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingProduct(null)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProduct}>Remove</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteSupplier.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
