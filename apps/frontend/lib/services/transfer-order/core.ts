@@ -24,6 +24,7 @@ import {
   enrichWithWarehouses,
 } from './helpers'
 import { ErrorCode, EDITABLE_STATUSES, DRAFT_ONLY_STATUSES } from './constants'
+import { validateTransition, type TOStatus } from './state-machine'
 
 // ============================================================================
 // LIST TRANSFER ORDERS
@@ -139,7 +140,7 @@ export async function getTransferOrder(id: string): Promise<ServiceResult<Transf
       .select(
         `
         *,
-        lines:to_lines(
+        lines:transfer_order_lines(
           *,
           product:products(code, name)
         )
@@ -415,7 +416,10 @@ export async function deleteTransferOrder(id: string): Promise<ServiceResult<voi
  * Validation Rules:
  * - Only users with Warehouse role or higher can change status
  * - Cannot change status to 'planned' if TO has 0 lines
- * - Draft → Planned requires at least 1 line
+ * - Draft -> Planned requires at least 1 line
+ * - Status transitions must follow valid workflow (enforced by state-machine.ts)
+ *
+ * Refactored: Uses state-machine module for transition validation
  */
 export async function changeToStatus(
   id: string,
@@ -450,7 +454,7 @@ export async function changeToStatus(
         id,
         status,
         org_id,
-        to_lines(id)
+        transfer_order_lines(id)
       `)
       .eq('id', id)
       .eq('org_id', userData.orgId)
@@ -464,8 +468,18 @@ export async function changeToStatus(
       }
     }
 
+    // Validate status transition using state machine
+    const transitionResult = validateTransition(existingTo.status as TOStatus, status as TOStatus)
+    if (!transitionResult.valid) {
+      return {
+        success: false,
+        error: transitionResult.error!,
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
     // Validate: Cannot plan TO without lines (AC-3.7.8)
-    if (status === 'planned' && (!existingTo.to_lines || existingTo.to_lines.length === 0)) {
+    if (status === 'planned' && (!existingTo.transfer_order_lines || existingTo.transfer_order_lines.length === 0)) {
       return {
         success: false,
         error: 'Cannot plan Transfer Order without lines. Add at least one product.',
