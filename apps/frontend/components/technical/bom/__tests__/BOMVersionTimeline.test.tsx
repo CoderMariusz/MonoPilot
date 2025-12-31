@@ -32,7 +32,7 @@ import { BOMVersionTimeline } from '../BOMVersionTimeline'
 
 describe('BOMVersionTimeline Component (Story 02.4)', () => {
   let mockVersions: BOMTimelineVersion[]
-  let mockOnVersionClick: ReturnType<typeof vi.fn>
+  let mockOnVersionClick: (bomId: string) => void
 
   beforeEach(() => {
     vi.clearAllMocks()
