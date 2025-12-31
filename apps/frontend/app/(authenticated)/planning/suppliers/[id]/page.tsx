@@ -225,7 +225,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
             </div>
             <h2 className="text-xl font-semibold">Failed to Load Supplier</h2>
             <p className="text-muted-foreground mt-2">
-              The supplier could not be found or you don't have permission to view it.
+              The supplier could not be found or you don&apos;t have permission to view it.
             </p>
             <p className="text-sm text-muted-foreground mt-1">Error: SUPPLIER_NOT_FOUND</p>
             <div className="flex gap-4 mt-6">
@@ -502,7 +502,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                     <Package className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold">No Products Assigned Yet</h3>
                     <p className="text-muted-foreground mt-1">
-                      This supplier doesn't have any products assigned.
+                      This supplier doesn&apos;t have any products assigned.
                     </p>
                     <p className="text-muted-foreground text-sm">
                       Add products to enable purchase order creation.

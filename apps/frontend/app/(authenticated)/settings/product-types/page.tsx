@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -66,7 +66,7 @@ export default function ProductTypesPage() {
   const { toast } = useToast()
 
   // Fetch product types
-  const fetchTypes = async () => {
+  const fetchTypes = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/technical/product-types?active=false')
@@ -87,11 +87,11 @@ export default function ProductTypesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     fetchTypes()
-  }, [])
+  }, [fetchTypes])
 
   // Validate form
   const validateForm = () => {

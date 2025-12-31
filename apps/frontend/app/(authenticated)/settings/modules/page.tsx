@@ -17,7 +17,7 @@
 
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -113,7 +113,7 @@ export default function ModulesPage() {
   }
 
   // Fetch current module statuses
-  const fetchModuleStatuses = async () => {
+  const fetchModuleStatuses = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/settings/modules')
@@ -134,11 +134,11 @@ export default function ModulesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
   useEffect(() => {
     fetchModuleStatuses()
-  }, [])
+  }, [fetchModuleStatuses])
 
   // Check if module is enabled
   const isModuleEnabled = (code: string): boolean => {

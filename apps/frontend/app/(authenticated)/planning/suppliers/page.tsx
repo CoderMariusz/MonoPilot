@@ -85,7 +85,7 @@ export default function SuppliersPage() {
   const activateSupplier = useActivateSupplier()
   const exportSuppliers = useExportSuppliers()
 
-  const suppliers = suppliersData?.data || []
+  const suppliers = useMemo(() => suppliersData?.data || [], [suppliersData?.data])
   const pagination = suppliersData?.meta
 
   // Responsive check
