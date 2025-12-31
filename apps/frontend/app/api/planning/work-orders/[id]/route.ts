@@ -1,29 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase/server'
-import {
-  updateWorkOrderSchema,
-  type UpdateWorkOrderInput,
-} from '@/lib/validation/work-order-schemas'
-import {
-  getWorkOrder,
-  updateWorkOrder,
-  deleteWorkOrder,
-} from '@/lib/services/work-order-service'
-import { ZodError } from 'zod'
-
 /**
- * Work Order Detail API Routes
- * Story: 3.10 - Work Order CRUD
+ * API Route: /api/planning/work-orders/[id]
+ * Story 03.10: Work Order CRUD - Get, Update, Delete single WO
  *
- * GET /api/planning/work-orders/[id] - Get single work order
- * PUT /api/planning/work-orders/[id] - Update work order
- * DELETE /api/planning/work-orders/[id] - Delete work order
+ * Refactored to use standardized error handling and auth helpers
  */
 
-// ============================================================================
-// GET /api/planning/work-orders/[id] - Get Work Order
-// ============================================================================
+import { NextRequest } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { WorkOrderService } from '@/lib/services/work-order-service'
+import { updateWOSchema } from '@/lib/validation/work-order'
+import { handleApiError, successResponse, notFoundResponse } from '@/lib/api/error-handler'
+import { getAuthContextOrThrow, getAuthContextWithRole, RoleSets } from '@/lib/api/auth-helpers'
 
+// GET /api/planning/work-orders/[id] - Get single work order with relations
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,51 +21,23 @@ export async function GET(
     const { id } = await params
     const supabase = await createServerSupabase()
 
-    // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession()
+    // Verify authentication (RLS enforces org isolation)
+    await getAuthContextOrThrow(supabase)
 
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Get work order
+    const workOrder = await WorkOrderService.getById(supabase, id)
+
+    if (!workOrder) {
+      return notFoundResponse('Work order not found')
     }
 
-    const result = await getWorkOrder(id)
-
-    if (!result.success) {
-      if (result.code === 'NOT_FOUND') {
-        return NextResponse.json(
-          { error: result.error || 'Work Order not found' },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json(
-        { error: result.error || 'Failed to fetch work order' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        work_order: result.data,
-      },
-      { status: 200 }
-    )
+    return successResponse(workOrder)
   } catch (error) {
-    console.error('Error in GET /api/planning/work-orders/[id]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'GET /api/planning/work-orders/[id]')
   }
 }
 
-// ============================================================================
-// PUT /api/planning/work-orders/[id] - Update Work Order
-// ============================================================================
-
+// PUT /api/planning/work-orders/[id] - Update work order
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -85,72 +46,23 @@ export async function PUT(
     const { id } = await params
     const supabase = await createServerSupabase()
 
-    // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession()
-
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Check authentication and permissions
+    const { userId } = await getAuthContextWithRole(supabase, RoleSets.WORK_ORDER_WRITE)
 
     // Parse and validate request body
     const body = await request.json()
-    const validatedData: UpdateWorkOrderInput =
-      updateWorkOrderSchema.parse(body)
+    const validated = updateWOSchema.parse(body)
 
-    const result = await updateWorkOrder(id, validatedData)
+    // Update work order
+    const workOrder = await WorkOrderService.update(supabase, id, userId, validated)
 
-    if (!result.success) {
-      if (result.code === 'NOT_FOUND') {
-        return NextResponse.json(
-          { error: result.error || 'Work Order not found' },
-          { status: 404 }
-        )
-      }
-
-      if (result.code === 'INVALID_INPUT') {
-        return NextResponse.json(
-          { error: result.error || 'Invalid input' },
-          { status: 400 }
-        )
-      }
-
-      return NextResponse.json(
-        { error: result.error || 'Failed to update work order' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        work_order: result.data,
-        message: 'Work Order updated successfully',
-      },
-      { status: 200 }
-    )
+    return successResponse(workOrder)
   } catch (error) {
-    console.error('Error in PUT /api/planning/work-orders/[id]:', error)
-
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PUT /api/planning/work-orders/[id]')
   }
 }
 
-// ============================================================================
-// DELETE /api/planning/work-orders/[id] - Delete Work Order
-// ============================================================================
-
+// DELETE /api/planning/work-orders/[id] - Delete draft work order
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -159,43 +71,14 @@ export async function DELETE(
     const { id } = await params
     const supabase = await createServerSupabase()
 
-    // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession()
+    // Check authentication and permissions (delete is more restricted)
+    await getAuthContextWithRole(supabase, RoleSets.WORK_ORDER_DELETE)
 
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Delete work order (service validates draft status)
+    await WorkOrderService.delete(supabase, id)
 
-    const result = await deleteWorkOrder(id)
-
-    if (!result.success) {
-      if (result.code === 'NOT_FOUND') {
-        return NextResponse.json(
-          { error: result.error || 'Work Order not found' },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json(
-        { error: result.error || 'Failed to delete work order' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        message: 'Work Order deleted successfully',
-      },
-      { status: 200 }
-    )
+    return successResponse(undefined, { message: 'Work order deleted successfully' })
   } catch (error) {
-    console.error('Error in DELETE /api/planning/work-orders/[id]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'DELETE /api/planning/work-orders/[id]')
   }
 }

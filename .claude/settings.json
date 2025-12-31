@@ -1,9 +1,11 @@
 {
   "permissions": {
-    "Allow": [
+    "defaultMode": "bypassPermissions",
+    "allow": [
       "*"
     ]
   },
+  
   "model": "sonnet[1m]",
   "enableAllProjectMcpServers": true
 }

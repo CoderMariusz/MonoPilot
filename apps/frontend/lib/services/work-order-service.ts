@@ -1,840 +1,1062 @@
-import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
-import {
-  type WorkOrder,
-  type CreateWorkOrderInput,
-  type UpdateWorkOrderInput,
-  type WorkOrderFilters,
-} from '@/lib/validation/work-order-schemas'
-import { getActiveBOMForProduct } from './bom-service'
-
 /**
- * Work Order Service
- * Epic 3 Batch 3B: Planning Operations MVP
- * Story 3.10: Work Order CRUD
+ * Work Order Service (Story 03.10)
+ * Handles CRUD operations, BOM auto-selection, and status transitions
  *
- * Handles Work Order CRUD operations with:
- * - Auto-generated WO numbers (WO-YYYY-NNN format)
- * - Product validation and UoM inheritance
- * - Status management (draft, released, in_progress, completed, closed, cancelled)
- * - Production line assignment
- * - Date validation
- * - Multi-org RLS isolation
+ * Architecture: Service layer accepts Supabase client as parameter to support
+ * both server-side (API routes) and client-side usage.
+ *
+ * Security: All queries enforce org_id isolation (ADR-013).
  */
 
-export interface ServiceResult<T = any> {
-  success: boolean
-  data?: T
-  error?: string
-  code?:
-    | 'DUPLICATE_WO_NUMBER'
-    | 'NOT_FOUND'
-    | 'INVALID_INPUT'
-    | 'INVALID_STATUS'
-    | 'FOREIGN_KEY_CONSTRAINT'
-    | 'DATABASE_ERROR'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type WOStatus =
+  | 'draft'
+  | 'planned'
+  | 'released'
+  | 'in_progress'
+  | 'on_hold'
+  | 'completed'
+  | 'closed'
+  | 'cancelled'
+
+export type WOPriority = 'low' | 'normal' | 'high' | 'critical'
+
+export interface WorkOrder {
+  id: string
+  org_id: string
+  wo_number: string
+  product_id: string
+  bom_id: string | null
+  routing_id: string | null
+  planned_quantity: number
+  produced_quantity: number
+  uom: string
+  status: WOStatus
+  planned_start_date: string | null
+  planned_end_date: string | null
+  scheduled_start_time: string | null
+  scheduled_end_time: string | null
+  production_line_id: string | null
+  machine_id: string | null
+  priority: WOPriority
+  source_of_demand: string | null
+  source_reference: string | null
+  started_at: string | null
+  completed_at: string | null
+  paused_at: string | null
+  pause_reason: string | null
+  actual_qty: number | null
+  yield_percent: number | null
+  expiry_date: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  created_by: string
+  updated_by: string | null
 }
 
-export interface ListResult<T> {
-  success: boolean
-  data?: T[]
-  total?: number
+export interface WorkOrderWithRelations extends WorkOrder {
+  product?: {
+    id: string
+    code: string
+    name: string
+    base_uom: string
+  }
+  bom?: {
+    id: string
+    code: string
+    version: number
+    output_qty: number
+    effective_from: string
+    effective_to: string | null
+    item_count?: number
+  }
+  routing?: {
+    id: string
+    code: string
+    name: string
+  }
+  production_line?: {
+    id: string
+    code: string
+    name: string
+  }
+  machine?: {
+    id: string
+    code: string
+    name: string
+  }
+  created_by_user?: {
+    name: string
+  }
+}
+
+export interface WOListItem {
+  id: string
+  wo_number: string
+  product_code: string
+  product_name: string
+  planned_quantity: number
+  uom: string
+  status: WOStatus
+  planned_start_date: string | null
+  production_line_name: string | null
+  priority: WOPriority
+  created_at: string
+}
+
+export interface BomPreview {
+  bom_id: string
+  bom_code: string
+  bom_version: number
+  output_qty: number
+  effective_from: string
+  effective_to: string | null
+  routing_id: string | null
+  item_count: number
+  is_current?: boolean
+}
+
+export interface BomValidationResult {
+  valid: boolean
+  bom?: BomPreview
   error?: string
+  warning?: string
+}
+
+export interface WOStatusHistory {
+  id: string
+  wo_id: string
+  from_status: WOStatus | null
+  to_status: WOStatus
+  changed_by: string
+  changed_at: string
+  notes: string | null
+  changed_by_user?: {
+    name: string
+  }
+}
+
+export interface WOListParams {
+  page?: number
+  limit?: number
+  search?: string
+  product_id?: string
+  status?: string
+  line_id?: string
+  machine_id?: string
+  priority?: WOPriority
+  date_from?: string
+  date_to?: string
+  sort?: string
+  order?: 'asc' | 'desc'
+}
+
+export interface PaginatedWOResult {
+  data: WOListItem[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+export interface CreateWOInput {
+  product_id: string
+  bom_id?: string | null
+  planned_quantity: number
+  uom?: string
+  planned_start_date: string
+  planned_end_date?: string | null
+  scheduled_start_time?: string | null
+  scheduled_end_time?: string | null
+  production_line_id?: string | null
+  machine_id?: string | null
+  priority?: WOPriority
+  source_of_demand?: string | null
+  source_reference?: string | null
+  expiry_date?: string | null
+  notes?: string | null
+}
+
+export interface UpdateWOInput {
+  product_id?: string
+  bom_id?: string | null
+  planned_quantity?: number
+  uom?: string
+  planned_start_date?: string
+  planned_end_date?: string | null
+  scheduled_start_time?: string | null
+  scheduled_end_time?: string | null
+  production_line_id?: string | null
+  machine_id?: string | null
+  priority?: WOPriority
+  source_of_demand?: string | null
+  source_reference?: string | null
+  expiry_date?: string | null
+  notes?: string | null
+}
+
+// ============================================================================
+// ERROR CLASSES
+// ============================================================================
+
+export class WorkOrderError extends Error {
+  code: string
+  status: number
+
+  constructor(message: string, code: string, status: number = 400) {
+    super(message)
+    this.name = 'WorkOrderError'
+    this.code = code
+    this.status = status
+  }
+}
+
+// ============================================================================
+// STATUS TRANSITION VALIDATION
+// ============================================================================
+
+/**
+ * Valid status transitions map
+ */
+export const VALID_TRANSITIONS: Record<WOStatus, WOStatus[]> = {
+  draft: ['planned', 'cancelled'],
+  planned: ['released', 'draft', 'cancelled'],
+  released: ['in_progress', 'cancelled'],
+  in_progress: ['on_hold', 'completed'],
+  on_hold: ['in_progress', 'cancelled'],
+  completed: ['closed'],
+  closed: [],
+  cancelled: [],
 }
 
 /**
- * Get current user's org_id from JWT
+ * Fields that become locked after release
  */
-async function getCurrentOrgId(): Promise<string | null> {
-  const supabase = await createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
+export const LOCKED_FIELDS_AFTER_RELEASE = [
+  'product_id',
+  'bom_id',
+  'planned_quantity',
+]
 
-  if (!user) return null
+/**
+ * Validate if a status transition is allowed
+ */
+export function validateStatusTransition(
+  currentStatus: WOStatus,
+  newStatus: WOStatus
+): boolean {
+  return VALID_TRANSITIONS[currentStatus]?.includes(newStatus) ?? false
+}
 
-  const { data: userData, error } = await supabase
-    .from('users')
-    .select('org_id')
-    .eq('id', user.id)
-    .single()
+/**
+ * Check if a field can be edited in the current status
+ */
+export function canEditField(status: WOStatus, field: string): boolean {
+  // After release, certain fields are locked
+  if (
+    ['released', 'in_progress', 'on_hold', 'completed', 'closed'].includes(
+      status
+    )
+  ) {
+    return !LOCKED_FIELDS_AFTER_RELEASE.includes(field)
+  }
+  // Cancelled WOs cannot be edited
+  if (status === 'cancelled') {
+    return false
+  }
+  return true
+}
 
-  if (error || !userData) {
-    console.error('Failed to get org_id for user:', user.id, error)
-    return null
+// ============================================================================
+// SERVICE METHODS
+// ============================================================================
+
+/**
+ * List work orders with filters, pagination, and sorting
+ */
+export async function list(
+  supabase: SupabaseClient,
+  orgId: string,
+  params: WOListParams
+): Promise<PaginatedWOResult> {
+  const {
+    page = 1,
+    limit = 20,
+    search,
+    product_id,
+    status,
+    line_id,
+    machine_id,
+    priority,
+    date_from,
+    date_to,
+    sort = 'created_at',
+    order = 'desc',
+  } = params
+
+  // Build query with relations
+  let query = supabase
+    .from('work_orders')
+    .select(
+      `
+      id,
+      wo_number,
+      planned_quantity,
+      uom,
+      status,
+      planned_start_date,
+      priority,
+      created_at,
+      product:products(code, name),
+      production_line:production_lines(name)
+    `,
+      { count: 'exact' }
+    )
+    .eq('org_id', orgId)
+
+  // Apply search filter (WO number or product name/code)
+  if (search && search.length >= 2) {
+    query = query.or(`wo_number.ilike.%${search}%`)
   }
 
-  return userData.org_id
-}
+  // Apply product filter
+  if (product_id) {
+    query = query.eq('product_id', product_id)
+  }
 
-/**
- * Get current user ID
- */
-async function getCurrentUserId(): Promise<string | null> {
-  const supabase = await createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.id || null
-}
+  // Apply status filter (can be comma-separated)
+  if (status) {
+    const statuses = status.split(',').map((s) => s.trim())
+    query = query.in('status', statuses)
+  }
 
-/**
- * Generate next WO number in format: WO-YYYYMMDD-NNNN
- * AC-3.10.2: Resets sequence daily, unique per org
- */
-async function generateWoNumber(orgId: string): Promise<string> {
-  const supabaseAdmin = createServerSupabaseAdmin()
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  const datePrefix = `${year}${month}${day}`
-  const prefix = `WO-${datePrefix}-`
+  // Apply production line filter
+  if (line_id) {
+    query = query.eq('production_line_id', line_id)
+  }
 
-  // Find highest number for current day
-  const { data: existingWos, error } = await supabaseAdmin
-    .from('work_orders')
-    .select('wo_number')
-    .eq('org_id', orgId)
-    .like('wo_number', `${prefix}%`)
-    .order('wo_number', { ascending: false })
-    .limit(1)
+  // Apply machine filter
+  if (machine_id) {
+    query = query.eq('machine_id', machine_id)
+  }
+
+  // Apply priority filter
+  if (priority) {
+    query = query.eq('priority', priority)
+  }
+
+  // Apply date range filter
+  if (date_from) {
+    query = query.gte('planned_start_date', date_from)
+  }
+  if (date_to) {
+    query = query.lte('planned_start_date', date_to)
+  }
+
+  // Apply sorting
+  query = query.order(sort, { ascending: order === 'asc' })
+
+  // Apply pagination
+  const start = (page - 1) * limit
+  const end = start + limit - 1
+  query = query.range(start, end)
+
+  const { data, error, count } = await query
 
   if (error) {
-    console.error('Error fetching latest WO number:', error)
-    throw new Error('Failed to generate WO number')
+    throw new WorkOrderError(
+      `Failed to fetch work orders: ${error.message}`,
+      'FETCH_ERROR',
+      500
+    )
   }
 
-  let nextSequence = 1
+  // Transform to WOListItem format
+  const items: WOListItem[] = (data || []).map((wo: any) => ({
+    id: wo.id,
+    wo_number: wo.wo_number,
+    product_code: wo.product?.code || '',
+    product_name: wo.product?.name || '',
+    planned_quantity: wo.planned_quantity,
+    uom: wo.uom,
+    status: wo.status,
+    planned_start_date: wo.planned_start_date,
+    production_line_name: wo.production_line?.name || null,
+    priority: wo.priority,
+    created_at: wo.created_at,
+  }))
 
-  if (existingWos && existingWos.length > 0) {
-    // Extract sequence from WO-YYYYMMDD-NNNN
-    const latestWo = existingWos[0].wo_number
-    const parts = latestWo.split('-')
-    if (parts.length === 3) {
-      const currentSequence = parseInt(parts[2], 10)
-      if (!isNaN(currentSequence)) {
-        nextSequence = currentSequence + 1
-      }
-    }
-  }
-
-  // Format: WO-YYYYMMDD-NNNN (4 digits)
-  const formattedSequence = nextSequence.toString().padStart(4, '0')
-  return `WO-${datePrefix}-${formattedSequence}`
-}
-
-/**
- * Create a new Work Order
- * AC-3.10.1: Auto-generate WO number, validate product, inherit UoM
- */
-export async function createWorkOrder(
-  input: CreateWorkOrderInput
-): Promise<ServiceResult<WorkOrder>> {
-  try {
-    const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
-
-    const orgId = await getCurrentOrgId()
-    const userId = await getCurrentUserId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Validate product exists and get UoM
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('id, uom, code, name')
-      .eq('id', input.product_id)
-      .eq('org_id', orgId)
-      .single()
-
-    if (productError || !product) {
-      return {
-        success: false,
-        error: 'Product not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Validate production line if provided
-    if (input.production_line_id) {
-      const { data: machine, error: machineError } = await supabase
-        .from('machines')
-        .select('id')
-        .eq('id', input.production_line_id)
-        .eq('org_id', orgId)
-        .single()
-
-      if (machineError || !machine) {
-        return {
-          success: false,
-          error: 'Production line not found',
-          code: 'INVALID_INPUT',
-        }
-      }
-    }
-
-    // Generate WO number
-    const woNumber = await generateWoNumber(orgId)
-
-    // AC-3.10.3: Auto-select BOM based on scheduled date
-    let bomId: string | null = null
-    const scheduledDate = input.planned_start_date || new Date()
-    try {
-      const activeBom = await getActiveBOMForProduct(input.product_id, scheduledDate)
-      if (activeBom) {
-        bomId = activeBom.id
-      }
-    } catch (bomError) {
-      // BOM selection is optional - log but don't fail WO creation
-      console.warn('Could not auto-select BOM:', bomError)
-    }
-
-    // Create work order
-    const { data: workOrder, error: createError } = await supabaseAdmin
-      .from('work_orders')
-      .insert({
-        org_id: orgId,
-        wo_number: woNumber,
-        product_id: input.product_id,
-        bom_id: bomId,
-        planned_quantity: input.planned_quantity,
-        produced_quantity: 0,
-        uom: product.uom,
-        status: 'draft',
-        planned_start_date: input.planned_start_date || null,
-        planned_end_date: input.planned_end_date || null,
-        production_line_id: input.production_line_id || null,
-        created_by: userId,
-      })
-      .select(`
-        *,
-        products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name),
-        boms:bom_id (id, version, status)
-      `)
-      .single()
-
-    if (createError) {
-      console.error('Error creating work order:', createError)
-
-      if (createError.code === '23505') {
-        return {
-          success: false,
-          error: 'Work Order number already exists',
-          code: 'DUPLICATE_WO_NUMBER',
-        }
-      }
-
-      if (createError.code === '23503') {
-        return {
-          success: false,
-          error: 'Referenced entity not found',
-          code: 'FOREIGN_KEY_CONSTRAINT',
-        }
-      }
-
-      return {
-        success: false,
-        error: createError.message || 'Failed to create work order',
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    // Story 3.12: Copy BOM materials to WO (if product has BOM)
-    if (workOrder && bomId) {
-      const bomCopyResult = await copyBOMToWOMaterials(
-        workOrder.id,
-        bomId,
-        input.planned_quantity,
-        orgId
-      )
-      if (!bomCopyResult.success) {
-        console.warn('Failed to copy BOM materials:', bomCopyResult.error)
-      }
-    }
-
-    // Story 3.14: Copy routing operations to WO (if BOM has routing)
-    if (workOrder && bomId) {
-      // Get routing_id from BOM
-      const { data: bomData, error: bomFetchError } = await supabaseAdmin
-        .from('boms')
-        .select('routing_id')
-        .eq('id', bomId)
-        .single()
-
-      if (!bomFetchError && bomData?.routing_id) {
-        const copyResult = await copyRoutingToWO(
-          workOrder.id,
-          bomData.routing_id,
-          orgId
-        )
-        if (!copyResult.success) {
-          console.warn('Failed to copy routing operations:', copyResult.error)
-        }
-      }
-    }
-
-    return {
-      success: true,
-      data: workOrder as WorkOrder,
-    }
-  } catch (error) {
-    console.error('Unexpected error in createWorkOrder:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unexpected error occurred',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * Update an existing Work Order
- * AC-3.10.2: Update WO details (dates, quantity, status, production line)
- */
-export async function updateWorkOrder(
-  woId: string,
-  input: UpdateWorkOrderInput
-): Promise<ServiceResult<WorkOrder>> {
-  try {
-    const supabase = await createServerSupabase()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    // Check work order exists and belongs to org
-    const { data: existingWo, error: fetchError } = await supabase
-      .from('work_orders')
-      .select('id, status')
-      .eq('id', woId)
-      .eq('org_id', orgId)
-      .single()
-
-    if (fetchError || !existingWo) {
-      return {
-        success: false,
-        error: 'Work Order not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // Validate production line if provided
-    if (input.production_line_id) {
-      const { data: machine, error: machineError } = await supabase
-        .from('machines')
-        .select('id')
-        .eq('id', input.production_line_id)
-        .eq('org_id', orgId)
-        .single()
-
-      if (machineError || !machine) {
-        return {
-          success: false,
-          error: 'Production line not found',
-          code: 'INVALID_INPUT',
-        }
-      }
-    }
-
-    // Update work order
-    const { data: workOrder, error: updateError } = await supabase
-      .from('work_orders')
-      .update({
-        ...input,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', woId)
-      .eq('org_id', orgId)
-      .select(`
-        *,
-        products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name),
-        boms:bom_id (id, version, status)
-      `)
-      .single()
-
-    if (updateError) {
-      console.error('Error updating work order:', updateError)
-      return {
-        success: false,
-        error: updateError.message || 'Failed to update work order',
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    return {
-      success: true,
-      data: workOrder as WorkOrder,
-    }
-  } catch (error) {
-    console.error('Unexpected error in updateWorkOrder:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unexpected error occurred',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * Get a single Work Order by ID
- * AC-3.10.3: View WO details with product and production line info
- */
-export async function getWorkOrder(woId: string): Promise<ServiceResult<WorkOrder>> {
-  try {
-    const supabase = await createServerSupabase()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization not found',
-        code: 'INVALID_INPUT',
-      }
-    }
-
-    const { data: workOrder, error } = await supabase
-      .from('work_orders')
-      .select(`
-        *,
-        products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name),
-        boms:bom_id (id, version, status)
-      `)
-      .eq('id', woId)
-      .eq('org_id', orgId)
-      .single()
-
-    if (error || !workOrder) {
-      return {
-        success: false,
-        error: 'Work Order not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    return {
-      success: true,
-      data: workOrder as WorkOrder,
-    }
-  } catch (error) {
-    console.error('Unexpected error in getWorkOrder:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unexpected error occurred',
-      code: 'DATABASE_ERROR',
-    }
-  }
-}
-
-/**
- * List Work Orders with filters
- * AC-3.10.1: Display WOs with search, status filter, sorting
- */
-export async function listWorkOrders(
-  filters: WorkOrderFilters = {}
-): Promise<ListResult<WorkOrder>> {
-  try {
-    const supabase = await createServerSupabase()
-    const orgId = await getCurrentOrgId()
-
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization not found',
-      }
-    }
-
-    let query = supabase
-      .from('work_orders')
-      .select(
-        `
-        *,
-        products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name),
-        boms:bom_id (id, version, status)
-      `,
-        { count: 'exact' }
-      )
-      .eq('org_id', orgId)
-
-    // Apply filters
-    if (filters.search) {
-      query = query.or(
-        `wo_number.ilike.%${filters.search}%,products.name.ilike.%${filters.search}%`
-      )
-    }
-
-    if (filters.status) {
-      query = query.eq('status', filters.status)
-    }
-
-    if (filters.product_id) {
-      query = query.eq('product_id', filters.product_id)
-    }
-
-    if (filters.production_line_id) {
-      query = query.eq('production_line_id', filters.production_line_id)
-    }
-
-    if (filters.date_from) {
-      query = query.gte('planned_start_date', filters.date_from.toISOString().split('T')[0])
-    }
-
-    if (filters.date_to) {
-      query = query.lte('planned_start_date', filters.date_to.toISOString().split('T')[0])
-    }
-
-    // Apply sorting
-    const sortBy = filters.sort_by || 'created_at'
-    const sortDirection = filters.sort_direction || 'desc'
-    query = query.order(sortBy, { ascending: sortDirection === 'asc' })
-
-    const { data: workOrders, error, count } = await query
-
-    if (error) {
-      console.error('Error listing work orders:', error)
-      return {
-        success: false,
-        error: error.message || 'Failed to fetch work orders',
-      }
-    }
-
-    return {
-      success: true,
-      data: (workOrders as WorkOrder[]) || [],
+  return {
+    data: items,
+    pagination: {
+      page,
+      limit,
       total: count || 0,
-    }
-  } catch (error) {
-    console.error('Unexpected error in listWorkOrders:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unexpected error occurred',
-    }
+      totalPages: Math.ceil((count || 0) / limit),
+    },
   }
 }
 
 /**
- * Delete a Work Order
- * AC-3.10.4: Delete WO (admin only, handled by RLS)
+ * Get single work order by ID with all relations
  */
-export async function deleteWorkOrder(woId: string): Promise<ServiceResult> {
-  try {
-    const supabase = await createServerSupabase()
-    const orgId = await getCurrentOrgId()
+export async function getById(
+  supabase: SupabaseClient,
+  id: string
+): Promise<WorkOrderWithRelations | null> {
+  const { data, error } = await supabase
+    .from('work_orders')
+    .select(
+      `
+      *,
+      product:products(id, code, name, base_uom),
+      bom:boms(id, code, version, output_qty, effective_from, effective_to),
+      routing:routings(id, code, name),
+      production_line:production_lines(id, code, name),
+      machine:machines(id, code, name)
+    `
+    )
+    .eq('id', id)
+    .single()
 
-    if (!orgId) {
-      return {
-        success: false,
-        error: 'Organization not found',
-        code: 'INVALID_INPUT',
-      }
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null
     }
-
-    // Check work order exists
-    const { data: existingWo, error: fetchError } = await supabase
-      .from('work_orders')
-      .select('id')
-      .eq('id', woId)
-      .eq('org_id', orgId)
-      .single()
-
-    if (fetchError || !existingWo) {
-      return {
-        success: false,
-        error: 'Work Order not found',
-        code: 'NOT_FOUND',
-      }
-    }
-
-    // Delete work order
-    const { error: deleteError } = await supabase
-      .from('work_orders')
-      .delete()
-      .eq('id', woId)
-      .eq('org_id', orgId)
-
-    if (deleteError) {
-      console.error('Error deleting work order:', deleteError)
-      return {
-        success: false,
-        error: deleteError.message || 'Failed to delete work order',
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    return {
-      success: true,
-    }
-  } catch (error) {
-    console.error('Unexpected error in deleteWorkOrder:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unexpected error occurred',
-      code: 'DATABASE_ERROR',
-    }
+    throw new WorkOrderError(
+      `Failed to fetch work order: ${error.message}`,
+      'FETCH_ERROR',
+      500
+    )
   }
+
+  return data as WorkOrderWithRelations
 }
 
-// =============================================================================
-// Story 3.14: Routing Copy to WO
-// =============================================================================
-
 /**
- * Copy BOM items to WO materials
- * Story 3.12: Snapshot BOM items at WO creation time with quantity scaling
- *
- * AC-3.12.1: Copy BOM items and scale quantities
- * AC-3.12.2: Calculate scaled qty = bom_item.qty × (wo.qty / bom.output_qty)
- * AC-3.12.3: Store BOM item reference and version for immutability tracking
+ * Create new work order with BOM auto-selection
  */
-export async function copyBOMToWOMaterials(
-  woId: string,
-  bomId: string,
-  woQty: number,
-  orgId: string
-): Promise<ServiceResult> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
+export async function create(
+  supabase: SupabaseClient,
+  orgId: string,
+  userId: string,
+  input: CreateWOInput
+): Promise<WorkOrder> {
+  // 1. Verify product exists and belongs to org
+  const { data: product, error: productError } = await supabase
+    .from('products')
+    .select('id, code, name, base_uom')
+    .eq('id', input.product_id)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
+    .single()
 
-    // Get BOM with items and product names
-    const { data: bom, error: bomError } = await supabaseAdmin
+  if (productError || !product) {
+    throw new WorkOrderError('Product not found', 'PRODUCT_NOT_FOUND', 404)
+  }
+
+  // 2. Handle BOM selection
+  let bomId = input.bom_id
+
+  // If no BOM provided, auto-select
+  if (!bomId) {
+    const activeBom = await getActiveBomForDate(
+      supabase,
+      input.product_id,
+      orgId,
+      new Date(input.planned_start_date)
+    )
+
+    if (activeBom) {
+      bomId = activeBom.bom_id
+    }
+  }
+
+  // 3. Validate BOM if provided
+  if (bomId) {
+    const { data: bom, error: bomError } = await supabase
       .from('boms')
-      .select(`
-        id,
-        version,
-        output_qty,
-        bom_items (
-          id,
-          product_id,
-          quantity,
-          uom,
-          scrap_percent,
-          sequence,
-          consume_whole_lp,
-          is_by_product,
-          yield_percent,
-          condition_flags,
-          notes,
-          product:products!product_id (name)
-        )
-      `)
+      .select('id, product_id, org_id, status')
       .eq('id', bomId)
       .single()
 
     if (bomError || !bom) {
-      console.error('Error fetching BOM:', bomError)
-      return {
-        success: false,
-        error: 'Failed to fetch BOM',
-        code: 'DATABASE_ERROR',
-      }
+      throw new WorkOrderError('BOM not found', 'BOM_NOT_FOUND', 404)
     }
 
-    const bomItems = bom.bom_items || []
-
-    if (bomItems.length === 0) {
-      // No items to copy - this is not an error
-      return { success: true, data: [] }
+    if (bom.product_id !== input.product_id) {
+      throw new WorkOrderError(
+        'BOM does not belong to selected product',
+        'INVALID_BOM',
+        400
+      )
     }
 
-    // Prepare wo_materials records with quantity scaling
-    // Formula: scaled_qty = bom_item.qty × (wo.qty / bom.output_qty)
-    // DB uses: material_name, required_qty
-    const woMaterials = bomItems.map((item: any) => ({
-      wo_id: woId,
-      organization_id: orgId,
-      product_id: item.product_id,
-      material_name: item.product?.name || 'Unknown Material',
-      required_qty: (item.quantity || 0) * (woQty / (bom.output_qty || 1)),
-      consumed_qty: 0,
-      uom: item.uom,
-      sequence: item.sequence || 0,
-      consume_whole_lp: item.consume_whole_lp || false,
-      is_by_product: item.is_by_product || false,
-      yield_percent: item.yield_percent || null,
-      scrap_percent: item.scrap_percent || 0,
-      condition_flags: item.condition_flags || null,
-      bom_item_id: item.id,
-      bom_version: bom.version,
-      notes: item.notes || null,
-    }))
-
-    // Insert wo_materials records
-    const { data: inserted, error: insertError } = await supabaseAdmin
-      .from('wo_materials')
-      .insert(woMaterials)
-      .select()
-
-    if (insertError) {
-      console.error('Error inserting WO materials:', insertError)
-      return {
-        success: false,
-        error: 'Failed to copy BOM items to work order',
-        code: 'DATABASE_ERROR',
-      }
+    if (bom.org_id !== orgId) {
+      throw new WorkOrderError('BOM not found', 'BOM_NOT_FOUND', 404)
     }
 
-    return { success: true, data: inserted }
-  } catch (error) {
-    console.error('Unexpected error in copyBOMToWOMaterials:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unexpected error',
-      code: 'DATABASE_ERROR',
+    if (bom.status !== 'active') {
+      throw new WorkOrderError('BOM is not active', 'INACTIVE_BOM', 400)
     }
+  }
+
+  // 4. Generate WO number
+  const { data: woNumber, error: woNumError } = await supabase.rpc(
+    'generate_wo_number',
+    {
+      p_org_id: orgId,
+      p_date: input.planned_start_date,
+    }
+  )
+
+  if (woNumError || !woNumber) {
+    throw new WorkOrderError(
+      'Failed to generate WO number',
+      'NUMBER_GENERATION_ERROR',
+      500
+    )
+  }
+
+  // 5. Determine UoM (use product's base_uom if not provided)
+  const uom = input.uom || product.base_uom
+
+  // 6. Insert work order
+  const { data: workOrder, error: insertError } = await supabase
+    .from('work_orders')
+    .insert({
+      org_id: orgId,
+      wo_number: woNumber,
+      product_id: input.product_id,
+      bom_id: bomId || null,
+      planned_quantity: input.planned_quantity,
+      produced_quantity: 0,
+      uom,
+      status: 'draft',
+      planned_start_date: input.planned_start_date,
+      planned_end_date: input.planned_end_date || null,
+      scheduled_start_time: input.scheduled_start_time || null,
+      scheduled_end_time: input.scheduled_end_time || null,
+      production_line_id: input.production_line_id || null,
+      machine_id: input.machine_id || null,
+      priority: input.priority || 'normal',
+      source_of_demand: input.source_of_demand || null,
+      source_reference: input.source_reference || null,
+      expiry_date: input.expiry_date || null,
+      notes: input.notes || null,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select()
+    .single()
+
+  if (insertError) {
+    throw new WorkOrderError(
+      `Failed to create work order: ${insertError.message}`,
+      'CREATE_ERROR',
+      500
+    )
+  }
+
+  return workOrder as WorkOrder
+}
+
+/**
+ * Update work order (validates field restrictions by status)
+ */
+export async function update(
+  supabase: SupabaseClient,
+  id: string,
+  userId: string,
+  input: UpdateWOInput
+): Promise<WorkOrder> {
+  // 1. Get current WO
+  const { data: currentWO, error: fetchError } = await supabase
+    .from('work_orders')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !currentWO) {
+    throw new WorkOrderError('Work order not found', 'NOT_FOUND', 404)
+  }
+
+  // 2. Check field restrictions based on status
+  const currentStatus = currentWO.status as WOStatus
+
+  // Cannot edit cancelled or closed WOs
+  if (['cancelled', 'closed'].includes(currentStatus)) {
+    throw new WorkOrderError(
+      `Cannot modify ${currentStatus} work order`,
+      'INVALID_STATUS',
+      400
+    )
+  }
+
+  // Check locked fields after release
+  for (const field of LOCKED_FIELDS_AFTER_RELEASE) {
+    if (
+      field in input &&
+      input[field as keyof UpdateWOInput] !== undefined &&
+      !canEditField(currentStatus, field)
+    ) {
+      throw new WorkOrderError(
+        `Cannot modify ${field} after status ${currentStatus}`,
+        'FIELD_LOCKED',
+        400
+      )
+    }
+  }
+
+  // 3. Build update data (strip locked fields and wo_number)
+  const updateData: any = { ...input }
+  delete updateData.wo_number // Always immutable
+
+  // Remove locked fields if status doesn't allow
+  if (!canEditField(currentStatus, 'product_id')) {
+    delete updateData.product_id
+  }
+  if (!canEditField(currentStatus, 'bom_id')) {
+    delete updateData.bom_id
+  }
+  if (!canEditField(currentStatus, 'planned_quantity')) {
+    delete updateData.planned_quantity
+  }
+
+  // Add updated_by
+  updateData.updated_by = userId
+
+  // 4. Update
+  const { data: updatedWO, error: updateError } = await supabase
+    .from('work_orders')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (updateError) {
+    throw new WorkOrderError(
+      `Failed to update work order: ${updateError.message}`,
+      'UPDATE_ERROR',
+      500
+    )
+  }
+
+  return updatedWO as WorkOrder
+}
+
+/**
+ * Delete draft work order (only draft status, no materials)
+ */
+export async function deleteWorkOrder(
+  supabase: SupabaseClient,
+  id: string
+): Promise<void> {
+  // 1. Get WO to verify status
+  const { data: wo, error: fetchError } = await supabase
+    .from('work_orders')
+    .select('id, status')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !wo) {
+    throw new WorkOrderError('Work order not found', 'NOT_FOUND', 404)
+  }
+
+  if (wo.status !== 'draft') {
+    throw new WorkOrderError(
+      'Only draft work orders can be deleted',
+      'INVALID_STATUS',
+      400
+    )
+  }
+
+  // 2. Delete
+  const { error: deleteError } = await supabase
+    .from('work_orders')
+    .delete()
+    .eq('id', id)
+
+  if (deleteError) {
+    throw new WorkOrderError(
+      `Failed to delete work order: ${deleteError.message}`,
+      'DELETE_ERROR',
+      500
+    )
   }
 }
 
 /**
- * Copy routing operations to WO
- * Story 3.14: Creates wo_operations from routing_operations
+ * Plan work order (draft -> planned)
  */
-export async function copyRoutingToWO(
-  woId: string,
-  routingId: string,
+export async function plan(
+  supabase: SupabaseClient,
+  id: string,
+  userId: string,
+  notes?: string
+): Promise<WorkOrder> {
+  // 1. Get current WO
+  const { data: wo, error: fetchError } = await supabase
+    .from('work_orders')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !wo) {
+    throw new WorkOrderError('Work order not found', 'NOT_FOUND', 404)
+  }
+
+  // 2. Validate transition
+  if (!validateStatusTransition(wo.status as WOStatus, 'planned')) {
+    throw new WorkOrderError(
+      'Cannot plan WO from current status',
+      'INVALID_TRANSITION',
+      400
+    )
+  }
+
+  // 3. Update status
+  const { data: updatedWO, error: updateError } = await supabase
+    .from('work_orders')
+    .update({
+      status: 'planned',
+      updated_by: userId,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (updateError) {
+    throw new WorkOrderError(
+      `Failed to plan work order: ${updateError.message}`,
+      'UPDATE_ERROR',
+      500
+    )
+  }
+
+  // 4. Add notes to history if provided
+  if (notes) {
+    await supabase.from('wo_status_history').insert({
+      wo_id: id,
+      from_status: wo.status,
+      to_status: 'planned',
+      changed_by: userId,
+      notes,
+    })
+  }
+
+  return updatedWO as WorkOrder
+}
+
+/**
+ * Release work order (planned -> released)
+ */
+export async function release(
+  supabase: SupabaseClient,
+  id: string,
+  userId: string,
+  notes?: string
+): Promise<WorkOrder> {
+  // 1. Get current WO
+  const { data: wo, error: fetchError } = await supabase
+    .from('work_orders')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !wo) {
+    throw new WorkOrderError('Work order not found', 'NOT_FOUND', 404)
+  }
+
+  // 2. Validate transition
+  if (!validateStatusTransition(wo.status as WOStatus, 'released')) {
+    throw new WorkOrderError(
+      'Cannot release WO from current status',
+      'INVALID_TRANSITION',
+      400
+    )
+  }
+
+  // 3. Update status
+  const { data: updatedWO, error: updateError } = await supabase
+    .from('work_orders')
+    .update({
+      status: 'released',
+      updated_by: userId,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (updateError) {
+    throw new WorkOrderError(
+      `Failed to release work order: ${updateError.message}`,
+      'UPDATE_ERROR',
+      500
+    )
+  }
+
+  // 4. Add notes to history if provided
+  if (notes) {
+    await supabase.from('wo_status_history').insert({
+      wo_id: id,
+      from_status: wo.status,
+      to_status: 'released',
+      changed_by: userId,
+      notes,
+    })
+  }
+
+  return updatedWO as WorkOrder
+}
+
+/**
+ * Cancel work order
+ */
+export async function cancel(
+  supabase: SupabaseClient,
+  id: string,
+  userId: string,
+  reason?: string
+): Promise<WorkOrder> {
+  // 1. Get current WO
+  const { data: wo, error: fetchError } = await supabase
+    .from('work_orders')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !wo) {
+    throw new WorkOrderError('Work order not found', 'NOT_FOUND', 404)
+  }
+
+  // 2. Validate transition
+  if (!validateStatusTransition(wo.status as WOStatus, 'cancelled')) {
+    throw new WorkOrderError(
+      'Cannot cancel WO from current status',
+      'INVALID_TRANSITION',
+      400
+    )
+  }
+
+  // 3. Update status
+  const { data: updatedWO, error: updateError } = await supabase
+    .from('work_orders')
+    .update({
+      status: 'cancelled',
+      updated_by: userId,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (updateError) {
+    throw new WorkOrderError(
+      `Failed to cancel work order: ${updateError.message}`,
+      'UPDATE_ERROR',
+      500
+    )
+  }
+
+  // 4. Record reason in history
+  if (reason) {
+    await supabase.from('wo_status_history').insert({
+      wo_id: id,
+      from_status: wo.status,
+      to_status: 'cancelled',
+      changed_by: userId,
+      notes: reason,
+    })
+  }
+
+  return updatedWO as WorkOrder
+}
+
+/**
+ * Get auto-selected BOM for product on scheduled date
+ *
+ * Algorithm (implemented in database function):
+ * 1. Find active BOMs for product (status = 'active')
+ * 2. Filter BOMs where effective_from <= scheduled_date < effective_to (or effective_to IS NULL)
+ * 3. Order by version DESC (highest version = most recent)
+ * 4. Return first match (latest version valid on date)
+ *
+ * @param supabase - Supabase client
+ * @param productId - Product UUID
+ * @param orgId - Organization UUID
+ * @param scheduledDate - Scheduled production date
+ * @returns BOM preview or null if no active BOM found for date
+ */
+export async function getActiveBomForDate(
+  supabase: SupabaseClient,
+  productId: string,
+  orgId: string,
+  scheduledDate: Date
+): Promise<BomPreview | null> {
+  const dateStr = scheduledDate.toISOString().split('T')[0]
+
+  const { data, error } = await supabase.rpc('get_active_bom_for_date', {
+    p_product_id: productId,
+    p_org_id: orgId,
+    p_scheduled_date: dateStr,
+  })
+
+  if (error) {
+    console.error('Error getting active BOM:', error)
+    return null
+  }
+
+  if (!data || data.length === 0) {
+    return null
+  }
+
+  return data[0] as BomPreview
+}
+
+/**
+ * Get all active BOMs for product (manual selection)
+ */
+export async function getAvailableBoms(
+  supabase: SupabaseClient,
+  productId: string,
   orgId: string
-): Promise<ServiceResult> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
+): Promise<BomPreview[]> {
+  const { data, error } = await supabase.rpc('get_all_active_boms_for_product', {
+    p_product_id: productId,
+    p_org_id: orgId,
+  })
 
-    // Get routing operations
-    const { data: routingOps, error: routingError } = await supabaseAdmin
-      .from('routing_operations')
-      .select('*')
-      .eq('routing_id', routingId)
-      .order('sequence', { ascending: true })
+  if (error) {
+    console.error('Error getting available BOMs:', error)
+    return []
+  }
 
-    if (routingError) {
-      console.error('Error fetching routing operations:', routingError)
-      return {
-        success: false,
-        error: 'Failed to fetch routing operations',
-        code: 'DATABASE_ERROR',
-      }
-    }
+  return (data || []) as BomPreview[]
+}
 
-    if (!routingOps || routingOps.length === 0) {
-      // No operations to copy - this is not an error
-      return { success: true, data: [] }
-    }
+/**
+ * Validate product has active BOM on date
+ */
+export async function validateProductHasActiveBom(
+  supabase: SupabaseClient,
+  productId: string,
+  orgId: string,
+  scheduledDate: Date
+): Promise<BomValidationResult> {
+  const bom = await getActiveBomForDate(supabase, productId, orgId, scheduledDate)
 
-    // Prepare wo_operations records (mapping routing_operations → wo_operations)
-    // Actual DB schema uses: wo_id, organization_id, sequence, expected_duration_minutes
-    const woOperations = routingOps.map((op) => ({
-      organization_id: orgId,
-      wo_id: woId,
-      sequence: op.sequence,
-      operation_name: op.name,
-      machine_id: op.machine_id || null,
-      expected_duration_minutes: op.duration || 0,
-      expected_yield_percent: null,
-      status: 'pending',
-    }))
-
-    // Insert all operations
-    const { data: inserted, error: insertError } = await supabaseAdmin
-      .from('wo_operations')
-      .insert(woOperations)
-      .select()
-
-    if (insertError) {
-      console.error('Error inserting WO operations:', insertError)
-      return {
-        success: false,
-        error: 'Failed to copy routing operations',
-        code: 'DATABASE_ERROR',
-      }
-    }
-
-    return { success: true, data: inserted }
-  } catch (error) {
-    console.error('Unexpected error in copyRoutingToWO:', error)
+  if (!bom) {
     return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unexpected error',
-      code: 'DATABASE_ERROR',
+      valid: false,
+      error: 'No active BOM found for product on scheduled date',
     }
+  }
+
+  return {
+    valid: true,
+    bom,
   }
 }
 
 /**
- * Get WO operations
- * Story 3.14: Fetches operations for a Work Order
+ * Generate next WO number (without actually creating)
+ *
+ * Format: WO-YYYYMMDD-NNNN
+ * - YYYYMMDD = production date (or today if not provided)
+ * - NNNN = sequence number (0001, 0002, etc.)
+ *
+ * Database function finds max sequence for date and increments by 1
+ *
+ * @param supabase - Supabase client
+ * @param orgId - Organization UUID
+ * @param date - Optional target date (defaults to today)
+ * @returns Preview WO number (e.g., "WO-20250115-0001")
+ * @throws WorkOrderError if generation fails
  */
-export async function getWOOperations(woId: string): Promise<ListResult<any>> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
+export async function previewNextNumber(
+  supabase: SupabaseClient,
+  orgId: string,
+  date?: Date
+): Promise<string> {
+  const targetDate = date || new Date()
+  const dateStr = targetDate.toISOString().split('T')[0]
 
-    // DB schema uses: wo_id, sequence, expected_duration_minutes, expected_yield_percent
-    const { data, error } = await supabaseAdmin
-      .from('wo_operations')
-      .select(`
-        id,
-        wo_id,
-        sequence,
-        operation_name,
-        machine_id,
-        line_id,
-        expected_duration_minutes,
-        expected_yield_percent,
-        actual_duration_minutes,
-        status,
-        started_at,
-        completed_at,
-        machines:machine_id (
-          id,
-          code,
-          name
-        )
-      `)
-      .eq('wo_id', woId)
-      .order('sequence', { ascending: true })
+  const { data, error } = await supabase.rpc('preview_next_wo_number', {
+    p_org_id: orgId,
+    p_date: dateStr,
+  })
 
-    if (error) {
-      console.error('Error fetching WO operations:', error)
-      return { success: false, error: 'Failed to fetch operations' }
-    }
-
-    return { success: true, data: data || [], total: data?.length || 0 }
-  } catch (error) {
-    console.error('Unexpected error in getWOOperations:', error)
-    return { success: false, error: 'Unexpected error' }
+  if (error) {
+    throw new WorkOrderError(
+      'Failed to preview WO number',
+      'NUMBER_GENERATION_ERROR',
+      500
+    )
   }
+
+  return data
 }
 
 /**
- * Get product's default routing
- * Story 3.14: Gets the routing assigned to a product
+ * Get status transition history for WO
  */
-export async function getProductRouting(productId: string): Promise<ServiceResult<string | null>> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
+export async function getStatusHistory(
+  supabase: SupabaseClient,
+  woId: string
+): Promise<WOStatusHistory[]> {
+  const { data, error } = await supabase
+    .from('wo_status_history')
+    .select(
+      `
+      id,
+      wo_id,
+      from_status,
+      to_status,
+      changed_by,
+      changed_at,
+      notes
+    `
+    )
+    .eq('wo_id', woId)
+    .order('changed_at', { ascending: true })
 
-    // Check product_routings for assigned routing
-    const { data, error } = await supabaseAdmin
-      .from('product_routings')
-      .select('routing_id')
-      .eq('product_id', productId)
-      .eq('is_default', true)
-      .single()
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
-      console.error('Error fetching product routing:', error)
-      return { success: false, error: 'Failed to fetch product routing' }
-    }
-
-    return { success: true, data: data?.routing_id || null }
-  } catch (error) {
-    console.error('Unexpected error in getProductRouting:', error)
-    return { success: false, error: 'Unexpected error' }
+  if (error) {
+    throw new WorkOrderError(
+      `Failed to fetch status history: ${error.message}`,
+      'FETCH_ERROR',
+      500
+    )
   }
+
+  return (data || []) as WOStatusHistory[]
+}
+
+// ============================================================================
+// EXPORT SERVICE OBJECT
+// ============================================================================
+
+export const WorkOrderService = {
+  list,
+  getById,
+  create,
+  update,
+  delete: deleteWorkOrder,
+  plan,
+  release,
+  cancel,
+  getActiveBomForDate,
+  getAvailableBoms,
+  validateProductHasActiveBom,
+  previewNextNumber,
+  getStatusHistory,
+  validateStatusTransition,
+  canEditField,
 }
