@@ -28,148 +28,33 @@ import { calculateToStatus, enrichWithWarehouses } from './helpers'
  * Updates shipped_qty cumulatively
  * Sets actual_ship_date on FIRST shipment only (immutable)
  * Automatically updates TO status based on line quantities
+ *
+ * Refactored: Uses executeTransferOrderAction helper (eliminates 90% duplication)
  */
 export async function shipTransferOrder(
   transferOrderId: string,
   input: ShipToInput,
   userId: string
 ): Promise<ServiceResult<TransferOrder>> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const { executeTransferOrderAction } = await import('./action-helpers')
 
-    // Check if TO exists and is shippable
-    const { data: existingTo, error: toError } = await supabaseAdmin
-      .from('transfer_orders')
-      .select('status, actual_ship_date, shipped_by')
-      .eq('id', transferOrderId)
-      .single()
+  // Map input to generic line quantities
+  const lineQuantities = input.line_items.map((item) => ({
+    line_id: item.to_line_id,
+    quantity: item.ship_qty,
+  }))
 
-    if (toError || !existingTo) {
-      return {
-        success: false,
-        error: 'Transfer Order not found',
-        code: ErrorCode.NOT_FOUND,
-      }
-    }
-
-    if (NON_SHIPPABLE_STATUSES.includes(existingTo.status as any)) {
-      return {
-        success: false,
-        error: `Cannot ship Transfer Order with status: ${existingTo.status}`,
-        code: ErrorCode.INVALID_STATUS,
-      }
-    }
-
-    // Get all TO lines to validate ship quantities
-    const { data: lines, error: linesError } = await supabaseAdmin
-      .from('to_lines')
-      .select('id, quantity, shipped_qty')
-      .eq('transfer_order_id', transferOrderId)
-
-    if (linesError || !lines) {
-      return {
-        success: false,
-        error: 'Failed to fetch TO lines',
-        code: ErrorCode.DATABASE_ERROR,
-      }
-    }
-
-    // Validate ship quantities
-    for (const lineItem of input.line_items) {
-      const line = lines.find((l) => l.id === lineItem.to_line_id)
-      if (!line) {
-        return {
-          success: false,
-          error: `TO line ${lineItem.to_line_id} not found`,
-          code: ErrorCode.NOT_FOUND,
-        }
-      }
-
-      const newShippedQty = line.shipped_qty + lineItem.ship_qty
-      if (newShippedQty > line.quantity) {
-        return {
-          success: false,
-          error: `Ship quantity exceeds remaining quantity for line ${lineItem.to_line_id}`,
-          code: ErrorCode.INVALID_QUANTITY,
-        }
-      }
-    }
-
-    // Update shipped_qty for each line (cumulative)
-    for (const lineItem of input.line_items) {
-      const line = lines.find((l) => l.id === lineItem.to_line_id)!
-      const newShippedQty = line.shipped_qty + lineItem.ship_qty
-
-      const { error: updateError } = await supabaseAdmin
-        .from('to_lines')
-        .update({
-          shipped_qty: newShippedQty,
-        })
-        .eq('id', lineItem.to_line_id)
-
-      if (updateError) {
-        console.error('Error updating TO line shipped_qty:', updateError)
-        return {
-          success: false,
-          error: 'Failed to update TO line',
-          code: ErrorCode.DATABASE_ERROR,
-        }
-      }
-    }
-
-    // Set actual_ship_date and shipped_by on FIRST shipment only (immutable)
-    const updateData: Record<string, unknown> = {
-      updated_by: userId,
-    }
-    if (!existingTo.actual_ship_date) {
-      updateData.actual_ship_date = input.actual_ship_date || new Date().toISOString().split('T')[0]
-      updateData.shipped_by = userId
-    }
-
-    // Calculate and update status
-    const newStatus = await calculateToStatus(transferOrderId)
-    updateData.status = newStatus
-
-    // Update transfer order
-    const { data, error } = await supabaseAdmin
-      .from('transfer_orders')
-      .update(updateData)
-      .eq('id', transferOrderId)
-      .select(
-        `
-        *,
-        lines:to_lines(
-          *,
-          product:products(code, name)
-        )
-      `
-      )
-      .single()
-
-    if (error) {
-      console.error('Error updating transfer order after shipment:', error)
-      return {
-        success: false,
-        error: 'Failed to update transfer order',
-        code: ErrorCode.DATABASE_ERROR,
-      }
-    }
-
-    // Enrich with warehouse info
-    const enriched = await enrichWithWarehouses(data)
-
-    return {
-      success: true,
-      data: enriched as TransferOrder,
-    }
-  } catch (error) {
-    console.error('Error in shipTransferOrder:', error)
-    return {
-      success: false,
-      error: 'Internal server error',
-      code: ErrorCode.DATABASE_ERROR,
-    }
-  }
+  // Execute using common helper
+  return executeTransferOrderAction(
+    {
+      transferOrderId,
+      userId,
+      actionType: 'ship',
+      date: input.actual_ship_date || new Date().toISOString().split('T')[0],
+      notes: input.notes,
+    },
+    lineQuantities
+  )
 }
 
 // ============================================================================
@@ -420,148 +305,33 @@ export async function deleteToLineLp(lpSelectionId: string): Promise<ServiceResu
  * Updates received_qty cumulatively
  * Sets actual_receive_date on FIRST receipt only (immutable)
  * Automatically updates TO status based on line quantities
+ *
+ * Refactored: Uses executeTransferOrderAction helper (eliminates 90% duplication)
  */
 export async function receiveTransferOrder(
   transferOrderId: string,
   input: ReceiveTOInput,
   userId: string
 ): Promise<ServiceResult<TransferOrder>> {
-  try {
-    const supabaseAdmin = createServerSupabaseAdmin()
+  const { executeTransferOrderAction } = await import('./action-helpers')
 
-    // Check if TO exists and is receivable
-    const { data: existingTo, error: toError } = await supabaseAdmin
-      .from('transfer_orders')
-      .select('status, actual_receive_date, received_by')
-      .eq('id', transferOrderId)
-      .single()
+  // Map input to generic line quantities
+  const lineQuantities = input.lines.map((item) => ({
+    line_id: item.line_id,
+    quantity: item.receive_qty,
+  }))
 
-    if (toError || !existingTo) {
-      return {
-        success: false,
-        error: 'Transfer Order not found',
-        code: ErrorCode.NOT_FOUND,
-      }
-    }
-
-    if (NON_RECEIVABLE_STATUSES.includes(existingTo.status as any)) {
-      return {
-        success: false,
-        error: `Cannot receive Transfer Order with status: ${existingTo.status}`,
-        code: ErrorCode.INVALID_STATUS,
-      }
-    }
-
-    // Get all TO lines to validate receive quantities
-    const { data: lines, error: linesError } = await supabaseAdmin
-      .from('to_lines')
-      .select('id, quantity, shipped_qty, received_qty')
-      .eq('transfer_order_id', transferOrderId)
-
-    if (linesError || !lines) {
-      return {
-        success: false,
-        error: 'Failed to fetch TO lines',
-        code: ErrorCode.DATABASE_ERROR,
-      }
-    }
-
-    // Validate receive quantities
-    for (const lineItem of input.lines) {
-      const line = lines.find((l) => l.id === lineItem.line_id)
-      if (!line) {
-        return {
-          success: false,
-          error: `TO line ${lineItem.line_id} not found`,
-          code: ErrorCode.NOT_FOUND,
-        }
-      }
-
-      const newReceivedQty = line.received_qty + lineItem.receive_qty
-      if (newReceivedQty > line.shipped_qty) {
-        return {
-          success: false,
-          error: `Cannot receive more than shipped quantity for line ${lineItem.line_id}`,
-          code: ErrorCode.INVALID_QUANTITY,
-        }
-      }
-    }
-
-    // Update received_qty for each line (cumulative)
-    for (const lineItem of input.lines) {
-      const line = lines.find((l) => l.id === lineItem.line_id)!
-      const newReceivedQty = line.received_qty + lineItem.receive_qty
-
-      const { error: updateError } = await supabaseAdmin
-        .from('to_lines')
-        .update({
-          received_qty: newReceivedQty,
-        })
-        .eq('id', lineItem.line_id)
-
-      if (updateError) {
-        console.error('Error updating TO line received_qty:', updateError)
-        return {
-          success: false,
-          error: 'Failed to update TO line',
-          code: ErrorCode.DATABASE_ERROR,
-        }
-      }
-    }
-
-    // Set actual_receive_date and received_by on FIRST receipt only (immutable)
-    const updateData: Record<string, unknown> = {
-      updated_by: userId,
-    }
-    if (!existingTo.actual_receive_date) {
-      updateData.actual_receive_date = input.receipt_date
-      updateData.received_by = userId
-    }
-
-    // Calculate and update status
-    const newStatus = await calculateToStatus(transferOrderId)
-    updateData.status = newStatus
-
-    // Update transfer order
-    const { data, error } = await supabaseAdmin
-      .from('transfer_orders')
-      .update(updateData)
-      .eq('id', transferOrderId)
-      .select(
-        `
-        *,
-        lines:to_lines(
-          *,
-          product:products(code, name)
-        )
-      `
-      )
-      .single()
-
-    if (error) {
-      console.error('Error updating transfer order after receipt:', error)
-      return {
-        success: false,
-        error: 'Failed to update transfer order',
-        code: ErrorCode.DATABASE_ERROR,
-      }
-    }
-
-    // Enrich with warehouse info
-    const enriched = await enrichWithWarehouses(data)
-
-    return {
-      success: true,
-      data: enriched as TransferOrder,
-    }
-  } catch (error) {
-    console.error('Error in receiveTransferOrder:', error)
-    return {
-      success: false,
-      error: 'Internal server error',
-      code: ErrorCode.DATABASE_ERROR,
-    }
-  }
+  // Execute using common helper
+  return executeTransferOrderAction(
+    {
+      transferOrderId,
+      userId,
+      actionType: 'receive',
+      date: input.receipt_date,
+      notes: input.notes,
+    },
+    lineQuantities
+  )
 }
 
 // ============================================================================
