@@ -1,0 +1,206 @@
+# Story 03.14 - WO Scheduling: RED → GREEN Handoff
+# From: TEST-WRITER
+# To: DEV
+# Date: 2025-12-31
+
+handoff:
+  from_agent: "TEST-WRITER"
+  to_agent: "DEV"
+  phase: "RED → GREEN"
+  story: "03.14"
+  status: "ready_for_implementation"
+
+red_phase_complete:
+  date: "2025-12-31"
+  tests_created: 3
+  total_test_cases: 39
+  all_failing: true
+  verification: "All tests fail for the right reasons (missing implementation)"
+
+test_files:
+  - path: "apps/frontend/lib/validation/__tests__/work-order-schemas.test.ts"
+    type: "unit"
+    tests: 27
+    status: "failing"
+    reason: "scheduleWOSchema is undefined"
+
+  - path: "apps/frontend/lib/services/__tests__/work-order-service.schedule.test.ts"
+    type: "unit"
+    tests: 12
+    status: "failing"
+    reason: "WorkOrderService.scheduleWorkOrder is not a function"
+
+  - path: "apps/frontend/__tests__/api/planning/work-orders/schedule.test.ts"
+    type: "integration"
+    tests: ~20
+    status: "not_run"
+    reason: "Requires API endpoint implementation"
+
+# Implementation tasks for DEV
+implementation_tasks:
+  1_validation_schema:
+    priority: "P0"
+    file: "apps/frontend/lib/validation/work-order-schemas.ts"
+    action: "add"
+    what: "scheduleWOSchema with time/date validation"
+    reference: "docs/2-MANAGEMENT/epics/current/03-planning/context/03.14/api.yaml (lines 135-175)"
+    tests_to_pass: 27
+
+  2_service_method:
+    priority: "P0"
+    file: "apps/frontend/lib/services/work-order-service.ts"
+    action: "add"
+    what: "scheduleWorkOrder method"
+    reference: "docs/2-MANAGEMENT/epics/current/03-planning/context/03.14/api.yaml (lines 176-365)"
+    tests_to_pass: 12
+    logic:
+      - "Fetch WO and validate org_id"
+      - "Check status (reject completed/cancelled/closed)"
+      - "Validate line/machine existence if provided"
+      - "Update WO with schedule data"
+      - "Return updated WO with relations"
+
+  3_api_endpoint:
+    priority: "P0"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/schedule/route.ts"
+    action: "create"
+    what: "PATCH endpoint for WO scheduling"
+    reference: "docs/2-MANAGEMENT/epics/current/03-planning/context/03.14/api.yaml (lines 190-248)"
+    tests_to_pass: ~20
+    flow:
+      - "Auth check (getOrgContext)"
+      - "Permission check (planning update)"
+      - "Parse and validate body (scheduleWOSchema)"
+      - "Call WorkOrderService.scheduleWorkOrder"
+      - "Return 200 with updated WO or error"
+
+# Acceptance criteria to satisfy
+acceptance_criteria:
+  - id: "AC-01"
+    description: "Schedule WO with valid times"
+    test_file: "schedule.test.ts"
+
+  - id: "AC-02"
+    description: "Reject end time before start time"
+    test_file: "work-order-schemas.test.ts + schedule.test.ts"
+
+  - id: "AC-03"
+    description: "Reject scheduling completed WO"
+    test_file: "work-order-service.schedule.test.ts + schedule.test.ts"
+
+  - id: "AC-04"
+    description: "Reject scheduling cancelled WO"
+    test_file: "work-order-service.schedule.test.ts + schedule.test.ts"
+
+  - id: "AC-05"
+    description: "Update production line with schedule"
+    test_file: "schedule.test.ts"
+
+  - id: "AC-06"
+    description: "Reject invalid production line"
+    test_file: "work-order-service.schedule.test.ts + schedule.test.ts"
+
+  - id: "AC-07"
+    description: "Clear machine assignment"
+    test_file: "schedule.test.ts"
+
+  - id: "AC-08"
+    description: "Multi-tenant isolation"
+    test_file: "work-order-service.schedule.test.ts + schedule.test.ts"
+
+  - id: "AC-09"
+    description: "Permission check"
+    test_file: "schedule.test.ts"
+
+  - id: "AC-10"
+    description: "Valid date range"
+    test_file: "work-order-schemas.test.ts + schedule.test.ts"
+
+  - id: "AC-11"
+    description: "Reject invalid date range"
+    test_file: "work-order-schemas.test.ts + schedule.test.ts"
+
+# Key validation rules
+validation_rules:
+  time_format:
+    pattern: "HH:mm (00:00 to 23:59)"
+    regex: "/^([01]\\d|2[0-3]):([0-5]\\d)$/"
+
+  date_format:
+    pattern: "YYYY-MM-DD (ISO 8601)"
+    zod: "z.string().date()"
+
+  time_range:
+    rule: "scheduled_end_time > scheduled_start_time (same day only)"
+    exception: "Allow overnight if planned_end_date != planned_start_date"
+
+  date_range:
+    rule: "planned_end_date >= planned_start_date"
+
+  status_constraint:
+    allowed: ["draft", "planned", "released", "in_progress", "on_hold"]
+    rejected: ["completed", "cancelled", "closed"]
+    error: "CANNOT_SCHEDULE_COMPLETED"
+
+# Database considerations
+database:
+  table: "work_orders"
+  columns_updated:
+    - "scheduled_start_time (TIME)"
+    - "scheduled_end_time (TIME)"
+    - "planned_start_date (DATE)"
+    - "planned_end_date (DATE)"
+    - "production_line_id (UUID)"
+    - "machine_id (UUID)"
+    - "updated_at (TIMESTAMP)"
+    - "updated_by (UUID)"
+  rls: "Enforce org_id on all operations"
+
+# Test execution
+test_commands:
+  validation: "npm test -- work-order-schemas.test.ts --run"
+  service: "npm test -- work-order-service.schedule.test.ts --run"
+  integration: "npm test -- schedule.test.ts --run"
+  all: "npm test -- schedule --run"
+
+# Success criteria
+success_criteria:
+  - "All 27 validation tests PASS"
+  - "All 12 service tests PASS"
+  - "All ~20 integration tests PASS"
+  - "Coverage >= 90% for validation"
+  - "Coverage >= 85% for service"
+  - "Coverage >= 80% for API"
+  - "All 11 ACs satisfied"
+  - "No TypeScript errors"
+  - "No ESLint warnings"
+
+# Reference documents
+reference_docs:
+  - "docs/2-MANAGEMENT/epics/current/03-planning/context/03.14/_index.yaml"
+  - "docs/2-MANAGEMENT/epics/current/03-planning/context/03.14/api.yaml"
+  - "docs/2-MANAGEMENT/epics/current/03-planning/context/03.14/tests.yaml"
+  - "docs/2-MANAGEMENT/epics/current/03-planning/context/03.14/TEST-STATUS.md"
+  - ".claude/PATTERNS.md (API/Service patterns)"
+
+# Example patterns to follow
+patterns:
+  validation: "See: apps/frontend/lib/validation/work-order-schemas.ts (existing schemas)"
+  service: "See: apps/frontend/lib/services/work-order-service.ts (existing methods)"
+  api: "See: apps/frontend/app/api/planning/work-orders/[id]/route.ts"
+
+# Notes for DEV
+notes:
+  - "Follow TDD: Run tests after each implementation step"
+  - "Start with validation schema (simplest, 27 tests)"
+  - "Then service method (12 tests)"
+  - "Finally API endpoint (integration tests)"
+  - "Use existing WO service patterns (class-based, static methods)"
+  - "Enforce org_id on all database queries (ADR-013)"
+  - "Return full WO with relations (product, line, machine)"
+  - "Use WorkOrderError for consistent error handling"
+
+# Ready for GREEN phase
+ready: true
+estimated_time: "2-3 hours"
+complexity: "M"
