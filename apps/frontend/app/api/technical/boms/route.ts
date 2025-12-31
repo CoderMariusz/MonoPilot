@@ -33,11 +33,12 @@ export async function GET(request: NextRequest) {
     // Get current user to check org_id
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
     if (userError || !currentUser) {
+      console.error('User lookup error:', userError)
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
@@ -107,16 +108,21 @@ export async function POST(request: NextRequest) {
     // Get current user to check role
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
     if (userError || !currentUser) {
+      console.error('User lookup error:', userError)
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Extract role code from joined data
+    const roleData = currentUser.role as { code: string } | null
+    const userRole = roleData?.code || ''
+
     // Check authorization: Admin or Technical only
-    if (!['admin', 'technical'].includes(currentUser.role)) {
+    if (!['admin', 'technical'].includes(userRole)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }

@@ -28,7 +28,7 @@ Source: `.claude/setting.local.json`
 
 ## 🎯 STORIES TO IMPLEMENT
 ```
-**Story_ids** 03.017
+**Story_ids** 03.10 
 ```
 **Epic:** `01-settings`
 **Mode:** `multi-track` (parallel stories)
@@ -57,6 +57,8 @@ UX Wireframes: docs/3-ARCHITECTURE/ux/wireframes/TEC{XXXX}/
 | 7. DOCS | tech-writer | **Haiku** | Docs complete |
 
 **Failed review → back to GREEN → repeat all phases**
+** green phase can be done by 4 agent if there is no conflict and they working on diferent files parallel track **
+** refactor moze byc robiony razem z code review**
 **If no UX wireframes are not provided, do phase 1 and give them to approv**
 
 ---
@@ -71,6 +73,7 @@ Task(agent-name):
   context_refs:
     - docs/.../context/{STORY_ID}/_index.yaml
     - docs/.../context/{STORY_ID}/tests.yaml
+    - docs/.../context/{STORY_ID}/... <--> plik odpowiadajacy zadaniu agenta (frontend, api, backend, etc.)
   wireframe: docs/3-ARCHITECTURE/ux/wireframes/TEC{XXXX}/
   previous_summary: {MAX 50 WORDS}
   additional_info: "czytaj caly pliki context, tests, gaps skup sie na calym funkcjonalnosci"
@@ -145,6 +148,9 @@ Next: {action for next agent}
 3. **No permissions needed** - execute autonomously
 4. **Update PROJECT-STATE.md** after each phase
 5. **Final report** when all stories complete
+6. **Raports condence** write only what need to dont overwrite. condence single report should not be over 300-500tokes
+7. **use skills to better and consistent implement code**
+8. **do not overenginier code simplisity is better in code / no short cut and condensecode**
 
 ---
 

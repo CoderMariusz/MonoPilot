@@ -96,10 +96,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current user to check role
+    // Get current user and their role
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role_id')
       .eq('id', session.user.id)
       .single()
 
@@ -107,8 +107,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Get role code separately to avoid join issues
+    let userRole = 'user' // default role
+    if (currentUser.role_id) {
+      const { data: roleData } = await supabase
+        .from('roles')
+        .select('code')
+        .eq('id', currentUser.role_id)
+        .single()
+
+      if (roleData) {
+        userRole = roleData.code
+      }
+    }
+
     // Check authorization: Admin or Technical only
-    if (!['admin', 'technical'].includes(currentUser.role)) {
+    if (!['admin', 'technical'].includes(userRole)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }

@@ -1,288 +1,291 @@
 /**
- * Transfer Order Details Page
- * Story 3.6 & 3.7: Transfer Order CRUD + TO Line Management
+ * Transfer Order Detail Page
+ * Story 03.8: Transfer Orders CRUD + Lines
+ * Displays TO detail with header info and line items
  */
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  ArrowLeft,
+  Edit,
+  MoreHorizontal,
+  CheckCircle,
+  XCircle,
+  Copy,
+  Printer,
+  RefreshCw,
+  AlertTriangle,
+} from 'lucide-react'
+import { PlanningHeader } from '@/components/planning/PlanningHeader'
+import {
+  TOHeader,
+  TOLinesDataTable,
+  ReleaseConfirmDialog,
+  CancelConfirmDialog,
+} from '@/components/planning/transfer-orders'
+import { TransferOrderFormModal } from '@/components/planning/TransferOrderFormModal'
+import { useTransferOrder } from '@/lib/hooks/use-transfer-order'
+import {
+  useReleaseTransferOrder,
+  useCancelTransferOrder,
+} from '@/lib/hooks/use-transfer-order-mutations'
+import { canEditTO, canModifyLines, canRelease, canCancel } from '@/lib/types/transfer-order'
 import { useToast } from '@/hooks/use-toast'
-import { TOLinesTable } from '@/components/planning/TOLinesTable'
 
-interface Warehouse {
-  id: string
-  code: string
-  name: string
+interface PageProps {
+  params: Promise<{ id: string }>
 }
 
-interface TransferOrder {
-  id: string
-  to_number: string
-  from_warehouse_id: string
-  to_warehouse_id: string
-  status: string
-  planned_ship_date: string
-  planned_receive_date: string
-  actual_ship_date: string | null
-  actual_receive_date: string | null
-  notes: string | null
-  from_warehouse?: Warehouse
-  to_warehouse?: Warehouse
-  created_at: string
-  updated_at: string
-}
-
-export default function TransferOrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-  const [to, setTO] = useState<TransferOrder | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [changingStatus, setChangingStatus] = useState(false)
-  const [lineCount, setLineCount] = useState(0)
-  const [paramsId, setParamsId] = useState<string>('')
+export default function TransferOrderDetailPage({ params }: PageProps) {
+  const { id } = use(params)
   const router = useRouter()
+
+  // Modal states
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [releaseDialogOpen, setReleaseDialogOpen] = useState(false)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+
+  // Data hooks
+  const { data: transferOrder, isLoading, isError, refetch } = useTransferOrder(id)
+  const releaseMutation = useReleaseTransferOrder()
+  const cancelMutation = useCancelTransferOrder()
   const { toast } = useToast()
 
-  // Unwrap params
-  useEffect(() => {
-    params.then((p) => setParamsId(p.id))
-  }, [params])
+  // Calculate permissions
+  const isEditable = transferOrder ? canEditTO(transferOrder.status) : false
+  const linesEditable = transferOrder ? canModifyLines(transferOrder.status) : false
+  const canReleaseTO = transferOrder
+    ? canRelease(transferOrder.status, transferOrder.lines?.length || 0)
+    : false
+  const canCancelTO = transferOrder ? canCancel(transferOrder.status) : false
 
-  // Fetch TO details
-  const fetchTO = useCallback(async () => {
-    if (!paramsId) return
-
-    try {
-      setLoading(true)
-
-      const response = await fetch(`/api/planning/transfer-orders/${paramsId}`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch transfer order')
-      }
-
-      const data = await response.json()
-      setTO(data.transfer_order || data)
-    } catch (error) {
-      console.error('Error fetching transfer order:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load transfer order details',
-        variant: 'destructive',
-      })
-      router.push('/planning/transfer-orders')
-    } finally {
-      setLoading(false)
-    }
-  }, [paramsId, toast, router])
-
-  useEffect(() => {
-    fetchTO()
-  }, [fetchTO])
-
-  // Handle line count update (callback from TOLinesTable)
-  const handleLinesUpdate = async () => {
-    await fetchTO()
-  }
-
-  // Handle status change
-  const handleStatusChange = async (newStatus: 'planned' | 'cancelled') => {
-    if (!to) return
+  // Handle release
+  const handleRelease = async () => {
+    if (!transferOrder) return
 
     try {
-      setChangingStatus(true)
-
-      const response = await fetch(`/api/planning/transfer-orders/${paramsId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to change status')
-      }
-
-      toast({
-        title: 'Success',
-        description: `Transfer Order ${newStatus === 'planned' ? 'planned' : 'cancelled'} successfully`,
-      })
-
-      await fetchTO()
+      await releaseMutation.mutateAsync({ id: transferOrder.id })
+      toast({ title: 'Success', description: `${transferOrder.to_number} released successfully` })
+      setReleaseDialogOpen(false)
+      refetch()
     } catch (error) {
-      console.error('Error changing status:', error)
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to change status',
+        description: error instanceof Error ? error.message : 'Failed to release transfer order',
         variant: 'destructive',
       })
-    } finally {
-      setChangingStatus(false)
     }
   }
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
+  // Handle cancel
+  const handleCancel = async (reason?: string) => {
+    if (!transferOrder) return
 
-  // Get status badge variant
-  const getStatusVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'draft':
-        return 'secondary'
-      case 'planned':
-        return 'default'
-      case 'partially_shipped':
-        return 'default'
-      case 'shipped':
-        return 'default'
-      case 'partially_received':
-        return 'default'
-      case 'received':
-        return 'default'
-      case 'cancelled':
-        return 'destructive'
-      default:
-        return 'secondary'
+    try {
+      await cancelMutation.mutateAsync({ id: transferOrder.id, reason })
+      toast({ title: 'Success', description: `${transferOrder.to_number} cancelled` })
+      setCancelDialogOpen(false)
+      refetch()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to cancel transfer order',
+        variant: 'destructive',
+      })
     }
   }
 
-  if (loading) {
+  // Handle form success
+  const handleFormSuccess = () => {
+    setEditModalOpen(false)
+    refetch()
+  }
+
+  // Loading state
+  if (isLoading) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">Loading...</div>
+      <div className="min-h-screen bg-gray-50">
+        <PlanningHeader currentPage="to" />
+        <div className="px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto">
+          {/* Back button skeleton */}
+          <Skeleton className="h-9 w-24" />
+
+          {/* Header skeleton */}
+          <div className="border rounded-lg bg-white p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+            <div className="grid grid-cols-4 gap-4">
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+            </div>
+          </div>
+
+          {/* Lines skeleton */}
+          <div className="border rounded-lg bg-white p-6">
+            <Skeleton className="h-6 w-24 mb-4" />
+            <Skeleton className="h-64" />
+          </div>
+        </div>
       </div>
     )
   }
 
-  if (!to) {
+  // Error state
+  if (isError || !transferOrder) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">Transfer order not found</div>
+      <div className="min-h-screen bg-gray-50">
+        <PlanningHeader currentPage="to" />
+        <div className="px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-lg font-medium text-gray-900 mb-2">
+              Transfer Order Not Found
+            </h2>
+            <p className="text-sm text-gray-500 mb-6 text-center">
+              The transfer order you&apos;re looking for doesn&apos;t exist or you don&apos;t
+              have permission to view it.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => refetch()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+              <Button asChild>
+                <Link href="/planning/transfer-orders">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to List
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/planning/transfer-orders')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+    <div className="min-h-screen bg-gray-50">
+      <PlanningHeader currentPage="to" />
+
+      <div className="px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto">
+        {/* Back button and actions */}
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/planning/transfer-orders">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Transfer Orders
+            </Link>
           </Button>
-          <h1 className="text-3xl font-bold">{to.to_number}</h1>
-          <Badge variant={getStatusVariant(to.status)}>
-            {to.status.replace('_', ' ')}
-          </Badge>
+
+          <div className="flex items-center gap-2">
+            {/* Edit button - only for draft status */}
+            {transferOrder.status === 'draft' && (
+              <Button variant="outline" size="sm" onClick={() => setEditModalOpen(true)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )}
+
+            {/* Release button - only for draft with lines */}
+            {canReleaseTO && (
+              <Button size="sm" onClick={() => setReleaseDialogOpen(true)}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Release TO
+              </Button>
+            )}
+
+            {/* Actions dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => window.print()}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicate TO
+                </DropdownMenuItem>
+                {canCancelTO && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setCancelDialogOpen(true)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Cancel TO
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          {to.status === 'draft' && (
-            <Button
-              onClick={() => handleStatusChange('planned')}
-              disabled={changingStatus}
-            >
-              {changingStatus ? 'Planning...' : 'Plan Transfer Order'}
-            </Button>
-          )}
-          {to.status !== 'cancelled' && to.status !== 'received' && (
-            <Button
-              variant="destructive"
-              onClick={() => handleStatusChange('cancelled')}
-              disabled={changingStatus}
-            >
-              Cancel Transfer
-            </Button>
-          )}
+        {/* TO Header */}
+        <TOHeader transferOrder={transferOrder} />
+
+        {/* TO Lines */}
+        <div className="bg-white rounded-lg border p-4 sm:p-6">
+          <TOLinesDataTable
+            toId={transferOrder.id}
+            lines={transferOrder.lines || []}
+            status={transferOrder.status}
+            onRefresh={refetch}
+            canEdit={linesEditable}
+          />
         </div>
       </div>
 
-      {/* TO Details Card */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border rounded-lg p-6">
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Transfer Order Information</h2>
-          <dl className="space-y-2">
-            <div className="flex justify-between">
-              <dt className="text-gray-600">TO Number:</dt>
-              <dd className="font-medium">{to.to_number}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">From Warehouse:</dt>
-              <dd className="font-medium">
-                {to.from_warehouse?.name || 'N/A'}
-                {to.from_warehouse?.code && (
-                  <div className="text-sm text-gray-500">{to.from_warehouse.code}</div>
-                )}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">To Warehouse:</dt>
-              <dd className="font-medium">
-                {to.to_warehouse?.name || 'N/A'}
-                {to.to_warehouse?.code && (
-                  <div className="text-sm text-gray-500">{to.to_warehouse.code}</div>
-                )}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">Status:</dt>
-              <dd className="font-medium">{to.status.replace('_', ' ')}</dd>
-            </div>
-          </dl>
-        </div>
+      {/* Edit Modal */}
+      {editModalOpen && (
+        <TransferOrderFormModal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          onSuccess={handleFormSuccess}
+          transferOrder={transferOrder}
+        />
+      )}
 
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Dates</h2>
-          <dl className="space-y-2">
-            <div className="flex justify-between">
-              <dt className="text-gray-600">Planned Ship Date:</dt>
-              <dd className="font-medium">{formatDate(to.planned_ship_date)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-600">Planned Receive Date:</dt>
-              <dd className="font-medium">{formatDate(to.planned_receive_date)}</dd>
-            </div>
-            {to.actual_ship_date && (
-              <div className="flex justify-between">
-                <dt className="text-gray-600">Actual Ship Date:</dt>
-                <dd className="font-medium">{formatDate(to.actual_ship_date)}</dd>
-              </div>
-            )}
-            {to.actual_receive_date && (
-              <div className="flex justify-between">
-                <dt className="text-gray-600">Actual Receive Date:</dt>
-                <dd className="font-medium">{formatDate(to.actual_receive_date)}</dd>
-              </div>
-            )}
-          </dl>
-          {to.notes && (
-            <div className="mt-4">
-              <dt className="text-gray-600 mb-1">Notes:</dt>
-              <dd className="text-sm">{to.notes}</dd>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Release Confirmation Dialog */}
+      <ReleaseConfirmDialog
+        open={releaseDialogOpen}
+        onClose={() => setReleaseDialogOpen(false)}
+        toNumber={transferOrder.to_number}
+        linesCount={transferOrder.lines?.length || 0}
+        onConfirm={handleRelease}
+        isLoading={releaseMutation.isPending}
+      />
 
-      {/* TO Lines Table */}
-      <TOLinesTable
-        transferOrderId={paramsId}
-        toStatus={to.status}
-        onLinesUpdate={handleLinesUpdate}
+      {/* Cancel Confirmation Dialog */}
+      <CancelConfirmDialog
+        open={cancelDialogOpen}
+        onClose={() => setCancelDialogOpen(false)}
+        toNumber={transferOrder.to_number}
+        onConfirm={handleCancel}
+        isLoading={cancelMutation.isPending}
       />
     </div>
   )

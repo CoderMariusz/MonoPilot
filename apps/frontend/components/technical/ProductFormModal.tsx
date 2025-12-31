@@ -64,6 +64,7 @@ interface SupplierProduct {
 
 interface ProductFormModalProps {
   product?: Product | null
+  open: boolean
   onClose: () => void
   onSuccess: () => void
 }
@@ -81,7 +82,8 @@ const PRODUCT_TYPES = [
 // Common UoM options
 const UOM_OPTIONS = ['kg', 'g', 'L', 'mL', 'pcs', 'pack', 'box', 'pallet', 'unit']
 
-export function ProductFormModal({ product, onClose, onSuccess }: ProductFormModalProps) {
+export function ProductFormModal({ product, open, onClose, onSuccess }: ProductFormModalProps) {
+  // All hooks must be at the top level (Rules of Hooks)
   const [formData, setFormData] = useState({
     code: product?.code || '',
     name: product?.name || '',
@@ -196,6 +198,9 @@ export function ProductFormModal({ product, onClose, onSuccess }: ProductFormMod
       fetchProductAllergens()
     }
   }, [isEditMode, product?.id])
+
+  // Early return after all hooks (Rules of Hooks)
+  if (!open) return null
 
   // Handle input change
   const handleChange = (field: string, value: string) => {

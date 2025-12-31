@@ -37,7 +37,7 @@ export async function POST(
     // Get current user to check role and org_id
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', user.id)
       .single()
 

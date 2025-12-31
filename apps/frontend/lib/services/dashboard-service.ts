@@ -29,7 +29,8 @@ export async function getProductDashboard(
   let query = supabase
     .from('products')
     .select(`
-      id, code, name, type, uom, version, status, updated_at, created_at,
+      id, code, name, base_uom, version, status, updated_at, created_at,
+      product_type:product_types!product_type_id (code),
       product_allergens (count),
       boms (count)
     `)
@@ -42,17 +43,24 @@ export async function getProductDashboard(
     query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%`)
   }
 
-  // Apply type filter
-  if (type_filter !== 'all') {
-    query = query.eq('type', type_filter)
-  }
+  // Note: Can't filter by joined column in PostgREST
+  // We'll filter client-side after fetching
 
   const { data, error } = await query
 
   if (error) throw new Error(`Dashboard query failed: ${error.message}`)
 
   // Handle empty or null data
-  const products = data || []
+  let products = data || []
+
+  // Client-side filter by type if specified
+  if (type_filter !== 'all') {
+    const filterTypes = type_filter === 'RM' ? ['RM', 'RAW']
+      : type_filter === 'WIP' ? ['WIP', 'SEMI']
+      : type_filter === 'FG' ? ['FG', 'FINISHED']
+      : []
+    products = products.filter((p: any) => filterTypes.includes(p.product_type?.code))
+  }
 
   // Calculate total for percentage
   const totalProducts = products.length
@@ -75,10 +83,10 @@ export async function getProductDashboard(
 
   const groups = categoryConfigs.map(config => {
     const groupProducts = products
-      .filter((p: any) => config.types.includes(p.type))
+      .filter((p: any) => config.types.includes(p.product_type?.code))
       .slice(0, limit)
 
-    const count = products.filter((p: any) => config.types.includes(p.type)).length
+    const count = products.filter((p: any) => config.types.includes(p.product_type?.code)).length
 
     return {
       category: config.category,
@@ -89,11 +97,11 @@ export async function getProductDashboard(
         id: p.id,
         code: p.code,
         name: p.name,
-        type: p.type as 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP' | 'CUSTOM',
+        type: p.product_type?.code as 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP' | 'CUSTOM',
         version: p.version || 1,
         status: p.status,
         updated_at: p.updated_at,
-        uom: p.uom,
+        uom: p.base_uom,
         allergen_count: p.product_allergens?.[0]?.count || 0,
         bom_count: p.boms?.[0]?.count || 0
       })),
@@ -103,7 +111,7 @@ export async function getProductDashboard(
 
   // Build category stats
   const category_stats = categoryConfigs.map(config => {
-    const count = products.filter((p: any) => config.types.includes(p.type)).length
+    const count = products.filter((p: any) => config.types.includes(p.product_type?.code)).length
     return {
       category: config.category,
       count,
@@ -210,30 +218,32 @@ export async function getAllergenMatrix(
   let query = supabase
     .from('products')
     .select(`
-      id, code, name, type,
+      id, code, name,
+      product_type:product_types!product_type_id (code),
       product_allergens (allergen_id, relation_type)
     `, { count: 'exact' })
     .eq('org_id', orgId)
     .eq('status', 'active')
 
-  // Apply product type filter
-  if (product_types?.length) {
-    query = query.in('type', product_types)
-  }
+  // Note: Can't filter by joined column in PostgREST
+  // We'll filter client-side after fetching if needed
 
   // Apply search filter
   if (search) {
     query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%`)
   }
 
-  // Apply sorting
+  // Apply sorting (except for type - we'll sort that client-side)
   const ascending = sort_order === 'asc'
+  const needsClientSort = sort_by === 'type'
+
   switch (sort_by) {
     case 'name':
       query = query.order('name', { ascending })
       break
     case 'type':
-      query = query.order('type', { ascending })
+      // Can't sort by joined column - will sort client-side later
+      query = query.order('code', { ascending })
       break
     case 'code':
     default:
@@ -244,10 +254,16 @@ export async function getAllergenMatrix(
   // Calculate offset
   const offset = (page - 1) * pageSize
 
-  const { data: products, error, count } = await query
+  const { data: productsData, error, count } = await query
     .range(offset, offset + pageSize - 1)
 
   if (error) throw new Error(`Allergen matrix query failed: ${error.message}`)
+
+  // Client-side filter by product types if specified
+  let products = productsData || []
+  if (product_types?.length) {
+    products = products.filter((p: any) => product_types.includes(p.product_type?.code))
+  }
 
   // Build matrix
   let matrix = (products || []).map((p: any) => {
@@ -270,11 +286,20 @@ export async function getAllergenMatrix(
       product_id: p.id,
       product_code: p.code,
       product_name: p.name,
-      product_type: p.type as ProductCategory,
+      product_type: p.product_type?.code as ProductCategory,
       allergens: allergenMap,
       allergen_count: allergenCount
     }
   })
+
+  // Client-side sort by type if needed
+  if (needsClientSort && sort_by === 'type') {
+    matrix.sort((a, b) => {
+      const typeA = a.product_type || ''
+      const typeB = b.product_type || ''
+      return ascending ? typeA.localeCompare(typeB) : typeB.localeCompare(typeA)
+    })
+  }
 
   // Apply allergen count filters (client-side for now)
   if (allergen_count_min !== undefined) {
@@ -333,7 +358,8 @@ export async function getAllergenInsights(orgId: string): Promise<AllergenInsigh
   const { data: products } = await supabase
     .from('products')
     .select(`
-      id, code, name, type,
+      id, code, name,
+      product_type:product_types!product_type_id (code),
       product_allergens (allergen_id, relation_type)
     `)
     .eq('org_id', orgId)
@@ -611,7 +637,8 @@ export async function fetchAllergenMatrix(
   let productsQuery = supabase
     .from('products')
     .select(`
-      id, code, name, type,
+      id, code, name,
+      product_type:product_types!product_type_id (code),
       product_allergens (allergen_id, relation_type)
     `)
     .eq('org_id', orgId)
@@ -619,11 +646,15 @@ export async function fetchAllergenMatrix(
     .order('code')
     .limit(50)
 
-  if (productType) {
-    productsQuery = productsQuery.eq('type', productType)
-  }
+  // Note: Can't filter by joined column - will filter client-side if needed
 
-  const { data: products } = await productsQuery
+  const { data: productsData } = await productsQuery
+
+  // Client-side filter by productType if specified
+  let products = productsData || []
+  if (productType) {
+    products = products.filter((p: any) => p.product_type?.code === productType)
+  }
 
   // Build matrix
   const matrixProducts = (products || []).map((p: any) => {

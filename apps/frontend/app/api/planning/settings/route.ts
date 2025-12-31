@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     // Get current user
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
@@ -91,7 +91,7 @@ export async function PUT(request: NextRequest) {
     // Get current user
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
