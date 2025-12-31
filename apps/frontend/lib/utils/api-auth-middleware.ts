@@ -55,7 +55,7 @@ export async function requireAuth(): Promise<AuthResult> {
     // Get current user details
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', user.id)
       .single()
 
@@ -66,12 +66,16 @@ export async function requireAuth(): Promise<AuthResult> {
       }
     }
 
+    // Extract role code from joined roles table
+    const roleData = currentUser.role as any
+    const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+
     return {
       success: true,
       user: {
         id: user.id,
         email: user.email || '',
-        role: currentUser.role as UserRole,
+        role: userRole as UserRole,
         org_id: currentUser.org_id,
       },
       supabase,

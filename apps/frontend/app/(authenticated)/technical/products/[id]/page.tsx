@@ -728,13 +728,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       </Tabs>
 
       {/* Edit Modal */}
-      {showEditModal && (
-        <ProductFormModal
-          product={product}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+      <ProductFormModal
+        product={product}
+        open={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={handleEditSuccess}
+      />
 
       {/* Delete Dialog */}
       {showDeleteDialog && (

@@ -96,7 +96,7 @@ export async function PUT(
     // Get current user to check role
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
@@ -104,8 +104,12 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Extract role code from joined roles table
+    const roleData = currentUser.role as any
+    const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+
     // Check authorization: Admin or Technical only
-    if (!['admin', 'technical'].includes(currentUser.role)) {
+    if (!['admin', 'technical'].includes(userRole)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }
@@ -189,7 +193,7 @@ export async function DELETE(
     // Get current user to check role
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role, org_id')
+      .select('org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
@@ -197,8 +201,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Extract role code from joined roles table
+    const roleData = currentUser.role as any
+    const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+
     // Check authorization: Admin only (matches RLS policy routings_delete_policy)
-    if (currentUser.role !== 'admin') {
+    if (userRole !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required for deletion' },
         { status: 403 }

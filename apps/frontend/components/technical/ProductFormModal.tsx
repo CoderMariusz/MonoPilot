@@ -64,6 +64,7 @@ interface SupplierProduct {
 
 interface ProductFormModalProps {
   product?: Product | null
+  open: boolean
   onClose: () => void
   onSuccess: () => void
 }
@@ -81,7 +82,9 @@ const PRODUCT_TYPES = [
 // Common UoM options
 const UOM_OPTIONS = ['kg', 'g', 'L', 'mL', 'pcs', 'pack', 'box', 'pallet', 'unit']
 
-export function ProductFormModal({ product, onClose, onSuccess }: ProductFormModalProps) {
+export function ProductFormModal({ product, open, onClose, onSuccess }: ProductFormModalProps) {
+  // Don't render if not open
+  if (!open) return null
   const [formData, setFormData] = useState({
     code: product?.code || '',
     name: product?.name || '',

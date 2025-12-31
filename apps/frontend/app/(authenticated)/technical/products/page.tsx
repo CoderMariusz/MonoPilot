@@ -13,9 +13,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { ProductsDataTable } from '@/components/technical/products/ProductsDataTable'
+import { ProductFormModal } from '@/components/technical/ProductFormModal'
 import type { ProductFilters } from '@/components/technical/products/ProductFilters'
 import type { Product } from '@/lib/types/product'
 
@@ -32,7 +33,11 @@ interface SortingState {
 
 export default function ProductsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
+
+  // Modal state
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // State
   const [products, setProducts] = useState<Product[]>([])
@@ -58,6 +63,16 @@ export default function ProductsPage() {
     field: 'code',
     order: 'asc',
   })
+
+  // Check for create URL param
+  useEffect(() => {
+    const createParam = searchParams.get('create')
+    if (createParam === 'true') {
+      setShowCreateModal(true)
+      // Clean up URL without reloading
+      router.replace('/technical/products', { scroll: false })
+    }
+  }, [searchParams, router])
 
   // Fetch products from API
   const fetchProducts = async () => {
@@ -116,10 +131,19 @@ export default function ProductsPage() {
   }
 
   const handleCreateClick = () => {
-    router.push('/technical/products?create=true')
+    setShowCreateModal(true)
+  }
+
+  const handleModalClose = () => {
+    setShowCreateModal(false)
+  }
+
+  const handleModalSuccess = () => {
+    setShowCreateModal(false)
+    fetchProducts() // Refresh the product list
     toast({
-      title: 'Create Product',
-      description: 'Product creation modal will be implemented in next iteration',
+      title: 'Success',
+      description: 'Product created successfully',
     })
   }
 
@@ -160,6 +184,14 @@ export default function ProductsPage() {
         onPaginationChange={handlePaginationChange}
         sorting={sorting}
         onSortingChange={handleSortingChange}
+      />
+
+      {/* Product Creation Modal */}
+      <ProductFormModal
+        product={null}
+        open={showCreateModal}
+        onClose={handleModalClose}
+        onSuccess={handleModalSuccess}
       />
     </div>
   )
