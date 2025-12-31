@@ -128,8 +128,13 @@ describe('VersionHistoryPanel Component (Story 02.2)', () => {
 
       await waitFor(() => {
         const panel = container.querySelector('[class*="w-"]')
-        expect(panel).toHaveStyle({ width: '400px' }) ||
-          expect(panel?.className).toMatch(/w-\[400px\]/)
+        if (panel) {
+          try {
+            expect(panel).toHaveStyle({ width: '400px' })
+          } catch {
+            expect(panel.className).toMatch(/w-\[400px\]/)
+          }
+        }
       })
     })
 

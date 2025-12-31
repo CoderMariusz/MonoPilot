@@ -25,11 +25,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type {
   DashboardStatsResponse,
-  AllergenMatrixResponse,
+  TechnicalAllergenMatrixResponse as AllergenMatrixResponse,
   BomTimelineResponse,
-  RecentActivityResponse,
+  TechnicalRecentActivityResponse as RecentActivityResponse,
   CostTrendsResponse,
-} from '../../../lib/types/dashboard'
+} from '@/lib/types/dashboard'
 
 /**
  * Mock API responses for testing
@@ -246,7 +246,7 @@ describe('Dashboard API Endpoints Integration Tests', () => {
       // Expected: Allergen objects with id, code, name
       const allergens = mockAllergenMatrix.allergens
       expect(allergens).toHaveLength(2)
-      allergens.forEach(allergen => {
+      allergens.forEach((allergen: { id: string; code: string; name: string }) => {
         expect(allergen).toHaveProperty('id')
         expect(allergen).toHaveProperty('code')
         expect(allergen).toHaveProperty('name')
@@ -516,7 +516,7 @@ describe('Dashboard API Endpoints Integration Tests', () => {
       // Expected: Array of month strings (YYYY-MM format)
       const months = mockCostTrends.months
       expect(months).toHaveLength(6)
-      months.forEach(month => {
+      months.forEach((month: string) => {
         expect(month).toMatch(/\d{4}-\d{2}/)
       })
     })

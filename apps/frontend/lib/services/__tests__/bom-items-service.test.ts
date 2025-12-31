@@ -343,8 +343,8 @@ describe('BOMItemsService (Story 02.5a)', () => {
       const result = await createBOMItem(TEST_BOM_ID, request)
 
       expect(result.warnings).toBeDefined()
-      expect(result.warnings).toHaveLength(1)
-      expect(result.warnings[0].code).toBe('UOM_MISMATCH')
+      expect(result.warnings?.length).toBe(1)
+      expect(result.warnings?.[0].code).toBe('UOM_MISMATCH')
     })
 
     it('should validate operation exists in routing', async () => {
@@ -489,8 +489,8 @@ describe('BOMItemsService (Story 02.5a)', () => {
       const request = { uom: 'L' }
       const result = await updateBOMItem(TEST_BOM_ID, TEST_ITEM_ID, request)
 
-      expect(result.warnings).toHaveLength(1)
-      expect(result.warnings[0].code).toBe('UOM_MISMATCH')
+      expect(result.warnings?.length).toBe(1)
+      expect(result.warnings?.[0].code).toBe('UOM_MISMATCH')
     })
 
     it('should return 404 for non-existent item', async () => {
