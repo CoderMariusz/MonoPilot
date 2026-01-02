@@ -50,7 +50,7 @@ let testTransferOrderId: string
 
 // Cleanup test data
 async function cleanup() {
-  await supabase.from('to_lines').delete().eq('transfer_order_id', testTransferOrderId)
+  await supabase.from('transfer_order_lines').delete().eq('to_id', testTransferOrderId)
   await supabase.from('transfer_orders').delete().eq('org_id', testOrgId)
   await supabase.from('products').delete().eq('id', testProductId)
   await supabase.from('warehouses').delete().eq('org_id', testOrgId)
@@ -169,9 +169,9 @@ describe('Transfer Orders API Integration Tests', () => {
     it('should succeed when TO has at least 1 line', async () => {
       // Add a line first
       const { data: line } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .insert({
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           quantity: 10,
           uom: 'kg',
@@ -219,9 +219,9 @@ describe('Transfer Orders API Integration Tests', () => {
   describe('AC-3.7.1: Create TO line', () => {
     it('should create a TO line with valid data', async () => {
       const { data: line, error } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .insert({
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           quantity: 25.5,
           uom: 'kg',
@@ -235,7 +235,7 @@ describe('Transfer Orders API Integration Tests', () => {
 
       expect(error).toBeNull()
       expect(line).toMatchObject({
-        transfer_order_id: testTransferOrderId,
+        to_id: testTransferOrderId,
         product_id: testProductId,
         quantity: 25.5,
         uom: 'kg',
@@ -247,9 +247,9 @@ describe('Transfer Orders API Integration Tests', () => {
 
     it('should enforce quantity > 0', async () => {
       const { error } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .insert({
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           quantity: 0, // Invalid
           uom: 'kg',
@@ -262,9 +262,9 @@ describe('Transfer Orders API Integration Tests', () => {
 
     it('should enforce quantity not null', async () => {
       const { error } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .insert({
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           // quantity missing
           uom: 'kg',
@@ -280,16 +280,16 @@ describe('Transfer Orders API Integration Tests', () => {
     it('should update TO line quantity', async () => {
       // Get first line
       const { data: lines } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .select('id, quantity')
-        .eq('transfer_order_id', testTransferOrderId)
+        .eq('to_id', testTransferOrderId)
         .limit(1)
 
       const lineId = lines?.[0]?.id
 
       // Update quantity
       const { data: updatedLine, error } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .update({ quantity: 50.0, updated_by: testUserId })
         .eq('id', lineId)
         .select()
@@ -302,16 +302,16 @@ describe('Transfer Orders API Integration Tests', () => {
     it('should update TO line notes', async () => {
       // Get first line
       const { data: lines } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .select('id')
-        .eq('transfer_order_id', testTransferOrderId)
+        .eq('to_id', testTransferOrderId)
         .limit(1)
 
       const lineId = lines?.[0]?.id
 
       // Update notes
       const { data: updatedLine, error } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .update({ notes: 'Updated notes', updated_by: testUserId })
         .eq('id', lineId)
         .select()
@@ -326,9 +326,9 @@ describe('Transfer Orders API Integration Tests', () => {
     it('should delete TO line when TO is in draft', async () => {
       // Create a line to delete
       const { data: line } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .insert({
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           quantity: 5,
           uom: 'kg',
@@ -341,7 +341,7 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Delete line
       const { error } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .delete()
         .eq('id', lineId)
 
@@ -349,7 +349,7 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Verify deleted
       const { data: deletedLine } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .select('id')
         .eq('id', lineId)
         .single()
@@ -362,14 +362,14 @@ describe('Transfer Orders API Integration Tests', () => {
     it('should calculate summary correctly', async () => {
       // Clear existing lines
       await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .delete()
-        .eq('transfer_order_id', testTransferOrderId)
+        .eq('to_id', testTransferOrderId)
 
       // Add 3 lines with different shipped/received status
-      await supabase.from('to_lines').insert([
+      await supabase.from('transfer_order_lines').insert([
         {
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           quantity: 10,
           uom: 'kg',
@@ -378,7 +378,7 @@ describe('Transfer Orders API Integration Tests', () => {
           created_by: testUserId,
         },
         {
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           quantity: 20,
           uom: 'kg',
@@ -387,7 +387,7 @@ describe('Transfer Orders API Integration Tests', () => {
           created_by: testUserId,
         },
         {
-          transfer_order_id: testTransferOrderId,
+          to_id: testTransferOrderId,
           product_id: testProductId,
           quantity: 30,
           uom: 'kg',
@@ -399,9 +399,9 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Fetch lines and calculate summary
       const { data: lines } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .select('quantity, shipped_qty, received_qty')
-        .eq('transfer_order_id', testTransferOrderId)
+        .eq('to_id', testTransferOrderId)
 
       expect(lines).toHaveLength(3)
 
@@ -800,8 +800,8 @@ describe('Transfer Orders API Integration Tests', () => {
       shipmentToId = to!.id
 
       // Add line to the TO
-      await supabase.from('to_lines').insert({
-        transfer_order_id: shipmentToId,
+      await supabase.from('transfer_order_lines').insert({
+        to_id: shipmentToId,
         product_id: testProductId,
         quantity: 100,
         shipped_quantity: 0,
@@ -819,15 +819,15 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Get line
       const { data: lines } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .select('*')
-        .eq('transfer_order_id', shipmentToId)
+        .eq('to_id', shipmentToId)
 
       if (lines && lines.length > 0) {
         const line = lines[0]
         // Update shipped quantity to full
         const { data: updatedLine } = await supabase
-          .from('to_lines')
+          .from('transfer_order_lines')
           .update({
             shipped_quantity: line.quantity,
             updated_by: testUserId,
@@ -869,9 +869,9 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Add line
       const { data: line } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .insert({
-          transfer_order_id: partialTo!.id,
+          to_id: partialTo!.id,
           product_id: testProductId,
           quantity: 100,
           shipped_quantity: 0,
@@ -882,7 +882,7 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Ship partial quantity (60 out of 100)
       const { data: partialLine } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .update({
           shipped_quantity: 60,
           updated_by: testUserId,
@@ -895,7 +895,7 @@ describe('Transfer Orders API Integration Tests', () => {
       expect(partialLine?.quantity).toBe(100)
 
       // Cleanup
-      await supabase.from('to_lines').delete().eq('transfer_order_id', partialTo!.id)
+      await supabase.from('transfer_order_lines').delete().eq('to_id', partialTo!.id)
       await supabase.from('transfer_orders').delete().eq('id', partialTo!.id)
     })
 
@@ -918,8 +918,8 @@ describe('Transfer Orders API Integration Tests', () => {
       const toId = transitionTo!.id
 
       // Add line (required for planned status)
-      await supabase.from('to_lines').insert({
-        transfer_order_id: toId,
+      await supabase.from('transfer_order_lines').insert({
+        to_id: toId,
         product_id: testProductId,
         quantity: 50,
         shipped_quantity: 0,
@@ -954,7 +954,7 @@ describe('Transfer Orders API Integration Tests', () => {
       expect(receivedTo?.status).toBe('received')
 
       // Cleanup
-      await supabase.from('to_lines').delete().eq('transfer_order_id', toId)
+      await supabase.from('transfer_order_lines').delete().eq('to_id', toId)
       await supabase.from('transfer_orders').delete().eq('id', toId)
     })
   })
@@ -1004,9 +1004,9 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Verify lines also have audit fields
       const { data: line } = await supabase
-        .from('to_lines')
+        .from('transfer_order_lines')
         .insert({
-          transfer_order_id: toId,
+          to_id: toId,
           product_id: testProductId,
           quantity: 25,
           shipped_quantity: 0,
@@ -1019,7 +1019,7 @@ describe('Transfer Orders API Integration Tests', () => {
       expect(line?.created_at).toBeDefined()
 
       // Cleanup
-      await supabase.from('to_lines').delete().eq('transfer_order_id', toId)
+      await supabase.from('transfer_order_lines').delete().eq('to_id', toId)
       await supabase.from('transfer_orders').delete().eq('id', toId)
     })
   })

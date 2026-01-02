@@ -27,14 +27,14 @@ export async function getToLines(transferOrderId: string): Promise<ListResult<To
     const supabaseAdmin = createServerSupabaseAdmin()
 
     const { data, error } = await supabaseAdmin
-      .from('to_lines')
+      .from('transfer_order_lines')
       .select(
         `
         *,
         product:products(code, name)
       `
       )
-      .eq('transfer_order_id', transferOrderId)
+      .eq('to_id', transferOrderId)
       .order('created_at', { ascending: true })
 
     if (error) {
@@ -115,9 +115,9 @@ export async function createToLine(
 
     // Create TO line
     const { data, error } = await supabaseAdmin
-      .from('to_lines')
+      .from('transfer_order_lines')
       .insert({
-        transfer_order_id: transferOrderId,
+        to_id: transferOrderId,
         product_id: input.product_id,
         quantity: input.quantity,
         uom: product.uom,
@@ -176,8 +176,8 @@ export async function updateToLine(
 
     // Check if line exists and TO is editable
     const { data: existingLine, error: lineError } = await supabaseAdmin
-      .from('to_lines')
-      .select('transfer_order_id')
+      .from('transfer_order_lines')
+      .select('to_id')
       .eq('id', lineId)
       .single()
 
@@ -192,7 +192,7 @@ export async function updateToLine(
     const { data: existingTo, error: toError } = await supabaseAdmin
       .from('transfer_orders')
       .select('status')
-      .eq('id', existingLine.transfer_order_id)
+      .eq('id', existingLine.to_id)
       .single()
 
     if (toError || !existingTo) {
@@ -213,7 +213,7 @@ export async function updateToLine(
 
     // Update TO line (add audit trail)
     const { data, error } = await supabaseAdmin
-      .from('to_lines')
+      .from('transfer_order_lines')
       .update({
         ...input,
         updated_by: userId,
@@ -258,15 +258,16 @@ export async function updateToLine(
 /**
  * Delete TO Line
  * Only draft/planned TOs allow line deletion
+ * AC-7b: Cannot delete line that has been shipped (shipped_qty > 0)
  */
 export async function deleteToLine(lineId: string): Promise<ServiceResult<void>> {
   try {
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Check if line exists and TO is editable
+    // Check if line exists, get shipped_qty, and get TO ID
     const { data: existingLine, error: lineError } = await supabaseAdmin
-      .from('to_lines')
-      .select('transfer_order_id')
+      .from('transfer_order_lines')
+      .select('to_id, shipped_qty')
       .eq('id', lineId)
       .single()
 
@@ -278,10 +279,19 @@ export async function deleteToLine(lineId: string): Promise<ServiceResult<void>>
       }
     }
 
+    // AC-7b: Block deletion if line has been shipped
+    if (existingLine.shipped_qty > 0) {
+      return {
+        success: false,
+        error: 'Cannot delete line that has been partially or fully shipped',
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
     const { data: existingTo, error: toError } = await supabaseAdmin
       .from('transfer_orders')
       .select('status')
-      .eq('id', existingLine.transfer_order_id)
+      .eq('id', existingLine.to_id)
       .single()
 
     if (toError || !existingTo) {
@@ -301,8 +311,9 @@ export async function deleteToLine(lineId: string): Promise<ServiceResult<void>>
     }
 
     // Delete TO line (cascade deletes LP selections)
+    // Note: Line renumbering is handled by database trigger (tr_transfer_order_lines_renumber)
     const { error } = await supabaseAdmin
-      .from('to_lines')
+      .from('transfer_order_lines')
       .delete()
       .eq('id', lineId)
 

@@ -25,7 +25,8 @@ export type ErrorCodeType = typeof ErrorCode[keyof typeof ErrorCode]
 // ROLES & PERMISSIONS
 // ============================================================================
 
-export const ALLOWED_ROLES: string[] = ['warehouse', 'purchasing', 'technical', 'admin']
+// Role codes matching RLS policies (owner, admin, warehouse_manager)
+export const ALLOWED_ROLES: string[] = ['owner', 'admin', 'warehouse_manager']
 
 export const EDITABLE_STATUSES: string[] = ['draft', 'planned']
 

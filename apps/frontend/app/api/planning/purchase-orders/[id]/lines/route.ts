@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import { poLineSchema, type POLineInput } from '@/lib/validation/planning-schemas'
+import { checkPOPermission, getPermissionRequirement } from '@/lib/utils/po-permissions'
 import { ZodError } from 'zod'
 
 // GET /api/planning/purchase-orders/:id/lines - Get all PO lines
@@ -108,10 +109,10 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Authorization: Purchasing, Manager, Admin
-    if (!['purchasing', 'manager', 'admin'].includes(currentUser.role.toLowerCase())) {
+    // Authorization: MAJOR-02 Fix - Use centralized permission check
+    if (!checkPOPermission(currentUser, 'addLines')) {
       return NextResponse.json(
-        { error: 'Forbidden: Purchasing role or higher required' },
+        { error: `Forbidden: ${getPermissionRequirement('addLines')} required` },
         { status: 403 }
       )
     }

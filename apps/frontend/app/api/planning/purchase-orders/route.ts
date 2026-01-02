@@ -7,7 +7,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import { purchaseOrderSchema, type PurchaseOrderInput } from '@/lib/validation/planning-schemas'
 import { generatePONumber } from '@/lib/utils/po-number-generator'
+import { checkPOPermission, getPermissionRequirement } from '@/lib/utils/po-permissions'
 import { ZodError } from 'zod'
+
+/**
+ * Sanitize search input to prevent SQL injection via ILIKE patterns.
+ * Escapes special characters: % _ \
+ * MAJOR-01 Fix: SQL Injection Risk
+ */
+function sanitizeSearchInput(input: string): string {
+  return input
+    .replace(/\\/g, '\\\\')  // Escape backslashes first
+    .replace(/%/g, '\\%')     // Escape percent signs
+    .replace(/_/g, '\\_')     // Escape underscores
+}
 
 // GET /api/planning/purchase-orders - List purchase orders
 export async function GET(request: NextRequest) {
@@ -57,8 +70,10 @@ export async function GET(request: NextRequest) {
       .order('po_number', { ascending: false })
 
     // Search filter (AC-1.1: Search by PO number or supplier name)
+    // MAJOR-01 Fix: Sanitize search input to prevent query manipulation
     if (search) {
-      query = query.or(`po_number.ilike.%${search}%,suppliers.name.ilike.%${search}%`)
+      const sanitized = sanitizeSearchInput(search)
+      query = query.or(`po_number.ilike.%${sanitized}%,suppliers.name.ilike.%${sanitized}%`)
     }
 
     // Status filter
@@ -128,10 +143,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Authorization: Purchasing, Manager, Admin
-    if (!['purchasing', 'manager', 'admin'].includes(currentUser.role.toLowerCase())) {
+    // Authorization: MAJOR-02 Fix - Use centralized permission check
+    if (!checkPOPermission(currentUser, 'create')) {
       return NextResponse.json(
-        { error: 'Forbidden: Purchasing role or higher required' },
+        { error: `Forbidden: ${getPermissionRequirement('create')} required` },
         { status: 403 }
       )
     }

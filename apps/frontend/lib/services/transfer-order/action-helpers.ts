@@ -9,7 +9,7 @@
 import { createServerSupabaseAdmin } from '@/lib/supabase/server'
 import type { ServiceResult } from './types'
 import { ErrorCode, NON_SHIPPABLE_STATUSES, NON_RECEIVABLE_STATUSES } from './constants'
-import { calculateToStatus, enrichWithWarehouses } from './helpers'
+import { calculateToStatus, enrichWithWarehouses, getCurrentOrgId } from './helpers'
 import type { TransferOrder } from '@/lib/validation/transfer-order-schemas'
 
 // ============================================================================
@@ -54,12 +54,23 @@ interface ValidationResult {
 
 /**
  * Validate Transfer Order exists and is in actionable state
+ * CRITICAL-SEC-02: Added org_id filter to prevent RLS policy bypass
  */
 export async function validateTransferOrderState(
   transferOrderId: string,
   actionType: 'ship' | 'receive'
 ): Promise<ValidationResult> {
   const supabaseAdmin = createServerSupabaseAdmin()
+
+  // CRITICAL-SEC-02: Get org_id to enforce multi-tenant isolation
+  const orgId = await getCurrentOrgId()
+  if (!orgId) {
+    return {
+      success: false,
+      error: 'Organization ID not found',
+      code: ErrorCode.NOT_FOUND,
+    }
+  }
 
   // Get TO status and action date
   const dateField = actionType === 'ship' ? 'actual_ship_date' : 'actual_receive_date'
@@ -69,6 +80,7 @@ export async function validateTransferOrderState(
     .from('transfer_orders')
     .select(`status, ${dateField}, ${byField}`)
     .eq('id', transferOrderId)
+    .eq('org_id', orgId) // CRITICAL-SEC-02: Add org_id filter
     .single()
 
   if (toError || !existingTo) {
@@ -104,6 +116,7 @@ export async function validateTransferOrderState(
 
 /**
  * Fetch and validate TO lines
+ * CRITICAL-SEC-02: Added org_id filter via transfer_order join to prevent RLS bypass
  */
 export async function fetchAndValidateLines(
   transferOrderId: string,
@@ -112,11 +125,37 @@ export async function fetchAndValidateLines(
 ): Promise<ValidationResult> {
   const supabaseAdmin = createServerSupabaseAdmin()
 
-  // Fetch all TO lines
+  // CRITICAL-SEC-02: Get org_id to enforce multi-tenant isolation
+  const orgId = await getCurrentOrgId()
+  if (!orgId) {
+    return {
+      success: false,
+      error: 'Organization ID not found',
+      code: ErrorCode.DATABASE_ERROR,
+    }
+  }
+
+  // First verify the TO belongs to current org
+  const { data: to, error: toError } = await supabaseAdmin
+    .from('transfer_orders')
+    .select('id')
+    .eq('id', transferOrderId)
+    .eq('org_id', orgId) // CRITICAL-SEC-02: Add org_id filter
+    .single()
+
+  if (toError || !to) {
+    return {
+      success: false,
+      error: 'Transfer Order not found',
+      code: ErrorCode.NOT_FOUND,
+    }
+  }
+
+  // Fetch all TO lines (now safe since TO ownership is verified)
   const { data: lines, error: linesError } = await supabaseAdmin
-    .from('to_lines')
+    .from('transfer_order_lines')
     .select('id, quantity, shipped_qty, received_qty')
-    .eq('transfer_order_id', transferOrderId)
+    .eq('to_id', transferOrderId)
 
   if (linesError || !lines) {
     return {
@@ -147,6 +186,15 @@ export async function fetchAndValidateLines(
     } else {
       newQty = line.received_qty + lineQty.quantity
       maxQty = line.shipped_qty
+    }
+
+    // CRITICAL-SEC-01: Prevent receiving items that haven't been shipped
+    if (actionType === 'receive' && maxQty === 0) {
+      return {
+        success: false,
+        error: `Cannot receive line ${lineQty.line_id}: no items have been shipped yet`,
+        code: ErrorCode.INVALID_QUANTITY,
+      }
     }
 
     // Validate not exceeding max
@@ -188,7 +236,7 @@ export async function updateLineQuantities(
     const newQty = currentQty + lineQty.quantity
 
     const { error: updateError } = await supabaseAdmin
-      .from('to_lines')
+      .from('transfer_order_lines')
       .update({ [qtyField]: newQty })
       .eq('id', lineQty.line_id)
 
@@ -239,7 +287,7 @@ export async function updateTransferOrderMetadata(
     .select(
       `
       *,
-      lines:to_lines(
+      lines:transfer_order_lines(
         *,
         product:products(code, name)
       )

@@ -123,9 +123,9 @@ export async function calculateToStatus(transferOrderId: string): Promise<string
   const supabaseAdmin = createServerSupabaseAdmin()
 
   const { data: lines, error } = await supabaseAdmin
-    .from('to_lines')
+    .from('transfer_order_lines')
     .select('quantity, shipped_qty, received_qty')
-    .eq('transfer_order_id', transferOrderId)
+    .eq('to_id', transferOrderId)
 
   if (error || !lines || lines.length === 0) {
     return 'draft'

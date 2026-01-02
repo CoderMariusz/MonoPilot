@@ -894,6 +894,133 @@ export async function cancel(
 }
 
 /**
+ * Schedule work order (Story 03.14)
+ * Updates schedule dates/times and optionally line/machine assignment
+ *
+ * @param supabase - Supabase client
+ * @param orgId - Organization UUID
+ * @param woId - Work order UUID
+ * @param userId - User UUID performing the action
+ * @param input - Schedule input data
+ * @returns Updated work order with relations
+ */
+export async function scheduleWorkOrder(
+  supabase: SupabaseClient,
+  orgId: string,
+  woId: string,
+  userId: string,
+  input: {
+    planned_start_date?: string
+    planned_end_date?: string | null
+    scheduled_start_time?: string | null
+    scheduled_end_time?: string | null
+    production_line_id?: string | null
+    machine_id?: string | null
+  }
+): Promise<WorkOrderWithRelations> {
+  // 1. Get current WO to check status and org_id
+  const { data: existingWO, error: fetchError } = await supabase
+    .from('work_orders')
+    .select('id, status')
+    .eq('id', woId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (fetchError || !existingWO) {
+    throw new WorkOrderError('Work order not found', 'NOT_FOUND', 404)
+  }
+
+  // 2. Check status allows scheduling
+  const terminalStatuses: WOStatus[] = ['completed', 'cancelled', 'closed']
+  if (terminalStatuses.includes(existingWO.status as WOStatus)) {
+    throw new WorkOrderError(
+      'Cannot schedule completed or cancelled work order',
+      'CANNOT_SCHEDULE',
+      400
+    )
+  }
+
+  // 3. Validate production line exists in org (if provided)
+  if (input.production_line_id) {
+    const { data: line } = await supabase
+      .from('production_lines')
+      .select('id')
+      .eq('id', input.production_line_id)
+      .eq('org_id', orgId)
+      .single()
+
+    if (!line) {
+      throw new WorkOrderError('Production line not found', 'NOT_FOUND', 404)
+    }
+  }
+
+  // 4. Validate machine exists in org (if provided)
+  if (input.machine_id) {
+    const { data: machine } = await supabase
+      .from('machines')
+      .select('id')
+      .eq('id', input.machine_id)
+      .eq('org_id', orgId)
+      .single()
+
+    if (!machine) {
+      throw new WorkOrderError('Machine not found', 'NOT_FOUND', 404)
+    }
+  }
+
+  // 5. Build update object (only include provided fields)
+  const updateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+    updated_by: userId,
+  }
+
+  if (input.planned_start_date !== undefined) {
+    updateData.planned_start_date = input.planned_start_date
+  }
+  if (input.planned_end_date !== undefined) {
+    updateData.planned_end_date = input.planned_end_date
+  }
+  if (input.scheduled_start_time !== undefined) {
+    updateData.scheduled_start_time = input.scheduled_start_time
+  }
+  if (input.scheduled_end_time !== undefined) {
+    updateData.scheduled_end_time = input.scheduled_end_time
+  }
+  if (input.production_line_id !== undefined) {
+    updateData.production_line_id = input.production_line_id
+  }
+  if (input.machine_id !== undefined) {
+    updateData.machine_id = input.machine_id
+  }
+
+  // 6. Update WO with relations
+  const { data: updatedWO, error: updateError } = await supabase
+    .from('work_orders')
+    .update(updateData)
+    .eq('id', woId)
+    .eq('org_id', orgId)
+    .select(
+      `
+      *,
+      product:products!inner(id, name, code),
+      production_line:production_lines(id, name),
+      machine:machines(id, name)
+    `
+    )
+    .single()
+
+  if (updateError) {
+    throw new WorkOrderError(
+      `Failed to schedule work order: ${updateError.message}`,
+      'UPDATE_ERROR',
+      500
+    )
+  }
+
+  return updatedWO as WorkOrderWithRelations
+}
+
+/**
  * Get auto-selected BOM for product on scheduled date
  *
  * Algorithm (implemented in database function):
@@ -1065,6 +1192,7 @@ export const WorkOrderService = {
   plan,
   release,
   cancel,
+  scheduleWorkOrder,
   getActiveBomForDate,
   getAvailableBoms,
   validateProductHasActiveBom,

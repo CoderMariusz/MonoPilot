@@ -1,6 +1,11 @@
 import '@testing-library/jest-dom'
 import { expect, afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
+import { config } from 'dotenv'
+import path from 'path'
+
+// Load .env.local from apps/frontend for integration tests
+config({ path: path.resolve(__dirname, '.env.local') })
 
 // Polyfill for Radix UI (JSDOM compatibility)
 // See: https://github.com/radix-ui/primitives/issues/1822

@@ -28,7 +28,7 @@ Source: `.claude/setting.local.json`
 
 ## 🎯 STORIES TO IMPLEMENT
 ```
-**Story_ids** 03.10 
+**Story_ids** 03.4 03.5a 
 ```
 **Epic:** `01-settings`
 **Mode:** `multi-track` (parallel stories)

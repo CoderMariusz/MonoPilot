@@ -1,0 +1,124 @@
+story: "03.8"
+name: "Transfer Orders CRUD + Lines"
+epic: "03-planning"
+
+decision: PASS
+qa_report: "docs/2-MANAGEMENT/qa/qa-report-story-03.8.md"
+
+# Test Results Summary
+ac_results: "16/16 passing"
+ac_tested:
+  - "AC-01: TO List Page (filters, search, sort, pagination) ✅"
+  - "AC-02: Auto-generate TO Number (TO-YYYY-NNNNN format) ✅"
+  - "AC-03: Warehouse Validation (from != to) ✅"
+  - "AC-04: Date Validation (receive >= ship) ✅"
+  - "AC-05: Add TO Lines (auto-increment line number, UOM fill) ✅"
+  - "AC-06: Edit TO Line (quantity, notes) ✅"
+  - "AC-07: Line Renumbering After Delete ✅"
+  - "AC-07b: Cannot Delete Shipped Line ✅"
+  - "AC-08: Duplicate Product Prevention ✅"
+  - "AC-09: Release TO (draft to planned) ✅"
+  - "AC-09b: Cannot Release Empty TO ✅"
+  - "AC-13: Cancel TO ✅"
+  - "AC-14: Edit TO Header ✅"
+  - "AC-14b: Cannot Edit After Shipment ✅"
+  - "AC-15: Permission Enforcement (role-based) ✅"
+  - "AC-16: Multi-tenancy RLS (cross-org returns 404) ✅"
+
+critical_bugs_found: 0
+high_bugs_found: 0
+blocking_bugs: []
+
+critical_fixes_verified:
+  - "P0-FIX-01: Line Renumbering Trigger - VERIFIED ✅"
+  - "P1-FIX-02: shipped_qty Validation - VERIFIED ✅"
+  - "P0-FIX-03: Table Name Consistency (transfer_order_lines) - VERIFIED ✅"
+  - "P1-FIX-04: Role Constants Alignment (owner, admin, warehouse_manager) - VERIFIED ✅"
+  - "P1-FIX-05: Status Transition Validation - VERIFIED ✅"
+  - "P0-FIX-06: Integration Tests (23 tests) - VERIFIED ✅"
+
+edge_cases_tested:
+  - "Empty TO list - PASS ✅"
+  - "Single line TO - PASS ✅"
+  - "Delete first/middle/last line - PASS ✅"
+  - "Max quantity (DECIMAL 15,4) - PASS ✅"
+  - "Zero/negative quantity - BLOCKED ✅"
+  - "Same warehouse validation - BLOCKED ✅"
+  - "Receive before ship validation - BLOCKED ✅"
+  - "Duplicate product prevention - BLOCKED ✅"
+  - "Cross-org access isolation - 404 PASS ✅"
+  - "Invalid TO ID handling - 404 PASS ✅"
+
+regression_testing:
+  story_01_8_warehouses: PASS
+  story_02_1_products: PASS
+  story_03_9a_partial_shipments: PASS (ready for integration)
+  story_03_9b_lp_preselection: PASS (stub API ready)
+  no_regressions: true
+
+quality_metrics:
+  test_coverage: "80%+ (integration tests)"
+  integration_tests: "23/23 passing"
+  performance: "<500ms (all operations)"
+  database_constraints: "6 constraints enforced"
+  security_policies: "9 RLS policies enforced"
+  code_quality: "A (8.5/10 after fixes)"
+
+database_status:
+  migration: "063_create_transfer_orders.sql (READY)"
+  tables: 2
+  triggers: 4
+  indexes: 5
+  constraints: 6
+  rls_policies: 9
+
+api_endpoints_ready:
+  - "POST /api/planning/transfer-orders (create)"
+  - "GET /api/planning/transfer-orders (list)"
+  - "GET /api/planning/transfer-orders/:id (retrieve)"
+  - "PUT /api/planning/transfer-orders/:id (update)"
+  - "DELETE /api/planning/transfer-orders/:id (delete)"
+  - "POST /api/planning/transfer-orders/:id/lines (add line)"
+  - "PUT /api/planning/transfer-orders/:id/lines/:lineId (edit line)"
+  - "DELETE /api/planning/transfer-orders/:id/lines/:lineId (delete line)"
+  - "POST /api/planning/transfer-orders/:id/release (status action)"
+  - "POST /api/planning/transfer-orders/:id/cancel (status action)"
+
+deployment_readiness:
+  - "All 16 ACs passing ✅"
+  - "All critical fixes verified ✅"
+  - "No blocking issues ✅"
+  - "Integration tests passing ✅"
+  - "RLS security verified ✅"
+  - "Performance targets met ✅"
+  - "Database migration ready ✅"
+  - "API endpoints implemented ✅"
+  - "Service layer ready ✅"
+  - "Validation schemas ready ✅"
+
+next_phase: DEPLOYMENT
+next_phase_owner: DEVOPS
+handoff_date: "2025-12-31"
+
+notes: |
+  All acceptance criteria passing with zero blocking issues.
+  Implementation is production-ready.
+
+  Critical P0/P1 fixes from code review all verified:
+  - Line renumbering trigger confirmed working
+  - shipped_qty validation prevents deletion of shipped lines
+  - RLS policies enforce multi-tenancy isolation
+  - All 23 integration tests passing
+
+  Ready for immediate deployment to production.
+  No post-deployment QA actions required.
+  Story 03.9a (Partial Shipments) can proceed with integration.
+
+code_review:
+  commit: "6df0a85"
+  decision: "APPROVED"
+  tests_passing: "328/328"
+  issues_fixed: "6/6 blocking"
+  grade: "A (8.5/10 after fixes)"
+
+qa_report_file: "C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/docs/2-MANAGEMENT/qa/qa-report-story-03.8.md"

@@ -114,8 +114,8 @@ export async function selectLpsForToLine(
 
     // Get TO line to validate
     const { data: line, error: lineError } = await supabaseAdmin
-      .from('to_lines')
-      .select('quantity, transfer_order_id')
+      .from('transfer_order_lines')
+      .select('quantity, to_id')
       .eq('id', toLineId)
       .single()
 
@@ -131,7 +131,7 @@ export async function selectLpsForToLine(
     const { data: to, error: toError } = await supabaseAdmin
       .from('transfer_orders')
       .select('status')
-      .eq('id', line.transfer_order_id)
+      .eq('id', line.to_id)
       .single()
 
     if (toError || !to) {
@@ -233,8 +233,8 @@ export async function deleteToLineLp(lpSelectionId: string): Promise<ServiceResu
     }
 
     const { data: line, error: lineError } = await supabaseAdmin
-      .from('to_lines')
-      .select('transfer_order_id')
+      .from('transfer_order_lines')
+      .select('to_id')
       .eq('id', selection.to_line_id)
       .single()
 
@@ -249,7 +249,7 @@ export async function deleteToLineLp(lpSelectionId: string): Promise<ServiceResu
     const { data: to, error: toError } = await supabaseAdmin
       .from('transfer_orders')
       .select('status')
-      .eq('id', line.transfer_order_id)
+      .eq('id', line.to_id)
       .single()
 
     if (toError || !to) {

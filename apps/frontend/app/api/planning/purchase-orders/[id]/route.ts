@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import { updatePurchaseOrderSchema, type UpdatePurchaseOrderInput } from '@/lib/validation/planning-schemas'
+import { checkPOPermission, getPermissionRequirement } from '@/lib/utils/po-permissions'
 import { ZodError } from 'zod'
 
 // GET /api/planning/purchase-orders/:id - Get PO details
@@ -98,10 +99,10 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Authorization: Purchasing, Manager, Admin
-    if (!['purchasing', 'manager', 'admin'].includes(currentUser.role.toLowerCase())) {
+    // Authorization: MAJOR-02 Fix - Use centralized permission check
+    if (!checkPOPermission(currentUser, 'edit')) {
       return NextResponse.json(
-        { error: 'Forbidden: Purchasing role or higher required' },
+        { error: `Forbidden: ${getPermissionRequirement('edit')} required` },
         { status: 403 }
       )
     }
@@ -221,10 +222,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Authorization: Manager, Admin only
-    if (!['manager', 'admin'].includes(currentUser.role.toLowerCase())) {
+    // Authorization: MAJOR-02 Fix - Use centralized permission check
+    if (!checkPOPermission(currentUser, 'delete')) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager role or higher required' },
+        { error: `Forbidden: ${getPermissionRequirement('delete')} required` },
         { status: 403 }
       )
     }

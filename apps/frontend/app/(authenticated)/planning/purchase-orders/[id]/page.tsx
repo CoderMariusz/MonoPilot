@@ -1,798 +1,467 @@
 /**
  * Purchase Order Details Page
- * Story 3.1 & 3.2 & 3.4: Purchase Order CRUD + PO Line Management + Approval Workflow
- * Display PO header information with tabs: Overview, Lines, Approve
+ * Story 03.3: PO CRUD + Lines
+ * Display PO header information with tabs: Lines, History, Documents, Receiving
  */
 
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
-  ArrowLeft,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  FileText,
-  Package,
-  Shield
-} from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
-import { POLinesTable } from '@/components/planning/POLinesTable'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
-
-interface Supplier {
-  id: string
-  code: string
-  name: string
-  currency: string
-}
-
-interface Warehouse {
-  id: string
-  code: string
-  name: string
-}
-
-interface User {
-  id: string
-  email: string
-  first_name?: string
-  last_name?: string
-}
-
-interface POApproval {
-  id: string
-  status: 'pending' | 'approved' | 'rejected'
-  approved_by: string
-  approved_at: string
-  rejection_reason: string | null
-  comments: string | null
-  users?: User
-}
-
-interface PlanningSettings {
-  po_statuses: Array<{
-    code: string
-    label: string
-    color: string
-    is_default: boolean
-    sequence: number
-  }>
-}
-
-interface PurchaseOrder {
-  id: string
-  po_number: string
-  supplier_id: string
-  warehouse_id: string
-  status: string
-  approval_status: 'pending' | 'approved' | 'rejected' | null
-  expected_delivery_date: string
-  actual_delivery_date: string | null
-  payment_terms: string | null
-  shipping_method: string | null
-  notes: string | null
-  currency: string
-  subtotal: number
-  tax_amount: number
-  total: number
-  suppliers?: Supplier
-  warehouses?: Warehouse
-  created_at: string
-  updated_at: string
-  created_by?: string
-  updated_by?: string
-  rejection_reason?: string | null
-}
+import {
+  POHeader,
+  POLinesDataTable,
+  POTotalsPanel,
+  POStatusTimeline,
+  POActionsBar,
+  POErrorState,
+  POCancelConfirmDialog,
+  POLineModal,
+} from '@/components/planning/purchase-orders'
+import {
+  usePurchaseOrder,
+  usePOStatusHistory,
+  useSubmitPO,
+  useConfirmPO,
+  useCancelPO,
+  useApprovePO,
+  useRejectPO,
+  useAddPOLine,
+  useUpdatePOLine,
+  useDeletePOLine,
+} from '@/lib/hooks/use-purchase-orders'
+import { useTaxCodes } from '@/lib/hooks/use-tax-codes'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { POLine, CreatePOLineInput, POStatus } from '@/lib/types/purchase-order'
+import { canEditPOLines, calculatePOTotals } from '@/lib/types/purchase-order'
 
 export default function PurchaseOrderDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  const [po, setPO] = useState<PurchaseOrder | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [paramsId, setParamsId] = useState<string>('')
-  const [approvals, setApprovals] = useState<POApproval[]>([])
-  const [approvalsLoading, setApprovalsLoading] = useState(false)
-  const [settings, setSettings] = useState<PlanningSettings | null>(null)
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false)
-  const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
-  const [rejectionReason, setRejectionReason] = useState('')
-  const [approvalComments, setApprovalComments] = useState('')
-  const [submittingApproval, setSubmittingApproval] = useState(false)
-  const [statusChanging, setStatusChanging] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
+
+  const [paramsId, setParamsId] = useState<string>('')
+  const [activeTab, setActiveTab] = useState('lines')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Dialog states
+  const [cancelDialog, setCancelDialog] = useState(false)
+  const [lineModal, setLineModal] = useState<{
+    isOpen: boolean
+    mode: 'add' | 'edit'
+    line: POLine | null
+  }>({
+    isOpen: false,
+    mode: 'add',
+    line: null,
+  })
 
   // Unwrap params
   useEffect(() => {
     params.then((p) => setParamsId(p.id))
   }, [params])
 
-  // Fetch PO details
-  const fetchPO = useCallback(async () => {
-    if (!paramsId) return
+  // Fetch data
+  const { data: po, isLoading, error, refetch } = usePurchaseOrder(paramsId)
+  const { data: history, isLoading: historyLoading } = usePOStatusHistory(paramsId)
+  const { data: taxCodesData } = useTaxCodes()
+  const taxCodes = taxCodesData || []
 
-    try {
-      setLoading(true)
+  // Mutations
+  const submitPO = useSubmitPO()
+  const confirmPO = useConfirmPO()
+  const cancelPO = useCancelPO()
+  const approvePO = useApprovePO()
+  const rejectPO = useRejectPO()
+  const addLine = useAddPOLine()
+  const updateLine = useUpdatePOLine()
+  const deleteLine = useDeletePOLine()
 
-      const response = await fetch(`/api/planning/purchase-orders/${paramsId}`)
+  // Handlers
+  const handleEdit = useCallback(() => {
+    // For now, just reload with edit mode
+    router.push(`/planning/purchase-orders/${paramsId}?edit=true`)
+  }, [router, paramsId])
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch purchase order')
-      }
-
-      const data = await response.json()
-      setPO(data.purchase_order || data)
-    } catch (error) {
-      console.error('Error fetching purchase order:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load purchase order details',
-        variant: 'destructive',
-      })
-      router.push('/planning/purchase-orders')
-    } finally {
-      setLoading(false)
-    }
-  }, [paramsId, toast, router])
-
-  // Fetch approval history
-  const fetchApprovals = useCallback(async () => {
-    if (!paramsId) return
-
-    try {
-      setApprovalsLoading(true)
-
-      const response = await fetch(`/api/planning/purchase-orders/${paramsId}/approvals`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch approvals')
-      }
-
-      const data = await response.json()
-      setApprovals(data.approvals || [])
-    } catch (error) {
-      console.error('Error fetching approvals:', error)
-    } finally {
-      setApprovalsLoading(false)
-    }
-  }, [paramsId])
-
-  // Fetch planning settings
-  const fetchSettings = useCallback(async () => {
-    try {
-      const response = await fetch('/api/planning/settings')
-      if (response.ok) {
-        const data = await response.json()
-        setSettings(data.settings)
-      }
-    } catch (error) {
-      console.error('Error fetching settings:', error)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchPO()
-    fetchSettings()
-  }, [fetchPO, fetchSettings])
-
-  useEffect(() => {
-    if (paramsId) {
-      fetchApprovals()
-    }
-  }, [paramsId, fetchApprovals])
-
-  // Format currency
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
-
-  // Format datetime
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-
-  // Get status badge
-  const getStatusBadge = (status: string) => {
-    const statusConfig = settings?.po_statuses?.find((s: { code: string }) => s.code === status)
-    const color = statusConfig?.color || 'gray'
-
-    const colorClasses: Record<string, string> = {
-      gray: 'bg-gray-100 text-gray-800',
-      blue: 'bg-blue-100 text-blue-800',
-      green: 'bg-green-100 text-green-800',
-      yellow: 'bg-yellow-100 text-yellow-800',
-      red: 'bg-red-100 text-red-800',
-      purple: 'bg-purple-100 text-purple-800',
-      orange: 'bg-orange-100 text-orange-800',
-    }
-
-    return (
-      <Badge className={colorClasses[color] || colorClasses.gray}>
-        {statusConfig?.label || status}
-      </Badge>
-    )
-  }
-
-  // Get approval badge
-  const getApprovalBadge = (status: string | null) => {
-    if (!status) return null
-
-    switch (status) {
-      case 'pending':
-        return (
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending Approval
-          </Badge>
-        )
-      case 'approved':
-        return (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Approved
-          </Badge>
-        )
-      case 'rejected':
-        return (
-          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
-            <XCircle className="h-3 w-3 mr-1" />
-            Rejected
-          </Badge>
-        )
-      default:
-        return null
-    }
-  }
-
-  // Handle status change
-  const handleStatusChange = async (newStatus: string) => {
+  const handleSubmit = useCallback(async () => {
     if (!po) return
-
-    setStatusChanging(true)
+    setIsSubmitting(true)
     try {
-      const response = await fetch(`/api/planning/purchase-orders/${po.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update status')
-      }
-
+      await submitPO.mutateAsync(po.id)
       toast({
         title: 'Success',
-        description: `Status updated to ${newStatus}`,
+        description: 'Purchase order submitted',
       })
-
-      fetchPO()
+      refetch()
     } catch (error) {
-      console.error('Error updating status:', error)
       toast({
         title: 'Error',
-        description: 'Failed to update status',
+        description: error instanceof Error ? error.message : 'Failed to submit',
         variant: 'destructive',
       })
     } finally {
-      setStatusChanging(false)
+      setIsSubmitting(false)
     }
-  }
+  }, [po, submitPO, toast, refetch])
 
-  // Handle approve
-  const handleApprove = async () => {
+  const handleApprove = useCallback(async () => {
     if (!po) return
-
-    setSubmittingApproval(true)
+    setIsSubmitting(true)
     try {
-      const response = await fetch(`/api/planning/purchase-orders/${po.id}/approvals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'approve',
-          comments: approvalComments || undefined,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to approve')
-      }
-
+      await approvePO.mutateAsync({ id: po.id })
       toast({
         title: 'Success',
         description: 'Purchase order approved',
       })
-
-      setApproveDialogOpen(false)
-      setApprovalComments('')
-      fetchPO()
-      fetchApprovals()
+      refetch()
     } catch (error) {
-      console.error('Error approving PO:', error)
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to approve',
         variant: 'destructive',
       })
     } finally {
-      setSubmittingApproval(false)
+      setIsSubmitting(false)
     }
-  }
+  }, [po, approvePO, toast, refetch])
 
-  // Handle reject
-  const handleReject = async () => {
-    if (!po || !rejectionReason) return
-
-    setSubmittingApproval(true)
+  const handleReject = useCallback(async () => {
+    if (!po) return
+    setIsSubmitting(true)
     try {
-      const response = await fetch(`/api/planning/purchase-orders/${po.id}/approvals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'reject',
-          rejection_reason: rejectionReason,
-          comments: approvalComments || undefined,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to reject')
-      }
-
+      await rejectPO.mutateAsync({ id: po.id, reason: 'Rejected' })
       toast({
         title: 'Success',
         description: 'Purchase order rejected',
       })
-
-      setRejectDialogOpen(false)
-      setRejectionReason('')
-      setApprovalComments('')
-      fetchPO()
-      fetchApprovals()
+      refetch()
     } catch (error) {
-      console.error('Error rejecting PO:', error)
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to reject',
         variant: 'destructive',
       })
     } finally {
-      setSubmittingApproval(false)
+      setIsSubmitting(false)
     }
-  }
+  }, [po, rejectPO, toast, refetch])
 
-  if (loading) {
+  const handleConfirm = useCallback(async () => {
+    if (!po) return
+    setIsSubmitting(true)
+    try {
+      await confirmPO.mutateAsync(po.id)
+      toast({
+        title: 'Success',
+        description: 'Purchase order confirmed',
+      })
+      refetch()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to confirm',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [po, confirmPO, toast, refetch])
+
+  const handleCancelConfirm = useCallback(
+    async (reason?: string) => {
+      if (!po) return
+      try {
+        await cancelPO.mutateAsync({ id: po.id, reason })
+        toast({
+          title: 'Success',
+          description: 'Purchase order cancelled',
+        })
+        setCancelDialog(false)
+        refetch()
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to cancel',
+          variant: 'destructive',
+        })
+      }
+    },
+    [po, cancelPO, toast, refetch]
+  )
+
+  const handleDuplicate = useCallback(() => {
+    router.push(`/planning/purchase-orders/new?duplicate=${paramsId}`)
+  }, [router, paramsId])
+
+  const handlePrint = useCallback(() => {
+    window.print()
+  }, [])
+
+  const handleExportPDF = useCallback(() => {
+    toast({
+      title: 'Coming Soon',
+      description: 'PDF export is coming soon',
+    })
+  }, [toast])
+
+  const handleEmailSupplier = useCallback(() => {
+    toast({
+      title: 'Coming Soon',
+      description: 'Email supplier is coming soon',
+    })
+  }, [toast])
+
+  const handleGoToReceiving = useCallback(() => {
+    router.push(`/warehouse/receiving?po_id=${paramsId}`)
+  }, [router, paramsId])
+
+  // Line handlers
+  const handleAddLine = useCallback(() => {
+    setLineModal({ isOpen: true, mode: 'add', line: null })
+  }, [])
+
+  const handleEditLine = useCallback(
+    (lineId: string) => {
+      const line = po?.lines.find((l) => l.id === lineId)
+      if (line) {
+        setLineModal({ isOpen: true, mode: 'edit', line })
+      }
+    },
+    [po]
+  )
+
+  const handleDeleteLine = useCallback(
+    async (lineId: string) => {
+      if (!po || !confirm('Delete this line?')) return
+      try {
+        await deleteLine.mutateAsync({ poId: po.id, lineId })
+        toast({
+          title: 'Success',
+          description: 'Line deleted',
+        })
+        refetch()
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to delete line',
+          variant: 'destructive',
+        })
+      }
+    },
+    [po, deleteLine, toast, refetch]
+  )
+
+  const handleLineSubmit = useCallback(
+    async (data: CreatePOLineInput) => {
+      if (!po) return
+      try {
+        if (lineModal.mode === 'add') {
+          await addLine.mutateAsync({ poId: po.id, line: data })
+          toast({
+            title: 'Success',
+            description: 'Line added',
+          })
+        } else if (lineModal.line) {
+          await updateLine.mutateAsync({
+            poId: po.id,
+            lineId: lineModal.line.id,
+            data,
+          })
+          toast({
+            title: 'Success',
+            description: 'Line updated',
+          })
+        }
+        refetch()
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to save line',
+          variant: 'destructive',
+        })
+        throw error
+      }
+    },
+    [po, lineModal, addLine, updateLine, toast, refetch]
+  )
+
+  // Loading state
+  if (isLoading || !paramsId) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading...</span>
+      <div>
+        <PlanningHeader currentPage="po" />
+        <div className="px-6 py-6 space-y-6">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-6 w-20" />
+          </div>
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </div>
     )
   }
 
-  if (!po) {
+  // Error state
+  if (error || !po) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">Purchase order not found</div>
+      <div>
+        <PlanningHeader currentPage="po" />
+        <div className="px-6 py-6">
+          <POErrorState
+            title="Failed to Load Purchase Order"
+            message="The purchase order could not be found or you don't have permission to view it."
+            errorCode="PO_NOT_FOUND"
+            onRetry={() => refetch()}
+            onContactSupport={() => router.push('/planning/purchase-orders')}
+          />
+        </div>
       </div>
     )
   }
+
+  const isEditable = canEditPOLines(po.status as POStatus)
+  const existingProductIds = po.lines.map((l) => l.product_id)
+
+  // Calculate totals from lines
+  const linesForCalc = po.lines.map((l) => ({
+    quantity: l.quantity,
+    unit_price: l.unit_price,
+    discount_percent: l.discount_percent,
+    tax_rate: l.tax_rate,
+  }))
+  const totals = calculatePOTotals(linesForCalc, po.shipping_cost)
 
   return (
     <div>
       <PlanningHeader currentPage="po" />
 
       <div className="px-6 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 flex-wrap">
+        {/* Back button and actions */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push('/planning/purchase-orders')}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            Back to List
           </Button>
-          <h1 className="text-2xl font-bold">{po.po_number}</h1>
-          {getStatusBadge(po.status)}
-          {getApprovalBadge(po.approval_status)}
+          <POActionsBar
+            po={po}
+            onEdit={handleEdit}
+            onSubmit={handleSubmit}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onConfirm={handleConfirm}
+            onCancel={() => setCancelDialog(true)}
+            onDuplicate={handleDuplicate}
+            onPrint={handlePrint}
+            onExportPDF={handleExportPDF}
+            onEmailSupplier={handleEmailSupplier}
+            onGoToReceiving={handleGoToReceiving}
+            isSubmitting={isSubmitting}
+          />
         </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="lines" className="gap-2">
-            <Package className="h-4 w-4" />
-            Lines
-          </TabsTrigger>
-          <TabsTrigger value="approve" className="gap-2">
-            <Shield className="h-4 w-4" />
-            Approve
-          </TabsTrigger>
-        </TabsList>
+        {/* PO Header */}
+        <POHeader po={po} />
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* PO Details Card */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border rounded-lg p-6">
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Purchase Order Information</h2>
-              <dl className="space-y-3">
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">PO Number:</dt>
-                  <dd className="font-medium font-mono">{po.po_number}</dd>
-                </div>
-                <div className="flex justify-between items-start">
-                  <dt className="text-gray-600">Status:</dt>
-                  <dd>
-                    {po.status === 'draft' ? (
-                      <Select
-                        value={po.status}
-                        onValueChange={handleStatusChange}
-                        disabled={statusChanging}
-                      >
-                        <SelectTrigger className="w-[150px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {settings?.po_statuses
-                            ?.sort((a: { sequence: number }, b: { sequence: number }) => a.sequence - b.sequence)
-                            .map((s: { code: string; label: string }) => (
-                              <SelectItem key={s.code} value={s.code}>
-                                {s.label}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      getStatusBadge(po.status)
-                    )}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Supplier:</dt>
-                  <dd className="font-medium">
-                    {po.suppliers?.name}
-                    <div className="text-sm text-gray-500">{po.suppliers?.code}</div>
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Warehouse:</dt>
-                  <dd className="font-medium">
-                    {po.warehouses?.name}
-                    <div className="text-sm text-gray-500">{po.warehouses?.code}</div>
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Currency:</dt>
-                  <dd className="font-medium">{po.currency}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Expected Delivery:</dt>
-                  <dd className="font-medium">{formatDate(po.expected_delivery_date)}</dd>
-                </div>
-                {po.actual_delivery_date && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Actual Delivery:</dt>
-                    <dd className="font-medium">{formatDate(po.actual_delivery_date)}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Additional Information</h2>
-              <dl className="space-y-3">
-                {po.payment_terms && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Payment Terms:</dt>
-                    <dd className="font-medium">{po.payment_terms}</dd>
-                  </div>
-                )}
-                {po.shipping_method && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Shipping Method:</dt>
-                    <dd className="font-medium">{po.shipping_method}</dd>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Created:</dt>
-                  <dd className="font-medium text-sm">{formatDateTime(po.created_at)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Updated:</dt>
-                  <dd className="font-medium text-sm">{formatDateTime(po.updated_at)}</dd>
-                </div>
-                {po.notes && (
-                  <div>
-                    <dt className="text-gray-600 mb-1">Notes:</dt>
-                    <dd className="text-sm bg-gray-50 p-2 rounded">{po.notes}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-          </div>
-
-          {/* PO Totals Card */}
-          <div className="border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Order Totals</h2>
-            <dl className="space-y-2 max-w-md ml-auto">
-              <div className="flex justify-between">
-                <dt className="text-gray-600">Subtotal:</dt>
-                <dd className="font-medium">{formatCurrency(po.subtotal, po.currency)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-600">Tax:</dt>
-                <dd className="font-medium">{formatCurrency(po.tax_amount, po.currency)}</dd>
-              </div>
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <dt>Total:</dt>
-                <dd>{formatCurrency(po.total, po.currency)}</dd>
-              </div>
-            </dl>
-          </div>
-        </TabsContent>
-
-        {/* Lines Tab */}
-        <TabsContent value="lines">
-          <POLinesTable
-            poId={paramsId}
-            currency={po.currency}
-            onTotalsUpdate={fetchPO}
-          />
-        </TabsContent>
-
-        {/* Approve Tab */}
-        <TabsContent value="approve" className="space-y-6">
-          {/* Approval Status Card */}
-          <div className="border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Approval Status</h2>
-
-            <div className="flex items-center gap-4 mb-6">
-              {getApprovalBadge(po.approval_status) || (
-                <Badge variant="outline">Not Required</Badge>
-              )}
-              {po.approval_status === 'rejected' && po.rejection_reason && (
-                <div className="text-sm text-red-600">
-                  <strong>Reason:</strong> {po.rejection_reason}
-                </div>
-              )}
-            </div>
-
-            {/* Approval Actions */}
-            {po.approval_status === 'pending' && (
-              <div className="flex gap-4">
-                <Button
-                  onClick={() => setApproveDialogOpen(true)}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Approve
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setRejectDialogOpen(true)}
-                >
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Reject
-                </Button>
-              </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="lines">Lines</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+            {(po.status === 'confirmed' ||
+              po.status === 'receiving' ||
+              po.status === 'closed') && (
+              <TabsTrigger value="receiving">Receiving</TabsTrigger>
             )}
+          </TabsList>
 
-            {!po.approval_status && (
-              <p className="text-gray-500">
-                This purchase order does not require approval.
-              </p>
-            )}
-          </div>
-
-          {/* Approval History Card */}
-          <div className="border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Approval History</h2>
-
-            {approvalsLoading ? (
-              <div className="flex items-center">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Loading history...
-              </div>
-            ) : approvals.length === 0 ? (
-              <p className="text-gray-500">No approval history</p>
-            ) : (
-              <div className="space-y-4">
-                {approvals.map((approval: POApproval) => (
-                  <div
-                    key={approval.id}
-                    className="flex items-start gap-4 p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex-shrink-0">
-                      {approval.status === 'approved' ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : approval.status === 'rejected' ? (
-                        <XCircle className="h-5 w-5 text-red-600" />
-                      ) : (
-                        <Clock className="h-5 w-5 text-yellow-600" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium capitalize">{approval.status}</span>
-                        <span className="text-sm text-gray-500">
-                          by {approval.users?.email || 'Unknown'}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {formatDateTime(approval.approved_at)}
-                      </div>
-                      {approval.rejection_reason && (
-                        <div className="mt-1 text-sm text-red-600">
-                          Reason: {approval.rejection_reason}
-                        </div>
-                      )}
-                      {approval.comments && (
-                        <div className="mt-1 text-sm text-gray-600">
-                          {approval.comments}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Approve Dialog */}
-      <AlertDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Approve Purchase Order</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to approve {po.po_number}? This will mark the PO as approved
-              for processing.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4">
-            <Label htmlFor="approval-comments">Comments (optional)</Label>
-            <Textarea
-              id="approval-comments"
-              value={approvalComments}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setApprovalComments(e.target.value)}
-              placeholder="Add any comments..."
-              className="mt-2"
+          {/* Lines Tab */}
+          <TabsContent value="lines" className="space-y-4">
+            <POLinesDataTable
+              lines={po.lines}
+              currency={po.currency}
+              isEditable={isEditable}
+              onAddLine={handleAddLine}
+              onEditLine={handleEditLine}
+              onDeleteLine={handleDeleteLine}
             />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submittingApproval}>Cancel</AlertDialogCancel>
-            <Button
-              onClick={handleApprove}
-              disabled={submittingApproval}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {submittingApproval ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Approving...
-                </>
-              ) : (
-                'Approve'
-              )}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <POTotalsPanel
+              subtotal={totals.subtotal}
+              taxAmount={totals.tax_amount}
+              taxBreakdown={totals.tax_breakdown}
+              discountTotal={totals.discount_total}
+              shippingCost={totals.shipping_cost}
+              total={totals.total}
+              currency={po.currency}
+              receivedValue={po.received_value}
+            />
+          </TabsContent>
 
-      {/* Reject Dialog */}
-      <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reject Purchase Order</AlertDialogTitle>
-            <AlertDialogDescription>
-              Please provide a reason for rejecting {po.po_number}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4 space-y-4">
-            <div>
-              <Label htmlFor="rejection-reason">Rejection Reason *</Label>
-              <Textarea
-                id="rejection-reason"
-                value={rejectionReason}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRejectionReason(e.target.value)}
-                placeholder="Enter the reason for rejection..."
-                className="mt-2"
-                required
+          {/* History Tab */}
+          <TabsContent value="history">
+            <div className="border rounded-lg p-6">
+              <h3 className="font-medium mb-4">Status History</h3>
+              <POStatusTimeline
+                history={history || []}
+                isLoading={historyLoading}
               />
             </div>
-            <div>
-              <Label htmlFor="reject-comments">Additional Comments (optional)</Label>
-              <Textarea
-                id="reject-comments"
-                value={approvalComments}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setApprovalComments(e.target.value)}
-                placeholder="Add any additional comments..."
-                className="mt-2"
-              />
+          </TabsContent>
+
+          {/* Receiving Tab */}
+          <TabsContent value="receiving">
+            <div className="border rounded-lg p-6 text-center text-muted-foreground">
+              <p>Receiving information will be shown here.</p>
+              <Button
+                className="mt-4"
+                onClick={handleGoToReceiving}
+              >
+                Go to Receiving
+              </Button>
             </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submittingApproval}>Cancel</AlertDialogCancel>
-            <Button
-              onClick={handleReject}
-              disabled={submittingApproval || !rejectionReason}
-              variant="destructive"
-            >
-              {submittingApproval ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Rejecting...
-                </>
-              ) : (
-                'Reject'
-              )}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Dialogs */}
+      <POCancelConfirmDialog
+        isOpen={cancelDialog}
+        poNumber={po.po_number}
+        onConfirm={handleCancelConfirm}
+        onCancel={() => setCancelDialog(false)}
+      />
+
+      <POLineModal
+        isOpen={lineModal.isOpen}
+        mode={lineModal.mode}
+        initialData={lineModal.line}
+        supplierId={po.supplier_id}
+        taxCodeId={po.tax_code_id}
+        currency={po.currency}
+        taxCodes={taxCodes.map((t) => ({
+          id: t.id,
+          code: t.code,
+          name: t.name,
+          rate: t.rate,
+        }))}
+        existingProductIds={existingProductIds}
+        onSubmit={handleLineSubmit}
+        onClose={() => setLineModal({ isOpen: false, mode: 'add', line: null })}
+      />
     </div>
   )
 }

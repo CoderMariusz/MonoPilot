@@ -40,7 +40,7 @@ LEVEL 2: Core Entities (Parallel possible)
 └── 03.10 - WO CRUD + BOM Auto [L, 5-7d] ← 01.1, 01.11, 02.1, 02.4
 
 LEVEL 3: Entity Extensions
-├── 03.3 - PO CRUD + Lines [L, 5-7d] ← 03.1, 03.2
+├── 03.3 - PO CRUD + Lines [L, 5-7d] ← 03.1, 03.2 
 ├── 03.9a - TO Partial Shipments [S, 2d] ← 03.8
 ├── 03.11a - WO Materials Snapshot [L, 5-7d] ← 03.10, 02.5a
 └── 03.12 - WO Operations Copy [M, 4d] ← 03.10, 02.7, 02.8

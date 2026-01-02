@@ -76,8 +76,9 @@ export async function POST(
 
     return NextResponse.json(
       {
+        success: true, // MAJOR-BUG-01: Add success field for consistency with receive endpoint
         transfer_order: result.data,
-        message: 'Transfer Order shipped successfully',
+        message: `Transfer Order ${result.data?.to_number} shipped successfully`,
       },
       { status: 200 }
     )
