@@ -61,8 +61,13 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_type ON public.activity_logs(activi
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
--- CREATE RLS POLICIES
+-- CREATE RLS POLICIES (idempotent - drop and recreate)
 -- ============================================================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Service role bypass RLS" ON public.activity_logs;
+DROP POLICY IF EXISTS "Users can view org activities" ON public.activity_logs;
+DROP POLICY IF EXISTS "Users can insert org activities" ON public.activity_logs;
 
 -- Policy: Service role bypass RLS (for admin operations)
 CREATE POLICY "Service role bypass RLS"

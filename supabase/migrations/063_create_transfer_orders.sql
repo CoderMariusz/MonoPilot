@@ -279,6 +279,30 @@ COMMENT ON COLUMN transfer_order_lines.shipped_qty IS 'Cumulative shipped quanti
 COMMENT ON COLUMN transfer_order_lines.received_qty IS 'Cumulative received quantity (cannot exceed quantity)';
 
 -- ============================================================================
+-- TRIGGER: Auto-renumber lines after deletion (AC-7)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION renumber_transfer_order_lines()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Renumber all lines after the deleted line
+  UPDATE transfer_order_lines
+  SET line_number = line_number - 1
+  WHERE to_id = OLD.to_id
+    AND line_number > OLD.line_number;
+
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tr_transfer_order_lines_renumber
+AFTER DELETE ON transfer_order_lines
+FOR EACH ROW
+EXECUTE FUNCTION renumber_transfer_order_lines();
+
+COMMENT ON FUNCTION renumber_transfer_order_lines IS 'Auto-renumber TO lines after deletion (AC-7)';
+
+-- ============================================================================
 -- GRANTS
 -- ============================================================================
 
