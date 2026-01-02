@@ -1,10 +1,10 @@
 // API Route: Submit Purchase Order
-// Story 03.3: PO CRUD + Lines
-// POST /api/planning/purchase-orders/:id/submit - Submit PO (draft -> confirmed)
+// Story 03.5b: PO Approval Workflow
+// POST /api/planning/purchase-orders/:id/submit - Submit PO for approval or direct submission
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
-import { PurchaseOrderService } from '@/lib/services/purchase-order-service'
+import { submitPO } from '@/lib/services/purchase-order-service'
 import { checkPOPermission, getPermissionRequirement } from '@/lib/utils/po-permissions'
 
 export async function POST(
@@ -44,37 +44,52 @@ export async function POST(
       )
     }
 
-    // Submit PO using service
-    const result = await PurchaseOrderService.submit(
+    // Submit PO using the new approval-aware function
+    const result = await submitPO(
       id,
       currentUser.org_id,
       session.user.id
     )
 
-    if (!result.success) {
-      // Map error codes to HTTP status
-      const statusMap: Record<string, number> = {
-        NOT_FOUND: 404,
-        INVALID_STATUS: 400,
-        NO_LINES: 400,
-        DATABASE_ERROR: 500,
-      }
-      const status = statusMap[result.code ?? ''] ?? 400
-
-      return NextResponse.json(
-        { error: result.error, code: result.code },
-        { status }
-      )
-    }
+    // Get PO details for response
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { data: po } = await supabaseAdmin
+      .from('purchase_orders')
+      .select('id, po_number, status, approval_status')
+      .eq('id', id)
+      .single()
 
     return NextResponse.json({
-      id: result.data?.id,
-      status: result.data?.status,
-      approval_required: false, // Simplified - no approval in MVP
-      message: 'Purchase order submitted successfully',
+      success: true,
+      data: {
+        id: po?.id || id,
+        po_number: po?.po_number,
+        status: result.status,
+        approval_required: result.approvalRequired,
+        approval_status: result.approvalRequired ? 'pending' : null,
+        notification_sent: result.notificationSent,
+        notification_count: result.notificationCount,
+      },
+      message: result.approvalRequired
+        ? 'Purchase order submitted for approval'
+        : 'Purchase order submitted successfully',
     })
   } catch (error) {
     console.error('Error in POST /api/planning/purchase-orders/:id/submit:', error)
+
+    const message = error instanceof Error ? error.message : 'Internal server error'
+
+    // Map error messages to HTTP status codes
+    if (message.includes('not found')) {
+      return NextResponse.json({ error: message, code: 'PO_NOT_FOUND' }, { status: 404 })
+    }
+    if (message.includes('draft status')) {
+      return NextResponse.json({ error: message, code: 'PO_NOT_DRAFT' }, { status: 400 })
+    }
+    if (message.includes('at least one line')) {
+      return NextResponse.json({ error: message, code: 'PO_NO_LINES' }, { status: 400 })
+    }
+
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

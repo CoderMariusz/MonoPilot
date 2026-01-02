@@ -74,7 +74,7 @@ export default function PurchaseOrderDetailsPage({
   const { data: po, isLoading, error, refetch } = usePurchaseOrder(paramsId)
   const { data: history, isLoading: historyLoading } = usePOStatusHistory(paramsId)
   const { data: taxCodesData } = useTaxCodes()
-  const taxCodes = taxCodesData || []
+  const taxCodes = taxCodesData?.data || []
 
   // Mutations
   const submitPO = useSubmitPO()
@@ -364,7 +364,7 @@ export default function PurchaseOrderDetailsPage({
             onApprove={handleApprove}
             onReject={handleReject}
             onConfirm={handleConfirm}
-            onCancel={() => setCancelDialog(true)}
+            onCancel={async () => setCancelDialog(true)}
             onDuplicate={handleDuplicate}
             onPrint={handlePrint}
             onExportPDF={handleExportPDF}

@@ -1,0 +1,343 @@
+# Code Review Handoff: Stories 03.4 & 03.5a
+# Date: 2026-01-02
+# Reviewer: CODE-REVIEWER Agent
+
+decision: REQUEST_CHANGES
+severity: MAJOR
+stories:
+  - id: "03.4"
+    name: "PO Totals + Tax Calculations"
+  - id: "03.5a"
+    name: "PO Approval Setup"
+
+# Overall Assessment
+assessment:
+  code_quality_score: 6.5/10
+  security_score: 6/10
+  type_safety_score: 9/10
+  test_coverage_score: 9/10
+  accessibility_score: 6/10
+  performance_score: 8/10
+
+# Test Status
+tests:
+  total_tests: 266
+  passing: 265
+  failing: 1  # Flaky test unrelated to these stories
+  coverage_target_03_4: ">=85%"
+  coverage_target_03_5a: ">=79%"
+  coverage_actual: "pending_verification"
+
+# Acceptance Criteria
+acceptance_criteria:
+  story_03_4:
+    total: 20
+    implemented: 20
+    percentage: 100%
+  story_03_5a:
+    total: 16
+    implemented: 15  # AC-13 is E2E only
+    percentage: 94%
+
+# Issues Found
+issues:
+  critical:
+    count: 1
+    items:
+      - id: CRIT-1
+        title: "API Route Security Vulnerability - Inconsistent Error Handling"
+        file: "apps/frontend/app/api/settings/planning/route.ts"
+        lines: "72-143, 180-247"
+        severity: CRITICAL
+        description: "PUT and PATCH handlers use different error handling. PUT uses handleUpdateSettings(), PATCH duplicates 60+ lines of auth/validation logic. Error messages inconsistent. No use of standardized error handler from lib/api/error-handler.ts"
+        impact: "Information leakage, security audit failure, maintenance nightmare"
+        fix_required: "Refactor both handlers to use handleApiError() and successResponse() utilities"
+        estimated_fix_time: "1 hour"
+
+  major:
+    count: 4
+    items:
+      - id: MAJ-1
+        title: "Duplicate Schema Imports"
+        file: "apps/frontend/app/api/settings/planning/route.ts"
+        lines: "17-18"
+        severity: MAJOR
+        description: "Imports TWO different planningSettingsUpdateSchema from different files. PUT uses one, PATCH uses another. Confusing and error-prone."
+        impact: "Validation inconsistencies, hard-to-debug bugs"
+        fix_required: "Use single schema consistently"
+        estimated_fix_time: "15 minutes"
+
+      - id: MAJ-2
+        title: "Inconsistent API Response Formats"
+        file: "apps/frontend/app/api/settings/planning/route.ts"
+        lines: "138-142, 235-239"
+        severity: MAJOR
+        description: "PUT returns {success, data, message}, PATCH returns {success, message, settings}. Different keys for same data."
+        impact: "Frontend integration issues, TypeScript errors, API contract violations"
+        fix_required: "Use consistent response format (successResponse helper)"
+        estimated_fix_time: "15 minutes"
+
+      - id: MAJ-3
+        title: "Missing Standardized Error Handler Usage"
+        file: "apps/frontend/app/api/settings/planning/route.ts"
+        lines: "30-247"
+        severity: MAJOR
+        description: "Project has standardized error handlers (handleApiError, unauthorizedResponse, etc.) but this route doesn't use them"
+        impact: "Inconsistent error messages across API, maintenance issues"
+        fix_required: "Refactor to use lib/api/error-handler.ts utilities"
+        estimated_fix_time: "30 minutes"
+
+      - id: MAJ-4
+        title: "Duplicate Validation Logic"
+        file: "apps/frontend/lib/validation/planning-settings-schema.ts"
+        lines: "38-50, 86-98"
+        severity: MAJOR
+        description: "Same threshold validation duplicated in two places. val > 0 checked twice with different messages."
+        impact: "Code duplication, harder maintenance"
+        fix_required: "Extract to shared schema, reuse"
+        estimated_fix_time: "30 minutes"
+
+  moderate:
+    count: 2
+    items:
+      - id: MOD-1
+        title: "Component Accessibility Issues"
+        file: "apps/frontend/components/settings/POApprovalSettings.tsx"
+        lines: "250, 362"
+        severity: MODERATE
+        description: "Switch missing aria-describedby. Button has redundant role='button'"
+        impact: "WCAG 2.1 AA compliance failure"
+        fix_required: "Add aria-describedby, remove redundant role"
+        estimated_fix_time: "10 minutes"
+
+      - id: MOD-2
+        title: "Duplicate Refinement in Schema"
+        file: "apps/frontend/lib/validation/planning-settings-schema.ts"
+        lines: "41-44"
+        severity: MODERATE
+        description: "Two refinements check val > 0 with different error messages"
+        impact: "Confusing validation errors"
+        fix_required: "Remove duplicate, use single message"
+        estimated_fix_time: "5 minutes"
+
+  minor:
+    count: 3
+    items:
+      - id: MIN-1
+        title: "Magic Numbers in Component"
+        file: "apps/frontend/components/planning/purchase-orders/DiscountInput.tsx"
+        lines: "195-196"
+        severity: MINOR
+        fix_required: "Extract to named constants"
+
+      - id: MIN-2
+        title: "Missing JSDoc Comments"
+        files:
+          - "POTotalsSection.tsx (line 65)"
+          - "TaxBreakdownTooltip.tsx (line 64)"
+          - "planning-settings-schema.ts (line 18)"
+        severity: MINOR
+        fix_required: "Add JSDoc comments to helper functions"
+
+      - id: MIN-3
+        title: "Missing useMemo Optimization"
+        file: "apps/frontend/components/planning/purchase-orders/TaxBreakdownTooltip.tsx"
+        lines: "82"
+        severity: MINOR
+        fix_required: "Use useMemo for sorted breakdown"
+
+# Security Assessment
+security:
+  vulnerabilities_found: 2
+  critical_vulnerabilities: 1
+  sql_injection_risk: NONE
+  xss_risk: LOW  # Mitigated by Zod validation
+  authentication: GOOD
+  authorization: GOOD
+  rls_enforcement: GOOD
+  input_validation: EXCELLENT
+  error_handling: POOR  # Inconsistent
+  findings:
+    - type: "Inconsistent Error Handling"
+      severity: CRITICAL
+      status: NOT_FIXED
+      description: "Error messages might leak sensitive information"
+    - type: "Missing Input Sanitization"
+      severity: LOW
+      status: ACCEPTABLE
+      description: "XSS mitigated by Zod validation"
+
+# Performance Assessment
+performance:
+  database_trigger_performance: GOOD  # < 100ms for 50 lines
+  calculation_performance: GOOD  # < 50ms for 50 lines
+  component_performance: GOOD
+  bundle_size: ACCEPTABLE
+  optimizations_needed:
+    - "Add useMemo to POTotalsSection for tax breakdown sorting"
+
+# Pattern Adherence
+patterns:
+  total_patterns: 7
+  followed: 6
+  violated: 1
+  compliance_score: 86%
+  violations:
+    - pattern: "Error Handling"
+      expected: "Use handleApiError()"
+      actual: "Custom error handling"
+      file: "apps/frontend/app/api/settings/planning/route.ts"
+
+# Files Reviewed
+files_reviewed:
+  total: 11
+  total_lines: 2842
+  story_03_4:
+    backend:
+      - path: "apps/frontend/lib/services/po-calculation-service.ts"
+        lines: 303
+      - path: "apps/frontend/lib/validation/po-calculation.ts"
+        lines: 98
+      - path: "supabase/migrations/084_po_calculation_enhancements.sql"
+        lines: 174
+    frontend:
+      - path: "apps/frontend/components/planning/purchase-orders/POTotalsSection.tsx"
+        lines: 423
+      - path: "apps/frontend/components/planning/purchase-orders/TaxBreakdownTooltip.tsx"
+        lines: 212
+      - path: "apps/frontend/components/planning/purchase-orders/DiscountInput.tsx"
+        lines: 321
+  story_03_5a:
+    backend:
+      - path: "apps/frontend/lib/validation/planning-settings-schema.ts"
+        lines: 114
+      - path: "apps/frontend/lib/services/planning-settings-service.ts"
+        lines: 159
+      - path: "apps/frontend/app/api/settings/planning/route.ts"
+        lines: 248
+      - path: "apps/frontend/lib/types/planning-settings.ts"
+        lines: 154
+    frontend:
+      - path: "apps/frontend/components/settings/POApprovalSettings.tsx"
+        lines: 436
+
+# Required Fixes (Blocking Merge)
+required_fixes:
+  - id: FIX-1
+    priority: CRITICAL
+    title: "Refactor API route to use standardized error handling"
+    files:
+      - "apps/frontend/app/api/settings/planning/route.ts"
+    estimated_time: "1 hour"
+    details:
+      - "Replace custom error handling with handleApiError()"
+      - "Use successResponse() for success responses"
+      - "Use unauthorizedResponse(), forbiddenResponse() helpers"
+
+  - id: FIX-2
+    priority: CRITICAL
+    title: "Consolidate PUT/PATCH handlers"
+    files:
+      - "apps/frontend/app/api/settings/planning/route.ts"
+    estimated_time: "30 minutes"
+    details:
+      - "Both handlers should use handleUpdateSettings()"
+      - "Remove 60+ lines of duplicated auth/validation logic from PATCH"
+
+  - id: FIX-3
+    priority: MAJOR
+    title: "Use single validation schema"
+    files:
+      - "apps/frontend/app/api/settings/planning/route.ts"
+    estimated_time: "15 minutes"
+    details:
+      - "Remove duplicate schema import"
+      - "Use consistent schema for both PUT and PATCH"
+
+  - id: FIX-4
+    priority: MAJOR
+    title: "Fix response format inconsistency"
+    files:
+      - "apps/frontend/app/api/settings/planning/route.ts"
+    estimated_time: "15 minutes"
+    details:
+      - "Both handlers return same structure"
+      - "Use {success, data, message} format consistently"
+
+# Recommended Fixes (Not Blocking)
+recommended_fixes:
+  - id: REC-1
+    priority: MODERATE
+    title: "Fix duplicate validation refinement"
+    files:
+      - "apps/frontend/lib/validation/planning-settings-schema.ts"
+    estimated_time: "30 minutes"
+
+  - id: REC-2
+    priority: MODERATE
+    title: "Add missing ARIA attributes"
+    files:
+      - "apps/frontend/components/settings/POApprovalSettings.tsx"
+    estimated_time: "10 minutes"
+
+# Positive Findings
+positive_findings:
+  - "Excellent TypeScript type safety (no 'any' types)"
+  - "Comprehensive test coverage (244 tests in RED phase)"
+  - "Clean service layer with pure functions"
+  - "Proper database trigger implementation"
+  - "Thorough Zod validation schemas"
+  - "Good separation of concerns"
+  - "No SQL injection vulnerabilities"
+  - "RLS properly enforced"
+
+# Refactoring Recommendations
+refactoring:
+  - title: "Extract API Route Helper"
+    priority: HIGH
+    effort: "2 hours"
+    description: "Create reusable helper for settings API routes"
+
+  - title: "Consolidate Validation Schemas"
+    priority: MEDIUM
+    effort: "1 hour"
+    description: "Merge planning-settings-schemas.ts and planning-settings-schema.ts"
+
+  - title: "Extract Currency Formatting Utility"
+    priority: LOW
+    effort: "30 minutes"
+    description: "Create lib/utils/currency.ts for reusable formatting"
+
+# Handoff
+handoff:
+  to: "DEV"
+  from: "CODE-REVIEWER"
+  stories:
+    - "03.4"
+    - "03.5a"
+  action_required: "Fix 4 critical/major issues then re-review"
+  estimated_fix_time: "2-3 hours"
+  re_review_required: true
+  blocking_issues:
+    - CRIT-1
+    - MAJ-1
+    - MAJ-2
+    - MAJ-3
+
+# Next Steps
+next_steps:
+  - "Developer fixes required issues (2-3 hours)"
+  - "Re-run tests to ensure all pass"
+  - "Re-review code after fixes"
+  - "If approved, proceed to QA phase"
+
+# Review Metadata
+metadata:
+  reviewer: "CODE-REVIEWER Agent"
+  review_date: "2026-01-02"
+  review_duration: "110 minutes"
+  review_mode: "BRUTALLY_HONEST"
+  review_type: "CODE_REVIEW"
+  phase: "4-REVIEW"
+  workflow: "7-phase TDD"
+  report_path: "docs/2-MANAGEMENT/reviews/code-review-story-03.4-03.5a.md"

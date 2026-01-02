@@ -1,18 +1,151 @@
-// API Route: Purchase Order Status Change
-// Epic 3 Batch 3A - Story 3.5: Configurable PO Statuses
-// PUT /api/planning/purchase-orders/:id/status - Change PO status
+/**
+ * API Route: Purchase Order Status Change
+ * Story: 03.7 - PO Status Lifecycle (Configurable Statuses)
+ *
+ * POST /api/planning/purchase-orders/:id/status - Change PO status (Story 03.7)
+ * PUT /api/planning/purchase-orders/:id/status - Change PO status (Legacy)
+ */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { POStatusService } from '@/lib/services/po-status-service'
+import { transitionStatusSchema } from '@/lib/validation/po-status-schemas'
 import { z } from 'zod'
 
+// Legacy schema for backward compatibility
 const statusChangeSchema = z.object({
   status: z.string().min(1, 'Status is required'),
 })
 
 type StatusChangeInput = z.infer<typeof statusChangeSchema>
 
-// PUT /api/planning/purchase-orders/:id/status - Change PO status
+/**
+ * POST /api/planning/purchase-orders/:id/status
+ * Change the status of a PO using the new transition system (Story 03.7)
+ *
+ * Body: { to_status: string, notes?: string }
+ *
+ * Auth: Planner or Admin
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+
+    // Check authentication
+    const supabase = await createServerSupabase()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get user's org and role
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { data: userData, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('org_id, role:roles(code)')
+      .eq('id', user.id)
+      .single()
+
+    if (userError || !userData) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 403 }
+      )
+    }
+
+    const roleData = userData.role as any
+    const role = (
+      typeof roleData === 'string'
+        ? roleData
+        : Array.isArray(roleData)
+          ? roleData[0]?.code
+          : roleData?.code
+    )?.toLowerCase()
+
+    // Planner and above can change status
+    const allowedRoles = ['admin', 'owner', 'super_admin', 'superadmin', 'planner', 'production_manager']
+    if (!role || !allowedRoles.includes(role)) {
+      return NextResponse.json(
+        { error: 'Forbidden - Planner access required' },
+        { status: 403 }
+      )
+    }
+
+    // Check if PO exists
+    const { data: po } = await supabaseAdmin
+      .from('purchase_orders')
+      .select('id')
+      .eq('id', id)
+      .eq('org_id', userData.org_id)
+      .single()
+
+    if (!po) {
+      return NextResponse.json(
+        { error: 'Purchase order not found' },
+        { status: 404 }
+      )
+    }
+
+    // Parse and validate request body
+    const body = await request.json()
+    const validationResult = transitionStatusSchema.safeParse(body)
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validationResult.error.errors },
+        { status: 400 }
+      )
+    }
+
+    // Execute transition using the new service
+    const result = await POStatusService.transitionStatus(
+      id,
+      validationResult.data.to_status,
+      user.id,
+      userData.org_id,
+      validationResult.data.notes || undefined
+    )
+
+    if (!result.success) {
+      if (result.code === 'INVALID_TRANSITION' || result.code === 'NO_LINES') {
+        return NextResponse.json(
+          { error: result.error },
+          { status: 400 }
+        )
+      }
+      if (result.code === 'NOT_FOUND') {
+        return NextResponse.json(
+          { error: result.error },
+          { status: 404 }
+        )
+      }
+      return NextResponse.json(
+        { error: result.error },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(result.data)
+  } catch (error) {
+    console.error('Error in POST /api/planning/purchase-orders/:id/status:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PUT /api/planning/purchase-orders/:id/status - Change PO status (Legacy)
+ * Kept for backward compatibility
+ */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

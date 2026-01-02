@@ -13,6 +13,7 @@ export type POStatus =
   | 'submitted'
   | 'pending_approval'
   | 'approved'
+  | 'rejected'
   | 'confirmed'
   | 'receiving'
   | 'closed'
@@ -53,6 +54,12 @@ export const PO_STATUS_CONFIG: Record<POStatus, {
     bgColor: 'bg-green-100',
     textColor: 'text-green-800',
     borderColor: 'border-green-300',
+  },
+  rejected: {
+    label: 'Rejected',
+    bgColor: 'bg-red-100',
+    textColor: 'text-red-800',
+    borderColor: 'border-red-300',
   },
   confirmed: {
     label: 'Confirmed',
@@ -399,15 +406,16 @@ export const VALID_PO_STATUS_TRANSITIONS: Record<POStatus, POStatus[]> = {
   submitted: ['pending_approval', 'confirmed', 'cancelled'],
   pending_approval: ['approved', 'rejected', 'cancelled'],
   approved: ['confirmed', 'cancelled'],
+  rejected: ['draft', 'cancelled'], // Rejected POs can be edited (back to draft) or cancelled
   confirmed: ['receiving', 'cancelled'],
   receiving: ['closed', 'cancelled'],
   closed: [],
   cancelled: [],
 }
 
-export const EDITABLE_STATUSES: POStatus[] = ['draft']
-export const LINE_EDITABLE_STATUSES: POStatus[] = ['draft']
-export const CANCELABLE_STATUSES: POStatus[] = ['draft', 'submitted', 'pending_approval', 'approved', 'confirmed']
+export const EDITABLE_STATUSES: POStatus[] = ['draft', 'rejected']
+export const LINE_EDITABLE_STATUSES: POStatus[] = ['draft', 'rejected']
+export const CANCELABLE_STATUSES: POStatus[] = ['draft', 'submitted', 'pending_approval', 'approved', 'rejected', 'confirmed']
 
 // ============================================================================
 // HELPER FUNCTIONS

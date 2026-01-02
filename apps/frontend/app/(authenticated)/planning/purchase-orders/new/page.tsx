@@ -65,7 +65,7 @@ const createPOSchema = z.object({
   currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']),
   tax_code_id: z.string().uuid({ message: 'Please select a tax code' }),
   payment_terms: z.string().optional().nullable(),
-  shipping_cost: z.number().min(0).optional().default(0),
+  shipping_cost: z.number().min(0),
   notes: z.string().max(1000).optional().nullable(),
 })
 
@@ -115,8 +115,8 @@ export default function CreatePurchaseOrderPage() {
   const { data: duplicatePO, isLoading: duplicateLoading } = usePurchaseOrder(duplicateId)
 
   const suppliers = suppliersData?.data || []
-  const warehouses = warehousesData || []
-  const taxCodes = taxCodesData || []
+  const warehouses = warehousesData?.data || []
+  const taxCodes = taxCodesData?.data || []
 
   // Form setup
   const form = useForm<CreatePOFormData>({

@@ -132,3 +132,27 @@ export async function initializePlanningSettings(orgId: string): Promise<Plannin
 
   return data;
 }
+
+/**
+ * Default PO Approval Settings
+ * Used for fresh organizations and UI defaults
+ */
+export interface POApprovalDefaults {
+  po_require_approval: boolean;
+  po_approval_threshold: number | null;
+  po_approval_roles: string[];
+}
+
+/**
+ * Get default planning settings values
+ * Returns a new object each time to prevent mutation
+ *
+ * @returns POApprovalDefaults - Default values for PO approval settings
+ */
+export function getDefaultPlanningSettings(): POApprovalDefaults {
+  return {
+    po_require_approval: false,
+    po_approval_threshold: null,
+    po_approval_roles: ['admin', 'manager'],
+  };
+}

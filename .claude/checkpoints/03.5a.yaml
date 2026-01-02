@@ -1,0 +1,8 @@
+# Story 03.5a: Purchase Order Approval Workflow
+# Checkpoint log - append only, never modify existing lines
+
+P1: ✓ ux-designer 09:30 wireframes:4 approved:yes
+P2: ✓ test-writer 10:15 files:4 tests:32 status:red
+P3: ✓ backend-dev 11:30 files:6 tests:18/18
+P3: ✓ frontend-dev 11:55 files:9 tests:14/14
+# Next: P4 (senior-dev for refactor)

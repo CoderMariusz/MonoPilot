@@ -6,7 +6,7 @@
     "dev": "cd apps/frontend && pnpm dev",
     "build": "cd apps/frontend && pnpm build",
     "start": "cd apps/frontend && pnpm start",
-     "vercel:install": "corepack enable && corepack prepare pnpm@8.15.0 --activate && pnpm install --no-frozen-lockfile",
+    "vercel:install": "corepack enable && corepack prepare pnpm@8.15.0 --activate && pnpm install --no-frozen-lockfile",
     "lint": "cd apps/frontend && pnpm lint",
     "type-check": "cd apps/frontend && pnpm type-check",
     "type-check:monitor": "bash scripts/type-check-monitor.sh",
@@ -36,18 +36,20 @@
   "engines": {
     "node": "20.x || 22.x"
   },
-   "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@8.15.0",
   "devDependencies": {
     "@faker-js/faker": "^9.3.0",
     "@playwright/test": "^1.49.0",
     "@supabase/supabase-js": "^2.84.0",
     "dotenv": "^17.2.3",
+    "husky": "^8.0.3",
     "lint-staged": "^16.2.7",
     "supabase": "^2.58.5",
-    "husky": "^8.0.3",
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "pg": "^8.16.3"
+    "@radix-ui/react-avatar": "^1.1.11",
+    "pg": "^8.16.3",
+    "xlsx": "^0.18.5"
   }
 }

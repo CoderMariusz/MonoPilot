@@ -257,6 +257,144 @@ ORCHESTRATOR knows skill_index from REGISTRY.yaml (~200 tokens) for routing hint
 
 ---
 
+## 📋 Checkpoint-Driven Coordination
+
+**ORCHESTRATOR reads checkpoints. Agents write them.**
+
+### Checkpoint File Structure
+
+```yaml
+# .claude/checkpoints/{STORY_ID}.yaml
+
+# Phase 1: UX Design
+P1: ✓ ux-designer 13:15 wireframes:3 approved:yes
+
+# Phase 2: RED (Tests)
+P2: ✓ test-writer 13:50 files:3 tests:27 status:red
+
+# Phase 3: GREEN (Implementation - backend/frontend/fullstack)
+P3: ✓ backend-dev 14:23 files:5 tests:12/12
+# OR: P3: ✓ frontend-dev 14:23 files:8 tests:15/15
+# OR: P3: ✓ dev-parallel 14:23 backend:5/5 frontend:8/8
+
+# Phase 4: REFACTOR
+P4: ✓ senior-dev 14:45 refactored:3 complexity:reduced
+
+# Phase 5: REVIEW
+P5: ✓ code-reviewer 15:10 issues:0 decision:approved
+
+# Phase 6: QA
+P6: ✓ qa-agent 15:30 ac:5/5 bugs:0 decision:pass
+
+# Phase 7: DOCUMENTATION
+P7: ✓ tech-writer 15:45 report:done docs:updated
+```
+
+### Reading Checkpoints
+
+**Before delegating next phase:**
+
+```bash
+# Check story progress
+cat .claude/checkpoints/03.4.yaml
+
+# Determine next action
+if [ latest = "P1✓" ]; then
+  → test-writer (P2)
+elif [ latest = "P2✓" ]; then
+  → backend-dev/frontend-dev (P3) # based on story type
+elif [ latest = "P3✓" ]; then
+  → senior-dev (P4) # or skip to P5 if no refactor needed
+elif [ latest = "P4✓" ]; then
+  → code-reviewer (P5)
+elif [ latest = "P5✓" && decision = "approved" ]; then
+  → qa-agent (P6)
+elif [ latest = "P6✓" && decision = "pass" ]; then
+  → tech-writer (P7)
+elif [ latest = "P7✓" ]; then
+  → Story DONE ✅
+fi
+```
+
+### Checkpoint Interpretation
+
+| Phase | Agent | Next Action | Block Condition |
+|-------|-------|-------------|-----------------|
+| P1✓ | ux-designer | → test-writer (P2) | approved≠yes |
+| P1 skip | - | → test-writer (P2) | No UX needed (backend-only) |
+| P2✓ | test-writer | → dev (P3) | status≠red |
+| P3✓ | backend/frontend-dev | → senior-dev (P4) | tests≠X/X |
+| P4✓ | senior-dev | → code-reviewer (P5) | - |
+| P4 skip | - | → code-reviewer (P5) | No refactor needed |
+| P5✓ | code-reviewer | → qa-agent (P6) if approved<br>→ dev (P3) if rejected | decision≠approved |
+| P6✓ | qa-agent | → tech-writer (P7) if pass<br>→ dev (P3) if fail | decision≠pass |
+| P7✓ | tech-writer | Story DONE ✅ | - |
+
+### Multi-Story Checkpoint Management
+
+```bash
+# List all active stories
+ls .claude/checkpoints/*.yaml
+
+# Check which phase each story is in
+for file in .claude/checkpoints/*.yaml; do
+  story=$(basename "$file" .yaml)
+  last_phase=$(tail -1 "$file" | cut -d: -f1)
+  echo "$story: $last_phase"
+done
+
+# Example output:
+# 03.4: P5✓  → Ready for qa-agent (P6)
+# 03.5a: P3✓ → Ready for senior-dev (P4)
+# 03.7: P2✓  → Ready for dev (P3)
+
+# Parallelization decision:
+# → qa-agent(03.4) || senior-dev(03.5a) || backend-dev(03.7)
+```
+
+### Error Handling from Checkpoints
+
+```bash
+# Blocked scenario
+P5: ✗ code-reviewer 15:10 issues:3-critical decision:request_changes
+
+# Action: Read micro-handoff from agent output, route back to dev (P3)
+# Don't create new checkpoint - dev will update after fixes
+
+# OR
+P6: ✗ qa-agent 15:30 ac:3/5 bugs:2-critical decision:fail
+
+# Action: Route back to dev (P3) for fixes, then re-run P4→P5→P6
+```
+
+### Final Documentation Trigger
+
+**When P6✓ (QA pass) detected:**
+
+```
+1. Read all checkpoints for story
+2. Route to tech-writer (P7):
+   - Input: checkpoint file path
+   - Task: "Create final documentation from checkpoints"
+3. tech-writer reads checkpoint, generates:
+   - Implementation report
+   - Test summary
+   - Coverage metrics
+   - Known issues (if any)
+4. Append P7✓ to checkpoint
+5. Story marked DONE ✅
+```
+
+### Checkpoint Rules for ORCHESTRATOR
+
+1. **Read-only** - Never modify checkpoints
+2. **Latest wins** - Last line = current phase
+3. **Block on ✗** - Any failure stops pipeline
+4. **Parallel safe** - Different stories = different files
+5. **No assumptions** - If checkpoint missing, ask user for story state
+
+---
+
 ## Error Recovery
 
 | Status | Action |
@@ -265,6 +403,8 @@ ORCHESTRATOR knows skill_index from REGISTRY.yaml (~200 tokens) for routing hint
 | `failed` | Retry once, then escalate |
 | `needs_input` | Route to discovery-agent |
 | Context too large | Compress, split task |
+| Checkpoint missing | Ask user for story phase or start from P1 |
+| Checkpoint shows ✗ | Read agent micro-handoff, route to fix |
 
 ---
 

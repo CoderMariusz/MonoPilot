@@ -1,16 +1,20 @@
 /**
  * Purchase Orders List Page
  * Story 03.3: PO CRUD + Lines
+ * Story 03.6: PO Bulk Operations
  * AC-01-1: View purchase orders list
  * AC-01-2: Search POs by number or supplier
  * AC-01-3: Filter by status
+ * AC-03: Import wizard
+ * AC-04: Export to Excel
+ * AC-05: Bulk status updates
  */
 
 'use client'
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Upload } from 'lucide-react'
+import { Plus, Upload, FileSpreadsheet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
@@ -22,11 +26,16 @@ import {
   POErrorState,
   POCancelConfirmDialog,
   PODeleteConfirmDialog,
+  ImportWizard,
+  POExportDialog,
+  POBulkActionsBar,
 } from '@/components/planning/purchase-orders'
 import { usePurchaseOrders, useSubmitPO, useCancelPO, useDeletePO } from '@/lib/hooks/use-purchase-orders'
 import { useSuppliers } from '@/lib/hooks/use-suppliers'
 import { useWarehouses } from '@/lib/hooks/use-warehouses'
+import { usePOSelection } from '@/lib/hooks/use-po-selection'
 import type { POListItem, POFilterParams, POStatus } from '@/lib/types/purchase-order'
+import type { BulkCreatePOResult } from '@/lib/types/po-bulk'
 
 // Pagination component
 function Pagination({
@@ -94,6 +103,10 @@ export default function PurchaseOrdersPage() {
     po: null,
   })
 
+  // Story 03.6: Import/Export dialogs
+  const [isImportWizardOpen, setIsImportWizardOpen] = useState(false)
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+
   // Fetch data
   const { data: suppliers, isLoading: isLoadingSuppliers } = useSuppliers({})
   const { data: warehouses, isLoading: isLoadingWarehouses } = useWarehouses({})
@@ -110,6 +123,23 @@ export default function PurchaseOrdersPage() {
     order: 'desc',
   })
 
+  const pos = posData?.data || []
+  const totalPages = posData?.meta?.pages || 1
+  const totalCount = posData?.meta?.total || 0
+
+  // Story 03.6: Selection state for bulk operations
+  const {
+    selectedIds,
+    selectedStatuses,
+    selectedCount,
+    isAllSelected,
+    isPartiallySelected,
+    toggleSelection,
+    toggleAll,
+    clearSelection,
+    isSelected,
+  } = usePOSelection(pos)
+
   // Mutations
   const submitPO = useSubmitPO()
   const cancelPO = useCancelPO()
@@ -119,7 +149,8 @@ export default function PurchaseOrdersPage() {
   const handleFilterChange = useCallback((newFilters: Partial<POFilterParams>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }))
     setPage(1) // Reset to first page on filter change
-  }, [])
+    clearSelection() // Clear selection on filter change
+  }, [clearSelection])
 
   const handleKPICardClick = useCallback(
     ({ type }: { type: 'open' | 'pending_approval' | 'overdue' | 'this_month' }) => {
@@ -141,8 +172,9 @@ export default function PurchaseOrdersPage() {
           break
       }
       setPage(1)
+      clearSelection()
     },
-    []
+    [clearSelection]
   )
 
   const handleRowClick = useCallback(
@@ -241,17 +273,41 @@ export default function PurchaseOrdersPage() {
     router.push('/planning/purchase-orders/new')
   }, [router])
 
+  // Story 03.6: Import/Export handlers
   const handleImport = useCallback(() => {
-    // TODO: Implement import
-    toast({
-      title: 'Coming Soon',
-      description: 'Bulk import feature is coming soon',
-    })
-  }, [toast])
+    setIsImportWizardOpen(true)
+  }, [])
+
+  const handleImportComplete = useCallback(
+    (result: BulkCreatePOResult) => {
+      toast({
+        title: 'Import Complete',
+        description: `${result.pos_created.length} PO(s) created successfully`,
+      })
+      refetch()
+    },
+    [toast, refetch]
+  )
+
+  const handleExport = useCallback(() => {
+    setIsExportDialogOpen(true)
+  }, [])
 
   const handleGoToSuppliers = useCallback(() => {
     router.push('/planning/suppliers')
   }, [router])
+
+  // Story 03.6: Row selection handler
+  const handleRowSelect = useCallback(
+    (po: POListItem, checked: boolean) => {
+      toggleSelection(po.id, po.status)
+    },
+    [toggleSelection]
+  )
+
+  const handleSelectAll = useCallback(() => {
+    toggleAll(pos)
+  }, [toggleAll, pos])
 
   // Render states
   if (error) {
@@ -268,8 +324,6 @@ export default function PurchaseOrdersPage() {
     )
   }
 
-  const pos = posData?.data || []
-  const totalPages = posData?.meta?.pages || 1
   const isEmpty = !isLoading && pos.length === 0 && !filters.search && filters.status.length === 0
 
   return (
@@ -286,6 +340,10 @@ export default function PurchaseOrdersPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExport} className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Export
+            </Button>
             <Button variant="outline" onClick={handleImport} className="gap-2">
               <Upload className="h-4 w-4" />
               Import POs
@@ -308,6 +366,16 @@ export default function PurchaseOrdersPage() {
           isLoadingSuppliers={isLoadingSuppliers}
         />
 
+        {/* Story 03.6: Bulk Actions Bar */}
+        {selectedCount > 0 && (
+          <POBulkActionsBar
+            selectedIds={selectedIds}
+            selectedStatuses={selectedStatuses}
+            onExport={handleExport}
+            onClearSelection={clearSelection}
+          />
+        )}
+
         {/* Content */}
         {isEmpty ? (
           <POEmptyState
@@ -326,6 +394,13 @@ export default function PurchaseOrdersPage() {
               onCancel={handleCancelClick}
               onDuplicate={handleDuplicate}
               onPrint={handlePrint}
+              // Story 03.6: Selection props
+              selectable={true}
+              selectedIds={selectedIds}
+              onRowSelect={handleRowSelect}
+              onSelectAll={handleSelectAll}
+              isAllSelected={isAllSelected}
+              isPartiallySelected={isPartiallySelected}
             />
             <Pagination
               page={page}
@@ -348,6 +423,27 @@ export default function PurchaseOrdersPage() {
         poNumber={deleteDialog.po?.po_number || ''}
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteDialog({ isOpen: false, po: null })}
+      />
+
+      {/* Story 03.6: Import Wizard */}
+      <ImportWizard
+        open={isImportWizardOpen}
+        onOpenChange={setIsImportWizardOpen}
+        onComplete={handleImportComplete}
+      />
+
+      {/* Story 03.6: Export Dialog */}
+      <POExportDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        selectedPoIds={selectedIds}
+        totalPoCount={totalCount}
+        filters={{
+          status: filters.status.length > 0 ? filters.status : undefined,
+          supplier_id: filters.supplier_id || undefined,
+          date_from: filters.from_date || undefined,
+          date_to: filters.to_date || undefined,
+        }}
       />
     </div>
   )

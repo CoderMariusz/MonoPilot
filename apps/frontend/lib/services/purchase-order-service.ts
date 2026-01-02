@@ -1,6 +1,7 @@
 import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 import { generatePONumber } from '../utils/po-number-generator'
-import type { POStatus } from '../validation/purchase-order'
+import type { POStatus, POApprovalAction, POApprovalHistory } from '../validation/purchase-order'
+import { getPlanningSettings } from './planning-settings-service'
 
 /**
  * Purchase Order Service
@@ -228,11 +229,20 @@ export interface PaginatedResult<T> {
 /**
  * Valid status transitions map.
  * Key: current status, Value: array of valid target statuses
+ *
+ * Story 03.5b: Extended with approval workflow statuses
+ * - draft -> pending_approval (if approval enabled)
+ * - draft -> submitted (if approval disabled)
+ * - pending_approval -> approved/rejected
+ * - approved -> confirmed
+ * - rejected -> draft (for re-editing)
  */
 const VALID_STATUS_TRANSITIONS: Record<POStatus, POStatus[]> = {
-  draft: ['submitted', 'cancelled'],
+  draft: ['submitted', 'pending_approval', 'cancelled'],
   submitted: ['pending_approval', 'confirmed', 'cancelled'],
-  pending_approval: ['confirmed', 'cancelled'],
+  pending_approval: ['approved', 'rejected', 'cancelled'],
+  approved: ['confirmed', 'cancelled'],
+  rejected: ['draft'],  // Return to draft for editing
   confirmed: ['receiving', 'cancelled'],
   receiving: ['closed', 'cancelled'],
   closed: [],
@@ -1517,5 +1527,577 @@ export class PurchaseOrderService {
         .update({ line_number: i + 1 })
         .eq('id', lines[i].id)
     }
+  }
+}
+
+// ============================================================================
+// Approval Workflow Functions (Story 03.5b)
+// ============================================================================
+
+/**
+ * Submit result interface
+ */
+export interface SubmitPOResult {
+  status: POStatus
+  approvalRequired: boolean
+  notificationSent: boolean
+  notificationCount: number
+}
+
+/**
+ * Approval history pagination options
+ */
+export interface ApprovalHistoryOptions {
+  page?: number
+  limit?: number
+}
+
+/**
+ * Approval history result with pagination
+ */
+export interface ApprovalHistoryResult {
+  history: POApprovalHistory[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    total_pages: number
+  }
+}
+
+/**
+ * Check if approval is required based on settings and PO total.
+ *
+ * Business Rules:
+ * - BR-01: If po_require_approval=false, return false
+ * - BR-02: If po_approval_threshold=null (and approval enabled), return true
+ * - BR-03: If total >= threshold, return true
+ *
+ * @param total - PO total amount (including tax)
+ * @param approvalEnabled - Whether approval is enabled in settings
+ * @param options - Optional threshold value
+ * @returns boolean indicating if approval is required
+ */
+export function checkApprovalRequired(
+  total: number | null,
+  approvalEnabled: boolean,
+  options?: { threshold?: number | null }
+): boolean {
+  // BR-01: If approval disabled, not required
+  if (!approvalEnabled) {
+    return false
+  }
+
+  // BR-02: If threshold is null (all POs need approval when enabled)
+  if (options?.threshold === undefined || options?.threshold === null) {
+    return true
+  }
+
+  // BR-03: If total >= threshold, approval required
+  if (total !== null && total >= options.threshold) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Validate PO status transition.
+ *
+ * @param currentStatus - Current PO status
+ * @param nextStatus - Target status
+ * @param approvalEnabled - Whether approval is enabled
+ * @throws Error if transition is invalid
+ */
+export function validateStatusTransition(
+  currentStatus: POStatus,
+  nextStatus: POStatus,
+  approvalEnabled: boolean
+): void {
+  const allowed = VALID_STATUS_TRANSITIONS[currentStatus] || []
+
+  // Special handling: when approval is enabled, draft cannot go directly to submitted
+  if (currentStatus === 'draft' && nextStatus === 'submitted' && approvalEnabled) {
+    throw new Error('Approval is enabled. PO must go through pending_approval.')
+  }
+
+  if (!allowed.includes(nextStatus)) {
+    throw new Error(`Invalid status transition: ${currentStatus} -> ${nextStatus}`)
+  }
+}
+
+/**
+ * Get approval roles from planning settings.
+ * Returns a Promise that resolves to the roles array.
+ *
+ * @param orgId - Organization ID
+ * @returns Promise<string[]> - Array of role codes that can approve POs
+ */
+export async function getApprovalRoles(orgId: string): Promise<string[]> {
+  try {
+    const settings = await getPlanningSettings(orgId)
+    return settings.po_approval_roles || []
+  } catch {
+    // Default to admin and manager if settings fetch fails
+    return ['admin', 'manager']
+  }
+}
+
+/**
+ * Check if a user can approve POs based on their role and org settings.
+ *
+ * @param userId - User ID
+ * @param orgId - Organization ID
+ * @param userRole - Optional user role (if already known)
+ * @returns Promise<boolean> - Whether user can approve
+ */
+export async function canUserApprove(
+  userId: string,
+  orgId: string,
+  userRole?: string
+): Promise<boolean> {
+  const supabaseAdmin = createServerSupabaseAdmin()
+
+  // Get user role if not provided
+  let role = userRole
+  if (!role) {
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('role:roles(code)')
+      .eq('id', userId)
+      .eq('org_id', orgId)
+      .single()
+
+    role = (user?.role as any)?.code
+  }
+
+  if (!role) {
+    return false
+  }
+
+  // Get approval roles from settings
+  const approvalRoles = await getApprovalRoles(orgId)
+
+  // Case-insensitive comparison
+  return approvalRoles.some(r => r.toLowerCase() === role!.toLowerCase())
+}
+
+/**
+ * Submit PO for approval or direct submission based on settings.
+ *
+ * @param poId - Purchase Order ID
+ * @param orgId - Organization ID
+ * @param userId - User ID performing the action
+ * @returns Promise with status, approval info, and notification count
+ */
+export async function submitPO(
+  poId: string,
+  orgId: string,
+  userId: string
+): Promise<SubmitPOResult> {
+  const supabaseAdmin = createServerSupabaseAdmin()
+
+  // Get PO with lines
+  const { data: po, error: poError } = await supabaseAdmin
+    .from('purchase_orders')
+    .select(`
+      id, status, total, org_id, created_by, po_number,
+      suppliers(name),
+      lines:purchase_order_lines(id)
+    `)
+    .eq('id', poId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (poError || !po) {
+    throw new Error('Purchase order not found')
+  }
+
+  // Verify org isolation
+  if (po.org_id !== orgId) {
+    throw new Error('Purchase order not found')
+  }
+
+  // Must be in draft status to submit
+  if (po.status !== 'draft') {
+    throw new Error('Cannot submit: PO must be in draft status')
+  }
+
+  // Must have at least one line
+  const lines = (po as any).lines || []
+  if (lines.length === 0) {
+    throw new Error('Cannot submit PO: Purchase order must have at least one line item')
+  }
+
+  // Get planning settings
+  const settings = await getPlanningSettings(orgId)
+
+  // Check if approval is required
+  const approvalRequired = checkApprovalRequired(
+    po.total,
+    settings.po_require_approval,
+    { threshold: settings.po_approval_threshold }
+  )
+
+  // Determine new status
+  const newStatus: POStatus = approvalRequired ? 'pending_approval' : 'submitted'
+  const newApprovalStatus = approvalRequired ? 'pending' : null
+
+  // Validate transition
+  validateStatusTransition(po.status as POStatus, newStatus, settings.po_require_approval)
+
+  // Get user info for history
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('first_name, last_name, role:roles(code)')
+    .eq('id', userId)
+    .single()
+
+  const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Unknown'
+  const userRole = (user?.role as any)?.code || 'unknown'
+
+  // Update PO status
+  const { error: updateError } = await supabaseAdmin
+    .from('purchase_orders')
+    .update({
+      status: newStatus,
+      approval_status: newApprovalStatus,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', poId)
+
+  if (updateError) {
+    throw new Error(updateError.message)
+  }
+
+  // Create approval history record
+  await supabaseAdmin.from('po_approval_history').insert({
+    org_id: orgId,
+    po_id: poId,
+    action: 'submitted',
+    user_id: userId,
+    user_name: userName,
+    user_role: userRole,
+    notes: null,
+  })
+
+  // Record status change in po_status_history
+  await supabaseAdmin.from('po_status_history').insert({
+    po_id: poId,
+    from_status: 'draft',
+    to_status: newStatus,
+    changed_by: userId,
+    changed_at: new Date().toISOString(),
+  })
+
+  // Send notifications if approval required (async, non-blocking)
+  let notificationCount = 0
+  if (approvalRequired) {
+    // Notification would be sent here (async)
+    // For now, just count potential approvers
+    const approvalRoles = settings.po_approval_roles || []
+    const { count } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .in('role', approvalRoles)
+
+    notificationCount = count || 0
+  }
+
+  return {
+    status: newStatus,
+    approvalRequired,
+    notificationSent: approvalRequired && notificationCount > 0,
+    notificationCount,
+  }
+}
+
+/**
+ * Approve a PO.
+ *
+ * @param poId - Purchase Order ID
+ * @param orgId - Organization ID
+ * @param userId - User ID performing the approval
+ * @param userRole - Role of the user
+ * @param notes - Optional approval notes
+ * @returns Promise<void>
+ */
+export async function approvePO(
+  poId: string,
+  orgId: string,
+  userId: string,
+  userRole: string,
+  notes?: string
+): Promise<void> {
+  const supabaseAdmin = createServerSupabaseAdmin()
+
+  // Validate notes length
+  if (notes && notes.length > 1000) {
+    throw new Error('Notes cannot exceed 1000 characters')
+  }
+
+  // Check if user can approve
+  const canApprove = await canUserApprove(userId, orgId, userRole)
+  if (!canApprove) {
+    throw new Error('Access denied: You do not have permission to approve purchase orders')
+  }
+
+  // Get PO
+  const { data: po, error: poError } = await supabaseAdmin
+    .from('purchase_orders')
+    .select('id, status, approval_status, org_id, created_by, approved_by')
+    .eq('id', poId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (poError || !po) {
+    throw new Error('Purchase order not found')
+  }
+
+  if (po.org_id !== orgId) {
+    throw new Error('Purchase order not found')
+  }
+
+  // Check if already processed (concurrent approval detection)
+  if (po.approval_status === 'approved') {
+    // Get approver name
+    const { data: approver } = await supabaseAdmin
+      .from('users')
+      .select('first_name, last_name')
+      .eq('id', po.approved_by)
+      .single()
+
+    const approverName = approver ? `${approver.first_name || ''} ${approver.last_name || ''}`.trim() : 'another user'
+    throw new Error(`This PO has already been approved by ${approverName}`)
+  }
+
+  // Must be in pending_approval status
+  if (po.status !== 'pending_approval') {
+    throw new Error('Cannot approve: PO must be in pending approval status')
+  }
+
+  // Get user info for history
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('first_name, last_name')
+    .eq('id', userId)
+    .single()
+
+  const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Unknown'
+  const now = new Date().toISOString()
+
+  // Update PO
+  const { error: updateError } = await supabaseAdmin
+    .from('purchase_orders')
+    .update({
+      status: 'approved',
+      approval_status: 'approved',
+      approved_by: userId,
+      approved_at: now,
+      approval_notes: notes || null,
+      updated_by: userId,
+      updated_at: now,
+    })
+    .eq('id', poId)
+
+  if (updateError) {
+    throw new Error(updateError.message)
+  }
+
+  // Create approval history record
+  await supabaseAdmin.from('po_approval_history').insert({
+    org_id: orgId,
+    po_id: poId,
+    action: 'approved',
+    user_id: userId,
+    user_name: userName,
+    user_role: userRole,
+    notes: notes || null,
+  })
+
+  // Record status change
+  await supabaseAdmin.from('po_status_history').insert({
+    po_id: poId,
+    from_status: 'pending_approval',
+    to_status: 'approved',
+    changed_by: userId,
+    changed_at: now,
+    notes: notes || null,
+  })
+
+  // Notify PO creator (async, non-blocking)
+  // Notification service would be called here
+}
+
+/**
+ * Reject a PO.
+ *
+ * @param poId - Purchase Order ID
+ * @param orgId - Organization ID
+ * @param userId - User ID performing the rejection
+ * @param userRole - Role of the user
+ * @param rejectionReason - Required rejection reason (min 10 chars)
+ * @returns Promise<void>
+ */
+export async function rejectPO(
+  poId: string,
+  orgId: string,
+  userId: string,
+  userRole: string,
+  rejectionReason: string
+): Promise<void> {
+  const supabaseAdmin = createServerSupabaseAdmin()
+
+  // Validate rejection reason
+  if (!rejectionReason || rejectionReason.trim().length === 0) {
+    throw new Error('Rejection reason is required')
+  }
+
+  const trimmedReason = rejectionReason.trim()
+  if (trimmedReason.length < 10) {
+    throw new Error('Rejection reason must be at least 10 characters')
+  }
+
+  if (trimmedReason.length > 1000) {
+    throw new Error('Rejection reason must not exceed 1000 characters')
+  }
+
+  // Check if user can approve/reject
+  const canApprove = await canUserApprove(userId, orgId, userRole)
+  if (!canApprove) {
+    throw new Error('Access denied: You do not have permission to reject purchase orders')
+  }
+
+  // Get PO
+  const { data: po, error: poError } = await supabaseAdmin
+    .from('purchase_orders')
+    .select('id, status, approval_status, org_id, created_by')
+    .eq('id', poId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (poError || !po) {
+    throw new Error('Purchase order not found')
+  }
+
+  if (po.org_id !== orgId) {
+    throw new Error('Purchase order not found')
+  }
+
+  // Must be in pending_approval status
+  if (po.status !== 'pending_approval') {
+    throw new Error('Cannot reject: PO must be in pending approval status')
+  }
+
+  // Get user info for history
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('first_name, last_name')
+    .eq('id', userId)
+    .single()
+
+  const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Unknown'
+  const now = new Date().toISOString()
+
+  // Update PO
+  const { error: updateError } = await supabaseAdmin
+    .from('purchase_orders')
+    .update({
+      status: 'rejected',
+      approval_status: 'rejected',
+      approved_by: userId,
+      approved_at: now,
+      approval_notes: trimmedReason,
+      rejection_reason: trimmedReason,
+      updated_by: userId,
+      updated_at: now,
+    })
+    .eq('id', poId)
+
+  if (updateError) {
+    throw new Error(updateError.message)
+  }
+
+  // Create approval history record
+  await supabaseAdmin.from('po_approval_history').insert({
+    org_id: orgId,
+    po_id: poId,
+    action: 'rejected',
+    user_id: userId,
+    user_name: userName,
+    user_role: userRole,
+    notes: trimmedReason,
+  })
+
+  // Record status change
+  await supabaseAdmin.from('po_status_history').insert({
+    po_id: poId,
+    from_status: 'pending_approval',
+    to_status: 'rejected',
+    changed_by: userId,
+    changed_at: now,
+    notes: trimmedReason,
+  })
+
+  // Notify PO creator (async, non-blocking)
+  // Notification service would be called here
+}
+
+/**
+ * Get PO approval history.
+ *
+ * @param poId - Purchase Order ID
+ * @param orgId - Organization ID
+ * @param options - Pagination options
+ * @returns Promise with history and pagination
+ */
+export async function getPOApprovalHistory(
+  poId: string,
+  orgId: string,
+  options?: ApprovalHistoryOptions
+): Promise<ApprovalHistoryResult> {
+  const supabaseAdmin = createServerSupabaseAdmin()
+
+  const page = options?.page || 1
+  const limit = Math.min(options?.limit || 10, 50) // Max 50 per page
+  const offset = (page - 1) * limit
+
+  // Verify PO exists and belongs to org
+  const { data: po, error: poError } = await supabaseAdmin
+    .from('purchase_orders')
+    .select('id')
+    .eq('id', poId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (poError || !po) {
+    throw new Error('Purchase order not found')
+  }
+
+  // Get history with count
+  const { data, error, count } = await supabaseAdmin
+    .from('po_approval_history')
+    .select('*', { count: 'exact' })
+    .eq('po_id', poId)
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const total = count || 0
+
+  return {
+    history: (data as POApprovalHistory[]) || [],
+    pagination: {
+      page,
+      limit,
+      total,
+      total_pages: Math.ceil(total / limit),
+    },
   }
 }

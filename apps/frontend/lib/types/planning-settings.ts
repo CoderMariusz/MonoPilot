@@ -77,6 +77,17 @@ export interface PlanningSettingsResponse {
 }
 
 /**
+ * Planning Settings Update interface
+ * Used for partial updates to planning settings (PO approval settings)
+ * Story: 03.5a - PO Approval Setup
+ */
+export interface PlanningSettingsUpdate {
+  po_require_approval?: boolean;
+  po_approval_threshold?: number | null;
+  po_approval_roles?: string[];
+}
+
+/**
  * Default values for planning settings
  */
 export const PLANNING_SETTINGS_DEFAULTS: Omit<PlanningSettings, 'id' | 'org_id' | 'created_at' | 'updated_at'> = {

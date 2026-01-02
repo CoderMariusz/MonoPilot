@@ -25,14 +25,15 @@ export type Currency = z.infer<typeof currencyEnum>
 
 /**
  * PO Status enum representing the full lifecycle.
- * Status flow: draft -> submitted -> pending_approval -> confirmed -> receiving -> closed
+ * Status flow: draft -> submitted/pending_approval -> approved/rejected -> confirmed -> receiving -> closed
  * Any status can transition to cancelled (except closed and cancelled)
+ * Story 03.5b: Added 'approved' and 'rejected' for approval workflow
  */
 export const poStatusEnum = z.enum(
-  ['draft', 'submitted', 'pending_approval', 'confirmed', 'receiving', 'closed', 'cancelled'],
+  ['draft', 'submitted', 'pending_approval', 'approved', 'rejected', 'confirmed', 'receiving', 'closed', 'cancelled'],
   {
     errorMap: () => ({
-      message: 'Status must be one of: draft, submitted, pending_approval, confirmed, receiving, closed, cancelled',
+      message: 'Status must be one of: draft, submitted, pending_approval, approved, rejected, confirmed, receiving, closed, cancelled',
     }),
   }
 )
@@ -295,3 +296,86 @@ export const cancelPOSchema = z.object({
  * TypeScript type for cancel PO input
  */
 export type CancelPOInput = z.infer<typeof cancelPOSchema>
+
+// ============================================================================
+// Approval Workflow Schemas (Story 03.5b)
+// ============================================================================
+
+/**
+ * Schema for submitting a PO for approval.
+ * No body required - action is determined by PO state and settings.
+ */
+export const submitPoSchema = z.object({
+  // No body needed - submit is an idempotent action
+}).passthrough()
+
+/**
+ * TypeScript type for submit PO input
+ */
+export type SubmitPoInput = z.infer<typeof submitPoSchema>
+
+/**
+ * Schema for approving a PO.
+ * Notes are optional but limited to 1000 characters.
+ */
+export const approvePoSchema = z.object({
+  notes: z
+    .string()
+    .max(1000, 'Notes cannot exceed 1000 characters')
+    .optional(),
+})
+
+/**
+ * TypeScript type for approve PO input
+ */
+export type ApprovePoInput = z.infer<typeof approvePoSchema>
+
+/**
+ * Schema for rejecting a PO.
+ * Rejection reason is required with minimum 10 characters.
+ */
+export const rejectPoSchema = z.object({
+  rejection_reason: z
+    .string({
+      required_error: 'Rejection reason is required',
+      invalid_type_error: 'Rejection reason must be a string',
+    })
+    .min(1, 'Rejection reason is required')
+    .transform((val) => val.trim())
+    .refine((val) => val.length >= 10, {
+      message: 'Rejection reason must be at least 10 characters',
+    })
+    .refine((val) => val.length <= 1000, {
+      message: 'Rejection reason must not exceed 1000 characters',
+    }),
+})
+
+/**
+ * TypeScript type for reject PO input
+ */
+export type RejectPoInput = z.infer<typeof rejectPoSchema>
+
+/**
+ * PO Approval action type
+ */
+export type POApprovalAction = 'submitted' | 'approved' | 'rejected'
+
+/**
+ * PO Approval status type
+ */
+export type POApprovalStatus = 'pending' | 'approved' | 'rejected' | null
+
+/**
+ * PO Approval History interface
+ */
+export interface POApprovalHistory {
+  id: string
+  org_id: string
+  po_id: string
+  action: POApprovalAction
+  user_id: string
+  user_name: string
+  user_role: string
+  notes: string | null
+  created_at: string
+}
