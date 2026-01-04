@@ -1,0 +1,270 @@
+-- Migration 089: Enhance LP Genealogy for Story 05.2
+-- Adds org_id, operation_type, is_reversed columns and creates new RPC functions
+-- CRITICAL for Epic 04 Production - Material Traceability
+
+-- ============================================================================
+-- Step 1: Alter lp_genealogy table to add new columns
+-- ============================================================================
+
+-- Add org_id column (required for RLS)
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id);
+
+-- Add operation_type column (enum: consume, output, split, merge)
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS operation_type VARCHAR(10);
+
+-- Add constraint for operation_type
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'lp_genealogy_operation_type_check'
+  ) THEN
+    ALTER TABLE lp_genealogy
+    ADD CONSTRAINT lp_genealogy_operation_type_check
+    CHECK (operation_type IN ('consume', 'output', 'split', 'merge'));
+  END IF;
+END $$;
+
+-- Add is_reversed for reversal tracking
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS is_reversed BOOLEAN DEFAULT false;
+
+-- Add reversed_at and reversed_by for audit
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMPTZ;
+
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS reversed_by UUID REFERENCES users(id);
+
+-- Add quantity column if not exists (renamed from quantity_from_parent)
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS quantity DECIMAL(15,4) DEFAULT 0;
+
+-- Add operation_date if not exists
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS operation_date TIMESTAMPTZ DEFAULT NOW();
+
+-- Add wo_id column (alias for work_order_id) if not exists
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS wo_id UUID REFERENCES work_orders(id);
+
+-- Add operation_id for WO operation reference
+ALTER TABLE lp_genealogy
+ADD COLUMN IF NOT EXISTS operation_id UUID;
+
+-- ============================================================================
+-- Step 2: Backfill org_id from license_plates if needed
+-- ============================================================================
+
+UPDATE lp_genealogy g
+SET org_id = lp.org_id
+FROM license_plates lp
+WHERE g.parent_lp_id = lp.id
+AND g.org_id IS NULL;
+
+-- Make org_id NOT NULL after backfill
+ALTER TABLE lp_genealogy
+ALTER COLUMN org_id SET NOT NULL;
+
+-- ============================================================================
+-- Step 3: Create new indexes
+-- ============================================================================
+
+CREATE INDEX IF NOT EXISTS idx_genealogy_org ON lp_genealogy(org_id);
+CREATE INDEX IF NOT EXISTS idx_genealogy_operation_type ON lp_genealogy(org_id, operation_type);
+CREATE INDEX IF NOT EXISTS idx_genealogy_date ON lp_genealogy(operation_date);
+CREATE INDEX IF NOT EXISTS idx_genealogy_wo ON lp_genealogy(wo_id) WHERE wo_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_genealogy_reversed ON lp_genealogy(is_reversed) WHERE is_reversed = false;
+
+-- ============================================================================
+-- Step 4: Update RLS Policies
+-- ============================================================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view genealogy in their org" ON lp_genealogy;
+DROP POLICY IF EXISTS "Technical/Admin/QC can create genealogy" ON lp_genealogy;
+DROP POLICY IF EXISTS "Genealogy org isolation read" ON lp_genealogy;
+DROP POLICY IF EXISTS "Genealogy org isolation write" ON lp_genealogy;
+
+-- Create new RLS policies using org_id directly
+CREATE POLICY "Genealogy org isolation read" ON lp_genealogy
+  FOR SELECT
+  USING (org_id = (auth.jwt() ->> 'org_id')::uuid);
+
+CREATE POLICY "Genealogy org isolation write" ON lp_genealogy
+  FOR INSERT
+  WITH CHECK (
+    org_id = (auth.jwt() ->> 'org_id')::uuid
+    AND (auth.jwt() ->> 'role') IN ('technical', 'admin', 'qc_manager', 'warehouse', 'production')
+  );
+
+CREATE POLICY "Genealogy org isolation update" ON lp_genealogy
+  FOR UPDATE
+  USING (org_id = (auth.jwt() ->> 'org_id')::uuid)
+  WITH CHECK (
+    org_id = (auth.jwt() ->> 'org_id')::uuid
+    AND (auth.jwt() ->> 'role') IN ('technical', 'admin', 'qc_manager', 'warehouse', 'production')
+  );
+
+-- ============================================================================
+-- Step 5: Create RPC Functions for Recursive CTE Queries
+-- ============================================================================
+
+-- Forward Trace Function (with org_id filter and is_reversed handling)
+CREATE OR REPLACE FUNCTION get_lp_forward_trace(
+  p_lp_id UUID,
+  p_org_id UUID,
+  p_max_depth INT DEFAULT 10,
+  p_include_reversed BOOLEAN DEFAULT false
+)
+RETURNS TABLE (
+  lp_id UUID,
+  lp_number VARCHAR,
+  product_name VARCHAR,
+  operation_type VARCHAR,
+  quantity NUMERIC,
+  operation_date TIMESTAMPTZ,
+  depth INT
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH RECURSIVE forward_trace AS (
+    -- Base case: direct children
+    SELECT
+      g.child_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      1 AS depth,
+      ARRAY[g.parent_lp_id] AS path
+    FROM lp_genealogy g
+    JOIN license_plates lp ON g.child_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.parent_lp_id = p_lp_id
+      AND g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+
+    UNION ALL
+
+    -- Recursive case: children of children
+    SELECT
+      g.child_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      ft.depth + 1 AS depth,
+      ft.path || g.parent_lp_id
+    FROM lp_genealogy g
+    JOIN forward_trace ft ON g.parent_lp_id = ft.lp_id
+    JOIN license_plates lp ON g.child_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+      AND ft.depth < p_max_depth
+      AND NOT (g.child_lp_id = ANY(ft.path))  -- Cycle detection
+  )
+  SELECT DISTINCT ON (forward_trace.lp_id)
+    forward_trace.lp_id,
+    forward_trace.lp_number,
+    forward_trace.product_name,
+    forward_trace.operation_type,
+    forward_trace.quantity,
+    forward_trace.operation_date,
+    forward_trace.depth
+  FROM forward_trace
+  ORDER BY forward_trace.lp_id, forward_trace.depth;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Backward Trace Function (with org_id filter and is_reversed handling)
+CREATE OR REPLACE FUNCTION get_lp_backward_trace(
+  p_lp_id UUID,
+  p_org_id UUID,
+  p_max_depth INT DEFAULT 10,
+  p_include_reversed BOOLEAN DEFAULT false
+)
+RETURNS TABLE (
+  lp_id UUID,
+  lp_number VARCHAR,
+  product_name VARCHAR,
+  operation_type VARCHAR,
+  quantity NUMERIC,
+  operation_date TIMESTAMPTZ,
+  depth INT
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH RECURSIVE backward_trace AS (
+    -- Base case: direct parents
+    SELECT
+      g.parent_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      1 AS depth,
+      ARRAY[g.child_lp_id] AS path
+    FROM lp_genealogy g
+    JOIN license_plates lp ON g.parent_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.child_lp_id = p_lp_id
+      AND g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+
+    UNION ALL
+
+    -- Recursive case: parents of parents
+    SELECT
+      g.parent_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      bt.depth + 1 AS depth,
+      bt.path || g.child_lp_id
+    FROM lp_genealogy g
+    JOIN backward_trace bt ON g.child_lp_id = bt.lp_id
+    JOIN license_plates lp ON g.parent_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+      AND bt.depth < p_max_depth
+      AND NOT (g.parent_lp_id = ANY(bt.path))  -- Cycle detection
+  )
+  SELECT DISTINCT ON (backward_trace.lp_id)
+    backward_trace.lp_id,
+    backward_trace.lp_number,
+    backward_trace.product_name,
+    backward_trace.operation_type,
+    backward_trace.quantity,
+    backward_trace.operation_date,
+    backward_trace.depth
+  FROM backward_trace
+  ORDER BY backward_trace.lp_id, backward_trace.depth;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION get_lp_forward_trace TO authenticated;
+GRANT EXECUTE ON FUNCTION get_lp_backward_trace TO authenticated;
+
+-- ============================================================================
+-- Comments
+-- ============================================================================
+
+COMMENT ON COLUMN lp_genealogy.org_id IS 'Organization ID for RLS isolation';
+COMMENT ON COLUMN lp_genealogy.operation_type IS 'Type of genealogy operation: consume, output, split, merge';
+COMMENT ON COLUMN lp_genealogy.is_reversed IS 'True if this link was reversed (for corrections)';
+COMMENT ON COLUMN lp_genealogy.reversed_at IS 'Timestamp when link was reversed';
+COMMENT ON COLUMN lp_genealogy.reversed_by IS 'User who reversed the link';
+COMMENT ON COLUMN lp_genealogy.wo_id IS 'Work Order reference for production genealogy';
+COMMENT ON COLUMN lp_genealogy.operation_id IS 'WO Operation reference if applicable';
+COMMENT ON FUNCTION get_lp_forward_trace IS 'Recursive forward trace to find all LP descendants (Story 05.2)';
+COMMENT ON FUNCTION get_lp_backward_trace IS 'Recursive backward trace to find all LP ancestors (Story 05.2)';

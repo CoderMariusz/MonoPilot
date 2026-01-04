@@ -14,7 +14,7 @@
  * - open_orders: COUNT(purchase_orders WHERE status NOT IN ('closed', 'cancelled'))
  */
 
-import { createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import type {
   KPIData,
   Alert,
@@ -70,7 +70,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     return cached
   }
 
-  const supabase = createServerSupabaseAdmin()
+  const supabase = await createServerSupabase()
   const today = new Date().toISOString().split('T')[0]
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
     .toISOString()
@@ -175,7 +175,7 @@ export async function getAlerts(orgId: string, limit: number = 10): Promise<Aler
     }
   }
 
-  const supabase = createServerSupabaseAdmin()
+  const supabase = await createServerSupabase()
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
   const twoDaysAgo = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString()
@@ -298,7 +298,7 @@ export async function getRecentActivity(orgId: string, limit: number = 20): Prom
     }
   }
 
-  const supabase = createServerSupabaseAdmin()
+  const supabase = await createServerSupabase()
   const activities: Activity[] = []
 
   try {

@@ -44,15 +44,34 @@ if (typeof global.ResizeObserver === 'undefined') {
   }
 }
 
-// Mock global fetch to handle relative URLs in test environment
-// This resolves "Failed to parse URL" errors when using fetch('/api/...')
+// Store original fetch for integration tests
 const originalFetch = global.fetch
+
+// Mock global fetch for test environment
+// Only mock specific test scenarios, not Supabase requests
 global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-  // Convert relative URLs to absolute URLs for testing
-  if (typeof input === 'string' && input.startsWith('/')) {
-    input = `http://localhost:3000${input}`
+  const url = typeof input === 'string' ? input : input.toString()
+
+  // Let Supabase requests through (for integration tests)
+  if (url.includes('supabase.co') || url.includes('localhost:54321')) {
+    return originalFetch(input, init)
   }
-  return originalFetch(input, init)
+
+  // Mock successful responses for warehouse APIs (unit tests only)
+  if (url.includes('/api/warehouse/license-plates/') && init?.method === 'PUT') {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: {} }),
+    } as Response
+  }
+
+  // Default successful response for non-Supabase requests
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({}),
+  } as Response
 }
 
 // Cleanup after each test

@@ -34,7 +34,7 @@ import {
 
 // Mock Supabase
 vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseAdmin: () => ({
+  createServerSupabase: async () => ({
     from: () => ({
       select: () => ({
         eq: () => ({

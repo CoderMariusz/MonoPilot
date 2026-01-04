@@ -1,0 +1,30 @@
+Execute Epic 01-Settings pilot using HYBRID approach (Claude + GLM-4.7).
+
+Stories: 01.2 (User Roles), 01.3 (Permissions), 01.4 (Org Profile)
+
+Hybrid workflow (per story):
+- P1: Claude UX Design
+- P2: GLM-4.7 Tests (via glm_call_updated.py)
+- P3 iter1: GLM-4.7 Implementation
+- P5 iter1: Claude Code Review (expect 5-7 bugs)
+- P3 iter2: GLM-4.7 Bug Fixes
+- P5 iter2: Claude Re-review → APPROVED
+- P6: Claude QA Testing
+- P7: GLM-4.5-Air Documentation
+
+Quality monitoring after each story:
+python .experiments/claude-glm-test/scripts/monitor_quality.py --story {ID} --scenario b
+
+Track tokens in .claude/checkpoints/{story}.yaml
+
+GLM script: .experiments/claude-glm-test/scripts/glm_call_updated.py
+
+Reference guide: .experiments/claude-glm-test/HYBRID-ORCHESTRATOR-PROMPT.md
+
+Cost target: ~$0.60 total (3 stories × $0.20)
+vs Claude-only baseline: ~$1.32
+Expected savings: ~$0.72 (54%)
+
+Quality target: 10/10 ACs, >95% tests, 0 vulnerabilities
+
+START with Story 01.2. EXECUTE full 7-phase workflow.

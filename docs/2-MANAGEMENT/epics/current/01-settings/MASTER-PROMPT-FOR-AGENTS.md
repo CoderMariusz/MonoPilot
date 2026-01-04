@@ -2,8 +2,8 @@
 
 ## 🎯 TARGET
 ```yaml
-Stories: {{STORY_IDS}}  # e.g., 03.4, 03.5a, 03.7
-Epic: {{EPIC_ID}}       # e.g., 03-planning
+Stories: {{STORY_IDS}}  05.11 05.14
+Epic: {{EPIC_ID}}        05-warehouse
 ```
 
 ## 📋 7-PHASE FLOW

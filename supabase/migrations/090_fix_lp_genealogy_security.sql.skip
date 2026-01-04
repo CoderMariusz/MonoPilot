@@ -1,0 +1,196 @@
+-- =============================================================================
+-- Migration 090: Fix LP Genealogy Security (Story 05.2 P3-rework)
+-- Purpose: Enable RLS and add org_id validation to SECURITY DEFINER functions
+-- CRITICAL: Security fix for code review issues
+-- =============================================================================
+
+-- =============================================================================
+-- Step 1: Enable Row Level Security on lp_genealogy table
+-- ISSUE: RLS policies were created but RLS was never enabled
+-- =============================================================================
+
+ALTER TABLE lp_genealogy ENABLE ROW LEVEL SECURITY;
+
+-- =============================================================================
+-- Step 2: Recreate Forward Trace Function with org_id validation
+-- ISSUE: SECURITY DEFINER functions need internal org_id validation
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION get_lp_forward_trace(
+  p_lp_id UUID,
+  p_org_id UUID,
+  p_max_depth INT DEFAULT 10,
+  p_include_reversed BOOLEAN DEFAULT false
+)
+RETURNS TABLE (
+  lp_id UUID,
+  lp_number VARCHAR,
+  product_name VARCHAR,
+  operation_type VARCHAR,
+  quantity NUMERIC,
+  operation_date TIMESTAMPTZ,
+  depth INT
+) AS $$
+DECLARE
+  v_caller_org_id UUID;
+BEGIN
+  -- SECURITY: Validate org_id matches caller's organization
+  -- Get org_id from current user's JWT
+  v_caller_org_id := (auth.jwt() ->> 'org_id')::uuid;
+
+  -- Reject if p_org_id doesn't match caller's org_id
+  IF p_org_id != v_caller_org_id THEN
+    RAISE EXCEPTION 'Access denied: org_id mismatch';
+  END IF;
+
+  RETURN QUERY
+  WITH RECURSIVE forward_trace AS (
+    -- Base case: direct children
+    SELECT
+      g.child_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      1 AS depth,
+      ARRAY[g.parent_lp_id] AS path
+    FROM lp_genealogy g
+    JOIN license_plates lp ON g.child_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.parent_lp_id = p_lp_id
+      AND g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+
+    UNION ALL
+
+    -- Recursive case: children of children
+    SELECT
+      g.child_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      ft.depth + 1 AS depth,
+      ft.path || g.parent_lp_id
+    FROM lp_genealogy g
+    JOIN forward_trace ft ON g.parent_lp_id = ft.lp_id
+    JOIN license_plates lp ON g.child_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+      AND ft.depth < p_max_depth
+      AND NOT (g.child_lp_id = ANY(ft.path))  -- Cycle detection
+  )
+  SELECT DISTINCT ON (forward_trace.lp_id)
+    forward_trace.lp_id,
+    forward_trace.lp_number,
+    forward_trace.product_name,
+    forward_trace.operation_type,
+    forward_trace.quantity,
+    forward_trace.operation_date,
+    forward_trace.depth
+  FROM forward_trace
+  ORDER BY forward_trace.lp_id, forward_trace.depth;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================================================
+-- Step 3: Recreate Backward Trace Function with org_id validation
+-- ISSUE: SECURITY DEFINER functions need internal org_id validation
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION get_lp_backward_trace(
+  p_lp_id UUID,
+  p_org_id UUID,
+  p_max_depth INT DEFAULT 10,
+  p_include_reversed BOOLEAN DEFAULT false
+)
+RETURNS TABLE (
+  lp_id UUID,
+  lp_number VARCHAR,
+  product_name VARCHAR,
+  operation_type VARCHAR,
+  quantity NUMERIC,
+  operation_date TIMESTAMPTZ,
+  depth INT
+) AS $$
+DECLARE
+  v_caller_org_id UUID;
+BEGIN
+  -- SECURITY: Validate org_id matches caller's organization
+  -- Get org_id from current user's JWT
+  v_caller_org_id := (auth.jwt() ->> 'org_id')::uuid;
+
+  -- Reject if p_org_id doesn't match caller's org_id
+  IF p_org_id != v_caller_org_id THEN
+    RAISE EXCEPTION 'Access denied: org_id mismatch';
+  END IF;
+
+  RETURN QUERY
+  WITH RECURSIVE backward_trace AS (
+    -- Base case: direct parents
+    SELECT
+      g.parent_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      1 AS depth,
+      ARRAY[g.child_lp_id] AS path
+    FROM lp_genealogy g
+    JOIN license_plates lp ON g.parent_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.child_lp_id = p_lp_id
+      AND g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+
+    UNION ALL
+
+    -- Recursive case: parents of parents
+    SELECT
+      g.parent_lp_id AS lp_id,
+      lp.lp_number::VARCHAR,
+      p.name::VARCHAR AS product_name,
+      g.operation_type::VARCHAR,
+      g.quantity,
+      g.operation_date,
+      bt.depth + 1 AS depth,
+      bt.path || g.child_lp_id
+    FROM lp_genealogy g
+    JOIN backward_trace bt ON g.child_lp_id = bt.lp_id
+    JOIN license_plates lp ON g.parent_lp_id = lp.id
+    JOIN products p ON lp.product_id = p.id
+    WHERE g.org_id = p_org_id
+      AND (p_include_reversed OR g.is_reversed = false)
+      AND bt.depth < p_max_depth
+      AND NOT (g.parent_lp_id = ANY(bt.path))  -- Cycle detection
+  )
+  SELECT DISTINCT ON (backward_trace.lp_id)
+    backward_trace.lp_id,
+    backward_trace.lp_number,
+    backward_trace.product_name,
+    backward_trace.operation_type,
+    backward_trace.quantity,
+    backward_trace.operation_date,
+    backward_trace.depth
+  FROM backward_trace
+  ORDER BY backward_trace.lp_id, backward_trace.depth;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================================================
+-- Step 4: Grant execute permissions
+-- =============================================================================
+
+GRANT EXECUTE ON FUNCTION get_lp_forward_trace TO authenticated;
+GRANT EXECUTE ON FUNCTION get_lp_backward_trace TO authenticated;
+
+-- =============================================================================
+-- Comments
+-- =============================================================================
+
+COMMENT ON FUNCTION get_lp_forward_trace IS 'Recursive forward trace with org_id validation (Story 05.2 Security Fix)';
+COMMENT ON FUNCTION get_lp_backward_trace IS 'Recursive backward trace with org_id validation (Story 05.2 Security Fix)';

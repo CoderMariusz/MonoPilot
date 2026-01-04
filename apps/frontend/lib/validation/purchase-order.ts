@@ -333,6 +333,7 @@ export type ApprovePoInput = z.infer<typeof approvePoSchema>
 /**
  * Schema for rejecting a PO.
  * Rejection reason is required with minimum 10 characters.
+ * XSS sanitization: Escapes HTML special characters to prevent injection attacks.
  */
 export const rejectPoSchema = z.object({
   rejection_reason: z
@@ -342,6 +343,16 @@ export const rejectPoSchema = z.object({
     })
     .min(1, 'Rejection reason is required')
     .transform((val) => val.trim())
+    .transform((val) => {
+      // XSS sanitization: Escape HTML special characters
+      return val
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/\//g, '&#x2F;')
+    })
     .refine((val) => val.length >= 10, {
       message: 'Rejection reason must be at least 10 characters',
     })

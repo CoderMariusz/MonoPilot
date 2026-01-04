@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { POApprovalModal } from '../POApprovalModal';
 import { usePOApproval } from '@/lib/hooks/use-po-approval';
+import { usePlanningSettings } from '@/lib/hooks/use-planning-settings';
 
 // Mock hooks
 vi.mock('@/lib/hooks/use-po-approval');
+vi.mock('@/lib/hooks/use-planning-settings');
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
@@ -64,9 +66,18 @@ describe('POApprovalModal Component', () => {
     isRejecting: false,
   };
 
+  const mockUsePlanningSettings = {
+    data: {
+      po_approval_threshold: 1000,
+    },
+    isLoading: false,
+    error: null,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(usePOApproval).mockReturnValue(mockUsePOApproval as any);
+    vi.mocked(usePlanningSettings).mockReturnValue(mockUsePlanningSettings as any);
   });
 
   describe('Rendering - Approve Mode', () => {

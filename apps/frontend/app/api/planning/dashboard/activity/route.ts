@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get user's org_id
+    // Get user's org_id from session
     const { data: userData, error: orgError } = await supabase
       .from('users')
       .select('org_id')
@@ -55,15 +55,20 @@ export async function GET(request: NextRequest) {
 
     const orgId = userData.org_id
 
-    // Parse query parameters
+    // Parse and validate query parameters (limit only)
     const searchParams = request.nextUrl.searchParams
     const limitParam = searchParams.get('limit')
-    const queryOrgId = searchParams.get('org_id')
 
-    // Build query object for validation
-    const queryObj: Record<string, unknown> = { org_id: queryOrgId || orgId }
+    const queryObj: Record<string, unknown> = {}
     if (limitParam) {
-      queryObj.limit = parseInt(limitParam, 10)
+      const parsedLimit = parseInt(limitParam, 10)
+      if (isNaN(parsedLimit)) {
+        return NextResponse.json(
+          { error: 'Invalid query parameters: limit must be a number' },
+          { status: 400 }
+        )
+      }
+      queryObj.limit = parsedLimit
     }
 
     // Validate query parameters
@@ -73,14 +78,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: `Invalid query parameters: ${errors}` },
         { status: 400 }
-      )
-    }
-
-    // Ensure user can only access their own org's data (RLS)
-    if (queryOrgId && queryOrgId !== orgId) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
       )
     }
 
@@ -106,4 +103,44 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * POST method not allowed
+ */
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
+}
+
+/**
+ * PUT method not allowed
+ */
+export async function PUT() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
+}
+
+/**
+ * DELETE method not allowed
+ */
+export async function DELETE() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
+}
+
+/**
+ * PATCH method not allowed
+ */
+export async function PATCH() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
 }

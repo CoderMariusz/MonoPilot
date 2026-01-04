@@ -64,7 +64,7 @@ async function rejectPO(input: RejectPoInput): Promise<PORejectResponse> {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ reason: input.rejectionReason }),
+    body: JSON.stringify({ rejection_reason: input.rejectionReason }),
   });
 
   if (!response.ok) {

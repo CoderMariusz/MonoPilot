@@ -224,6 +224,36 @@ describe('Purchase Order Approval Validation Schemas', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should sanitize XSS attempts in rejection reason', () => {
+      // Test case: Security - XSS prevention
+      const result = rejectPoSchema.safeParse({
+        rejection_reason: 'Budget exceeded <script>alert("XSS")</script> please reduce',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Verify HTML is escaped
+        expect(result.data.rejection_reason).not.toContain('<script>');
+        expect(result.data.rejection_reason).toContain('&lt;script&gt;');
+        expect(result.data.rejection_reason).toContain('&lt;&#x2F;script&gt;');
+      }
+    });
+
+    it('should sanitize HTML entities in rejection reason', () => {
+      // Test case: Security - HTML injection prevention
+      const result = rejectPoSchema.safeParse({
+        rejection_reason: 'Rejected: <b>Bold text</b> & "quotes" \' apostrophe',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Verify all HTML special characters are escaped
+        expect(result.data.rejection_reason).not.toContain('<b>');
+        expect(result.data.rejection_reason).toContain('&lt;b&gt;');
+        expect(result.data.rejection_reason).toContain('&amp;');
+        expect(result.data.rejection_reason).toContain('&quot;');
+        expect(result.data.rejection_reason).toContain('&#x27;');
+      }
+    });
+
     it('should have proper error message for missing reason', () => {
       // Test case: Error message quality
       const result = rejectPoSchema.safeParse({});

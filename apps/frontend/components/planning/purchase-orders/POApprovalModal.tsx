@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { usePOApproval } from '@/lib/hooks/use-po-approval';
+import { usePlanningSettings } from '@/lib/hooks/use-planning-settings';
 import type { PurchaseOrderWithLines, Currency } from '@/lib/types/purchase-order';
 
 // ============================================================================
@@ -298,6 +299,7 @@ export function POApprovalModal({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { approvePO, rejectPO, isApproving, isRejecting } = usePOApproval();
+  const { data: settings, isLoading: isLoadingSettings } = usePlanningSettings();
 
   const isApproveMode = mode === 'approve';
   const isSubmitting = isApproving || isRejecting;
@@ -407,11 +409,15 @@ export function POApprovalModal({
         <POTotalsSummary po={po} />
 
         {/* Threshold Indicator */}
-        <ThresholdIndicator
-          total={po.total}
-          threshold={1000} // TODO: Get from settings
-          currency={po.currency}
-        />
+        {isLoadingSettings ? (
+          <Skeleton className="h-12 w-full" />
+        ) : (
+          <ThresholdIndicator
+            total={po.total}
+            threshold={settings?.po_approval_threshold ?? null}
+            currency={po.currency}
+          />
+        )}
 
         {/* Error Display */}
         {error && (

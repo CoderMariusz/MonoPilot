@@ -21,6 +21,7 @@
     "prepare": "husky install || true",
     "pre-push": "pnpm lint",
     "seed:admin": "node scripts/seed-first-admin.mjs",
+    "seed:e2e": "npx ts-node scripts/seed-e2e-test-data.ts",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "cd apps/frontend && pnpm test",
     "test:e2e": "playwright test",
@@ -41,10 +42,13 @@
     "@faker-js/faker": "^9.3.0",
     "@playwright/test": "^1.49.0",
     "@supabase/supabase-js": "^2.84.0",
+    "@types/node": "^22",
     "dotenv": "^17.2.3",
     "husky": "^8.0.3",
     "lint-staged": "^16.2.7",
     "supabase": "^2.58.5",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3"
   },
   "dependencies": {

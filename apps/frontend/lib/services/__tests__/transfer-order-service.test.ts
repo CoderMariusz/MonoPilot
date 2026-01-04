@@ -63,8 +63,60 @@ const mockQuery = {
 }
 
 // Mock the Supabase client
+/**
+ * Mock Supabase - Create chainable mock that mimics Supabase query builder
+ */
+const createChainableMock = (): any => {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    not: vi.fn(() => chain),
+    in: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    lte: vi.fn(() => chain),
+    gt: vi.fn(() => chain),
+    lt: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    limit: vi.fn(() => chain),
+    insert: vi.fn(() => chain),
+    update: vi.fn(() => chain),
+    single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    then: vi.fn((resolve) => resolve({ data: null, error: null })),
+  }
+  return chain
+}
+
+/**
+ * Mock Supabase - Create chainable mock that mimics Supabase query builder
+ */
+const createChainableMock = (): any => {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    not: vi.fn(() => chain),
+    in: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    lte: vi.fn(() => chain),
+    gt: vi.fn(() => chain),
+    lt: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    limit: vi.fn(() => chain),
+    insert: vi.fn(() => chain),
+    update: vi.fn(() => chain),
+    single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    then: vi.fn((resolve) => resolve({ data: null, error: null })),
+  }
+  return chain
+}
+
+const mockSupabaseClient = {
+  from: vi.fn(() => createChainableMock()),
+  rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
+}
+
 vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => mockSupabaseClient,
+  createBrowserClient: vi.fn(() => mockSupabaseClient),
+  createClient: vi.fn(() => mockSupabaseClient),
 }))
 
 /**

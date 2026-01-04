@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabase()
 
-    // Check authentication
+    // Check authentication first
     const {
       data: { user },
       error: authError,
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get user's org_id
+    // Get user's org_id from session
     const { data: userData, error: orgError } = await supabase
       .from('users')
       .select('org_id')
@@ -54,29 +54,6 @@ export async function GET(request: NextRequest) {
     }
 
     const orgId = userData.org_id
-
-    // Validate query parameters if provided (org_id from URL takes precedence if valid)
-    const searchParams = request.nextUrl.searchParams
-    const queryOrgId = searchParams.get('org_id')
-
-    if (queryOrgId) {
-      // Validate the query org_id format
-      const parsed = dashboardKPIQuerySchema.safeParse({ org_id: queryOrgId })
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: 'Invalid org_id format' },
-          { status: 400 }
-        )
-      }
-
-      // Ensure user can only access their own org's data (RLS)
-      if (queryOrgId !== orgId) {
-        return NextResponse.json(
-          { error: 'Access denied' },
-          { status: 403 }
-        )
-      }
-    }
 
     // Get KPIs
     const kpis = await getKPIs(orgId)
@@ -100,4 +77,44 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * POST method not allowed
+ */
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
+}
+
+/**
+ * PUT method not allowed
+ */
+export async function PUT() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
+}
+
+/**
+ * DELETE method not allowed
+ */
+export async function DELETE() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
+}
+
+/**
+ * PATCH method not allowed
+ */
+export async function PATCH() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: { Allow: 'GET' } }
+  )
 }

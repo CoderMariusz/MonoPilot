@@ -10,7 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env.test') });
  * See https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './e2e',
 
   /* Run tests sequentially to avoid Supabase Auth rate limiting */
   fullyParallel: false,
@@ -41,8 +41,8 @@ export default defineConfig({
 
   /* Shared settings for all projects */
   use: {
-    /* Base URL from environment or default to localhost:5000 */
-    baseURL: process.env.BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5000',
+    /* Base URL from environment or default to localhost:3000 (Next.js default port) */
+    baseURL: process.env.BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 
     /* Collect trace on first retry */
     trace: 'retain-on-failure',
@@ -79,7 +79,7 @@ export default defineConfig({
   /* Run local dev server before starting tests */
   webServer: {
     command: 'cd apps/frontend && pnpm dev',
-    url: 'http://localhost:5000',
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 180 * 1000,
     stdout: 'pipe',

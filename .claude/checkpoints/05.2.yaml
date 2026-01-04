@@ -1,0 +1,18 @@
+# Story 05.2: LP Genealogy Tracking - Checkpoints
+
+story_id: "05.2"
+story_name: "LP Genealogy Tracking"
+epic: "05-warehouse"
+phase: "Phase 0 - CRITICAL"
+started_at: "2026-01-02T00:00:00Z"
+
+checkpoints:
+  - "P1: ✓ ux-designer 00:01 wireframes:1 approved:pending"
+P2: ✓ test-writer 20:52 files:3 tests:136 status:red
+P3: ✓ frontend-dev 20:59 files:8 tests:28/43 status:partial
+P3: backend-dev 21:07 files:12 tests:56/56
+P3: ✓ backend-dev 21:53 files:12 tests:138/138 issues:4-fixed
+P6: ✗ qa-agent 12:00 ac:13/25 bugs:1-critical,2-high decision:fail
+P3-bugfix: ✓ backend-dev 12:23 files:5 tests:138/138 bugs:3-fixed
+P6: ✓ qa-agent 12:28 ac:25/25 bugs:0 decision:pass
+P7: ✓ tech-writer 12:41 docs:3 report:done
