@@ -89,12 +89,12 @@
 
 | Phase | Agent | Model | Use Case |
 |-------|-------|-------|----------|
-| **P1: UX Design** | Claude | Sonnet 4.5 | Wireframes, user flows |
+| **P1: UX Design** | Claude | OPUS 4.5 | Wireframes, user flows |
 | **P2: Test Writing** | GLM | GLM-4.7 + Thinking | Unit/integration tests |
 | **P3: Implementation** | GLM | GLM-4.7 + Thinking | Service/API/components |
 | **P4: Refactor** | GLM | GLM-4.5-Air | Code cleanup (skip if clean) |
-| **P5: Code Review** | Claude | Sonnet 4.5 | **CRITICAL QUALITY GATE** |
-| **P6: QA Testing** | Claude | Sonnet 4.5 | Acceptance validation |
+| **P5: Code Review** | Claude | OPUS 4.5 | **CRITICAL QUALITY GATE** |
+| **P6: QA Testing** | Claude | OPUS 4.5 | Acceptance validation |
 | **P7: Documentation** | GLM | GLM-4.5-Air | API docs, user guides |
 
 **Critical**: **P5 (Claude Code Review) is MANDATORY** - this is the quality gate that ensures GLM code is production-ready.

@@ -32,14 +32,21 @@ export function SettingsLayout({
   description,
 }: SettingsLayoutProps) {
   return (
-    <div className="space-y-6">
-      {(title || description) && (
-        <div>
-          {title && <h1 className="text-2xl font-bold">{title}</h1>}
-          {description && (
-            <p className="text-muted-foreground">{description}</p>
-          )}
-        </div>
+    <div className="flex flex-col space-y-6 p-6">
+      {title && (
+        <>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">
+              {title}
+            </h1>
+            {description && (
+              <p className="text-sm text-muted-foreground max-w-prose">
+                {description}
+              </p>
+            )}
+          </div>
+          <div className="border-b mb-4" />
+        </>
       )}
       <div>{children}</div>
     </div>

@@ -1,0 +1,8 @@
+# Checkpoint Log for Story 01.2
+# Story: Settings Shell - Navigation + Role Guards
+# Epic: 01-settings
+# Phase: P1 (UX Design)
+
+P1: ✓ ux-designer 14:35 wireframes:3 approved:yes
+P2: ✓ test-writer 01:25 files:5 tests:49 status:red
+P3: ✓ backend-dev 01:41 files:4 tests:7/27

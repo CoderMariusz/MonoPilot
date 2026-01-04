@@ -3,6 +3,7 @@ import { expect, afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import { config } from 'dotenv'
 import path from 'path'
+import { statsCache } from './lib/services/settings-dashboard-service'
 
 // Load .env.local from apps/frontend for integration tests
 config({ path: path.resolve(__dirname, '.env.local') })
@@ -77,4 +78,9 @@ global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 // Cleanup after each test
 afterEach(() => {
   cleanup()
+
+  // Clear Settings Dashboard Service cache
+  if (statsCache && statsCache.clear) {
+    statsCache.clear()
+  }
 })
