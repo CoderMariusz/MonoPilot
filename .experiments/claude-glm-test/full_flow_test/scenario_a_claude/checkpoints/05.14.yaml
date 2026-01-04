@@ -1,0 +1,49 @@
+# Checkpoint File: Story 05.14 - Scenario A (Claude Full Flow)
+
+story_id: "05.14"
+scenario: "scenario_a_claude"
+current_phase: "P3"
+status: "in_progress"
+
+phases:
+  - phase: "P1"
+    agent: "ux-designer"
+    status: "completed"
+    timestamp: "2026-01-03T17:15:00Z"
+    tokens:
+      input: 850
+      output: 720
+    deliverables:
+      - "P1_ux_design.md"
+    notes: "Print label modal wireframe + user flow complete"
+
+  - phase: "P2"
+    agent: "test-writer"
+    status: "completed"
+    timestamp: "2026-01-03T17:20:00Z"
+    tokens:
+      input: 1200
+      output: 2150
+    deliverables:
+      - "P2_tests_red.test.ts"
+    tests:
+      total: 25
+      passing: 0
+      failing: 25
+    notes: "RED phase - all tests failing as expected"
+
+  - phase: "P3"
+    agent: "backend-dev"
+    model: "claude"
+    status: "completed"
+    timestamp: "2026-01-03T17:25:00Z"
+    tokens:
+      input: 2150
+      output: 1780
+    deliverables:
+      - "P3_label-print-service.ts"
+    tests:
+      total: 25
+      passing: 25
+      failing: 0
+    notes: "GREEN phase complete - all tests passing. Clean implementation with ZPL generation"

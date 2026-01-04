@@ -1,0 +1,1 @@
+static generateZPL(lp: LicensePlate, options: PrintLabelOptions): string

@@ -1,0 +1,30 @@
+# API Keys - NIGDY nie commituj!
+config.json
+
+# Wyniki testów (mogą być commitowane opcjonalnie)
+test_scenarios/*/output_*.ts
+test_scenarios/*/glm_output_*.ts
+test_scenarios/*/*.md
+!test_scenarios/*/input_story.md
+test_scenarios/*/context_files/*
+!test_scenarios/*/context_files/README.md
+
+# GLM response metadata
+glm_response.json
+*.response.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

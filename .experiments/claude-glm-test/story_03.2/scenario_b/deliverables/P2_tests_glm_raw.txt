@@ -1,0 +1,457 @@
+Of course! Here is a comprehensive set of Vitest tests for a "supplier-product assignment" feature. This example assumes a typical Node.js/TypeScript backend application using a framework like Express or NestJS, with a service layer, validation logic, and a REST API.
+
+### Project Structure Setup
+
+First, let's imagine a plausible file structure for our application:
+
+```
+/src
+  /modules
+    /suppliers-products
+      /dto
+        create-supplier-product.dto.ts
+        update-supplier-product.dto.ts
+      /entities
+        supplier-product.entity.ts
+      /suppliers-products.service.ts
+      /suppliers-products.controller.ts
+      /suppliers-products.module.ts
+      /suppliers-products.validation.ts
+  /database
+    providers.module.ts
+  /app.module.ts
+```
+
+For testing, we'll use a `tests` directory at the root:
+
+```
+/tests
+  /unit
+    /suppliers-products
+      suppliers-products.service.test.ts
+      suppliers-products.validation.test.ts
+  /integration
+    /api
+      suppliers-products.api.test.ts
+```
+
+---
+
+### 1. Test Configuration (`vitest.config.ts`)
+
+We'll use `@vitest/coverage-v8` for code coverage. Ensure you have these packages installed:
+
+```bash
+npm install -D vitest @vitest/coverage-v8 jsdom @sinonjs/fake-timers
+```
+
+Create a `vitest.config.ts` file:
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./tests/setup.ts'],
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+});
+```
+
+Create `tests/setup.ts` for global test setup:
+
+```typescript
+// tests/setup.ts
+import { vi, beforeAll, afterAll } from 'vitest';
+import sinon from 'sinon';
+
+// Mock console.log in tests to keep output clean
+const originalConsoleLog = console.log;
+beforeAll(() => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+});
+
+afterAll(() => {
+  console.log.mockRestore();
+});
+```
+
+---
+
+### 2. Mock Dependencies
+
+To make our tests isolated and fast, we'll mock the database provider and other dependencies.
+
+```typescript
+// tests/unit/mocks/database-mock.ts
+import { SupplierProduct } from '@/modules/suppliers-products/entities/supplier-product.entity';
+
+// A simple in-memory "database" for our mock
+const mockDatabase: Record<string, SupplierProduct[]> = {
+  'supplier-product': [],
+};
+
+export const DatabaseProviderMock = {
+  // Mock the repository methods
+  find: async (where?: any) => {
+    if (where && where.productId) {
+      return mockDatabase['supplier-product'].filter(
+        (sp) => sp.productId === where.productId,
+      );
+    }
+    return mockDatabase['supplier-product'];
+  },
+  findOne: async (where?: any) => {
+    if (where && where.id) {
+      return (
+        mockDatabase['supplier-product'].find((sp) => sp.id === where.id) ||
+        null
+      );
+    }
+    return null;
+  },
+  save: async (entity: SupplierProduct) => {
+    if (entity.id) {
+      // Update existing
+      const index = mockDatabase['supplier-product'].findIndex(
+        (sp) => sp.id === entity.id,
+      );
+      if (index !== -1) {
+        mockDatabase['supplier-product'][index] = entity;
+      }
+    } else {
+      // Create new
+      entity.id = `sp-${Date.now()}`;
+      mockDatabase['supplier-product'].push(entity);
+    }
+    return entity;
+  },
+  delete: async (id: string) => {
+    const index = mockDatabase['supplier-product'].findIndex(
+      (sp) => sp.id === id,
+    );
+    if (index !== -1) {
+      mockDatabase['supplier-product'].splice(index, 1);
+      return true;
+    }
+    return false;
+  },
+};
+```
+
+---
+
+### 3. Test Entities and DTOs
+
+Let's define the simple data structures we'll be testing.
+
+```typescript
+// src/modules/suppliers-products/entities/supplier-product.entity.ts
+export class SupplierProduct {
+  id?: string;
+  supplierId: string;
+  productId: string;
+  costPrice: number;
+  isActive: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+```
+
+```typescript
+// src/modules/suppliers-products/dto/create-supplier-product.dto.ts
+import { IsString, IsNumber, IsBoolean, IsOptional } from 'class-validator';
+
+export class CreateSupplierProductDto {
+  @IsString()
+  supplierId: string;
+
+  @IsString()
+  productId: string;
+
+  @IsNumber()
+  costPrice: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean; // Defaults to true in service
+}
+```
+
+```typescript
+// src/modules/suppliers-products/dto/update-supplier-product.dto.ts
+import { IsString, IsNumber, IsBoolean, IsOptional } from 'class-validator';
+
+export class UpdateSupplierProductDto {
+  @IsString()
+  @IsOptional()
+  supplierId?: string;
+
+  @IsString()
+  @IsOptional()
+  productId?: string;
+
+  @IsNumber()
+  @IsOptional()
+  costPrice?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
+```
+
+---
+
+### 4. Service Layer Tests (`suppliers-products.service.test.ts`)
+
+This file tests the core business logic.
+
+```typescript
+// tests/unit/suppliers-products/suppliers-products.service.test.ts
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { SuppliersProductsService } from '@/modules/suppliers-products/suppliers-products.service';
+import { SupplierProduct } from '@/modules/suppliers-products/entities/supplier-product.entity';
+import { DatabaseProviderMock } from '@/tests/unit/mocks/database-mock';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+
+// Mock the database provider
+vi.mock('@/database/providers.module', () => ({
+  DatabaseProvider: DatabaseProviderMock,
+}));
+
+describe('SuppliersProductsService', () => {
+  let service: SuppliersProductsService;
+
+  // Helper function to reset the mock database state before each test
+  const resetMockDatabase = () => {
+    DatabaseProviderMock['supplier-product'] = [];
+  };
+
+  beforeEach(() => {
+    service = new SuppliersProductsService();
+    resetMockDatabase();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  // --- CREATE TESTS ---
+
+  it('should create a new supplier-product assignment', async () => {
+    const dto = {
+      supplierId: 'supplier-1',
+      productId: 'product-A',
+      costPrice: 10.99,
+    };
+    const result = await service.create(dto);
+
+    expect(result).toBeInstanceOf(SupplierProduct);
+    expect(result.supplierId).toBe(dto.supplierId);
+    expect(result.productId).toBe(dto.productId);
+    expect(result.costPrice).toBe(dto.costPrice);
+    expect(result.isActive).toBe(true);
+    expect(result.id).toBeDefined();
+  });
+
+  it('should set isActive to true by default if not provided', async () => {
+    const dto = {
+      supplierId: 'supplier-1',
+      productId: 'product-A',
+      costPrice: 10.99,
+      isActive: undefined, // or omit the property
+    };
+    const result = await service.create(dto);
+    expect(result.isActive).toBe(true);
+  });
+
+  it('should set isActive to false if provided as false', async () => {
+    const dto = {
+      supplierId: 'supplier-1',
+      productId: 'product-A',
+      costPrice: 10.99,
+      isActive: false,
+    };
+    const result = await service.create(dto);
+    expect(result.isActive).toBe(false);
+  });
+
+  it('should throw an error if trying to create a duplicate assignment (same supplier and product)', async () => {
+    const dto = {
+      supplierId: 'supplier-1',
+      productId: 'product-A',
+      costPrice: 10.99,
+    };
+    await service.create(dto);
+
+    await expect(service.create(dto)).rejects.toThrow(
+      'Assignment for this supplier and product already exists.',
+    );
+  });
+
+  // --- FIND ALL TESTS ---
+
+  it('should find all supplier-product assignments', async () => {
+    await service.create({ supplierId: 's1', productId: 'p1', costPrice: 1 });
+    await service.create({ supplierId: 's2', productId: 'p2', costPrice: 2 });
+
+    const result = await service.findAll();
+    expect(result).toHaveLength(2);
+  });
+
+  it('should find all assignments for a specific product ID', async () => {
+    await service.create({ supplierId: 's1', productId: 'p-x', costPrice: 1 });
+    await service.create({ supplierId: 's2', productId: 'p-y', costPrice: 2 });
+    await service.create({ supplierId: 's3', productId: 'p-x', costPrice: 3 });
+
+    const result = await service.findAll({ productId: 'p-x' });
+    expect(result).toHaveLength(2);
+    expect(result.every((sp) => sp.productId === 'p-x')).toBe(true);
+  });
+
+  it('should return an empty array if no assignments match the filter', async () => {
+    const result = await service.findAll({ productId: 'non-existent' });
+    expect(result).toEqual([]);
+  });
+
+  // --- FIND ONE TESTS ---
+
+  it('should find one supplier-product assignment by ID', async () => {
+    const created = await service.create({
+      supplierId: 's1',
+      productId: 'p1',
+      costPrice: 1,
+    });
+    const id = created.id!;
+
+    const result = await service.findOne(id);
+    expect(result).toEqual(created);
+  });
+
+  it('should throw NotFoundException if assignment with ID is not found', async () => {
+    await expect(service.findOne('non-existent-id')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  // --- UPDATE TESTS ---
+
+  it('should update a supplier-product assignment', async () => {
+    const created = await service.create({
+      supplierId: 's1',
+      productId: 'p1',
+      costPrice: 1,
+    });
+    const id = created.id!;
+
+    const updateDto = { costPrice: 2.5, isActive: false };
+    const result = await service.update(id, updateDto);
+
+    expect(result.costPrice).toBe(2.5);
+    expect(result.isActive).toBe(false);
+    expect(result.supplierId).toBe('s1'); // Unchanged
+  });
+
+  it('should throw NotFoundException if updating a non-existent assignment', async () => {
+    await expect(
+      service.update('non-existent-id', { costPrice: 10 }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('should not throw an error if update DTO contains only some fields', async () => {
+    const created = await service.create({
+      supplierId: 's1',
+      productId: 'p1',
+      costPrice: 1,
+    });
+    const id = created.id!;
+
+    await expect(service.update(id, { costPrice: 10 })).resolves.toBeDefined();
+  });
+
+  // --- REMOVE TESTS ---
+
+  it('should remove a supplier-product assignment', async () => {
+    const created = await service.create({
+      supplierId: 's1',
+      productId: 'p1',
+      costPrice: 1,
+    });
+    const id = created.id!;
+
+    await service.remove(id);
+    await expect(service.findOne(id)).rejects.toThrow(NotFoundException);
+  });
+
+  it('should throw NotFoundException if removing a non-existent assignment', async () => {
+    await expect(service.remove('non-existent-id')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
+```
+
+---
+
+### 5. Validation Tests (`suppliers-products.validation.test.ts`)
+
+These tests use the `class-validator` library to ensure data integrity.
+
+```typescript
+// tests/unit/suppliers-products/suppliers-products.validation.test.ts
+import { validate } from 'class-validator';
+import { CreateSupplierProductDto } from '@/modules/suppliers-products/dto/create-supplier-product.dto';
+import { UpdateSupplierProductDto } from '@/modules/suppliers-products/dto/update-supplier-product.dto';
+import { describe, it, expect } from 'vitest';
+
+describe('SupplierProduct DTO Validation', () => {
+  // --- Create DTO Validation ---
+
+  it('should pass validation for a valid create DTO', async () => {
+    const dto = new CreateSupplierProductDto();
+    dto.supplierId = 'supplier-123';
+    dto.productId = 'product-abc';
+    dto.costPrice = 50.5;
+
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
+  });
+
+  it('should fail if supplierId is missing', async () => {
+    const dto = new CreateSupplierProductDto();
+    // dto.supplierId is missing
+    dto.productId = 'product-abc';
+    dto.costPrice = 50.5;
+
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].property).toBe('supplierId');
+    expect(errors[0].constraints).toHaveProperty('isNotEmpty');
+  });
+
+  it('should fail if supplierId is not a string', async () => {
+    const dto = new CreateSupplierProductDto();
+    dto.supplierId = 123 as any; // Invalid type
+    dto.productId = 'product-abc';
+    dto.costPrice = 50.5;
+
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].property).toBe('supplierId');
+    expect(errors[0].constraints).toHaveProperty('isString');
+  });
+
+  it('should fail if productId is

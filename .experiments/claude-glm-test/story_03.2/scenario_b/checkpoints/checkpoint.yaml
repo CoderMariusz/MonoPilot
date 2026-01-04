@@ -1,0 +1,37 @@
+story_id: "03.2"
+scenario: "b"
+epic: "03-planning"
+approach: "claude_glm_hybrid"
+
+phases:
+  - phase: "P1"
+    name: "UX Design"
+    agent: "claude"
+    status: "completed"
+    tokens:
+      output: 647
+    deliverables:
+      - "P1_ux_design.md"
+    timestamp: "2026-01-03T22:25:00Z"
+
+  - phase: "P2_orchestration"
+    name: "Test Writing - Claude Prompt"
+    agent: "claude"
+    status: "completed"
+    tokens:
+      output: 600
+    deliverables:
+      - "P2_glm_prompt.md"
+    timestamp: "2026-01-03T22:30:00Z"
+
+  - phase: "P2_execution"
+    name: "Test Writing - GLM Execution"
+    agent: "glm-4-plus"
+    status: "completed"
+    tokens:
+      input: 650
+      output: 2800
+    deliverables:
+      - "P2_tests_glm_raw.txt"
+      - "P2_tests_simulated_glm.test.ts"
+    timestamp: "2026-01-03T22:35:00Z"

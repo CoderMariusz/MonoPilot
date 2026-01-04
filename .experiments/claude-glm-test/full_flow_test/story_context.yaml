@@ -1,0 +1,81 @@
+# Story 05.14 - LP Label Printing (ZPL)
+# Test Context for 7-Phase Flow Comparison
+
+story:
+  id: "05.14"
+  name: "LP Label Printing (ZPL)"
+  epic: "05-warehouse"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+
+# Deliverables to implement
+deliverables:
+  - type: "service"
+    name: "LabelPrintService"
+    file: "apps/frontend/lib/services/label-print-service.ts"
+    description: "ZPL template generation for LP labels"
+
+  - type: "api"
+    name: "Print Label Endpoint"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/print-label/route.ts"
+    description: "POST endpoint for single LP label"
+
+  - type: "validation"
+    name: "Print Label Schema"
+    file: "apps/frontend/lib/validation/label-print-schemas.ts"
+    description: "Zod validation for print requests"
+
+  - type: "component"
+    name: "PrintLabelModal"
+    file: "apps/frontend/components/warehouse/license-plates/PrintLabelModal.tsx"
+    description: "Modal for label print configuration"
+
+# Acceptance Criteria (from tests.yaml)
+acceptance_criteria:
+  - "ZPL template generates valid Zebra ZPL II code"
+  - "QR code includes LP metadata as JSON"
+  - "CODE128 barcode for LP number"
+  - "Product name truncated to 40 chars"
+  - "Batch/expiry shows '--' when missing"
+  - "Label size configurable (4x6, 4x3, 3x2)"
+  - "Bulk print supports up to 100 LPs"
+  - "Print requests logged to label_print_logs"
+
+# Test scenarios
+test_scenarios:
+  scenario_a:
+    name: "Claude Full Flow"
+    agents:
+      P1: "claude"
+      P2: "claude"
+      P3: "claude"
+      P4: "claude"
+      P5: "claude"
+      P6: "claude"
+      P7: "claude"
+
+  scenario_b:
+    name: "Claude + GLM Hybrid"
+    agents:
+      P1: "claude"      # Strategic UX design
+      P2: "claude"      # Test design critical
+      P3: "glm"         # Code generation
+      P4: "glm"         # Refactoring
+      P5: "claude"      # Quality gate
+      P6: "claude"      # Acceptance testing
+      P7: "glm"         # Documentation
+
+# Expected iterations
+expected_behavior:
+  iterations: "1-2 cycles P3→P5→P3"
+  reason: "ZPL syntax and GS1 barcode implementation likely needs refinement"
+
+# Comparison metrics
+metrics_to_track:
+  - "Tokens per phase"
+  - "Total tokens per scenario"
+  - "Number of P5→P3 iterations"
+  - "Code quality score (P5 review)"
+  - "Time per phase"
+  - "Final deliverables completeness"

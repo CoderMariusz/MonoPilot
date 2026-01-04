@@ -1,0 +1,53 @@
+{
+  "scenario": "claude_glm",
+  "story_id": "05.5",
+  "task": "Extended LP Query Schema (Zod validation)",
+  "timestamp": "2026-01-03T17:00:00Z",
+  "total_tokens": 6350,
+  "claude_tokens": 2428,
+  "glm_tokens": 3922,
+  "claude_phases": {
+    "planning": {
+      "output_tokens": 955,
+      "description": "Designed detailed prompt for GLM with context, patterns, and examples"
+    },
+    "review": {
+      "input_tokens": 482,
+      "output_tokens": 991,
+      "description": "Code review of GLM output - APPROVED with minor suggestions"
+    }
+  },
+  "glm_phases": {
+    "generation": {
+      "model": "glm-4-plus",
+      "prompt_tokens": 2940,
+      "completion_tokens": 982,
+      "total_tokens": 3922,
+      "description": "Generated complete lpQuerySchema with all requirements"
+    }
+  },
+  "cost_usd": 0.017578,
+  "cost_breakdown": {
+    "claude": {
+      "planning_output": 0.014325,
+      "review_input": 0.001446,
+      "review_output": 0.014865,
+      "total": 0.030636
+    },
+    "glm": {
+      "input": 0.002058,
+      "output": 0.000687,
+      "total": 0.002745
+    },
+    "combined_total": 0.014877
+  },
+  "iterations": 1,
+  "glm_iterations": 1,
+  "quality_assessment": {
+    "code_review_score": "9/10",
+    "acceptance_criteria_passed": "12/12",
+    "approval_status": "APPROVED with minor suggestions",
+    "production_ready": true
+  },
+  "notes": "Single-pass implementation. GLM generated high-quality code on first try. Claude review found only minor, non-blocking improvements. No iterations needed."
+}

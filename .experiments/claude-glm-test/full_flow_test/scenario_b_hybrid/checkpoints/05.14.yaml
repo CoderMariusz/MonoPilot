@@ -1,0 +1,91 @@
+# Checkpoint File: Story 05.14 - Scenario B (Claude + GLM Hybrid)
+
+story_id: "05.14"
+scenario: "scenario_b_hybrid"
+current_phase: "P5"
+status: "in_progress"
+
+phases:
+  - phase: "P1"
+    agent: "ux-designer"
+    model: "claude"
+    status: "completed"
+    timestamp: "2026-01-03T17:15:00Z"
+    tokens:
+      input: 850
+      output: 720
+
+  - phase: "P2"
+    agent: "test-writer"
+    model: "claude"
+    status: "completed"
+    timestamp: "2026-01-03T17:20:00Z"
+    tokens:
+      input: 1200
+      output: 2150
+
+  - phase: "P3"
+    iteration: 1
+    agent: "backend-dev"
+    model: "glm-4-plus"
+    status: "completed"
+    timestamp: "2026-01-03T17:25:00Z"
+    tokens:
+      prompt_tokens: 3926
+      completion_tokens: 1322
+      total_tokens: 5248
+    claude_orchestration:
+      input: 950
+      output: 1100
+    tests:
+      passing: 25
+      failing: 0
+    notes: "Tests passing but code review found 3 critical bugs"
+
+  - phase: "P5"
+    iteration: 1
+    agent: "code-reviewer"
+    model: "claude"
+    status: "completed"
+    timestamp: "2026-01-03T17:30:00Z"
+    tokens:
+      input: 1400
+      output: 1550
+    decision: "request_changes"
+    issues_found: 3
+    severity: "critical"
+    deliverables:
+      - "P5_code_review_comparison.md"
+    notes: "Found 3 critical positioning bugs - QR and barcode overflow on smaller labels"
+
+  - phase: "P3"
+    iteration: 2
+    agent: "backend-dev"
+    model: "glm-4-plus"
+    status: "completed"
+    timestamp: "2026-01-03T17:35:00Z"
+    tokens:
+      prompt_tokens: 1826
+      completion_tokens: 1255
+      total_tokens: 3081
+    claude_orchestration:
+      input: 680
+      output: 920
+    deliverables:
+      - "P3_iteration2_fixed.ts"
+    notes: "Fixed all 3 bugs - added dynamic positioning constants"
+
+  - phase: "P5"
+    iteration: 2
+    agent: "code-reviewer"
+    model: "claude"
+    status: "completed"
+    timestamp: "2026-01-03T17:40:00Z"
+    tokens:
+      input: 1100
+      output: 1250
+    decision: "approved"
+    issues_found: 0
+    deliverables:
+      - "P5_iteration2_review.md"
+    notes: "All bugs fixed. Code is production-ready. Quality improved from 7/10 to 9/10"
