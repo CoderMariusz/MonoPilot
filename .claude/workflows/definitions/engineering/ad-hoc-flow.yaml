@@ -42,7 +42,7 @@ phases:
       complex_architectural: SENIOR-DEV
       full_stack: SENIOR-DEV
     model:
-      default: sonnet
+      default: opus
       complex: opus
     activities:
       - "Analyze user request thoroughly"
@@ -71,7 +71,7 @@ phases:
     mandatory: true
     critical: "This phase is NOT optional. All ad-hoc changes MUST be tested."
     agent: TEST-WRITER
-    model: sonnet
+    model: opus
     duration: "30min - 2 hours"
     activities:
       - "Review implemented changes"
@@ -108,7 +108,7 @@ phases:
     critical: "This phase is NOT optional. All ad-hoc changes MUST be reviewed."
     agent: CODE-REVIEWER
     model:
-      default: sonnet
+      default: opus
       simple: haiku
     duration: "30min - 1 hour"
     checklist:

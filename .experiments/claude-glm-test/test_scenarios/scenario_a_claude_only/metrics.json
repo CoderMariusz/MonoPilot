@@ -3,7 +3,7 @@
   "story_id": "05.5",
   "task": "Extended LP Query Schema (Zod validation)",
   "timestamp": "2026-01-03T16:45:00Z",
-  "model": "claude-sonnet-4-20250514",
+  "model": "claude-opus-4-20250514",
   "total_tokens": 2754,
   "claude_tokens": 2754,
   "glm_tokens": 0,

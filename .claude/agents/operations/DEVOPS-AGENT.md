@@ -4,7 +4,7 @@ description: Manages CI/CD pipelines, deployments, and infrastructure. Automates
 type: Operations
 trigger: CI/CD setup, deployment, infra changes, build failures
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: opus
 behavior: Test in staging first, never hardcode secrets, every deploy is rollback-capable
 skills:
   required:

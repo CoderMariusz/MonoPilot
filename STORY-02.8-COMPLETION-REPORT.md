@@ -34,7 +34,7 @@ Story 02.8 successfully completed through full TDD 7-phase workflow. All 32 acce
 
 ### Phase 3: GREEN (Implementation)
 **Status**: ✅ COMPLETE
-**Agents**: BACKEND-DEV (sonnet), FRONTEND-DEV (opus)
+**Agents**: BACKEND-DEV (opus), FRONTEND-DEV (opus)
 **Duration**: ~4 hours initial + ~8 hours UI fixes
 **Files Created**:
 - Service: routing-operations-service.ts (320 lines)
@@ -49,7 +49,7 @@ Story 02.8 successfully completed through full TDD 7-phase workflow. All 32 acce
 
 ### Phase 5: CODE REVIEW
 **Status**: ✅ APPROVED (after security fixes)
-**Agent**: CODE-REVIEWER (sonnet)
+**Agent**: CODE-REVIEWER (opus)
 **Duration**: ~1 hour review + ~1 hour fixes
 **Initial Decision**: REQUEST_CHANGES (3 CRITICAL security issues)
 **Issues Found**:
@@ -62,7 +62,7 @@ Story 02.8 successfully completed through full TDD 7-phase workflow. All 32 acce
 
 ### Phase 6: QA VALIDATION
 **Status**: ✅ PASS (after UI fixes)
-**Agent**: QA-AGENT (sonnet)
+**Agent**: QA-AGENT (opus)
 **Duration**: ~90 min initial + ~45 min retest
 **First Attempt**: FAIL (14/32 ACs passing) - 6 UI bugs
 **Bugs Fixed**:

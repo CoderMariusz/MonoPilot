@@ -289,7 +289,7 @@ approach: "hybrid"
 phases:
   - phase: "P1"
     agent: "claude"
-    model: "sonnet-4.5"
+    model: "opus-4.5"
     tokens: 650
     deliverable: "P1_ux_design.md"
 

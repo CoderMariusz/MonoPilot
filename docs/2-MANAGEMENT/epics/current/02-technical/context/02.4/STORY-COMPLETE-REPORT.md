@@ -155,7 +155,7 @@ Story 02.4 (BOMs CRUD + Date Validity) has been **successfully implemented** fol
 ---
 
 ### Phase 5: CODE REVIEW
-**Agent:** CODE-REVIEWER (sonnet)
+**Agent:** CODE-REVIEWER (opus)
 **Status:** ✅ APPROVED
 **Execution:** Parallel with Phase 4 (REFACTOR)
 

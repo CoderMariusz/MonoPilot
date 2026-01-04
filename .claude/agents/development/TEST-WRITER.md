@@ -4,7 +4,7 @@ description: Writes test code following TDD RED phase - creates failing tests be
 type: Development
 trigger: After TEST-ENGINEER designs test strategy, before implementation begins
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: opus
 behavior: Write minimal failing tests first, never write implementation code
 skills:
   required:

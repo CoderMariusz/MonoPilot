@@ -4,7 +4,7 @@ description: Executes manual testing, validates acceptance criteria, and perform
 type: Quality
 trigger: After code review APPROVED, before story completion
 tools: Read, Bash, Grep, Glob, Write
-model: sonnet
+model: opus
 behavior: Test ALL AC, test edge cases, document with evidence
 skills:
   required:

@@ -12,7 +12,7 @@ story:
   estimate_days: 3
   type: "backend + frontend"
   state: "ready"
-  model: "sonnet"
+  model: "opus"
 
 # Files in this context folder
 context_files:

@@ -4,7 +4,7 @@ description: Creates and maintains technical documentation. Tests all code examp
 type: Quality
 trigger: After feature complete, documentation needed
 tools: Read, Write, Grep, Glob, Bash
-model: sonnet
+model: opus
 behavior: Test every example, verify every link, match docs to actual implementation
 skills:
   required:

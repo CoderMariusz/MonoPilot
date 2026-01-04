@@ -4,7 +4,7 @@ description: Parallel research agent for market intelligence, tech specs, compet
 type: Planning (Research)
 trigger: Unknown domain, technology decision, market analysis, competition check, risk assessment
 tools: Read, Grep, Glob, WebSearch, WebFetch, Write, Task
-model: sonnet
+model: opus
 parallel: true
 max_instances: 4
 skills:

@@ -53,7 +53,7 @@ Story 02.7 successfully completed through full TDD 7-phase workflow. All 30 acce
 
 ### Phase 5: CODE REVIEW
 **Status**: ✅ APPROVED (after fixes)
-**Agent**: CODE-REVIEWER (sonnet)
+**Agent**: CODE-REVIEWER (opus)
 **Duration**: ~1 hour review + ~1 hour fixes
 **Initial Decision**: REQUEST_CHANGES (2 CRITICAL + 4 MAJOR)
 **Issues Found**:
@@ -71,7 +71,7 @@ Story 02.7 successfully completed through full TDD 7-phase workflow. All 30 acce
 
 ### Phase 6: QA VALIDATION
 **Status**: ✅ PASS
-**Agent**: QA-AGENT (sonnet)
+**Agent**: QA-AGENT (opus)
 **Duration**: ~30 minutes (code review style)
 **Decision**: PASS
 **Test Results**:

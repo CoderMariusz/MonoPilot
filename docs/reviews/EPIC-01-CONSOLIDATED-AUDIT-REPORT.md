@@ -64,7 +64,7 @@ Epic 01 (Settings Module) has been comprehensively audited, fixed, and prepared 
 
 ## Phase 2: Architecture Decisions (FALA FIX-1)
 
-**Agent:** 1 × architect-agent (sonnet)
+**Agent:** 1 × architect-agent (opus)
 
 ### Critical Decisions Made
 
@@ -390,7 +390,7 @@ All MINOR issues have been resolved.
 |-------|--------|------|-------|-------|
 | FALA 1 | 4 | doc-auditor | haiku | Validate 01.1-01.4 |
 | FALA 2 | 4 | architect/auditor | haiku | Create 01.5a/b, validate 01.6/7 |
-| FIX-1 | 1 | architect | sonnet | Architecture decisions |
+| FIX-1 | 1 | architect | opus | Architecture decisions |
 | FIX-2 | 3 | senior-dev | haiku | Update YAML files |
 | FIX-3 | 1 | tech-writer | haiku | Update markdown |
 | FIX-4 | 3 | doc-auditor | haiku | Re-validate |

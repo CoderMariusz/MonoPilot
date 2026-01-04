@@ -19,7 +19,7 @@ Planning phase reviews the audit report, chooses migration strategy, creates det
 |                                                                                     |
 |   +--------------------+                    +--------------------+                  |
 |   | ORCHESTRATOR       |                    | scrum-master       |                  |
-|   | (opus)             |                    | (sonnet)           |                  |
+|   | (opus)             |                    | (opus)             |                  |
 |   +--------------------+                    +--------------------+                  |
 |   | - Review audit     |                    | - Create plan      |                  |
 |   | - Assess scope     |                    | - Prioritize       |                  |
@@ -107,7 +107,7 @@ Planning phase reviews the audit report, chooses migration strategy, creates det
 ## Step 2.2: Detailed Planning
 
 **Agent:** scrum-master
-**Model:** sonnet
+**Model:** opus
 **Duration:** 30 minutes
 
 ### Activities

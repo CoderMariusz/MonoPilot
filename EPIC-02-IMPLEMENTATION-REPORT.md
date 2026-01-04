@@ -43,7 +43,7 @@ Successfully implemented **3 stories** from Epic 02 (Technical Module) using ful
 - **Handoff**: `HANDOFF-REPORT-STORY-02.8-RED-PHASE.md`
 
 **Phase 3: GREEN (Implementation)** - ✅ COMPLETE
-- **Agent**: BACKEND-DEV (sonnet), FRONTEND-DEV (sonnet)
+- **Agent**: BACKEND-DEV (opus), FRONTEND-DEV (opus)
 - **Duration**: ~4 hours
 - **Files Created**:
   - Service: `routing-operations-service.ts` (320 lines)
@@ -60,7 +60,7 @@ Successfully implemented **3 stories** from Epic 02 (Technical Module) using ful
 **Phase 4: REFACTOR** - ⏸️ SKIPPED (pending code review fixes)
 
 **Phase 5: CODE REVIEW** - ⛔ REQUEST_CHANGES
-- **Agent**: CODE-REVIEWER (sonnet)
+- **Agent**: CODE-REVIEWER (opus)
 - **Duration**: ~45 minutes
 - **Decision**: REQUEST_CHANGES (BLOCKING)
 - **Ratings**:
@@ -81,7 +81,7 @@ Successfully implemented **3 stories** from Epic 02 (Technical Module) using ful
   - All 60 tests still PASSING ✓
 
 **Phase 6: QA VALIDATION** - ⛔ FAIL
-- **Agent**: QA-AGENT (sonnet)
+- **Agent**: QA-AGENT (opus)
 - **Duration**: ~90 minutes
 - **Decision**: FAIL (return to DEV)
 - **Test Results**:
@@ -160,7 +160,7 @@ The service layer is rock-solid with perfect parallel operations logic, but the 
 **Phase 4: REFACTOR** - ⏭️ SKIPPED (code quality already 9/10)
 
 **Phase 5: CODE REVIEW** - ✅ APPROVED
-- **Agent**: CODE-REVIEWER (sonnet)
+- **Agent**: CODE-REVIEWER (opus)
 - **Duration**: ~1 hour
 - **Decision**: APPROVED FOR PRODUCTION ✅
 - **Ratings**:
@@ -176,7 +176,7 @@ The service layer is rock-solid with perfect parallel operations logic, but the 
 - **Report**: `docs/2-MANAGEMENT/reviews/code-review-story-02.10a.md`
 
 **Phase 6: QA VALIDATION** - ✅ PASS
-- **Agent**: QA-AGENT (sonnet)
+- **Agent**: QA-AGENT (opus)
 - **Duration**: ~90 minutes
 - **Decision**: PASS - APPROVED FOR PRODUCTION ✅
 - **Test Results**:
@@ -246,7 +246,7 @@ The service layer is rock-solid with perfect parallel operations logic, but the 
 **Phase 4: REFACTOR** - ⏭️ MINIMAL (code quality already 8/10)
 
 **Phase 5: CODE REVIEW** - ⛔ REQUEST_CHANGES
-- **Agent**: CODE-REVIEWER (sonnet)
+- **Agent**: CODE-REVIEWER (opus)
 - **Duration**: ~1 hour
 - **Decision**: REQUEST_CHANGES
 - **Ratings**:
@@ -266,7 +266,7 @@ The service layer is rock-solid with perfect parallel operations logic, but the 
   - All 120 tests PASSING ✓
 
 **Phase 6: QA VALIDATION** - ✅ PASS
-- **Agent**: QA-AGENT (sonnet)
+- **Agent**: QA-AGENT (opus)
 - **Duration**: ~2 hours
 - **Decision**: PASS - READY FOR DEPLOYMENT ✅
 - **Test Results**:

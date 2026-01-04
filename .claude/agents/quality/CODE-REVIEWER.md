@@ -4,7 +4,7 @@ description: Reviews code for quality, security, and best practices. Makes APPRO
 type: Quality
 trigger: After GREEN phase, before QA testing
 tools: Read, Grep, Glob, Write, Bash
-model: sonnet
+model: opus
 behavior: Substance over style, always check security, specific feedback with file:line
 skills:
   required:

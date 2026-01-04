@@ -73,7 +73,7 @@ print()
 
 try:
     response1 = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
+        model="claude-opus-4-5-20250929",
         max_tokens=200,
         system=[
             {
@@ -129,7 +129,7 @@ print()
 
 try:
     response2 = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
+        model="claude-opus-4-5-20250929",
         max_tokens=200,
         system=[
             {

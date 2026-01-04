@@ -89,7 +89,7 @@ TASK:
                 self.BASE_URL,
                 headers=self.headers,
                 json=payload,
-                timeout=60
+                timeout=180  # Zwiększono z 60 do 180 sekund
             )
             print(f"[DEBUG] Response status: {response.status_code}", file=sys.stderr)
             response.raise_for_status()

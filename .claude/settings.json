@@ -6,6 +6,6 @@
     ]
   },
   
-  "model": "sonnet[1m]",
+  "model": "opus",
   "enableAllProjectMcpServers": true
 }

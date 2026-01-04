@@ -21,7 +21,7 @@ Story 02.5a successfully completed through full TDD 7-phase workflow in ~8 hours
 
 ### Phase 1: UX Design
 **Status**: ✅ COMPLETE
-**Agent**: UX-DESIGNER (sonnet)
+**Agent**: UX-DESIGNER (opus)
 **Duration**: ~30 minutes
 **Deliverable**: `TEC-006a-mvp-bom-items.md` (MVP wireframe)
 **Decision**: Created simplified MVP version (removed Phase 1+ features)
@@ -73,7 +73,7 @@ Story 02.5a successfully completed through full TDD 7-phase workflow in ~8 hours
 
 ### Phase 5: CODE REVIEW
 **Status**: ✅ APPROVED
-**Agent**: CODE-REVIEWER (sonnet)
+**Agent**: CODE-REVIEWER (opus)
 **Duration**: ~45 minutes
 **Decision**: APPROVED FOR PRODUCTION
 **Ratings**:
@@ -87,7 +87,7 @@ Story 02.5a successfully completed through full TDD 7-phase workflow in ~8 hours
 
 ### Phase 6: QA VALIDATION
 **Status**: ✅ PASS
-**Agent**: QA-AGENT (sonnet)
+**Agent**: QA-AGENT (opus)
 **Duration**: ~30 minutes
 **Decision**: PASS
 **Test Results**:

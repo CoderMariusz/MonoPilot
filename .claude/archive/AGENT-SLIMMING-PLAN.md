@@ -182,7 +182,7 @@ description: One line description
 type: Development|Planning|Quality|Skills|Operations
 trigger: When X happens
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: opus
 behavior: Key behavior in one line
 skills:
   required:

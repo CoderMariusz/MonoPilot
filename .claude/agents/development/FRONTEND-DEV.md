@@ -4,7 +4,7 @@ description: Implements UI components and frontend logic. Makes failing tests pa
 type: Development
 trigger: RED phase complete, frontend implementation needed
 tools: Read, Edit, Write, Bash, Grep, Glob
-model: sonnet
+model: opus
 behavior: Implement all 4 states, keyboard-first, accessibility mandatory
 skills:
   required:

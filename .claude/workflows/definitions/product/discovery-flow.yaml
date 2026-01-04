@@ -77,7 +77,7 @@ phases:
     name: "Initial Scan"
     description: "Quick overview of project structure and existing documentation"
     agent: DOC-AUDITOR
-    model: sonnet
+    model: opus
     type: scan
     duration: "5-10 minutes"
 
@@ -120,7 +120,7 @@ phases:
     name: "Discovery Interview"
     description: "Conduct structured interview to capture core understanding"
     agent: DISCOVERY-AGENT
-    model: sonnet
+    model: opus
     model_complex: opus
     type: interview
     duration: "15-30 minutes"
@@ -217,7 +217,7 @@ phases:
 
       - id: business_discovery
         agent: PM-AGENT
-        model: sonnet
+        model: opus
         description: "Business context discovery"
         questions:
           - "What is the market context? (target, size, growth)"
@@ -228,7 +228,7 @@ phases:
 
       - id: research_discovery
         agent: RESEARCH-AGENT
-        model: sonnet
+        model: opus
         optional: true
         description: "Knowledge gap discovery"
         questions:
@@ -271,7 +271,7 @@ phases:
     name: "Gap Analysis"
     description: "Identify remaining gaps and propose resolution strategies"
     agents: [DOC-AUDITOR, DISCOVERY-AGENT]
-    model: sonnet
+    model: opus
     type: analysis
     duration: "10-15 minutes"
 

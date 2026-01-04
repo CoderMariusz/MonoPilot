@@ -368,7 +368,7 @@ metadata:
   review_date: "2025-12-29"
   review_type: "Comprehensive FDA Compliance Review"
   phase: "5-code-review"
-  model: "claude-sonnet-4-5-20250929"
+  model: "claude-opus-4-5-20250929"
 
 approval_conditions:
   - "Fix CRITICAL-1 and CRITICAL-2"

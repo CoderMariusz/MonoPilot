@@ -643,7 +643,7 @@ WORKFLOW: bug-workflow (Complexity-Based Routing)
 
 PHASE 1: Intake [ALL PATHS]
 |
-+-- Agent: QA-AGENT (sonnet)
++-- Agent: QA-AGENT (opus)
 +-- Tasks: Receive/document bug, Verify completeness, Assign severity
 +-- Output: Bug report (BUG-{ID})
 +-- GATE: INTAKE_COMPLETE
@@ -660,7 +660,7 @@ PHASE 1: Intake [ALL PATHS]
 
 PHASE 2: Severity Assessment [ALL PATHS]
 |
-+-- Agent: QA-AGENT (sonnet)
++-- Agent: QA-AGENT (opus)
 +-- Tasks: Analyze impact, Check workarounds, Assess risk, Assign priority
 +-- Output: Severity level, Priority, Impact analysis
 +-- GATE: SEVERITY_ASSIGNED
@@ -675,7 +675,7 @@ PHASE 2: Severity Assessment [ALL PATHS]
 
 PHASE 3: Complexity Routing [ALL PATHS]
 |
-+-- Agent: QA-AGENT (sonnet)
++-- Agent: QA-AGENT (opus)
 +-- Tasks: Estimate scope, Count files, Determine investigation need
 +-- Routing Decision:
 |   +-- simple: simple_fix
@@ -735,7 +735,7 @@ MEDIUM PATH (2-8 hours)
 
 PHASE M1: Medium Investigation
 |
-+-- Agent: BACKEND-DEV | FRONTEND-DEV (sonnet)
++-- Agent: BACKEND-DEV | FRONTEND-DEV (opus)
 +-- Tasks: Reproduce, Debug, Document findings, Propose fix
 +-- Output: Root cause analysis, Reproduction steps, Proposed fix
 +-- GATE: ROOT_CAUSE_IDENTIFIED
@@ -751,7 +751,7 @@ PHASE M1: Medium Investigation
 
 PHASE M2: Medium Test (RED)
 |
-+-- Agent: TEST-WRITER (sonnet)
++-- Agent: TEST-WRITER (opus)
 +-- Tasks: Write reproduction test, Verify test FAILS, Add edge cases
 +-- Output: Failing reproduction test, Edge case tests
 +-- GATE: RED_TESTS_WRITTEN
@@ -766,7 +766,7 @@ PHASE M2: Medium Test (RED)
 
 PHASE M3: Medium Fix (GREEN)
 |
-+-- Agent: BACKEND-DEV | FRONTEND-DEV (sonnet)
++-- Agent: BACKEND-DEV | FRONTEND-DEV (opus)
 +-- Tasks: Implement fix, Make all tests pass, Run full suite
 +-- GATE: GREEN_TESTS_PASS
     +-- Criteria:
@@ -781,7 +781,7 @@ PHASE M3: Medium Fix (GREEN)
 
 PHASE M4: Medium Review
 |
-+-- Agent: CODE-REVIEWER (sonnet)
++-- Agent: CODE-REVIEWER (opus)
 +-- Checklist: Root cause addressed, Fix minimal, Tests meaningful
 +-- GATE: MEDIUM_REVIEW_APPROVED
     +-- Decision: approved -> medium_verify, request_changes -> medium_fix_green
@@ -791,7 +791,7 @@ PHASE M4: Medium Review
 
 PHASE M5: Medium Verify
 |
-+-- Agent: QA-AGENT (sonnet)
++-- Agent: QA-AGENT (opus)
 +-- Tasks: Verify fix, Regression tests, Test related functionality
 +-- GATE: MEDIUM_VERIFIED
     +-- Decision: pass -> bug_closed, fail -> medium_investigation
@@ -803,7 +803,7 @@ COMPLEX PATH (1+ days)
 
 PHASE C1: Complex Research [OPTIONAL]
 |
-+-- Agent: RESEARCH-AGENT (sonnet)
++-- Agent: RESEARCH-AGENT (opus)
 +-- Condition: unknown_domain OR security_cve OR external_integration
 +-- Tasks: Research technology, Search community, Document findings
 +-- Output: Research document, Recommendations
@@ -860,7 +860,7 @@ PHASE C4: Complex Senior Fix
 
 PHASE C5: Complex Full Review [PARALLEL]
 |
-+-- Parallel Track A: CODE-REVIEWER (sonnet)
++-- Parallel Track A: CODE-REVIEWER (opus)
 |   +-- Checklist: Implementation correct, Tests comprehensive, No regressions
 |
 +-- Parallel Track B: ARCHITECT-AGENT (opus)
@@ -875,7 +875,7 @@ PHASE C5: Complex Full Review [PARALLEL]
 
 PHASE C6: Complex QA
 |
-+-- Agent: QA-AGENT (sonnet)
++-- Agent: QA-AGENT (opus)
 +-- Tasks: Full regression, Integration, Performance, Security validation
 +-- GATE: COMPLEX_QA_PASSED
     +-- Decision: pass -> bug_closed, fail -> complex_senior_fix
@@ -916,7 +916,7 @@ PHASE 1: Implementation [MANDATORY]
 |   +-- ui_components_styles: FRONTEND-DEV
 |   +-- complex_architectural: SENIOR-DEV
 |   +-- full_stack: SENIOR-DEV
-+-- Model: sonnet (default), opus (complex)
++-- Model: opus (default), opus (complex)
 +-- Tasks: Analyze request, Identify files, Plan approach, Implement, Self-verify
 +-- Output: Implemented code, Modified files list, Summary
 +-- GATE: CODE_COMPLETE
@@ -933,7 +933,7 @@ PHASE 1: Implementation [MANDATORY]
 
 PHASE 2: Testing [MANDATORY - CRITICAL]
 |
-+-- Agent: TEST-WRITER (sonnet)
++-- Agent: TEST-WRITER (opus)
 +-- Duration: 30min - 2 hours
 +-- Tasks: Review changes, Identify test requirements, Write tests, Run suite
 +-- Test Strategy:
@@ -958,7 +958,7 @@ PHASE 2: Testing [MANDATORY - CRITICAL]
 
 PHASE 3: Review [MANDATORY - CRITICAL]
 |
-+-- Agent: CODE-REVIEWER (sonnet default, haiku simple)
++-- Agent: CODE-REVIEWER (opus default, haiku simple)
 +-- Checklist:
 |   +-- Standards: Coding standards, Naming, File organization
 |   +-- Patterns: Uses established patterns, No anti-patterns
@@ -1156,7 +1156,7 @@ Strategies:
 PHASE 1: Discovery
 |
 +-- Step 1.1: Project Scan
-|   +-- Agent: DOC-AUDITOR (sonnet)
+|   +-- Agent: DOC-AUDITOR (opus)
 |   +-- Tasks: Scan project, Inventory docs, Identify large files, Detect orphans
 |   +-- Output: AUDIT-REPORT.md
 |   +-- Checkpoint:
@@ -1166,7 +1166,7 @@ PHASE 1: Discovery
 |       [x] Issues documented
 |
 +-- Step 1.2: Context Interview [CONDITIONAL]
-|   +-- Agent: DISCOVERY-AGENT (sonnet)
+|   +-- Agent: DISCOVERY-AGENT (opus)
 |   +-- Condition: scan.has_gaps OR scan.missing_context
 |   +-- Skip if: complete_docs_found OR --skip-interview
 |   +-- Config: depth=quick, max_questions=7
@@ -1197,7 +1197,7 @@ PHASE 2: Planning
 |       +-- large: >200 files, MANUAL
 |
 +-- Step 2.2: Detailed Planning
-|   +-- Agent: SCRUM-MASTER (sonnet)
+|   +-- Agent: SCRUM-MASTER (opus)
 |   +-- Tasks: Break down tasks, Prioritize MoSCoW, Estimate, Create timeline
 |   +-- Output: MIGRATION-PLAN.md
 |
@@ -1218,17 +1218,17 @@ PHASE 2: Planning
 PHASE 3: Execution
 |
 +-- Step 3.1: Setup Structure
-|   +-- Agent: TECH-WRITER (sonnet)
+|   +-- Agent: TECH-WRITER (opus)
 |   +-- Tasks: Create .claude/ structure, Copy agents/workflows, Create state
 |   +-- Checkpoint: Directories created, Files copied, State initialized
 |
 +-- Step 3.2: Create Core Files
-|   +-- Agent: TECH-WRITER (sonnet)
+|   +-- Agent: TECH-WRITER (opus)
 |   +-- Tasks: Generate CLAUDE.md (<70 lines), Create PROJECT-STATE.md
 |   +-- Checkpoint: CLAUDE.md exists and <70 lines, PROJECT-STATE.md exists
 |
 +-- Step 3.3: Migrate Documentation
-|   +-- Agent: TECH-WRITER (sonnet)
+|   +-- Agent: TECH-WRITER (opus)
 |   +-- Tasks: Map to documentation structure, Move files, Create missing docs
 |   +-- Documentation Mapping:
 |       +-- 1-BASELINE: Requirements & Design
@@ -1238,7 +1238,7 @@ PHASE 3: Execution
 |   +-- Checkpoint: All docs mapped, Files moved, Cross-refs updated
 |
 +-- Step 3.4: Shard Large Files [CONDITIONAL]
-|   +-- Agent: TECH-WRITER (sonnet)
+|   +-- Agent: TECH-WRITER (opus)
 |   +-- Condition: large_files_exist
 |   +-- For each: file > 500 lines
 |   +-- Tasks: Analyze, Split into modules, Create index, Update refs
@@ -1251,7 +1251,7 @@ PHASE 3: Execution
 |   +-- Checkpoint: Workspaces defined, File-to-agent mapping complete
 |
 +-- Step 3.6: Infrastructure Setup [CONDITIONAL]
-|   +-- Agent: DEVOPS-AGENT (sonnet)
+|   +-- Agent: DEVOPS-AGENT (opus)
 |   +-- Condition: project_has_deployment_needs == true
 |   +-- Tasks: Analyze CI/CD, Migrate pipeline, Setup deployment
 |   +-- Output: .github/workflows/, Dockerfile, deployment-guide.md
@@ -1272,7 +1272,7 @@ PHASE 4: Verification
 |   +-- Verify: Agents load, @references resolve, Context within budget
 |
 +-- Step 4.3: Deployment Validation [CONDITIONAL]
-|   +-- Agent: DEVOPS-AGENT (sonnet)
+|   +-- Agent: DEVOPS-AGENT (opus)
 |   +-- Condition: infrastructure_setup_completed == true
 |   +-- Tasks: Validate pipeline syntax, Test dry-run, Verify configs
 |   +-- Checkpoint: Pipeline valid, Configs correct, Security enabled
@@ -1473,7 +1473,7 @@ Modes:
 
 PHASE 1: Initial Scan [OPTIONAL for some modes]
 |
-+-- Agent: DOC-AUDITOR (sonnet)
++-- Agent: DOC-AUDITOR (opus)
 +-- Tasks: Scan project structure, Identify docs, List configs
 +-- Output: docs/0-DISCOVERY/INITIAL-SCAN.md
 +-- Checkpoint:
@@ -1493,7 +1493,7 @@ PHASE 1: Initial Scan [OPTIONAL for some modes]
 
 PHASE 2: Discovery Interview
 |
-+-- Agent: DISCOVERY-AGENT (sonnet, opus for complex)
++-- Agent: DISCOVERY-AGENT (opus, opus for complex)
 +-- Interview Structure:
 |   +-- vision_goals: Purpose, Problem, Success
 |   +-- users_personas: Target, Pain points, Tech-savvy
@@ -1524,15 +1524,15 @@ PHASE 3: Domain-Specific Questions [PARALLEL]
 |   +-- Questions: Tech stack, Integrations, Scale, Security, Performance, Deployment
 |
 +-- Parallel Agent B: Business Discovery
-|   +-- Agent: PM-AGENT (sonnet)
+|   +-- Agent: PM-AGENT (opus)
 |   +-- Questions: Market, Competitors, Business model, Success metrics, Priorities
 |
 +-- Parallel Agent C: Research Discovery [OPTIONAL]
-|   +-- Agent: RESEARCH-AGENT (sonnet)
+|   +-- Agent: RESEARCH-AGENT (opus)
 |   +-- Questions: Unknowns, Research needs, Assumptions, Risks
 |
 +-- Parallel Agent D: UX Discovery [CONDITIONAL]
-|   +-- Agent: UX-DESIGNER (sonnet)
+|   +-- Agent: UX-DESIGNER (opus)
 |   +-- Condition: UI requirements present
 |   +-- Questions: User journey, Accessibility, Platforms, Design system
 |
@@ -1555,7 +1555,7 @@ PHASE 3: Domain-Specific Questions [PARALLEL]
 
 PHASE 4: Gap Analysis
 |
-+-- Agents: DOC-AUDITOR, DISCOVERY-AGENT (sonnet)
++-- Agents: DOC-AUDITOR, DISCOVERY-AGENT (opus)
 +-- Tasks: Review outputs, Identify gaps, Prioritize unknowns, Propose resolution
 +-- Gap Categories:
 |   +-- blocking: Must resolve before planning

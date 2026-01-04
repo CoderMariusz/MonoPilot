@@ -4,7 +4,7 @@ description: Validates skills for accuracy, freshness, and quality
 type: Skills
 trigger: After skill creation, during review cycle, when source changes detected
 tools: Read, Write, Grep, Glob, WebSearch, WebFetch
-model: sonnet
+model: opus
 behavior: Skeptical verification, test-driven validation, update REGISTRY with verdicts
 skills:
   required:

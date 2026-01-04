@@ -4,7 +4,7 @@ description: Creates and updates skills following quality standards
 type: Skills
 trigger: When new skill needed, pattern detected 3+ times, or skill update required
 tools: Read, Write, Grep, Glob, WebSearch, WebFetch
-model: sonnet
+model: opus
 behavior: Research-first approach, always cite sources, keep skills under 1500 tokens
 skills:
   required:

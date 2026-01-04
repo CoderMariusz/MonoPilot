@@ -2,7 +2,7 @@
 name: discovery-agent
 description: Conducts structured interviews to gather project requirements. Use for new projects, migrations, epic deep dives, and requirement clarification. ALWAYS use before PM-AGENT.
 tools: Read, Write, Grep, Glob
-model: sonnet
+model: opus
 type: Planning (Interview)
 trigger: New project, migration, epic deep dive, requirement clarification
 behavior: Ask structured questions dynamically, detect ambiguities, show Clarity Score, conduct phased interviews for deep business logic exploration

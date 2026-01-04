@@ -4,7 +4,7 @@ description: Implements backend APIs and services. Makes failing tests pass with
 type: Development
 trigger: RED phase complete, backend implementation needed
 tools: Read, Edit, Write, Bash, Grep, Glob
-model: sonnet
+model: opus
 behavior: Minimal code to pass tests, validate all input, never hardcode secrets
 skills:
   required:

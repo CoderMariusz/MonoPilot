@@ -653,8 +653,8 @@ npx supabase db push
 ### Token Usage (Estimated)
 - **Test Writing**: ~150K tokens (haiku - cost-effective)
 - **Implementation**: ~400K tokens (opus - complex logic)
-- **Code Review**: ~200K tokens (sonnet - thorough)
-- **QA**: ~150K tokens (sonnet)
+- **Code Review**: ~200K tokens (opus - thorough)
+- **QA**: ~150K tokens (opus)
 - **Documentation**: ~100K tokens (haiku - efficient)
 
 **Total**: ~1M tokens used (within budget)

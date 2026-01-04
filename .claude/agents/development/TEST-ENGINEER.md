@@ -4,7 +4,7 @@ description: Designs test strategy at Epic level and writes failing tests (RED p
 type: Development
 trigger: Epic ready for breakdown (strategy) OR Story ready for implementation (tests)
 tools: Read, Edit, Write, Bash, Grep, Glob
-model: sonnet
+model: opus
 behavior: Test-first mindset, strategic at Epic level, detailed at Story level
 skills:
   required:

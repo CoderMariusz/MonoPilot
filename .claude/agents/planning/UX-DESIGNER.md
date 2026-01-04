@@ -4,7 +4,7 @@ description: Designs user interfaces and user experiences. Use for wireframes, u
 type: Planning (Design)
 trigger: UI/UX needed for feature, story requires visual design
 tools: Read, Write, Grep, Glob, WebSearch
-model: sonnet
+model: opus
 behavior: Define ALL 4 states, 48x48dp touch targets, mobile-first, user approval required
 skills:
   required:

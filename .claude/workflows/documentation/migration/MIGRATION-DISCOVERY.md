@@ -19,7 +19,7 @@ Discovery phase scans the project to understand its structure, identify issues, 
 |                                                                                     |
 |   +------------------+     +------------------+     +------------------+            |
 |   | doc-auditor      |---->| Generate Report  |---->| GATE: Audit      |            |
-|   | (sonnet)         |     |                  |     | Complete?        |            |
+|   | (opus)           |     |                  |     | Complete?        |            |
 |   +------------------+     +------------------+     +--------+---------+            |
 |   | - Scan project   |     | AUDIT-REPORT.md: |              |                      |
 |   | - File analysis  |     | - File inventory |         YES  |  NO                  |
@@ -48,7 +48,7 @@ Discovery phase scans the project to understand its structure, identify issues, 
 ## Step 1.1: Project Scanning
 
 **Agent:** doc-auditor
-**Model:** sonnet
+**Model:** opus
 **Duration:** 30 minutes
 
 ### Activities
@@ -101,7 +101,7 @@ Discovery phase scans the project to understand its structure, identify issues, 
 ## Step 1.2: Quick Context Interview (Optional)
 
 **Agent:** discovery-agent
-**Model:** sonnet
+**Model:** opus
 **Duration:** 5-15 minutes
 **Depth:** quick
 

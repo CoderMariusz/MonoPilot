@@ -19,7 +19,7 @@ Execution phase implements the migration plan: creates directory structure, core
 |                                                                                     |
 |   Step 3.1: SETUP STRUCTURE (2 hours)                                              |
 |   +------------------------------------------------------------+                   |
-|   | tech-writer (sonnet)                                       |                   |
+|   | tech-writer (opus)                                         |                   |
 |   | 1. Create .claude/ directory structure                     |                   |
 |   | 2. Copy agent definitions                                  |                   |
 |   | 3. Copy workflow files                                     |                   |
@@ -29,7 +29,7 @@ Execution phase implements the migration plan: creates directory structure, core
 |                            ↓                                                        |
 |   Step 3.2: CREATE CORE FILES (1 hour)                                             |
 |   +------------------------------------------------------------+                   |
-|   | tech-writer (sonnet)                                       |                   |
+|   | tech-writer (opus)                                         |                   |
 |   | 1. Generate CLAUDE.md (<70 lines)                          |                   |
 |   | 2. Create PROJECT-STATE.md                                 |                   |
 |   | 3. Initialize state files                                  |                   |
@@ -37,7 +37,7 @@ Execution phase implements the migration plan: creates directory structure, core
 |                            ↓                                                        |
 |   Step 3.3: MIGRATE DOCUMENTATION (4-8 hours)                                      |
 |   +------------------------------------------------------------+                   |
-|   | tech-writer (sonnet)                                       |                   |
+|   | tech-writer (opus)                                         |                   |
 |   | 1. Map existing docs to documentation structure            |                   |
 |   | 2. Move/copy files to appropriate locations                |                   |
 |   | 3. Create missing baseline docs                            |                   |
@@ -47,7 +47,7 @@ Execution phase implements the migration plan: creates directory structure, core
 |                            ↓                                                        |
 |   Step 3.4: SHARD LARGE FILES (2-4 hours)                                          |
 |   +------------------------------------------------------------+                   |
-|   | tech-writer (sonnet)                                       |                   |
+|   | tech-writer (opus)                                         |                   |
 |   | For each large file (>500 lines):                          |                   |
 |   | 1. Analyze file structure                                  |                   |
 |   | 2. Identify logical sections                               |                   |
@@ -73,7 +73,7 @@ Execution phase implements the migration plan: creates directory structure, core
 ## Step 3.1: Setup Structure
 
 **Agent:** tech-writer
-**Model:** sonnet
+**Model:** opus
 **Duration:** 2 hours
 
 ### Activities
@@ -129,7 +129,7 @@ mkdir -p docs/2-MANAGEMENT/{epics/current,sprints,risks,reviews}
 ## Step 3.2: Create Core Files
 
 **Agent:** tech-writer
-**Model:** sonnet
+**Model:** opus
 **Duration:** 1 hour
 
 ### CLAUDE.md Template (<70 lines)
@@ -227,7 +227,7 @@ See: @PROJECT-STATE.md
 ## Step 3.3: Migrate Documentation
 
 **Agent:** tech-writer
-**Model:** sonnet
+**Model:** opus
 **Duration:** 4-8 hours (varies by project size)
 
 ### Documentation Mapping Example
@@ -274,7 +274,7 @@ Current Location → New Location
 ## Step 3.4: Shard Large Files
 
 **Agent:** tech-writer
-**Model:** sonnet
+**Model:** opus
 **Duration:** 2-4 hours (30min per large file)
 
 ### Sharding Process

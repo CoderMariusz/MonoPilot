@@ -1,0 +1,123 @@
+HYBRID V2 ORCHESTRATOR - Gotowy do testów
+
+═══════════════════════════════════════════════════════════
+URUCHOMIENIE W NOWYM TERMINALU:
+═══════════════════════════════════════════════════════════
+
+1. Otwórz NOWY terminal (PowerShell/CMD)
+
+2. Ustaw API key (jeśli nie masz w env):
+
+   $env:ANTHROPIC_API_KEY="twoj-klucz-api"
+
+
+3. Uruchom orchestrator:
+
+   cd "C:\Users\Mariusz K\Documents\Programowanie\MonoPilot"
+
+   python .experiments\claude-glm-test\scripts\hybrid_orchestrator_v2.py --stories 01.2,01.6,01.4 --start-phase P1
+
+
+   LUB użyj skryptu .bat:
+
+   .experiments\claude-glm-test\RUN_ORCHESTRATOR.bat
+
+
+═══════════════════════════════════════════════════════════
+CO SIĘ STANIE:
+═══════════════════════════════════════════════════════════
+
+Phase P1: UX Design (Claude Sonnet)
+  ├─ Story 01.2: Parallel...
+  ├─ Story 01.6: Parallel...
+  └─ Story 01.4: Parallel...
+  ✓ Complete in ~8 min
+
+Phase P2: Test Writing (GLM-4.7)
+  ├─ Story 01.2: GLM generating tests...
+  ├─ Story 01.6: GLM generating tests...
+  └─ Story 01.4: GLM generating tests...
+  ✓ Complete in ~12 min
+
+Phase P3: Implementation (GLM-4.7)
+  ├─ Story 01.2: GLM writing code...
+  ├─ Story 01.6: GLM writing code...
+  └─ Story 01.4: GLM writing code...
+  ✓ Complete in ~15 min
+
+Phase P4: Refactoring (GLM-4.7) [NOWE!]
+  ├─ Story 01.2: GLM refactoring...
+  ├─ Story 01.6: GLM refactoring...
+  └─ Story 01.4: GLM refactoring...
+  ✓ Complete in ~10 min
+
+Phase P5: Code Review (Claude Sonnet)
+  ├─ Story 01.2: Review → REQUEST_CHANGES (6 issues)
+  ├─ Story 01.6: Review → APPROVED
+  └─ Story 01.4: Review → APPROVED
+
+  Detected issues in 01.2, launching P3 iter2...
+
+Phase P3 iter2: Bug Fixes (GLM-4.7)
+  └─ Story 01.2: GLM fixing bugs...
+  ✓ Complete
+
+Phase P5 iter2: Re-review (Claude Sonnet)
+  └─ Story 01.2: Review → APPROVED
+  ✓ All stories approved!
+
+Phase P6: QA Testing (Claude Sonnet)
+  ├─ Story 01.2: QA → PASS
+  ├─ Story 01.6: QA → PASS
+  └─ Story 01.4: QA → PASS
+  ✓ Complete
+
+Phase P7: Documentation (GLM-4.5-Air)
+  ├─ Story 01.2: GLM writing docs...
+  ├─ Story 01.6: GLM writing docs...
+  └─ Story 01.4: GLM writing docs...
+  ✓ Complete
+
+═══════════════════════════════════════════════════════════
+FINAL REPORT:
+═══════════════════════════════════════════════════════════
+
+Total Time:     2.1 hours
+Total Cost:     $0.58
+
+Claude Tokens:  18,450 (95% reduction vs 378K pure Claude!)
+GLM Tokens:     212,000 (P2+P3+P4+P7)
+
+Savings vs Pure Claude:
+  Tokens: 360K saved (95%)
+  Cost:   $4.16 saved (90%)
+
+Stories Completed: 3/3
+Quality: 10/10 ACs per story
+
+═══════════════════════════════════════════════════════════
+MONITORING:
+═══════════════════════════════════════════════════════════
+
+Detailed report:
+  python .experiments\claude-glm-test\scripts\hybrid_monitor.py --stories 01.2,01.6,01.4 --action report
+
+Quality dashboard:
+  python .experiments\claude-glm-test\scripts\quality_dashboard.py --epic 01-settings
+
+═══════════════════════════════════════════════════════════
+CHECKPOINTS:
+═══════════════════════════════════════════════════════════
+
+Real-time progress:
+  .claude\checkpoints\01.2.yaml
+  .claude\checkpoints\01.6.yaml
+  .claude\checkpoints\01.4.yaml
+
+Format:
+  P1: ✓ ux-designer 14:05 wireframes:3 approved:yes
+  P2: ✓ test-writer 14:18 files:5 tests:49 status:red
+  P3: ✓ backend-dev 14:35 files:4 tests:49/49 status:green
+  ...
+
+═══════════════════════════════════════════════════════════

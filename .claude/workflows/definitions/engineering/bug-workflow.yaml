@@ -77,7 +77,7 @@ phases:
     name: "Bug Intake"
     mandatory: true
     agent: QA-AGENT
-    model: sonnet
+    model: opus
     duration: "15-30 minutes"
     activities:
       - "Receive and document bug report"
@@ -103,7 +103,7 @@ phases:
     name: "Severity Assessment"
     mandatory: true
     agent: QA-AGENT
-    model: sonnet
+    model: opus
     duration: "15-30 minutes"
     activities:
       - "Analyze user impact"
@@ -127,7 +127,7 @@ phases:
     name: "Complexity Routing"
     mandatory: true
     agent: QA-AGENT
-    model: sonnet
+    model: opus
     duration: "15-30 minutes"
     activities:
       - "Estimate lines of change"
@@ -228,7 +228,7 @@ phases:
       backend_bug: BACKEND-DEV
       frontend_bug: FRONTEND-DEV
       default: BACKEND-DEV
-    model: sonnet
+    model: opus
     duration: "30 min - 2 hours"
     activities:
       - "Reproduce the bug reliably"
@@ -253,7 +253,7 @@ phases:
     name: "Medium Path - Test (RED)"
     path: medium
     agent: TEST-WRITER
-    model: sonnet
+    model: opus
     duration: "30 min - 1 hour"
     activities:
       - "Write test that reproduces bug"
@@ -279,7 +279,7 @@ phases:
       backend_bug: BACKEND-DEV
       frontend_bug: FRONTEND-DEV
       default: BACKEND-DEV
-    model: sonnet
+    model: opus
     duration: "1-4 hours"
     activities:
       - "Implement the fix"
@@ -302,7 +302,7 @@ phases:
     name: "Medium Path - Code Review"
     path: medium
     agent: CODE-REVIEWER
-    model: sonnet
+    model: opus
     duration: "30 min - 1 hour"
     checklist:
       fix_assessment:
@@ -327,7 +327,7 @@ phases:
     name: "Medium Path - Verification"
     path: medium
     agent: QA-AGENT
-    model: sonnet
+    model: opus
     duration: "30 min - 1 hour"
     activities:
       - "Verify bug is fixed"
@@ -354,7 +354,7 @@ phases:
     name: "Complex Path - Research (Optional)"
     path: complex
     agent: RESEARCH-AGENT
-    model: sonnet
+    model: opus
     duration: "1-2 hours"
     optional: true
     condition: "unknown_domain OR security_cve OR external_integration OR performance_benchmark"
@@ -449,7 +449,7 @@ phases:
     path: complex
     parallel:
       - agent: CODE-REVIEWER
-        model: sonnet
+        model: opus
         checklist:
           - "Implementation correct"
           - "Tests comprehensive"
@@ -478,7 +478,7 @@ phases:
     name: "Complex Path - Full QA"
     path: complex
     agent: QA-AGENT
-    model: sonnet
+    model: opus
     duration: "2-4 hours"
     activities:
       - "Full regression test suite"

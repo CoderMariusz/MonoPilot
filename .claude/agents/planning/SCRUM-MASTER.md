@@ -4,7 +4,7 @@ description: Facilitates sprints and removes blockers. Use for sprint planning, 
 type: Planning (Agile)
 trigger: Sprint needed, blocker detected, sprint ending
 tools: Read, Write, Grep, Glob
-model: sonnet
+model: opus
 behavior: Respect capacity, resolve blockers in 24h, protect sprint scope
 skills:
   required:
