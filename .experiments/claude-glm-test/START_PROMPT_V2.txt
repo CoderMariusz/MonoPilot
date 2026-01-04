@@ -1,0 +1,30 @@
+Execute Epic 01-Settings pilot using HYBRID V2 (Parallel + GLM).
+
+Stories: 01.2 (User Roles), 01.3 (Permissions), 01.4 (Org Profile)
+
+Use PARALLEL execution (like MASTER-PROMPT):
+- Launch multiple stories per phase simultaneously
+- Agents use GLM-4.7 internally for P2/P3/P7 (transparent)
+- Claude for P1/P5/P6 (strategic + quality gates)
+
+Phase sequence:
+P1: All 3 stories parallel (ux-designer)
+P2: All 3 stories parallel (test-writer → GLM-4.7 internal)
+P3: All 3 stories parallel (backend-dev → GLM-4.7 internal)
+P5: All 3 stories parallel (code-reviewer → Claude)
+P3 iter2: Bug fixes parallel (backend-dev → GLM)
+P5 iter2: Re-review parallel (code-reviewer → APPROVED)
+P6: All 3 stories parallel (qa-agent → Claude)
+P7: All 3 stories parallel (tech-writer → GLM-4.5-Air internal)
+
+After completion:
+python .experiments/claude-glm-test/scripts/hybrid_monitor.py --stories 01.2,01.3,01.4 --action report
+
+Expected:
+- Cost: ~$0.60 (vs $1.31 Claude-only = 54% savings)
+- Time: ~2h (parallel execution)
+- Quality: 10/10 ACs per story
+
+Reference: .experiments/claude-glm-test/HYBRID-ORCHESTRATOR-V2-FINAL.md
+
+START. Launch P1 for all 3 stories in PARALLEL (single message).
