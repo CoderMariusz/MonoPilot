@@ -103,7 +103,7 @@ function EmptyState({
       <Package className="h-16 w-16 text-muted-foreground" />
       <h3 className="text-lg font-semibold">No Available License Plates</h3>
       <div className="max-w-md space-y-2 text-center text-sm text-muted-foreground">
-        <p>No LPs found for this material with QA status 'passed' and available quantity.</p>
+        <p>No LPs found for this material with QA status &apos;passed&apos; and available quantity.</p>
         <div className="mt-4">
           <p className="font-medium">Possible reasons:</p>
           <ul className="mt-2 space-y-1 text-left">

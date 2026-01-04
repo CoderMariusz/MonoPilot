@@ -244,7 +244,7 @@ function StatusEffectsSection({
           </ul>
           <p className="text-xs text-amber-700 dark:text-amber-300">
             ❗ This action should normally be performed automatically by the production module.
-            Manual status change to 'Consumed' should only be used for corrections or special cases.
+            Manual status change to &apos;Consumed&apos; should only be used for corrections or special cases.
           </p>
         </div>
       )}
@@ -512,7 +512,7 @@ export function ChangeLPStatusModal({
                   Invalid Status Transition
                 </h3>
                 <p className="text-sm text-red-800 dark:text-red-200">
-                  Cannot change status from 'Consumed' to any other status. 'Consumed' is a terminal
+                  Cannot change status from &apos;Consumed&apos; to any other status. &apos;Consumed&apos; is a terminal
                   status and cannot be changed.
                 </p>
                 <div className="mt-3 space-y-1 text-sm">
@@ -522,7 +522,7 @@ export function ChangeLPStatusModal({
                   </div>
                 </div>
                 <p className="mt-3 text-xs text-red-700 dark:text-red-300">
-                  License plates marked as 'Consumed' have been fully used in production and cannot be
+                  License plates marked as &apos;Consumed&apos; have been fully used in production and cannot be
                   reactivated or modified.
                 </p>
                 <div className="mt-3 space-y-1 text-sm text-red-800 dark:text-red-200">

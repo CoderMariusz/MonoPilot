@@ -38,7 +38,7 @@ export default function LicensePlateNotFound() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold">License Plate Not Found</h1>
           <p className="text-muted-foreground max-w-md mx-auto">
-            The license plate you're looking for doesn't exist or you don't have permission to
+            The license plate you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to
             view it.
           </p>
         </div>
@@ -48,7 +48,7 @@ export default function LicensePlateNotFound() {
           <ul className="text-left space-y-1 text-muted-foreground">
             <li>• License plate number does not exist</li>
             <li>• License plate belongs to a different organization</li>
-            <li>• You don't have warehouse module access</li>
+            <li>• You don&apos;t have warehouse module access</li>
             <li>• License plate was deleted</li>
           </ul>
         </div>
@@ -76,7 +76,7 @@ export default function LicensePlateNotFound() {
           <ul className="list-disc list-inside space-y-1">
             <li>Double-check the license plate number</li>
             <li>Use the search feature on the license plates page</li>
-            <li>Filter by warehouse or product to find what you're looking for</li>
+            <li>Filter by warehouse or product to find what you&apos;re looking for</li>
             <li>Contact your system administrator for access issues</li>
           </ul>
         </div>

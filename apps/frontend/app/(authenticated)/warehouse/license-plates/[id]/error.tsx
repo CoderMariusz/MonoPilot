@@ -62,7 +62,7 @@ export default function LicensePlateDetailError({
             <p className="font-medium">Possible Causes:</p>
             <ul className="list-disc list-inside space-y-1 text-sm">
               <li>License plate does not exist</li>
-              <li>You don't have permission to view this license plate</li>
+              <li>You don&apos;t have permission to view this license plate</li>
               <li>Network connectivity issue</li>
               <li>Server temporarily unavailable</li>
             </ul>
