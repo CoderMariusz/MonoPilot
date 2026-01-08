@@ -53,7 +53,7 @@ export const SettingsNavItem = memo(function SettingsNavItem({
   // AC-05: Unimplemented routes show disabled state with "Soon" badge
   if (!item.implemented) {
     return (
-      <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed opacity-50">
+      <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed opacity-50" aria-disabled="true">
         <Icon className="h-4 w-4" />
         <span>{item.name}</span>
         <span className="ml-auto text-xs">Soon</span>
@@ -64,6 +64,7 @@ export const SettingsNavItem = memo(function SettingsNavItem({
   return (
     <Link
       href={item.path}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
         'flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
         isActive

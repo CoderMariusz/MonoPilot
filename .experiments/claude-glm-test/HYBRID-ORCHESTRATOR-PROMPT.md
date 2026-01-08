@@ -13,12 +13,12 @@ Approach: HYBRID (Claude strategic + GLM-4.7 implementation)
 
 | Phase | Agent | Model | Thinking | Temp | Parallel | Skip When |
 |-------|-------|-------|----------|------|----------|-----------|
-| **P1** | Claude UX Designer | Sonnet 4.5 | Auto | 1.0 | No | Backend-only |
+| **P1** | Claude UX Designer | OPUS 4.5 | Auto | 1.0 | No | Backend-only |
 | **P2** | **GLM Test Writer** | **GLM-4.7** | ✅ Yes | 0.7 | No | Never |
 | **P3** | **GLM Developer** | **GLM-4.7** | ✅ Yes | 0.7 | ✓ Backend/Frontend | - |
 | **P4** | GLM Refactor | GLM-4.5-Air | ❌ No | 0.7 | No | Clean code |
-| **P5** | **Claude Code Reviewer** | **Sonnet 4.5** | Auto | 0.7 | ✓ Multi-story | **NEVER (CRITICAL!)** |
-| **P6** | **Claude QA** | **Sonnet 4.5** | Auto | 0.7 | ✓ Multi-story | Never |
+| **P5** | **Claude Code Reviewer** | **OPUS 4.5** | Auto | 0.7 | ✓ Multi-story | **NEVER (CRITICAL!)** |
+| **P6** | **Claude QA** | **OPUS 4.5** | Auto | 0.7 | ✓ Multi-story | Never |
 | **P7** | GLM Tech Writer | GLM-4.5-Air | ❌ No | 1.0 | No | Never |
 
 **Critical**: **P5 (Claude Code Review) is MANDATORY** - this ensures GLM code quality.
@@ -30,7 +30,7 @@ Approach: HYBRID (Claude strategic + GLM-4.7 implementation)
 ### P1: UX Design (Claude)
 ```yaml
 Agent: ux-designer
-Model: Sonnet 4.5
+Model: OPUS 4.5
 Input: Story markdown from docs/2-MANAGEMENT/epics/current/{epic}/{story}.md
 Output: Wireframe specs, user flows, component specs
 Save: .claude/checkpoints/{story}/P1_ux_design.md
@@ -129,7 +129,7 @@ P3_iter1:
 
 ```yaml
 Agent: code-reviewer
-Model: Sonnet 4.5 (or Opus 4.5 for critical code)
+Model: OPUS 4.5 (or OPUS 4.5 for critical code)
 Task:
   - Review ALL GLM-generated code
   - Find bugs (expect 5-7 on first pass)
@@ -180,7 +180,7 @@ P5_iter2:
 
 ```yaml
 Agent: qa-agent
-Model: Sonnet 4.5
+Model: OPUS 4.5
 Task:
   - Run all 10 acceptance criteria
   - Manual testing (functional, security, performance)
@@ -289,7 +289,7 @@ approach: "hybrid"
 phases:
   - phase: "P1"
     agent: "claude"
-    model: "opus-4.5"
+    model: "OPUS-4.5"
     tokens: 650
     deliverable: "P1_ux_design.md"
 

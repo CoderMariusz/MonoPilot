@@ -68,3 +68,6 @@ apps/frontend/tsconfig.incremental.tsbuildinfo
 # TypeScript reports
 typescript-report-*.html
 typescript-errors-*.json
+
+# Auto Claude data directory
+.auto-claude/

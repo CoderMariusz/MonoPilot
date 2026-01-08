@@ -2,8 +2,10 @@
 """
 ZhipuAI GLM API Wrapper
 Wywołuje GLM-4 z kontekstem z plików
+UWAGA: Używa natywnego http.client zamiast requests (zero zależności)
 """
-import requests
+import http.client
+import ssl
 import sys
 import os
 import json
@@ -12,16 +14,13 @@ from pathlib import Path
 from typing import List, Optional
 
 class GLMClient:
-    """Klient do komunikacji z ZhipuAI API"""
+    """Klient do komunikacji z ZhipuAI API (bez requests)"""
 
-    BASE_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    HOST = "open.bigmodel.cn"
+    PATH = "/api/paas/v4/chat/completions"
 
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
 
     def read_file(self, path: str) -> str:
         """Wczytaj plik z dysku"""
@@ -43,9 +42,9 @@ class GLMClient:
         self,
         prompt: str,
         context_files: Optional[List[str]] = None,
-        model: str = "glm-4-plus",
+        model: str = "glm-4.7",  # Latest model
         temperature: float = 0.7,
-        max_tokens: int = 4096
+        max_tokens: int = 16000  # Increased for large code responses
     ) -> dict:
         """
         Wywołaj GLM API z promptem i opcjonalnym kontekstem
@@ -82,18 +81,43 @@ TASK:
             "max_tokens": max_tokens
         }
 
-        # Wywołaj API
+        # Wywołaj API używając http.client (natywne)
         try:
             print(f"[DEBUG] Calling {model} with {len(full_prompt)} chars prompt", file=sys.stderr)
-            response = requests.post(
-                self.BASE_URL,
-                headers=self.headers,
-                json=payload,
-                timeout=180  # Zwiększono z 60 do 180 sekund
-            )
-            print(f"[DEBUG] Response status: {response.status_code}", file=sys.stderr)
-            response.raise_for_status()
-            data = response.json()
+
+            # Tworzenie połączenia HTTPS
+            # Timeout 20 minut (1200s) - GLM potrzebuje czasu na długie odpowiedzi
+            context = ssl.create_default_context()
+            conn = http.client.HTTPSConnection(self.HOST, timeout=1200, context=context)
+
+            # Przygotowanie body
+            body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+
+            # Nagłówki
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json; charset=utf-8",
+                "Content-Length": str(len(body))
+            }
+
+            # Wysłanie żądania
+            conn.request("POST", self.PATH, body=body, headers=headers)
+
+            # Odczytanie odpowiedzi
+            response = conn.getresponse()
+            print(f"[DEBUG] Response status: {response.status}", file=sys.stderr)
+
+            response_body = response.read().decode('utf-8')
+            conn.close()
+
+            if response.status != 200:
+                return {
+                    "error": f"HTTP {response.status}: {response_body[:500]}",
+                    "response": None,
+                    "usage": {}
+                }
+
+            data = json.loads(response_body)
 
             return {
                 "response": data["choices"][0]["message"]["content"],
@@ -101,7 +125,7 @@ TASK:
                 "model": data.get("model", model),
                 "finish_reason": data["choices"][0].get("finish_reason", "unknown")
             }
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             return {
                 "error": str(e),
                 "response": None,
@@ -110,19 +134,19 @@ TASK:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Wywołaj ZhipuAI GLM API")
-    parser.add_argument("--prompt", "-p", help="Prompt (lub stdin)", default=None)
-    parser.add_argument("--context", "-c", nargs="+", help="Pliki kontekstowe", default=[])
-    parser.add_argument("--model", "-m", default="glm-4-plus",
-                       choices=["glm-4-plus", "glm-4-long", "glm-4-flash"])
+    parser = argparse.ArgumentParser(description="Call ZhipuAI GLM API")
+    parser.add_argument("--prompt", "-p", help="Prompt (or stdin)", default=None)
+    parser.add_argument("--context", "-c", nargs="+", help="Context files", default=[])
+    parser.add_argument("--model", "-m", default="glm-4.7",
+                       choices=["glm-4.7", "glm-4-plus", "glm-4-long", "glm-4-flash"])
     parser.add_argument("--temperature", "-t", type=float, default=0.7)
     parser.add_argument("--max-tokens", type=int, default=4096)
-    parser.add_argument("--output", "-o", help="Zapisz wynik do pliku")
-    parser.add_argument("--json", action="store_true", help="Zwróć pełny JSON z metadanymi")
+    parser.add_argument("--output", "-o", help="Save output to file")
+    parser.add_argument("--json", action="store_true", help="Return full JSON with metadata")
 
     args = parser.parse_args()
 
-    # Pobierz API key z configu lub zmiennej środowiskowej
+    # Get API key from config or env variable
     config_path = Path(__file__).parent.parent / "config.json"
     api_key = None
 
@@ -135,16 +159,16 @@ def main():
         api_key = os.getenv("ZHIPU_API_KEY")
 
     if not api_key:
-        print("ERROR: Brak klucza API! Ustaw ZHIPU_API_KEY lub dodaj do config.json", file=sys.stderr)
+        print("ERROR: No API key! Set ZHIPU_API_KEY or add to config.json", file=sys.stderr)
         sys.exit(1)
 
-    # Pobierz prompt
+    # Get prompt
     if args.prompt:
         prompt = args.prompt
     else:
         prompt = sys.stdin.read()
 
-    # Wywołaj GLM
+    # Call GLM
     client = GLMClient(api_key)
     result = client.call(
         prompt=prompt,
@@ -154,7 +178,7 @@ def main():
         max_tokens=args.max_tokens
     )
 
-    # Obsługa błędów
+    # Error handling
     if "error" in result and result["error"]:
         print(f"ERROR: {result['error']}", file=sys.stderr)
         sys.exit(1)
@@ -168,9 +192,9 @@ def main():
     if args.output:
         with open(args.output, 'w', encoding='utf-8') as f:
             f.write(output)
-        print(f"✓ Zapisano do {args.output}", file=sys.stderr)
+        print(f"OK: Saved to {args.output}", file=sys.stderr)
         if args.json:
-            print(f"✓ Tokens: {result['usage'].get('total_tokens', '?')}", file=sys.stderr)
+            print(f"Tokens: {result['usage'].get('total_tokens', '?')}", file=sys.stderr)
     else:
         print(output)
 

@@ -5,8 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
-import { productionSettingsSchema, type ProductionSettingsInput } from '@/lib/validation/production-schemas'
-import { ZodError } from 'zod'
+import { ProductionSettingsService, type ProductionSettingsUpdate } from '@/lib/services/production-settings-service'
 
 // GET /api/production/settings - Get production settings
 export async function GET(request: NextRequest) {
@@ -36,45 +35,20 @@ export async function GET(request: NextRequest) {
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Fetch production settings for org
-    const { data, error } = await supabaseAdmin
-      .from('production_settings')
-      .select('*')
-      .eq('organization_id', currentUser.org_id)
-      .single()
-
-    if (error) {
-      // If no settings exist, create default settings
-      if (error.code === 'PGRST116') {
-        const { data: newSettings, error: insertError } = await supabaseAdmin
-          .from('production_settings')
-          .insert({
-            organization_id: currentUser.org_id,
-            allow_pause_wo: true,
-            auto_complete_wo: true,
-            require_operation_sequence: true,
-            require_qa_on_output: true,
-            auto_create_by_product_lp: false,
-            dashboard_refresh_seconds: 30,
-            // Story 4.11: Over-Consumption Control (default: false - conservative)
-            allow_over_consumption: false,
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          console.error('Error creating default production settings:', insertError)
-          return NextResponse.json({ error: insertError.message }, { status: 500 })
-        }
-
-        return NextResponse.json({ settings: newSettings })
-      }
-
-      console.error('Error fetching production settings:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // Use service to get settings (handles upsert for new orgs)
+    try {
+      const settings = await ProductionSettingsService.getProductionSettings(
+        supabaseAdmin,
+        currentUser.org_id
+      )
+      return NextResponse.json({ settings })
+    } catch (serviceError) {
+      console.error('Error fetching production settings:', serviceError)
+      return NextResponse.json(
+        { error: serviceError instanceof Error ? serviceError.message : 'Failed to fetch settings' },
+        { status: 500 }
+      )
     }
-
-    return NextResponse.json({ settings: data })
   } catch (error) {
     console.error('Error in GET /api/production/settings:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -96,7 +70,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current user
+    // Get current user with role
     const { data: currentUser, error: userError } = await supabase
       .from('users')
       .select('org_id, role:roles(code)')
@@ -108,52 +82,44 @@ export async function PUT(request: NextRequest) {
     }
 
     // Authorization: Admin only (per AC-4.17.8)
-    if (currentUser.role.toLowerCase() !== 'admin') {
+    // Role is an object from join: { code: string }
+    const roleCode = (currentUser.role as { code: string } | null)?.code?.toLowerCase()
+    if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }
       )
     }
 
-    // Parse and validate request body
-    const body = await request.json()
-    const validatedData = productionSettingsSchema.parse(body)
+    // Parse request body
+    const body = await request.json() as ProductionSettingsUpdate
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Build update data
-    const updateData = {
-      ...validatedData,
-      updated_at: new Date().toISOString(),
-      updated_by: session.user.id,
+    // Use service for update (handles validation)
+    try {
+      const settings = await ProductionSettingsService.updateProductionSettings(
+        supabaseAdmin,
+        currentUser.org_id,
+        body
+      )
+      return NextResponse.json({
+        settings,
+        message: 'Production settings updated successfully',
+      })
+    } catch (serviceError) {
+      console.error('Error updating production settings:', serviceError)
+      const message = serviceError instanceof Error ? serviceError.message : 'Failed to update settings'
+
+      // Check if validation error
+      if (message.includes('must be') || message.includes('Invalid') || message.includes('No fields')) {
+        return NextResponse.json({ error: message }, { status: 400 })
+      }
+
+      return NextResponse.json({ error: message }, { status: 500 })
     }
-
-    const { data, error: updateError } = await supabaseAdmin
-      .from('production_settings')
-      .update(updateData)
-      .eq('organization_id', currentUser.org_id)
-      .select()
-      .single()
-
-    if (updateError) {
-      console.error('Error updating production settings:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      settings: data,
-      message: 'Production settings updated successfully',
-    })
   } catch (error) {
     console.error('Error in PUT /api/production/settings:', error)
-
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      )
-    }
-
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

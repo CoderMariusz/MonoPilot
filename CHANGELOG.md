@@ -1,3 +1,20 @@
+I'm ready to help you create a technical changelog for developers. I can assist with:
+
+- **Writing changelog entries** with precise technical language and developer-focused descriptions
+- **Organizing changes** by category (Features, Bug Fixes, Breaking Changes, Improvements, etc.)
+- **Formatting** using standard changelog conventions (semantic versioning, timestamps, etc.)
+- **Documenting** API changes, dependency updates, performance improvements, and migration notes
+- **Reviewing and refining** existing changelog content for accuracy and clarity
+
+To get started, please provide:
+
+1. **Version number** - What version are you documenting?
+2. **Release date** - When is/was this released?
+3. **Changes to document** - What modifications, fixes, features, or breaking changes should be included?
+4. **Existing changelog file** - Do you have a `CHANGELOG.md` or similar file I should update, or should I create one?
+
+Alternatively, if you have specific changelog entries or a file you'd like me to work with, just share that and I can help format and refine them.
+
 # Changelog
 
 All notable changes to MonoPilot are documented in this file.

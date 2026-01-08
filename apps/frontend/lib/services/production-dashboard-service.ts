@@ -47,7 +47,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     const { data: completedOrders, error: ordersError } = await supabase
       .from('work_orders')
       .select('id')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .eq('status', 'completed')
       .gte('completed_at', `${today}T00:00:00Z`)
       .lt('completed_at', `${today}T23:59:59Z`)
@@ -59,7 +59,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     const { data: outputs, error: outputError } = await supabase
       .from('production_outputs')
       .select('qty')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .gte('created_at', `${today}T00:00:00Z`)
       .lt('created_at', `${today}T23:59:59Z`)
 
@@ -70,7 +70,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     const { data: yieldData, error: yieldError } = await supabase
       .from('work_orders')
       .select('planned_qty, output_qty')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .eq('status', 'completed')
       .gte('completed_at', `${today}T00:00:00Z`)
       .lt('completed_at', `${today}T23:59:59Z`)
@@ -88,7 +88,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     const { data: activeWOs, error: activeError } = await supabase
       .from('work_orders')
       .select('id')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .in('status', ['in_progress', 'paused'])
 
     if (activeError) throw activeError
@@ -99,7 +99,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     const { data: shortages, error: shortageError } = await supabase
       .from('wo_materials')
       .select('id')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
 
     if (shortageError) throw shortageError
     // Placeholder - actual shortage detection logic would be more complex
@@ -146,7 +146,7 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         )
       `
       )
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .in('status', ['in_progress', 'paused'])
       .order('started_at', { ascending: true })
       .limit(limit)
@@ -186,7 +186,7 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
     const { data: shortageData, error: shortageError } = await supabase
       .from('wo_materials')
       .select('id, wo_id, material_id, required_qty')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .limit(10)
 
     if (!shortageError && shortageData) {
@@ -210,7 +210,7 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
     const { data: delayedWOs, error: delayError } = await supabase
       .from('work_orders')
       .select('id, wo_number, scheduled_completion_date')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .in('status', ['in_progress', 'paused'])
       .lt('scheduled_completion_date', delayThreshold)
       .limit(10)
@@ -232,7 +232,7 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
     const { data: qualityHolds, error: qaError } = await supabase
       .from('license_plates')
       .select('id, wo_id, qa_status')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .eq('qa_status', 'hold')
       .limit(10)
 

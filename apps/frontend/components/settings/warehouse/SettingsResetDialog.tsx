@@ -84,7 +84,7 @@ export function SettingsResetDialog({ open, onClose, onConfirm }: SettingsResetD
           <p className="text-sm font-medium mb-2">Preview of changes:</p>
           <ul className="text-sm space-y-1 text-muted-foreground font-mono">
             <li>• auto_generate_lp_number → true</li>
-            <li>• lp_number_prefix → "LP"</li>
+            <li>• lp_number_prefix → &quot;LP&quot;</li>
             <li>• enable_fifo → true</li>
             <li>• enable_batch_tracking → true</li>
             <li>• (and 21 more settings...)</li>

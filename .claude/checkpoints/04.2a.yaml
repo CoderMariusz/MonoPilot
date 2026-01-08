@@ -1,0 +1,76 @@
+story_id: "04.2a"
+name: "WO Start (Execution Begin)"
+epic: "04-production"
+status: in_progress
+started_at: "2026-01-06T10:00:00Z"
+
+phases:
+  P1:
+    status: skipped
+    reason: "Story has detailed UI specs - no additional UX design needed"
+    timestamp: "2026-01-06T10:00:00Z"
+  P2:
+    status: pending
+    agent: test-writer
+    model: GLM-4.7
+  P3:
+    status: pending
+  P4:
+    status: pending
+  P5:
+    status: pending
+  P6:
+    status: pending
+  P7:
+    status: pending
+
+context:
+  story_path: "docs/2-MANAGEMENT/epics/current/04-production/04.2a.wo-start.md"
+  type: "backend + frontend"
+  complexity: "M"
+  estimate_days: 3
+
+dependencies:
+  hard:
+    - "03.10 - Work Orders CRUD"
+  soft:
+    - "04.5 - Production Settings"
+
+deliverables:
+  api:
+    - path: "apps/frontend/app/api/production/work-orders/[id]/start/route.ts"
+      methods: ["POST"]
+      status: pending
+    - path: "apps/frontend/app/api/production/work-orders/[id]/material-availability/route.ts"
+      methods: ["GET"]
+      status: pending
+  services:
+    - path: "apps/frontend/lib/services/production-execution-service.ts"
+      status: pending
+  validation:
+    - path: "apps/frontend/lib/validation/production-execution.ts"
+      status: pending
+  components:
+    - path: "apps/frontend/components/production/work-orders/WorkOrderHeader.tsx"
+      status: pending
+    - path: "apps/frontend/components/production/work-orders/WorkOrderActions.tsx"
+      status: pending
+    - path: "apps/frontend/components/production/work-orders/StartWorkOrderButton.tsx"
+      status: pending
+    - path: "apps/frontend/components/production/work-orders/StartWorkOrderModal.tsx"
+      status: pending
+    - path: "apps/frontend/components/production/work-orders/MaterialAvailabilityCard.tsx"
+      status: pending
+    - path: "apps/frontend/components/production/work-orders/LineAvailabilityWarning.tsx"
+      status: pending
+    - path: "apps/frontend/components/production/work-orders/WorkOrderStatusBadge.tsx"
+      status: pending
+  tests:
+    - path: "apps/frontend/__tests__/unit/services/production-execution-service.test.ts"
+      status: pending
+    - path: "apps/frontend/__tests__/integration/api/production/work-orders-start.test.ts"
+      status: pending
+P2: test-writer 15:03 files:6 tests:124 status:red
+P5: ✓ code-reviewer 15:18 issues:1-minor decision:approved
+P6: X qa-agent 15:21 tests:36/73 ac:0/6 bugs:2-critical decision:BLOCKED
+P6: ✓ qa-agent 16:08 ac:3/3 bugs:0 decision:pass

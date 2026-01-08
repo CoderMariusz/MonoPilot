@@ -1,12 +1,101 @@
 # MonoPilot - Project State
 
-> Last Updated: 2026-01-03 (Epic 05 Warehouse: Stories 05.7 & 05.8 COMPLETE, 05.9 PARTIAL) ✅
+> Last Updated: 2026-01-08 (Epic 04 Production: Stories 04.1, 04.2a, 04.5 COMPLETE via Hybrid GLM/Claude) ✅
+> Epic 04 Progress: 3 stories complete (04.1, 04.2a, 04.5)
 > Epic 05 Progress: 2/19 stories complete, 1 in-progress
-> **29 Stories Implemented** (Stories 05.7 & 05.8 Production-Ready)
+> **32 Stories Implemented** (Epic 04 Production + Epic 05 Warehouse)
 
 ---
 
-## Current Session (2026-01-03 - Epic 05 Warehouse: Stories 05.6-05.9 Multi-Track)
+## Current Session (2026-01-08 - Epic 04 Production: Hybrid GLM/Claude Orchestration)
+
+### Session Summary
+
+**Duration**: ~3 hours
+**Stories Completed**: 3 (04.1, 04.2a, 04.5)
+**Orchestration**: Hybrid GLM-4.7 + Claude agents (7-phase flow)
+
+---
+
+### ✅ Story 04.5 - Production Settings: COMPLETE
+
+**Type**: Backend Service + API
+**Status**: ✅ **PRODUCTION-READY**
+**Tests**: 26/26 passing (100%)
+
+**Deliverables**:
+- `ProductionSettingsService` class with static methods (15 settings)
+- GET/PUT `/api/production/settings` endpoints
+- Auto-upsert default settings for new orgs
+- UUID validation, refresh interval (5-300s), OEE target (0-100%)
+- Documentation: `docs/3-ARCHITECTURE/api/production/production-settings.md`
+
+**Key Files**:
+- `apps/frontend/lib/services/production-settings-service.ts`
+- `apps/frontend/app/api/production/settings/route.ts`
+- `apps/frontend/lib/services/__tests__/production-settings-service.test.ts`
+
+---
+
+### ✅ Story 04.1 - Production Dashboard: COMPLETE
+
+**Type**: Backend Service
+**Status**: ✅ **PRODUCTION-READY**
+
+**Deliverables**:
+- KPI calculations (orders_today, units_produced, avg_yield, active_wos, material_shortages)
+- Active work orders list with progress tracking
+- Alerts (material_shortage, wo_delayed, quality_hold)
+- Documentation: `docs/3-ARCHITECTURE/api/production/production-dashboard.md`
+
+**Key Files**:
+- `apps/frontend/lib/services/production-dashboard-service.ts`
+
+**Fixes Applied**:
+- Changed column `organization_id` → `org_id` (9 places)
+
+---
+
+### ✅ Story 04.2a - WO Start: COMPLETE
+
+**Type**: Backend Service (existing)
+**Status**: ✅ **PRODUCTION-READY**
+
+**Deliverables**:
+- WO start modal data with material availability
+- Status transition: released → in_progress
+- Activity logging
+- Documentation: `docs/3-ARCHITECTURE/api/production/wo-start-service.md`
+
+**Key Files**:
+- `apps/frontend/lib/services/wo-start-service.ts`
+
+**Fixes Applied**:
+- Deleted unused `production-execution-service.ts` (GLM created, not used)
+
+---
+
+### Hybrid Orchestration Pipeline Results
+
+| Phase | Agent | Story 04.5 | Story 04.1 | Story 04.2a |
+|-------|-------|------------|------------|-------------|
+| P1 UX | - | SKIP | SKIP | SKIP |
+| P2 Tests | GLM-4.7 | ✓ | ✓ | ✓ |
+| P3 Implement | Claude | ✓ Fixed | ✓ Fixed | existing |
+| P5 Review | Claude | ✓ APPROVED | ✓ APPROVED | ✓ APPROVED |
+| P6 QA | Claude | ✓ PASS | ✓ PASS | ✓ PASS |
+| P7 Docs | GLM-4.7 | ✓ DONE | ✓ DONE | ✓ DONE |
+
+**Issues Fixed During P5**:
+1. 04.5: Service exported functions instead of class → Rewrote as `ProductionSettingsService` class
+2. 04.5: Invalid test UUIDs → Changed to valid UUID format
+3. 04.5: Unsafe role access → Fixed to handle role as join object
+4. 04.1: Wrong column name (organization_id) → Changed to org_id
+5. 04.2a: Duplicate service file → Deleted unused production-execution-service.ts
+
+---
+
+## Previous Session (2026-01-03 - Epic 05 Warehouse: Stories 05.6-05.9 Multi-Track)
 
 ### Session Summary
 

@@ -231,7 +231,7 @@ export default function SettingsPage() {
           <div className="text-5xl mb-4">⚙️</div>
           <h2 className="text-2xl font-bold mb-2">Welcome to MonoPilot!</h2>
           <p className="text-muted-foreground mb-6 text-center max-w-md">
-            Let's get your organization set up in 15 minutes. Complete the setup wizard to configure essential settings.
+            Let&apos;s get your organization set up in 15 minutes. Complete the setup wizard to configure essential settings.
           </p>
           <div className="flex gap-2">
             <Button onClick={() => (window.location.href = '/settings/onboarding')}>
