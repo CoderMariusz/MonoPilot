@@ -280,6 +280,7 @@ export default function TransferOrderDetailPage({ params }: PageProps) {
             status={transferOrder.status}
             onRefresh={refetch}
             canEdit={linesEditable}
+            fromWarehouse={transferOrder.from_warehouse}
           />
         </div>
       </div>

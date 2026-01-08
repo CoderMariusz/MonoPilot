@@ -9,8 +9,6 @@ import { getWOOperations, isSequenceRequired } from '@/lib/services/operation-se
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params
-
     const { id: woId } = await params
     const supabase = await createServerSupabase()
 

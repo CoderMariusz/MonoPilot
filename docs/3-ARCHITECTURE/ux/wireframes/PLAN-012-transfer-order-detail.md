@@ -3,7 +3,7 @@
 **Module**: Planning
 **Feature**: TO Detail View with Shipment History (FR-PLAN-013, FR-PLAN-015, FR-PLAN-016)
 **Status**: Ready for Review
-**Last Updated**: 2025-12-14
+**Last Updated**: 2026-01-08
 
 ---
 
@@ -40,18 +40,18 @@
 |  |  [Lines]  [Shipments]  [History]                                                            |  |
 |  |  -------                                                                                     |  |
 |  |                                                                                              |  |
-|  |  +----------------------------------------------------------------------------------------+ |  |
-|  |  | # | Product           | Requested | Shipped | Received | Remaining | Status  | LPs    | |  |
-|  |  +----------------------------------------------------------------------------------------+ |  |
-|  |  | 1 | Flour Type A      | 500 kg    | 500 kg  | 0 kg     | 0 kg      | [100%]  | 2 LPs  | |  |
-|  |  |   | RM-FLOUR-001      |           |         |          |           |         | [View] | |  |
-|  |  +----------------------------------------------------------------------------------------+ |  |
-|  |  | 2 | Sugar White       | 200 kg    | 100 kg  | 0 kg     | 100 kg    | [50%]   | 1 LP   | |  |
-|  |  |   | RM-SUGAR-001      |           |         |          |           |         | [View] | |  |
-|  |  +----------------------------------------------------------------------------------------+ |  |
-|  |  | 3 | Salt Industrial   | 100 kg    | 0 kg    | 0 kg     | 100 kg    | [0%]    | None   | |  |
-|  |  |   | RM-SALT-001       |           |         |          |           |         |        | |  |
-|  |  +----------------------------------------------------------------------------------------+ |  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | # | Product           | Requested | Shipped | Received | Remaining | Status  | LPs      ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | 1 | Flour Type A      | 500 kg    | 500 kg  | 0 kg     | 0 kg      | [100%]  | 2 LPs    ||  |
+|  |  |   | RM-FLOUR-001      |           |         |          |           |         | [View]   ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | 2 | Sugar White       | 200 kg    | 100 kg  | 0 kg     | 100 kg    | [50%]   | 1 LP     ||  |
+|  |  |   | RM-SUGAR-001      |           |         |          |           |         | [View]   ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | 3 | Salt Industrial   | 100 kg    | 0 kg    | 0 kg     | 100 kg    | [0%]    | None     ||  |
+|  |  |   | RM-SALT-001       |           |         |          |           |         |[Assign]  ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
 |  |                                                                                              |  |
 |  |  3 Lines | Requested: 800 kg | Shipped: 600 kg | Received: 0 kg | Remaining: 200 kg        |  |
 |  |                                                                                              |  |
@@ -70,6 +70,78 @@
   - Cancel TO
   - Duplicate TO
   - Export to PDF
+```
+
+### Lines Tab - Draft/Planned Status (With Assign LPs Button)
+
+```
++--------------------------------------------------------------------------------------------------+
+|  Planning > Transfer Orders > TO-2024-00043                       [Edit] [Actions v] [Print]     |
++--------------------------------------------------------------------------------------------------+
+|                                                                                                    |
+|  +-------------------------------- HEADER INFO -------------------------------------------------+  |
+|  |                                                                                              |  |
+|  |  TO-2024-00043                                                    Status: [Draft]           |  |
+|  |  Created by: John Smith on Jan 8, 2026                            0% shipped                |  |
+|  |                                                                                              |  |
+|  +----------------------------------------------------------------------------------------------+  |
+|                                                                                                    |
+|  +-------------------------------- LINES TAB ---------------------------------------------------+  |
+|  |                                                                                              |  |
+|  |  [Lines]  [Shipments]  [History]                                                            |  |
+|  |  -------                                                                                     |  |
+|  |                                                                                              |  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | # | Product           | Requested | Shipped | Received | Remaining | Status | LPs       ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | 1 | Flour Type A      | 500 kg    | 0 kg    | 0 kg     | 500 kg    | [0%]   | 2 LPs     ||  |
+|  |  |   | RM-FLOUR-001      |           |         |          |           |        | (500 kg)  ||  |
+|  |  |   |                   |           |         |          |           |        | [View]    ||  |
+|  |  |   |                   |           |         |          |           |        | [Assign]  ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | 2 | Sugar White       | 200 kg    | 0 kg    | 0 kg     | 200 kg    | [0%]   | 1 LP      ||  |
+|  |  |   | RM-SUGAR-001      |           |         |          |           |        | (100 kg)  ||  |
+|  |  |   |                   |           |         |          |           |        | [View]    ||  |
+|  |  |   |                   |           |         |          |           |        | [Assign]  ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  | 3 | Salt Industrial   | 100 kg    | 0 kg    | 0 kg     | 100 kg    | [0%]   | None      ||  |
+|  |  |   | RM-SALT-001       |           |         |          |           |        | [Assign]  ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |                                                                                              |  |
+|  |  LP Assignment Status:                                                                       |  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |  |  Line 1: 500/500 kg assigned (100%) [Complete]                                          ||  |
+|  |  |  Line 2: 100/200 kg assigned (50%)  [Partial - 100 kg remaining]                        ||  |
+|  |  |  Line 3: 0/100 kg assigned (0%)     [Not assigned]                                      ||  |
+|  |  +-------------------------------------------------------------------------------------------+|  |
+|  |                                                                                              |  |
+|  |  3 Lines | Requested: 800 kg | LP Assigned: 600 kg (75%)                                   |  |
+|  |                                                                                              |  |
+|  +----------------------------------------------------------------------------------------------+  |
+|                                                                                                    |
++--------------------------------------------------------------------------------------------------+
+```
+
+### LP Assignment Expanded View (Line 1)
+
+```
++-------------------------------------------------------------------------------------------+
+| 1 | Flour Type A      | 500 kg    | 0 kg    | 0 kg     | 500 kg    | [0%]   | 2 LPs     |
+|   | RM-FLOUR-001      |           |         |          |           |        | (500 kg)  |
+|   |                   |           |         |          |           |        | [View] v  |
+|   |                   |           |         |          |           |        | [Assign]  |
++-------------------------------------------------------------------------------------------+
+|   | Assigned License Plates:                                                              |
+|   | +---------------------------------------------------------------------------------+   |
+|   | | LP Number    | Lot      | Expiry     | Location | Assigned Qty | Action        |   |
+|   | +---------------------------------------------------------------------------------+   |
+|   | | LP-00123     | B-4501   | 2026-06-15 | A1-01    | 300 kg       | [X] Remove    |   |
+|   | +---------------------------------------------------------------------------------+   |
+|   | | LP-00124     | B-4502   | 2026-07-20 | A1-02    | 200 kg       | [X] Remove    |   |
+|   | +---------------------------------------------------------------------------------+   |
+|   |                                                     Total: 500 kg (100% of 500 kg)    |
+|   +---------------------------------------------------------------------------------+     |
++-------------------------------------------------------------------------------------------+
 ```
 
 ### Shipments Tab View
@@ -138,6 +210,10 @@
 |  |  |  o  Status Changed: Draft -> Planned                             John Smith          | |  |
 |  |  |     TO released for warehouse processing                                              | |  |
 |  |  |  |                                                                                    | |  |
+|  |  |  Dec 14, 2024 - 11:30 AM                                                              | |  |
+|  |  |  o  LPs Assigned to Line 1: Flour Type A                         John Smith          | |  |
+|  |  |     LP-12346 (300 kg), LP-12348 (200 kg)                                              | |  |
+|  |  |  |                                                                                    | |  |
 |  |  |  Dec 14, 2024 - 11:00 AM                                                              | |  |
 |  |  |  o  Line Added: Salt Industrial (100 kg)                         John Smith          | |  |
 |  |  |  |                                                                                    | |  |
@@ -147,7 +223,6 @@
 |  |  |  |                                                                                    | |  |
 |  |  |  Dec 14, 2024 - 10:30 AM                                                              | |  |
 |  |  |  o  Line Added: Flour Type A (500 kg)                            John Smith          | |  |
-|  |  |     LPs selected: LP-12346 (300 kg), LP-12348 (200 kg)                               | |  |
 |  |  |  |                                                                                    | |  |
 |  |  |  Dec 14, 2024 - 10:00 AM                                                              | |  |
 |  |  |  o  TO Created                                                   John Smith          | |  |
@@ -192,17 +267,20 @@
 |  | 1. Flour Type A            |  |
 |  | Requested: 500 kg          |  |
 |  | Shipped: 500 kg [100%]     |  |
-|  | LPs: 2 selected [View]     |  |
+|  | LPs: 2 assigned (500 kg)   |  |
+|  | [View LPs] [Assign LPs]    |  |
 |  +----------------------------+  |
 |  | 2. Sugar White             |  |
 |  | Requested: 200 kg          |  |
 |  | Shipped: 100 kg [50%]      |  |
-|  | LPs: 1 selected [View]     |  |
+|  | LPs: 1 assigned (100 kg)   |  |
+|  | [View LPs] [Assign LPs]    |  |
 |  +----------------------------+  |
 |  | 3. Salt Industrial         |  |
 |  | Requested: 100 kg          |  |
 |  | Shipped: 0 kg [0%]         |  |
-|  | LPs: None                  |  |
+|  | LPs: None assigned         |  |
+|  | [Assign LPs]               |  |
 |  +----------------------------+  |
 |                                  |
 |  Total: 600/800 kg (75%)         |
@@ -312,9 +390,17 @@
 | Received | 100px | Received quantity + UoM |
 | Remaining | 100px | Outstanding quantity |
 | Status | 80px | [100%], [50%], [0%] indicator |
-| LPs | 100px | LP count + View link |
+| LPs | 120px | LP count + assigned qty + actions |
 
-### 4. Line Status Indicators
+### 4. LP Column Display Rules
+
+| LP Assignment State | Display | Actions |
+|---------------------|---------|---------|
+| LPs assigned (100%) | "2 LPs (500 kg)" | [View] [Assign] |
+| LPs assigned (partial) | "1 LP (100 kg)" + warning icon | [View] [Assign] |
+| No LPs assigned | "None" | [Assign] |
+
+### 5. Line Status Indicators
 
 | Indicator | Condition | Color |
 |-----------|-----------|-------|
@@ -322,7 +408,15 @@
 | [XX%] | shipped_qty > 0 AND shipped_qty < requested_qty | Yellow |
 | [0%] | shipped_qty = 0 | Gray |
 
-### 5. Shipment Progress
+### 6. LP Assignment Badge Colors
+
+| Badge | Condition | Color |
+|-------|-----------|-------|
+| "2 LPs (500 kg)" | assigned_qty = requested_qty | Green |
+| "1 LP (100 kg)" | assigned_qty > 0 AND assigned_qty < requested_qty | Yellow/Amber |
+| "None" | assigned_qty = 0 | Gray |
+
+### 7. Shipment Progress
 
 | Field | Calculation | Display |
 |-------|-------------|---------|
@@ -346,6 +440,13 @@
 | **Export to PDF** | Always | Downloads PDF |
 | **Print** | Always | Opens print dialog |
 
+### Line-Level Actions (LP Column)
+
+| Action | Visible When | Result |
+|--------|--------------|--------|
+| **[View]** | lp_count > 0 | Expands row to show LP assignment details |
+| **[Assign LPs]** | status IN (Draft, Planned) | Opens PLAN-025 LP Picker Modal |
+
 ### Quick Actions (Bottom of Page)
 
 | Action | Visible When | Result |
@@ -353,6 +454,57 @@
 | **Ship Remaining Items** | status IN (Planned, Partially Shipped) | Navigate to warehouse ship page |
 | **Print Packing Slip** | status IN (Planned, Shipped, Partially Shipped) | Print packing slip PDF |
 | **Track Shipment** | status IN (Shipped, Partially Shipped) | View shipment tracking |
+
+---
+
+## LP Assignment Integration (Story 03.9b)
+
+### "Assign LPs" Button Visibility
+
+| TO Status | Button Visible | Notes |
+|-----------|----------------|-------|
+| DRAFT | Yes | Primary LP assignment phase |
+| PLANNED | Yes | Can still modify before shipping |
+| SHIPPED | No | Cannot modify after shipping started |
+| PARTIALLY_SHIPPED | No | Cannot modify after shipping started |
+| RECEIVED | No | TO complete |
+| CLOSED | No | TO complete |
+| CANCELLED | No | TO cancelled |
+
+### LP Assignment Display in Lines Table
+
+For each line with LP assignments:
+
+```
+LPs: 2 LPs (500/500 kg)
+[View] [Assign]
+```
+
+Clicking [View] expands the row to show:
+- LP Number
+- Lot Number
+- Expiry Date
+- Location
+- Assigned Qty
+- Remove button (if status allows)
+
+### LP Assignment Status Summary
+
+Shows below lines table when TO status = DRAFT or PLANNED:
+
+```
+LP Assignment Status:
+  Line 1: 500/500 kg assigned (100%) [Complete]
+  Line 2: 100/200 kg assigned (50%)  [Partial - 100 kg remaining]
+  Line 3: 0/100 kg assigned (0%)     [Not assigned]
+
+Total LP Assigned: 600/800 kg (75%)
+```
+
+### Related Modal
+
+- **PLAN-025**: TO LP Picker Modal (opened by [Assign LPs] button)
+  - See wireframe: `docs/3-ARCHITECTURE/ux/wireframes/PLAN-025-to-lp-picker-modal.md`
 
 ---
 
@@ -415,7 +567,8 @@ Response:
         "remaining_qty": 0,
         "uom": "kg",
         "status": "complete",
-        "lp_count": 2
+        "lp_count": 2,
+        "lp_assigned_qty": 500
       },
       {
         "id": "uuid-line-2",
@@ -431,7 +584,8 @@ Response:
         "remaining_qty": 100,
         "uom": "kg",
         "status": "partial",
-        "lp_count": 1
+        "lp_count": 1,
+        "lp_assigned_qty": 100
       },
       {
         "id": "uuid-line-3",
@@ -447,7 +601,8 @@ Response:
         "remaining_qty": 100,
         "uom": "kg",
         "status": "pending",
-        "lp_count": 0
+        "lp_count": 0,
+        "lp_assigned_qty": 0
       }
     ],
     "created_by": {
@@ -554,6 +709,20 @@ Response:
       }
     },
     {
+      "id": "uuid-hist-lp",
+      "event_type": "lps_assigned",
+      "event_date": "2024-12-14T11:30:00Z",
+      "user": { "id": "uuid-user-1", "name": "John Smith" },
+      "details": {
+        "line_id": "uuid-line-1",
+        "product": "Flour Type A",
+        "lps_assigned": [
+          { "lp_number": "LP-12346", "quantity": 300 },
+          { "lp_number": "LP-12348", "quantity": 200 }
+        ]
+      }
+    },
+    {
       "id": "uuid-hist-2",
       "event_type": "status_change",
       "event_date": "2024-12-16T14:15:00Z",
@@ -577,39 +746,66 @@ GET /api/planning/transfer-orders/:id/lines/:lineId/lps
 Response:
 {
   "success": true,
-  "data": [
-    {
-      "lp_id": "uuid-lp-12346",
-      "lp_number": "LP-2024-12346",
-      "quantity": 300,
-      "lot_number": "L-002",
-      "expiry_date": "2025-03-13",
-      "shipped": true,
-      "shipment_number": "SHIP-2024-00123"
-    },
-    {
-      "lp_id": "uuid-lp-12348",
-      "lp_number": "LP-2024-12348",
-      "quantity": 200,
-      "lot_number": "L-004",
-      "expiry_date": "2025-03-15",
-      "shipped": true,
-      "shipment_number": "SHIP-2024-00123"
-    }
-  ]
+  "data": {
+    "assignments": [
+      {
+        "id": "uuid-assignment-1",
+        "lp_id": "uuid-lp-12346",
+        "lp_number": "LP-2024-12346",
+        "quantity": 300,
+        "lot_number": "L-002",
+        "expiry_date": "2025-03-13",
+        "location": "A1-01",
+        "shipped": true,
+        "shipment_number": "SHIP-2024-00123"
+      },
+      {
+        "id": "uuid-assignment-2",
+        "lp_id": "uuid-lp-12348",
+        "lp_number": "LP-2024-12348",
+        "quantity": 200,
+        "lot_number": "L-004",
+        "expiry_date": "2025-03-15",
+        "location": "A1-02",
+        "shipped": true,
+        "shipment_number": "SHIP-2024-00123"
+      }
+    ],
+    "total_assigned": 500,
+    "total_required": 500,
+    "is_complete": true
+  }
 }
+```
+
+### LP Assignment Endpoints (Story 03.9b)
+
+```
+# Get available LPs for TO line (LP Picker Modal)
+GET /api/planning/transfer-orders/:id/lines/:lineId/available-lps
+?lot_number=B-450*
+&expiry_from=2026-01-01
+&expiry_to=2026-12-31
+&search=LP-001
+
+# Assign LPs to TO line
+POST /api/planning/transfer-orders/:id/lines/:lineId/assign-lps
+Body: { "lps": [{ "lp_id": "uuid", "quantity": 100 }] }
+
+# Remove LP assignment from TO line
+DELETE /api/planning/transfer-orders/:id/lines/:lineId/lps/:lpId
 ```
 
 ---
 
 ## Permissions
 
-| Role | View Detail | Edit | Ship | Receive | Cancel | Print/Export |
-|------|-------------|------|------|---------|--------|--------------|
-| Admin | Yes | Yes (Draft) | Yes | Yes | Yes | Yes |
-| Warehouse Manager | Yes | Yes (Draft) | Yes | Yes | Yes | Yes |
-| Warehouse Staff | Yes | No | Yes | Yes | No | Yes |
-| Viewer | Yes | No | No | No | No | Yes |
+| Role | View Detail | Edit | Ship | Receive | Cancel | Assign LPs | Print/Export |
+|------|-------------|------|------|---------|--------|------------|--------------|
+| Admin | Yes | Yes (Draft) | Yes | Yes | Yes | Yes | Yes |
+| Warehouse Manager | Yes | Yes (Draft) | Yes | Yes | Yes | Yes | Yes |
+| Warehouse Staff | Yes | No | Yes | Yes | No | No | Yes |
+| Viewer | Yes | No | No | No | No | No | Yes |
 
 ---
 
@@ -617,15 +813,15 @@ Response:
 
 ### Status-Based UI Rules
 
-| Status | Edit Button | Action Menu Items |
-|--------|-------------|-------------------|
-| Draft | Visible | Release, Duplicate, Cancel, Print |
-| Planned | Hidden | Ship, Duplicate, Cancel, Print |
-| Partially Shipped | Hidden | Ship Remaining, Duplicate, Print |
-| Shipped | Hidden | Receive, Duplicate, Print |
-| Received | Hidden | Duplicate, Print |
-| Closed | Hidden | Duplicate, Print |
-| Cancelled | Hidden | Duplicate, Print |
+| Status | Edit Button | Assign LPs | Action Menu Items |
+|--------|-------------|------------|-------------------|
+| Draft | Visible | Visible | Release, Duplicate, Cancel, Print |
+| Planned | Hidden | Visible | Ship, Duplicate, Cancel, Print |
+| Partially Shipped | Hidden | Hidden | Ship Remaining, Duplicate, Print |
+| Shipped | Hidden | Hidden | Receive, Duplicate, Print |
+| Received | Hidden | Hidden | Duplicate, Print |
+| Closed | Hidden | Hidden | Duplicate, Print |
+| Cancelled | Hidden | Hidden | Duplicate, Print |
 
 ### Shipments Tab Visibility
 
@@ -641,6 +837,8 @@ Response:
 | line_added | POST /transfer-orders/:id/lines | product, quantity |
 | line_updated | PUT /transfer-orders/:id/lines/:lineId | changed fields |
 | line_deleted | DELETE /transfer-orders/:id/lines/:lineId | product that was removed |
+| lps_assigned | POST /transfer-orders/:id/lines/:lineId/assign-lps | lps assigned with quantities |
+| lp_removed | DELETE /transfer-orders/:id/lines/:lineId/lps/:lpId | lp that was removed |
 | to_released | Status change to planned | - |
 | status_change | Any status transition | from_status, to_status, reason |
 | shipment_created | Warehouse module creates shipment | shipment_number, items_shipped |
@@ -654,22 +852,26 @@ Response:
 - All buttons: 48x48dp minimum
 - Tab navigation items: 48dp height
 - History timeline events: 64dp minimum row height
+- [Assign LPs] and [View] buttons: 48x48dp minimum
 
 ### Contrast
 - Header info text: 4.5:1
 - Status badges: WCAG AA compliant
 - Table text: 4.5:1
+- LP assignment badges: 4.5:1
 
 ### Screen Reader
 - Page title: "Transfer Order TO-2024-00042 Detail"
 - Status: "Status: Partially Shipped, 60 percent shipped"
 - Lines table: Proper th/td structure with scope
+- LP column: "2 License Plates assigned, 500 kilograms, View or Assign more"
 - History timeline: "Timeline of transfer order events, 6 events"
 
 ### Keyboard Navigation
 - Tab: Navigate between sections, tabs, action buttons
 - Enter: Activate buttons, navigate links
 - Arrow keys: Navigate within tabs
+- [Assign LPs] button: Keyboard accessible, opens modal
 
 ---
 
@@ -687,6 +889,7 @@ Response:
 
 ### Data Loading
 - Header + Lines: Single query with JOINs
+- LP assignments: Included in lines query (count + assigned_qty)
 - Shipments: Lazy load on tab click
 - History: Lazy load on tab click
 
@@ -695,12 +898,14 @@ Response:
 'org:{orgId}:to:{toId}:detail'      // 30 sec TTL (refresh on action)
 'org:{orgId}:to:{toId}:shipments'   // 30 sec TTL
 'org:{orgId}:to:{toId}:history'     // 1 min TTL
+'org:{orgId}:to:{toId}:line:{lineId}:lps'  // 30 sec TTL
 ```
 
 ### Load Time Targets
 - Initial page (header + lines): <500ms
 - Tab switch (shipments): <300ms
 - Tab switch (history): <300ms
+- LP Picker Modal open: <500ms
 
 ---
 
@@ -710,12 +915,17 @@ Response:
 - Shipped percent calculation
 - Line status determination (complete, partial, pending)
 - Action button visibility by status
+- LP badge display logic (count, qty, color)
+- Assign LPs button visibility by status
 
 ### Integration Tests
 - GET /api/planning/transfer-orders/:id
 - GET /api/planning/transfer-orders/:id/shipments
 - GET /api/planning/transfer-orders/:id/history
 - GET /api/planning/transfer-orders/:id/lines/:lineId/lps
+- GET /api/planning/transfer-orders/:id/lines/:lineId/available-lps
+- POST /api/planning/transfer-orders/:id/lines/:lineId/assign-lps
+- DELETE /api/planning/transfer-orders/:id/lines/:lineId/lps/:lpId
 - RLS enforcement
 
 ### E2E Tests
@@ -725,7 +935,9 @@ Response:
 - Ship button navigates to warehouse (Planned TO)
 - Print action downloads PDF
 - Mobile responsive layout
-- View line LPs displays LP list
+- View line LPs displays LP list (expandable row)
+- [Assign LPs] button opens LP Picker Modal (PLAN-025)
+- LP assignment workflow: open modal, select LPs, assign, verify on page
 
 ---
 
@@ -740,6 +952,7 @@ Before handoff to FRONTEND-DEV:
 - [x] Responsive design documented
 - [x] History events listed
 - [x] LP tracking integration specified
+- [x] LP assignment button integration defined (Story 03.9b)
 
 ---
 
@@ -754,11 +967,16 @@ approval_status:
   user_approved: false  # PENDING USER REVIEW
 deliverables:
   wireframe: docs/3-ARCHITECTURE/ux/wireframes/PLAN-012-transfer-order-detail.md
+  related_wireframes:
+    - PLAN-025: TO LP Picker Modal (for [Assign LPs] button)
   api_endpoints:
     - GET /api/planning/transfer-orders/:id
     - GET /api/planning/transfer-orders/:id/shipments
     - GET /api/planning/transfer-orders/:id/history
     - GET /api/planning/transfer-orders/:id/lines/:lineId/lps
+    - GET /api/planning/transfer-orders/:id/lines/:lineId/available-lps
+    - POST /api/planning/transfer-orders/:id/lines/:lineId/assign-lps
+    - DELETE /api/planning/transfer-orders/:id/lines/:lineId/lps/:lpId
 states_per_screen: [loading, success, error]
 tabs: [lines, shipments, history]
 breakpoints:
@@ -771,6 +989,7 @@ accessibility:
 related_screens:
   - PLAN-010: TO List Page
   - PLAN-011: TO Create/Edit Modal
+  - PLAN-025: TO LP Picker Modal
   - Warehouse Ship/Receive Pages (cross-module)
 ```
 

@@ -2,10 +2,10 @@
 
 ## 🎯 TARGET
 ```yaml
-Stories: {{STORY_IDS}}  05.11 05.14
-Epic: {{EPIC_ID}}        05-warehouse
+Stories: {{STORY_IDS}}  03.11b 03.13
+Epic: {{EPIC_ID}}        03-planning
 ```
-
+   e
 ## 📋 7-PHASE FLOW
 
 | Phase | Agent | Skip When | Parallel |
@@ -66,6 +66,8 @@ Exit: {condition}
 3. **Max 4 parallel agents**
 4. **Phase skip = orchestrator decision** (agents don't skip)
 5. **Micro-handoff ≤50 tokens** from agents
+6. **check UX in cataloge 3-Architecture/ux/wireframe**
+7. **check context make sure you dont runout if there is posibility /compact context or close subagent and run next after short handover**
 
 ---
 

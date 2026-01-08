@@ -1,0 +1,7 @@
+# Story 03.11b - WO Material Reservations (LP Allocation)
+# Type: backend + frontend
+# Epic: 03-planning
+START: 2026-01-08T00:00:00Z orchestrator
+P1: ✓ ux-designer 2026-01-08 wireframes:4 approved:pending
+P2: ✓ test-writer 16:05 files:7 tests:148 status:red
+P3: ✓ backend-dev 16:31 files:6 tests:148/148

@@ -48,3 +48,13 @@ export { WOMaterialCard } from './WOMaterialCard'
 export { RefreshSnapshotButton } from './RefreshSnapshotButton'
 export { MaterialProductTypeBadge } from './MaterialProductTypeBadge'
 export { ByProductBadge } from './ByProductBadge'
+
+// Availability (Story 03.13)
+export {
+  WOAvailabilityPanel,
+  AvailabilitySummaryCard,
+  AvailabilityMaterialRow,
+  AvailabilityMaterialCard,
+  AvailabilityTrafficLight,
+  AvailabilityWarningModal,
+} from './availability'

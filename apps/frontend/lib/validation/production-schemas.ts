@@ -20,3 +20,47 @@ export const productionSettingsSchema = z.object({
 })
 
 export type ProductionSettingsInput = z.infer<typeof productionSettingsSchema>
+
+/**
+ * Story 04.2b: WO Pause/Resume Schemas
+ * Validates pause/resume request bodies
+ */
+
+// Pause reason enum
+export const pauseReasonEnum = z.enum([
+  'machine_breakdown',
+  'material_shortage',
+  'break',
+  'quality_issue',
+  'other',
+])
+
+export type PauseReason = z.infer<typeof pauseReasonEnum>
+
+// Pause work order request schema
+export const pauseWorkOrderSchema = z.object({
+  reason: pauseReasonEnum,
+  notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional(),
+})
+
+export type PauseWorkOrderInput = z.infer<typeof pauseWorkOrderSchema>
+
+// Resume work order request schema (no body required, but allow empty object)
+export const resumeWorkOrderSchema = z.object({}).optional()
+
+export type ResumeWorkOrderInput = z.infer<typeof resumeWorkOrderSchema>
+
+/**
+ * Work Order Status Type
+ * Shared across Pause/Resume and Yield components
+ */
+export const woStatusEnum = z.enum([
+  'draft',
+  'released',
+  'in_progress',
+  'paused',
+  'completed',
+  'cancelled',
+])
+
+export type WOStatus = z.infer<typeof woStatusEnum>

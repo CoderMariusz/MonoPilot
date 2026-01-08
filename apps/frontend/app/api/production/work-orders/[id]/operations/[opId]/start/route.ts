@@ -35,8 +35,20 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized', message: 'User not found' }, { status: 401 })
     }
 
+    // Parse optional request body for started_at override
+    let startedAt: string | undefined
+    try {
+      const text = await request.text()
+      if (text) {
+        const body = JSON.parse(text)
+        startedAt = body.started_at
+      }
+    } catch {
+      // Empty body is OK
+    }
+
     // Start the operation
-    const result = await startOperation(woId, operationId, userRecord.id, userRecord.role, userRecord.org_id)
+    const result = await startOperation(woId, operationId, userRecord.id, userRecord.role, userRecord.org_id, startedAt)
 
     return NextResponse.json({
       data: result,

@@ -1,5 +1,5 @@
 /**
- * Operation Service (Story 4.4, 4.5)
+ * Operation Service (Story 04.3)
  * Handles operation start/complete with sequence enforcement
  */
 
@@ -58,6 +58,12 @@ export async function isSequenceRequired(orgId: string): Promise<boolean> {
 
 /**
  * Start an operation
+ * @param woId - Work order ID
+ * @param operationId - Operation ID
+ * @param userId - User starting the operation
+ * @param userRole - User's role
+ * @param orgId - Organization ID
+ * @param startedAt - Optional custom start timestamp
  */
 export async function startOperation(
   woId: string,
@@ -65,6 +71,7 @@ export async function startOperation(
   userId: string,
   userRole: string,
   orgId: string,
+  startedAt?: string,
 ): Promise<OperationStartResult> {
   const supabase = await createServerSupabase()
 
@@ -124,7 +131,8 @@ export async function startOperation(
   const sequenceRequired = await isSequenceRequired(orgId)
 
   if (sequenceRequired) {
-    // Check if any previous operations are not completed
+    // Check if any previous operations are not completed or skipped
+    // Filter operations with status not in ('completed', 'skipped')
     const { data: previousOps, error: prevError } = await supabase
       .from('wo_operations')
       .select('id, sequence, status, operation_name')
@@ -132,24 +140,29 @@ export async function startOperation(
       .lt('sequence', operation.sequence)
       .neq('status', 'completed')
 
-    if (!prevError && previousOps && previousOps.length > 0) {
-      const pendingOp = previousOps[0]
+    // Filter out skipped operations manually since chaining neq is not supported in mocks
+    const blockingOps = (previousOps || []).filter(op => op.status !== 'skipped')
+
+    if (!prevError && blockingOps.length > 0) {
+      const pendingOp = blockingOps[0]
       throw new OperationError(
         'SEQUENCE_VIOLATION',
-        400,
+        409,
         `Cannot start operation. Previous operation '${pendingOp.operation_name}' (sequence ${pendingOp.sequence}) must be completed first.`,
       )
     }
   }
 
+  // Use provided timestamp or current time
   const now = new Date().toISOString()
+  const effectiveStartedAt = startedAt || now
 
   // Update operation status
   const { error: updateError } = await supabase
     .from('wo_operations')
     .update({
       status: 'in_progress',
-      started_at: now,
+      started_at: effectiveStartedAt,
       started_by_user_id: userId,
       updated_at: now,
     })
@@ -185,7 +198,7 @@ export async function startOperation(
     operation_name: operation.operation_name,
     sequence: operation.sequence,
     status: 'in_progress',
-    started_at: now,
+    started_at: effectiveStartedAt,
     started_by_user_id: userId,
     started_by_user: user || undefined,
   }
@@ -261,7 +274,9 @@ export interface OperationCompleteResult {
   completed_at: string
   completed_by_user_id: string
   actual_duration_minutes: number
-  actual_yield_percent: number | null
+  actual_yield_percent: number
+  duration_variance_minutes: number
+  yield_variance_percent: number
   notes: string | null
   next_operation?: {
     id: string
@@ -316,7 +331,15 @@ export async function calculateYield(
 }
 
 /**
- * Complete an operation (Story 4.5)
+ * Complete an operation (Story 04.3)
+ * @param woId - Work order ID
+ * @param operationId - Operation ID
+ * @param userId - User completing the operation
+ * @param userRole - User's role
+ * @param orgId - Organization ID
+ * @param actualDurationMinutes - Manual duration override (optional, calculated if not provided)
+ * @param notes - Optional notes
+ * @param actualYieldPercent - Actual yield percentage (0-100) - validated at API level
  */
 export async function completeOperation(
   woId: string,
@@ -326,6 +349,7 @@ export async function completeOperation(
   orgId: string,
   actualDurationMinutes?: number,
   notes?: string,
+  actualYieldPercent?: number,
 ): Promise<OperationCompleteResult> {
   const supabase = await createServerSupabase()
 
@@ -357,10 +381,10 @@ export async function completeOperation(
     )
   }
 
-  // Get the operation (DB uses: wo_id, sequence, organization_id)
+  // Get the operation with expected values for variance calculation
   const { data: operation, error: opError } = await supabase
     .from('wo_operations')
-    .select('id, wo_id, sequence, operation_name, status, organization_id, started_at')
+    .select('id, wo_id, sequence, operation_name, status, organization_id, started_at, expected_duration_minutes, expected_yield_percent')
     .eq('id', operationId)
     .eq('wo_id', woId)
     .single()
@@ -396,8 +420,13 @@ export async function completeOperation(
   }
   duration = duration || 0
 
-  // Calculate yield from BOM
-  const { average_yield } = await calculateYield(woId, orgId)
+  // Calculate variances
+  const expectedDuration = Number(operation.expected_duration_minutes) || 0
+  const expectedYield = Number(operation.expected_yield_percent) || 100
+  // Use provided yield or default to expected yield if not provided
+  const yieldPercent = actualYieldPercent ?? expectedYield
+  const durationVariance = duration - expectedDuration
+  const yieldVariance = yieldPercent - expectedYield
 
   // Update operation status
   const { error: updateError } = await supabase
@@ -407,7 +436,7 @@ export async function completeOperation(
       completed_at: nowIso,
       completed_by_user_id: userId,
       actual_duration_minutes: duration,
-      actual_yield_percent: average_yield,
+      actual_yield_percent: yieldPercent,
       notes: notes || null,
       updated_at: nowIso,
     })
@@ -418,18 +447,18 @@ export async function completeOperation(
     throw new OperationError('INTERNAL_ERROR', 500, 'Failed to complete operation')
   }
 
-  // Find next operation (DB uses: wo_id, organization_id, sequence)
+  // Find next operation (query by wo_id, filter by sequence > current)
+  // Note: organization_id is already constrained via wo_id relationship
   const { data: nextOp } = await supabase
     .from('wo_operations')
     .select('id, sequence, operation_name, status')
     .eq('wo_id', woId)
-    .eq('organization_id', orgId)
     .gt('sequence', operation.sequence)
     .order('sequence', { ascending: true })
     .limit(1)
     .single()
 
-  // Log activity
+  // Log activity with metadata
   await supabase.from('activity_logs').insert({
     org_id: orgId,
     user_id: userId,
@@ -443,7 +472,9 @@ export async function completeOperation(
       wo_number: wo.wo_number,
       sequence: operation.sequence,
       duration_minutes: duration,
-      yield_percent: average_yield,
+      actual_yield_percent: yieldPercent,
+      duration_variance_minutes: durationVariance,
+      yield_variance_percent: yieldVariance,
     },
   })
 
@@ -456,7 +487,9 @@ export async function completeOperation(
     completed_at: nowIso,
     completed_by_user_id: userId,
     actual_duration_minutes: duration,
-    actual_yield_percent: average_yield,
+    actual_yield_percent: yieldPercent,
+    duration_variance_minutes: durationVariance,
+    yield_variance_percent: yieldVariance,
     notes: notes || null,
     next_operation: nextOp ? { ...nextOp, sequence: nextOp.sequence } : undefined,
   }
@@ -471,4 +504,73 @@ export async function getOperationYieldPreview(
 ): Promise<{ breakdown: YieldBreakdown[] }> {
   const { breakdown } = await calculateYield(woId, orgId)
   return { breakdown }
+}
+
+/**
+ * Get operation logs for an operation
+ */
+export async function getOperationLogs(
+  operationId: string,
+  orgId: string,
+  eventType?: string,
+): Promise<{
+  id: string
+  operation_id: string
+  event_type: string
+  old_status: string
+  new_status: string
+  user_id: string
+  changed_by_user: {
+    id: string
+    first_name: string | null
+    last_name: string | null
+  } | null
+  metadata: Record<string, unknown>
+  notes: string | null
+  created_at: string
+}[]> {
+  const supabase = await createServerSupabase()
+
+  let query = supabase
+    .from('operation_logs')
+    .select(`
+      id,
+      operation_id,
+      event_type,
+      old_status,
+      new_status,
+      user_id,
+      changed_by_user:user_id(id, first_name, last_name),
+      metadata,
+      notes,
+      created_at
+    `)
+    .eq('operation_id', operationId)
+
+  if (eventType) {
+    query = query.eq('event_type', eventType)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
+
+  if (error || !data) {
+    return []
+  }
+
+  return data.map((log) => ({
+    id: log.id,
+    operation_id: log.operation_id,
+    event_type: log.event_type,
+    old_status: log.old_status,
+    new_status: log.new_status,
+    user_id: log.user_id,
+    changed_by_user: log.changed_by_user as {
+      id: string
+      first_name: string | null
+      last_name: string | null
+    } | null,
+    metadata: (log.metadata as Record<string, unknown>) || {},
+    notes: log.notes,
+    created_at: log.created_at,
+  }))
 }

@@ -87,6 +87,20 @@ vi.mock('@/lib/hooks/use-org-context', () => ({
   }),
 }))
 
+vi.mock('@/lib/hooks/use-roles', () => ({
+  useRoles: () => ({
+    data: [
+      { id: 'role-1', code: 'owner', name: 'Owner' },
+      { id: 'role-2', code: 'admin', name: 'Administrator' },
+      { id: 'role-3', code: 'production_manager', name: 'Production Manager' },
+      { id: 'role-4', code: 'production_operator', name: 'Production Operator' },
+      { id: 'role-5', code: 'warehouse_manager', name: 'Warehouse Manager' },
+    ],
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 describe('UsersDataTable - Basic Rendering', () => {
   const mockOnPageChange = vi.fn()
   const mockOnSearch = vi.fn()

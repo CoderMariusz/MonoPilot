@@ -1,0 +1,6 @@
+# Story 03.13 - WO Material Availability Check
+# Type: backend + frontend
+# Epic: 03-planning
+START: 2026-01-08T00:00:00Z orchestrator
+P1: ux-designer 10:45 wireframes:1 components:5 approved:pending
+P2: ✓ test-writer 16:06 files:2 tests:77 status:red

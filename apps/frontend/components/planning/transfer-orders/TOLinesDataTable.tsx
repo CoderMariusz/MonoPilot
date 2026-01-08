@@ -2,6 +2,7 @@
  * TO Lines Data Table Component
  * Story 03.8: Transfer Orders CRUD + Lines
  * Story 03.9a: TO Partial Shipments (Basic)
+ * Story 03.9b: TO License Plate Pre-selection
  * Displays transfer order line items with actions and progress indicators
  */
 
@@ -24,9 +25,16 @@ import { AddLineModal } from './AddLineModal'
 import { DeleteLineDialog } from './DeleteLineDialog'
 import { TOLineProgressBar } from './TOLineProgressBar'
 import { useDeleteTOLine } from '@/lib/hooks/use-transfer-order-mutations'
-import type { TransferOrderLineWithProduct, TOStatus } from '@/lib/types/transfer-order'
+import { useAssignLPs, useRemoveLP } from '@/lib/hooks/use-to-line-lps'
+import type { TransferOrderLineWithProduct, TOStatus, WarehouseInfo } from '@/lib/types/transfer-order'
 import { canModifyLines } from '@/lib/types/transfer-order'
 import { useToast } from '@/hooks/use-toast'
+import {
+  TOLPPickerModal,
+  TOLineLPAssignments,
+  type LPAssignment,
+  type LPSelection,
+} from '@/app/(authenticated)/planning/transfer-orders/[id]/components'
 
 interface TOLinesDataTableProps {
   toId: string
@@ -35,6 +43,8 @@ interface TOLinesDataTableProps {
   loading?: boolean
   onRefresh?: () => void
   canEdit?: boolean
+  fromWarehouse?: WarehouseInfo
+  lineLPAssignments?: Map<string, LPAssignment[]>
 }
 
 export function TOLinesDataTable({
@@ -44,14 +54,20 @@ export function TOLinesDataTable({
   loading,
   onRefresh,
   canEdit = true,
+  fromWarehouse,
+  lineLPAssignments = new Map(),
 }: TOLinesDataTableProps) {
   const [addLineOpen, setAddLineOpen] = useState(false)
   const [editingLine, setEditingLine] = useState<TransferOrderLineWithProduct | null>(null)
   const [deletingLine, setDeletingLine] = useState<TransferOrderLineWithProduct | null>(null)
+  const [lpPickerLine, setLPPickerLine] = useState<TransferOrderLineWithProduct | null>(null)
 
   const deleteLineMutation = useDeleteTOLine()
+  const assignLPsMutation = useAssignLPs()
+  const removeLPMutation = useRemoveLP()
   const { toast } = useToast()
   const isEditable = canModifyLines(status) && canEdit
+  const canAssignLPs = ['draft', 'planned'].includes(status)
 
   // Get existing product IDs to prevent duplicates
   const existingProductIds = lines.map((line) => line.product_id)
@@ -97,6 +113,41 @@ export function TOLinesDataTable({
     }
   }
 
+  // Handle LP assignment
+  const handleAssignLPs = async (selections: LPSelection[]) => {
+    if (!lpPickerLine) return
+
+    try {
+      await assignLPsMutation.mutateAsync({
+        toId,
+        lineId: lpPickerLine.id,
+        lps: selections.map((sel) => ({
+          lp_id: sel.lp_id,
+          quantity: sel.quantity,
+        })),
+      })
+      setLPPickerLine(null)
+      onRefresh?.()
+    } catch (error) {
+      throw error // Let modal handle the error display
+    }
+  }
+
+  // Handle LP removal
+  const handleRemoveLP = async (lineId: string, lpId: string) => {
+    try {
+      await removeLPMutation.mutateAsync({ toId, lineId, lpId })
+      toast({ title: 'Success', description: 'LP removed successfully' })
+      onRefresh?.()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to remove LP',
+        variant: 'destructive',
+      })
+    }
+  }
+
   // Get line status display
   const getLineStatus = (line: TransferOrderLineWithProduct) => {
     const percent = line.quantity > 0
@@ -106,6 +157,17 @@ export function TOLinesDataTable({
     if (percent === 0) return { label: '0%', color: 'text-gray-500', bg: 'bg-gray-100' }
     if (percent >= 100) return { label: '100%', color: 'text-green-700', bg: 'bg-green-100' }
     return { label: `${percent}%`, color: 'text-yellow-700', bg: 'bg-yellow-100' }
+  }
+
+  // Get LP assignments for a line
+  const getLineAssignments = (lineId: string): LPAssignment[] => {
+    return lineLPAssignments.get(lineId) || []
+  }
+
+  // Calculate total assigned qty for a line
+  const getAssignedQty = (lineId: string): number => {
+    const assignments = getLineAssignments(lineId)
+    return assignments.reduce((sum, a) => sum + a.quantity, 0)
   }
 
   // Loading state
@@ -193,13 +255,14 @@ export function TOLinesDataTable({
               <TableHead className="text-right">Shipped</TableHead>
               <TableHead className="text-right">Received</TableHead>
               <TableHead className="text-center">Status</TableHead>
+              {canAssignLPs && <TableHead className="min-w-[200px]">LPs</TableHead>}
               {isEditable && <TableHead className="w-24"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {lines.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isEditable ? 7 : 6} className="py-12">
+                <TableCell colSpan={isEditable ? 8 : (canAssignLPs ? 7 : 6)} className="py-12">
                   <div className="flex flex-col items-center justify-center text-center">
                     <Package className="h-10 w-10 text-gray-400 mb-3" />
                     <h3 className="text-sm font-medium text-gray-900 mb-1">
@@ -257,6 +320,20 @@ export function TOLinesDataTable({
                         {lineStatus.label}
                       </span>
                     </TableCell>
+                    {canAssignLPs && (
+                      <TableCell>
+                        <TOLineLPAssignments
+                          toId={toId}
+                          toLineId={line.id}
+                          assignments={getLineAssignments(line.id)}
+                          totalRequired={line.quantity}
+                          uom={line.uom}
+                          canEdit={canAssignLPs}
+                          onRemove={(lpId) => handleRemoveLP(line.id, lpId)}
+                          onOpenPicker={() => setLPPickerLine(line)}
+                        />
+                      </TableCell>
+                    )}
                     {isEditable && (
                       <TableCell>
                         <div className="flex justify-end gap-1">
@@ -320,6 +397,27 @@ export function TOLinesDataTable({
           uom={deletingLine.uom}
           onConfirm={handleDeleteConfirm}
           isLoading={deleteLineMutation.isPending}
+        />
+      )}
+
+      {/* LP Picker Modal (Story 03.9b) */}
+      {lpPickerLine && fromWarehouse && (
+        <TOLPPickerModal
+          isOpen={!!lpPickerLine}
+          onClose={() => setLPPickerLine(null)}
+          onAssign={handleAssignLPs}
+          toId={toId}
+          toLineId={lpPickerLine.id}
+          toLine={{
+            id: lpPickerLine.id,
+            product_id: lpPickerLine.product_id,
+            product_name: lpPickerLine.product?.name || 'Unknown',
+            product_code: lpPickerLine.product?.code || '',
+            requested_qty: lpPickerLine.quantity,
+            uom: lpPickerLine.uom,
+          }}
+          fromWarehouse={fromWarehouse}
+          existingAssignedQty={getAssignedQty(lpPickerLine.id)}
         />
       )}
     </div>
