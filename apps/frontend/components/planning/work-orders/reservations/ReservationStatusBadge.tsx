@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/tooltip'
 import { CheckCircle2, AlertTriangle, Circle, PlusCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils/format-quantity'
 import type { CoverageStatus } from '@/lib/validation/wo-reservations'
 
 // ============================================================================
@@ -52,16 +53,6 @@ function getReservationStatus(required: number, reserved: number): CoverageStatu
 function getCoveragePercent(required: number, reserved: number): number {
   if (required === 0) return 0
   return Math.round((reserved / required) * 100)
-}
-
-/**
- * Format number with commas and limited decimals
- */
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })
 }
 
 // ============================================================================

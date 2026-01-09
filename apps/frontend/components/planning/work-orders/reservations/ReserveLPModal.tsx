@@ -43,6 +43,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useMediaQuery } from '@/lib/hooks/use-media-query'
+import { formatNumber, formatDate } from '@/lib/utils/format-quantity'
 import { AvailableLPsTable, type LPSelection } from './AvailableLPsTable'
 import { useAvailableLPsForMaterial, useReserveLPs } from '@/lib/hooks/use-wo-reservations'
 import type { AvailableLP } from '@/lib/validation/wo-reservations'
@@ -89,26 +90,6 @@ interface Filters {
   lot_number?: string
   location?: string
   search?: string
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
 }
 
 // ============================================================================

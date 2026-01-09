@@ -168,12 +168,9 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
     },
   }
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    // Clear service cache before each test
-    MaterialAvailabilityService.clearCache()
-
-    mockQuery = {
+  // Helper to create a chainable query mock for specific table
+  const createTableMock = (singleData: any = null, listData: any[] = [], error: any = null) => {
+    const chain: any = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       is: vi.fn().mockReturnThis(),
@@ -184,17 +181,47 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
       not: vi.fn().mockReturnThis(),
       neq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      then: vi.fn((resolve) => resolve({ data: [], error: null })),
+      single: vi.fn().mockResolvedValue({ data: singleData, error }),
+    }
+    // Make thenable for array queries (no .single())
+    chain.then = (resolve: any) => resolve({ data: listData, error })
+    return chain
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Clear service cache before each test
+    MaterialAvailabilityService.clearCache()
+
+    // Default mock work order
+    const mockWO = {
+      id: testWoId,
+      organization_id: testOrgId,
     }
 
-    // Make mockQuery thenable so await works
-    Object.defineProperty(mockQuery, Symbol.toStringTag, { value: 'Promise' })
-
+    // Create mockSupabase that returns different data based on table
     mockSupabase = {
-      from: vi.fn().mockReturnValue(mockQuery),
+      from: vi.fn((tableName: string) => {
+        if (tableName === 'work_orders') {
+          return createTableMock(mockWO, [mockWO], null)
+        }
+        if (tableName === 'wo_materials') {
+          return createTableMock(null, [], null)  // Empty materials by default
+        }
+        if (tableName === 'license_plates') {
+          return createTableMock(null, [], null)
+        }
+        if (tableName === 'lp_reservations') {
+          return createTableMock(null, [], null)
+        }
+        // Default empty query
+        return createTableMock(null, [], null)
+      }),
       rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     }
+
+    // Keep a reference to the generic mock query for tests that need it
+    mockQuery = createTableMock(null, [], null)
   })
 
   describe('calculateCoveragePercent()', () => {
@@ -391,8 +418,12 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         { product_id: testProductId1, quantity: 25, status: 'available' },
       ]
 
-      // Setup mock to return LPs
-      mockQuery.then = vi.fn((resolve) => resolve({ data: mockLPs, error: null }))
+      // Override mockSupabase to return LP data for license_plates table
+      const lpMock = createTableMock(null, mockLPs, null)
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'license_plates') return lpMock
+        return createTableMock(null, [], null)
+      })
 
       // Expected: 50 + 75 + 25 = 150
       const result = await MaterialAvailabilityService.getAvailableLPQuantity(
@@ -411,7 +442,11 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         { quantity: 25 },
       ]
 
-      mockQuery.then = vi.fn((resolve) => resolve({ data: mockNonExpiredLPs, error: null }))
+      const lpMock = createTableMock(null, mockNonExpiredLPs, null)
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'license_plates') return lpMock
+        return createTableMock(null, [], null)
+      })
 
       // Expected: 75 + 25 = 100 (expired 50 excluded by query)
       const result = await MaterialAvailabilityService.getAvailableLPQuantity(
@@ -429,7 +464,11 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         { quantity: 50 },
       ]
 
-      mockQuery.then = vi.fn((resolve) => resolve({ data: mockAvailableLPs, error: null }))
+      const lpMock = createTableMock(null, mockAvailableLPs, null)
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'license_plates') return lpMock
+        return createTableMock(null, [], null)
+      })
 
       // Expected: only 50 from available LP
       const result = await MaterialAvailabilityService.getAvailableLPQuantity(
@@ -453,7 +492,11 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
     it('should respect org_id isolation', async () => {
       // AC-12: RLS enforcement - verify eq is called with org_id
       const mockLPs = [{ quantity: 50 }]
-      mockQuery.then = vi.fn((resolve) => resolve({ data: mockLPs, error: null }))
+      const lpMock = createTableMock(null, mockLPs, null)
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'license_plates') return lpMock
+        return createTableMock(null, [], null)
+      })
 
       const result = await MaterialAvailabilityService.getAvailableLPQuantity(
         mockSupabase,
@@ -461,7 +504,7 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         testOrgId
       )
       expect(result).toBe(50)
-      expect(mockQuery.eq).toHaveBeenCalledWith('org_id', testOrgId)
+      expect(lpMock.eq).toHaveBeenCalledWith('org_id', testOrgId)
     })
   })
 
@@ -472,7 +515,11 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         { reserved_qty: 30, consumed_qty: 0, wo_id: 'other-wo-1', license_plates: { product_id: testProductId1 } },
         { reserved_qty: 20, consumed_qty: 0, wo_id: 'other-wo-2', license_plates: { product_id: testProductId1 } },
       ]
-      mockQuery.then = vi.fn((resolve) => resolve({ data: mockReservations, error: null }))
+      const resMock = createTableMock(null, mockReservations, null)
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'lp_reservations') return resMock
+        return createTableMock(null, [], null)
+      })
 
       // Expected: 30 + 20 = 50
       const result = await MaterialAvailabilityService.getReservedQuantity(
@@ -488,7 +535,11 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
       const mockActiveReservations = [
         { reserved_qty: 30, consumed_qty: 0, wo_id: 'active-wo', license_plates: { product_id: testProductId1 } },
       ]
-      mockQuery.then = vi.fn((resolve) => resolve({ data: mockActiveReservations, error: null }))
+      const resMock = createTableMock(null, mockActiveReservations, null)
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'lp_reservations') return resMock
+        return createTableMock(null, [], null)
+      })
 
       // Expected: only 30 (completed and cancelled excluded by query)
       const result = await MaterialAvailabilityService.getReservedQuantity(
@@ -497,7 +548,7 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         testOrgId
       )
       expect(result).toBe(30)
-      expect(mockQuery.eq).toHaveBeenCalledWith('status', 'active')
+      expect(resMock.eq).toHaveBeenCalledWith('status', 'active')
     })
 
     it('should exclude current WO from reservation calculation', async () => {
@@ -505,7 +556,11 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
       const mockOtherReservations = [
         { reserved_qty: 30, consumed_qty: 0, wo_id: 'other-wo', license_plates: { product_id: testProductId1 } },
       ]
-      mockQuery.then = vi.fn((resolve) => resolve({ data: mockOtherReservations, error: null }))
+      const resMock = createTableMock(null, mockOtherReservations, null)
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'lp_reservations') return resMock
+        return createTableMock(null, [], null)
+      })
 
       // Expected: only 30 (own WO excluded by neq filter)
       const result = await MaterialAvailabilityService.getReservedQuantity(
@@ -515,7 +570,7 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         testWoId
       )
       expect(result).toBe(30)
-      expect(mockQuery.neq).toHaveBeenCalledWith('wo_id', testWoId)
+      expect(resMock.neq).toHaveBeenCalledWith('wo_id', testWoId)
     })
 
     it('should return 0 when no other reservations exist', async () => {
@@ -542,13 +597,25 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
     })
 
     it('should calculate correct availability per material', async () => {
-      // AC-1: Per-material calculation
+      // AC-1: Per-material calculation - setup mock with materials
+      const mockWO = { id: testWoId, organization_id: testOrgId }
+      const mockMaterials = [mockWOMaterial1]
+
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'work_orders') return createTableMock(mockWO, [mockWO], null)
+        if (tableName === 'wo_materials') return createTableMock(null, mockMaterials, null)
+        if (tableName === 'license_plates') return createTableMock(null, [], null)
+        if (tableName === 'lp_reservations') return createTableMock(null, [], null)
+        return createTableMock(null, [], null)
+      })
+
       const result = await MaterialAvailabilityService.checkWOAvailability(
         mockSupabase,
         testWoId,
         testOrgId
       )
 
+      expect(result.materials.length).toBeGreaterThan(0)
       expect(result.materials[0].coverage_percent).toBeDefined()
       expect(result.materials[0].shortage_qty).toBeDefined()
       expect(result.materials[0].status).toBeDefined()
@@ -556,6 +623,17 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
 
     it('should include expired excluded qty in response', async () => {
       // AC-2: Show how much was excluded due to expiry
+      const mockWO = { id: testWoId, organization_id: testOrgId }
+      const mockMaterials = [mockWOMaterial1]
+
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'work_orders') return createTableMock(mockWO, [mockWO], null)
+        if (tableName === 'wo_materials') return createTableMock(null, mockMaterials, null)
+        if (tableName === 'license_plates') return createTableMock(null, [], null)
+        if (tableName === 'lp_reservations') return createTableMock(null, [], null)
+        return createTableMock(null, [], null)
+      })
+
       const result = await MaterialAvailabilityService.checkWOAvailability(
         mockSupabase,
         testWoId,
@@ -579,11 +657,19 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
     })
 
     it('should throw error for non-existent WO', async () => {
-      // Should throw WO_NOT_FOUND error
+      // Should throw NOT_FOUND error - use a valid UUID that doesn't exist
+      const nonExistentWoId = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+
+      // Mock WO not found
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'work_orders') return createTableMock(null, [], { code: 'PGRST116' })
+        return createTableMock(null, [], null)
+      })
+
       await expect(
         MaterialAvailabilityService.checkWOAvailability(
           mockSupabase,
-          'non-existent-wo-id',
+          nonExistentWoId,
           testOrgId
         )
       ).rejects.toThrow('NOT_FOUND')
@@ -735,6 +821,16 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
       const lpSum = 100
       const otherReservations = 30
 
+      // Setup mocks: LPs with 100 total, reservations with 30
+      const mockLPs = [{ quantity: 100 }]
+      const mockReservations = [{ reserved_qty: 30, consumed_qty: 0, license_plates: { product_id: testProductId1 } }]
+
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'license_plates') return createTableMock(null, mockLPs, null)
+        if (tableName === 'lp_reservations') return createTableMock(null, mockReservations, null)
+        return createTableMock(null, [], null)
+      })
+
       const result = await MaterialAvailabilityService.calculateNetAvailable(
         mockSupabase,
         testProductId1,
@@ -746,7 +842,17 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
     })
 
     it('should not double-count own WO reservations', async () => {
-      // AC-3: Own reservations included in available
+      // AC-3: Own reservations included in available (excluded from deduction)
+      const mockLPs = [{ quantity: 100 }]
+      // No reservations from OTHER WOs
+      const mockReservations: any[] = []
+
+      mockSupabase.from = vi.fn((tableName: string) => {
+        if (tableName === 'license_plates') return createTableMock(null, mockLPs, null)
+        if (tableName === 'lp_reservations') return createTableMock(null, mockReservations, null)
+        return createTableMock(null, [], null)
+      })
+
       const result = await MaterialAvailabilityService.calculateNetAvailable(
         mockSupabase,
         testProductId1,
@@ -754,20 +860,17 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
         testWoId
       )
 
-      // Own WO's 50 kg reservation should not be deducted
-      expect(result).toBeGreaterThan(0)
+      // Full 100 kg available since no other WO reservations
+      expect(result).toBe(100)
     })
   })
 
   describe('Error Handling', () => {
     it('should handle database errors gracefully', async () => {
-      mockSupabase.from.mockReturnValue({
-        ...mockQuery,
-        single: vi.fn().mockResolvedValue({
-          data: null,
-          error: { message: 'Database connection failed' },
-        }),
-      })
+      // Return error when querying work_orders
+      mockSupabase.from = vi.fn(() =>
+        createTableMock(null, [], { message: 'Database connection failed' })
+      )
 
       await expect(
         MaterialAvailabilityService.checkWOAvailability(
@@ -805,9 +908,10 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
 
   describe('Performance', () => {
     it('should handle WO with 50 materials efficiently', async () => {
-      // AC-11: <1s for 50 materials
+      // AC-11: <1s for 50 materials - mocked so just checks function works
       const startTime = Date.now()
 
+      // Note: With mocks, this tests the synchronous processing logic, not actual DB queries
       const result = await MaterialAvailabilityService.checkWOAvailability(
         mockSupabase,
         testWoId,
@@ -816,12 +920,14 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
 
       const elapsed = Date.now() - startTime
       expect(elapsed).toBeLessThan(1000)
+      expect(result).toBeDefined()
     })
 
     it('should handle WO with 200 materials efficiently', async () => {
-      // AC-11: <2s for 200 materials
+      // AC-11: <2s for 200 materials - mocked so just checks function works
       const startTime = Date.now()
 
+      // Note: With mocks, this tests the synchronous processing logic, not actual DB queries
       const result = await MaterialAvailabilityService.checkWOAvailability(
         mockSupabase,
         testWoId,
@@ -830,6 +936,7 @@ describe('MaterialAvailabilityService (Story 03.13)', () => {
 
       const elapsed = Date.now() - startTime
       expect(elapsed).toBeLessThan(2000)
+      expect(result).toBeDefined()
     })
   })
 })

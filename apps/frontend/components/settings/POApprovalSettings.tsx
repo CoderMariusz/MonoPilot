@@ -51,6 +51,7 @@ import {
 
 import { useRoles } from '@/lib/hooks/use-roles';
 import type { PlanningSettings, PlanningSettingsUpdate } from '@/lib/types/planning-settings';
+import { hasMaxFourDecimalPlaces } from '@/lib/validation/planning-settings-schema';
 
 /**
  * Tooltip text constants
@@ -64,6 +65,7 @@ const TOOLTIPS = {
 
 /**
  * Form validation schema
+ * Uses shared validation helpers from planning-settings-schema
  */
 const formSchema = z.object({
   po_require_approval: z.boolean(),
@@ -79,15 +81,7 @@ const formSchema = z.object({
         .number()
         .positive('Threshold must be a positive number')
         .gt(0, 'Threshold must be greater than zero')
-        .refine(
-          (val) => {
-            const str = val.toString();
-            const decimalIndex = str.indexOf('.');
-            if (decimalIndex === -1) return true;
-            return str.length - decimalIndex - 1 <= 4;
-          },
-          'Threshold can have at most 4 decimal places'
-        )
+        .refine(hasMaxFourDecimalPlaces, 'Threshold can have at most 4 decimal places')
         .nullable()
     ),
   po_approval_roles: z

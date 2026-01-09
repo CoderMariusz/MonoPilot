@@ -2,10 +2,10 @@
 
 ## 🎯 TARGET
 ```yaml
-Epic: {{EPIC_ID}}        02-technical
-Folder: {{EPIC_FOLDER}}  02-technical
-Prefix: {{PREFIX}}       02
-Mode: AUDIT   # AUDIT=tylko sprawdź, COMPLETE=dokończ stories
+Epic: {{EPIC_ID}}        03-PLANNING
+Folder: {{EPIC_FOLDER}}  03-planning
+Prefix: {{PREFIX}}       03
+Mode: COMPLETE   # AUDIT=tylko sprawdź, COMPLETE=dokończ stories
 ```
 
 ## 📋 7-PHASE FLOW (Reference)
@@ -34,6 +34,9 @@ ls docs/2-MANAGEMENT/epics/current/{{EPIC_FOLDER}}/*.md | grep -E '^\d+\.\d+'
 
 # 3. Read last 5 lines of each checkpoint
 for f in .claude/checkpoints/{{PREFIX}}*.yaml; do tail -5 "$f"; done
+
+# 4. Read Project-State
+.claude/projet-state.md
 ```
 
 **Output: Status Table**
@@ -211,6 +214,7 @@ next_action:
 4. **Sequential phases per story** - P1→P2→P3→P4→P5→P6→P7
 5. **Orchestrator doesn't code** - only reads, routes, delegates
 6. **Check context** - if running low, /compact or close agent before spawning new
+7. **Use opus model to correct errors**
 
 ---
 

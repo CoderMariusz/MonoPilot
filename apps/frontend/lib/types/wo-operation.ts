@@ -1,13 +1,22 @@
 /**
  * WO Operation Types (Story 03.12)
  * Type definitions for Work Order Operations
+ *
+ * NOTE: WOOperationStatus is re-exported from validation schemas (single source of truth).
+ * This ensures Zod validation and TypeScript types stay in sync.
  */
 
 // ============================================================================
-// ENUMS
+// RE-EXPORTS FROM VALIDATION (Single Source of Truth)
 // ============================================================================
 
-export type WOOperationStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+import {
+  type WOOperationStatus as _WOOperationStatus,
+  woOperationStatusEnum as _woOperationStatusEnum,
+} from '@/lib/validation/wo-operations-schemas';
+
+export type WOOperationStatus = _WOOperationStatus;
+export const woOperationStatusEnum = _woOperationStatusEnum;
 
 // ============================================================================
 // STATUS CONFIG

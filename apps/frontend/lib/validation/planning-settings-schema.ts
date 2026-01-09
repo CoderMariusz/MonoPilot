@@ -14,8 +14,9 @@ import { z } from 'zod';
 /**
  * Custom refinement to check decimal places
  * Returns true if the number has at most 4 decimal places
+ * Exported for reuse in component form schemas
  */
-function hasMaxFourDecimalPlaces(value: number): boolean {
+export function hasMaxFourDecimalPlaces(value: number): boolean {
   // Handle edge cases
   if (!Number.isFinite(value)) return false;
 
@@ -50,8 +51,9 @@ const thresholdSchema = z
  * PO Approval roles schema
  * - Must be a non-empty array of strings
  * - Each role must be a non-empty string
+ * Exported for reuse in component form schemas
  */
-const rolesSchema = z
+export const rolesSchema = z
   .array(z.string().min(1, 'Roles cannot be empty strings'))
   .min(1, 'At least one approval role must be selected');
 
@@ -81,10 +83,7 @@ export const planningSettingsUpdateSchema = z.object({
   // PO Approval fields (optional for partial updates)
   po_require_approval: z.boolean().optional(),
   po_approval_threshold: thresholdSchema,
-  po_approval_roles: z
-    .array(z.string().min(1))
-    .min(1, 'At least one approval role must be selected')
-    .optional(),
+  po_approval_roles: rolesSchema.optional(),
 });
 
 /**

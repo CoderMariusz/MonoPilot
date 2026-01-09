@@ -40,6 +40,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatNumber, formatDate, formatDateTime } from '@/lib/utils/format-quantity'
 import { useMediaQuery } from '@/lib/hooks/use-media-query'
 
 // ============================================================================
@@ -79,36 +80,6 @@ export interface ReservedLPsListProps {
   onRelease: (reservationId: string) => Promise<void>
   onViewLP: (lpId: string) => void
   onRetry: () => void
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-function formatDateTime(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
 }
 
 // ============================================================================

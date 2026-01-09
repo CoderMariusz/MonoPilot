@@ -12,6 +12,7 @@
 
 import { createServerSupabase } from '@/lib/supabase/server';
 import type { PlanningSettings } from '@/lib/types/planning-settings';
+import { PLANNING_SETTINGS_DEFAULTS } from '@/lib/types/planning-settings';
 import type { PlanningSettingsInput } from '@/lib/validation/planning-settings-schemas';
 
 // Re-export types for convenience
@@ -21,35 +22,9 @@ export type { PlanningSettingsInput } from '@/lib/validation/planning-settings-s
 /**
  * Default settings values for new organizations
  * Applied when initializing planning_settings for the first time
+ * @deprecated Use PLANNING_SETTINGS_DEFAULTS from @/lib/types/planning-settings directly
  */
-export const DEFAULT_SETTINGS: Omit<PlanningSettings, 'id' | 'org_id' | 'created_at' | 'updated_at'> = {
-  // PO defaults
-  po_require_approval: false,
-  po_approval_threshold: null,
-  po_approval_roles: ['admin', 'manager'],
-  po_auto_number_prefix: 'PO-',
-  po_auto_number_format: 'YYYY-NNNNN',
-  po_default_payment_terms: 'Net 30',
-  po_default_currency: 'PLN',
-
-  // TO defaults
-  to_allow_partial_shipments: true,
-  to_require_lp_selection: false,
-  to_auto_number_prefix: 'TO-',
-  to_auto_number_format: 'YYYY-NNNNN',
-  to_default_transit_days: 1,
-
-  // WO defaults
-  wo_material_check: true,
-  wo_copy_routing: true,
-  wo_auto_select_bom: true,
-  wo_require_bom: true,
-  wo_allow_overproduction: false,
-  wo_overproduction_limit: 10,
-  wo_auto_number_prefix: 'WO-',
-  wo_auto_number_format: 'YYYY-NNNNN',
-  wo_default_scheduling_buffer_hours: 2,
-};
+export const DEFAULT_SETTINGS = PLANNING_SETTINGS_DEFAULTS;
 
 /**
  * Get planning settings for an organization

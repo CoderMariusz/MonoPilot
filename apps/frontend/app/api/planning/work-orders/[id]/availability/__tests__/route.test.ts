@@ -171,6 +171,35 @@ vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: vi.fn(() => Promise.resolve(mockSupabaseClient)),
 }))
 
+// Store original from function for restoration
+const originalFromFn = (tableName: string) => {
+  if (tableName === 'users') {
+    return createChainableMock({ org_id: TEST_ORG_ID, role: { code: 'planner' } })
+  }
+  if (tableName === 'work_orders') {
+    return createChainableMock(mockWO)
+  }
+  if (tableName === 'wo_materials') {
+    const chain = createChainableMock(mockMaterials[0])
+    chain.then = (resolve: any) => resolve({ data: mockMaterials, error: null })
+    return chain
+  }
+  if (tableName === 'planning_settings') {
+    return createChainableMock({ wo_material_check: true })
+  }
+  if (tableName === 'license_plates') {
+    const chain = createChainableMock(null)
+    chain.then = (resolve: any) => resolve({ data: [], error: null })
+    return chain
+  }
+  if (tableName === 'lp_reservations') {
+    const chain = createChainableMock(null)
+    chain.then = (resolve: any) => resolve({ data: [], error: null })
+    return chain
+  }
+  return createChainableMock(null)
+}
+
 describe('GET /api/planning/work-orders/[id]/availability', () => {
   // Helper to create mock request
   const createRequest = (woId: string) => {
@@ -180,6 +209,16 @@ describe('GET /api/planning/work-orders/[id]/availability', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Restore original mock functions
+    mockSupabaseClient.from = vi.fn(originalFromFn)
+    mockSupabaseClient.auth.getSession = vi.fn().mockResolvedValue({
+      data: {
+        session: {
+          user: { id: TEST_USER_ID },
+        },
+      },
+      error: null,
+    })
   })
 
   describe('Success Responses', () => {

@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Package, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatNumber, formatDate, getShelfLife } from '@/lib/utils/format-quantity'
 import type { AvailableLP } from '@/lib/validation/wo-reservations'
 
 // ============================================================================
@@ -49,47 +50,6 @@ export interface AvailableLPsTableProps {
   onSelect: (lpId: string, selected: boolean, lp: AvailableLP) => void
   onQuantityChange: (lpId: string, quantity: number) => void
   onSortChange: (order: 'fifo' | 'fefo') => void
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-function getShelfLife(expiryDate: string | null): { text: string; isNearExpiry: boolean } {
-  if (!expiryDate) return { text: '-', isNearExpiry: false }
-
-  const expiry = new Date(expiryDate)
-  const today = new Date()
-  const diffMs = expiry.getTime() - today.getTime()
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffDays <= 0) {
-    return { text: 'Expired', isNearExpiry: true }
-  } else if (diffDays <= 30) {
-    return { text: `${diffDays} days`, isNearExpiry: true }
-  } else if (diffDays <= 90) {
-    const months = Math.round(diffDays / 30)
-    return { text: `${months} mo`, isNearExpiry: false }
-  } else {
-    const months = Math.round(diffDays / 30)
-    return { text: `${months} mo`, isNearExpiry: false }
-  }
 }
 
 // ============================================================================

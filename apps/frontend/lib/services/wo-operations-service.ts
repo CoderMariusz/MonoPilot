@@ -6,15 +6,19 @@
  * both server-side (API routes) and client-side usage.
  *
  * Security: All queries enforce org_id isolation (ADR-013).
+ *
+ * Types: Re-exports WOOperationStatus from validation schemas (single source of truth).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { WOOperationStatus } from '@/lib/validation/wo-operations-schemas'
+
+// Re-export for consumers who import from service
+export type { WOOperationStatus }
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-export type WOOperationStatus = 'pending' | 'in_progress' | 'completed' | 'skipped'
 
 export interface WOOperation {
   id: string
@@ -116,6 +120,52 @@ export class WOOperationsError extends Error {
 }
 
 // ============================================================================
+// INTERNAL HELPERS
+// ============================================================================
+
+/**
+ * Extract base WOOperation fields from database row
+ * Reduces duplication between getOperationsForWO and getOperationById
+ */
+function mapBaseOperationFields(op: Record<string, unknown>): WOOperation {
+  return {
+    id: op.id as string,
+    wo_id: op.wo_id as string,
+    organization_id: op.organization_id as string,
+    sequence: op.sequence as number,
+    operation_name: op.operation_name as string,
+    description: op.description as string | null,
+    instructions: op.instructions as string | null,
+    machine_id: op.machine_id as string | null,
+    line_id: op.line_id as string | null,
+    expected_duration_minutes: op.expected_duration_minutes as number | null,
+    expected_yield_percent: op.expected_yield_percent as number | null,
+    actual_duration_minutes: op.actual_duration_minutes as number | null,
+    actual_yield_percent: op.actual_yield_percent as number | null,
+    status: op.status as WOOperationStatus,
+    started_at: op.started_at as string | null,
+    completed_at: op.completed_at as string | null,
+    started_by: op.started_by as string | null,
+    completed_by: op.completed_by as string | null,
+    skip_reason: op.skip_reason as string | null,
+    notes: op.notes as string | null,
+    created_at: op.created_at as string,
+    updated_at: op.updated_at as string,
+  }
+}
+
+/**
+ * Calculate variance between actual and expected values
+ * Returns null if either value is null/undefined
+ */
+function calculateVariance(actual: number | null, expected: number | null): number | null {
+  if (actual === null || actual === undefined || expected === null || expected === undefined) {
+    return null
+  }
+  return Number(actual) - Number(expected)
+}
+
+// ============================================================================
 // SERVICE METHODS
 // ============================================================================
 
@@ -191,36 +241,15 @@ export async function getOperationsForWO(
     )
   }
 
-  // Map the response
-  const mapped: WOOperationListItem[] = (operations || []).map((op: any) => ({
-    id: op.id,
-    wo_id: op.wo_id,
-    organization_id: op.organization_id,
-    sequence: op.sequence,
-    operation_name: op.operation_name,
-    description: op.description,
-    instructions: op.instructions,
-    machine_id: op.machine_id,
-    line_id: op.line_id,
-    expected_duration_minutes: op.expected_duration_minutes,
-    expected_yield_percent: op.expected_yield_percent,
-    actual_duration_minutes: op.actual_duration_minutes,
-    actual_yield_percent: op.actual_yield_percent,
-    status: op.status,
-    started_at: op.started_at,
-    completed_at: op.completed_at,
-    started_by: op.started_by,
-    completed_by: op.completed_by,
-    skip_reason: op.skip_reason,
-    notes: op.notes,
-    created_at: op.created_at,
-    updated_at: op.updated_at,
-    machine_code: op.machine?.code ?? null,
-    machine_name: op.machine?.name ?? null,
-    line_code: op.line?.code ?? null,
-    line_name: op.line?.name ?? null,
-    started_by_user: op.started_by_user ?? null,
-    completed_by_user: op.completed_by_user ?? null,
+  // Map the response using helper + list-specific fields
+  const mapped: WOOperationListItem[] = (operations || []).map((op: Record<string, unknown>) => ({
+    ...mapBaseOperationFields(op),
+    machine_code: (op.machine as { code?: string } | null)?.code ?? null,
+    machine_name: (op.machine as { name?: string } | null)?.name ?? null,
+    line_code: (op.line as { code?: string } | null)?.code ?? null,
+    line_name: (op.line as { name?: string } | null)?.name ?? null,
+    started_by_user: (op.started_by_user as { name: string } | null) ?? null,
+    completed_by_user: (op.completed_by_user as { name: string } | null) ?? null,
   }))
 
   return {
@@ -270,44 +299,19 @@ export async function getOperationById(
     return null
   }
 
-  // Calculate variances
-  const duration_variance =
-    operation.actual_duration_minutes !== null && operation.expected_duration_minutes !== null
-      ? operation.actual_duration_minutes - operation.expected_duration_minutes
-      : null
-
-  const yield_variance =
-    operation.actual_yield_percent !== null && operation.expected_yield_percent !== null
-      ? Number(operation.actual_yield_percent) - Number(operation.expected_yield_percent)
-      : null
-
+  // Use helper for base fields + detail-specific fields
   return {
-    id: operation.id,
-    wo_id: operation.wo_id,
-    organization_id: operation.organization_id,
-    sequence: operation.sequence,
-    operation_name: operation.operation_name,
-    description: operation.description,
-    instructions: operation.instructions,
-    machine_id: operation.machine_id,
-    line_id: operation.line_id,
-    expected_duration_minutes: operation.expected_duration_minutes,
-    expected_yield_percent: operation.expected_yield_percent,
-    actual_duration_minutes: operation.actual_duration_minutes,
-    actual_yield_percent: operation.actual_yield_percent,
-    status: operation.status,
-    started_at: operation.started_at,
-    completed_at: operation.completed_at,
-    started_by: operation.started_by,
-    completed_by: operation.completed_by,
-    skip_reason: operation.skip_reason,
-    notes: operation.notes,
-    created_at: operation.created_at,
-    updated_at: operation.updated_at,
+    ...mapBaseOperationFields(operation),
     machine: operation.machine ?? null,
     line: operation.line ?? null,
-    duration_variance_minutes: duration_variance,
-    yield_variance_percent: yield_variance,
+    duration_variance_minutes: calculateVariance(
+      operation.actual_duration_minutes,
+      operation.expected_duration_minutes
+    ),
+    yield_variance_percent: calculateVariance(
+      operation.actual_yield_percent,
+      operation.expected_yield_percent
+    ),
     started_by_user: operation.started_by_user ?? null,
     completed_by_user: operation.completed_by_user ?? null,
   }

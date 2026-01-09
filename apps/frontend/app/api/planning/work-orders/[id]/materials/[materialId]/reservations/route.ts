@@ -12,7 +12,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { WOReservationService, WOReservationErrorCode } from '@/lib/services/wo-reservation-service'
+import { WOReservationService } from '@/lib/services/wo-reservation-service'
+import { getWOReservationStatusCode } from '@/lib/utils/wo-reservation-errors'
 import { CreateReservationSchema } from '@/lib/validation/wo-reservations'
 
 interface RouteParams {
@@ -20,29 +21,6 @@ interface RouteParams {
     id: string
     materialId: string
   }>
-}
-
-/**
- * Map error codes to HTTP status codes
- */
-function getStatusCode(code: string): number {
-  switch (code) {
-    case WOReservationErrorCode.WO_NOT_FOUND:
-    case WOReservationErrorCode.WO_MATERIAL_NOT_FOUND:
-    case WOReservationErrorCode.LP_NOT_FOUND:
-    case WOReservationErrorCode.RESERVATION_NOT_FOUND:
-      return 404
-    case WOReservationErrorCode.INVALID_WO_STATUS:
-      return 409
-    case WOReservationErrorCode.LP_NOT_AVAILABLE:
-    case WOReservationErrorCode.LP_PRODUCT_MISMATCH:
-    case WOReservationErrorCode.LP_WAREHOUSE_MISMATCH:
-    case WOReservationErrorCode.EXCEEDS_LP_QUANTITY:
-    case WOReservationErrorCode.ALREADY_RELEASED:
-      return 400
-    default:
-      return 500
-  }
 }
 
 /**
@@ -149,7 +127,7 @@ export async function POST(
     )
 
     if (!result.success) {
-      const statusCode = getStatusCode(result.code || 'DATABASE_ERROR')
+      const statusCode = getWOReservationStatusCode(result.code)
       return NextResponse.json(
         { success: false, error: { code: result.code, message: result.error } },
         { status: statusCode }

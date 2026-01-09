@@ -9,30 +9,14 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { WOReservationService, WOReservationErrorCode } from '@/lib/services/wo-reservation-service'
+import { WOReservationService } from '@/lib/services/wo-reservation-service'
+import { getWOReservationStatusCode } from '@/lib/utils/wo-reservation-errors'
 
 interface RouteParams {
   params: Promise<{
     id: string
     reservationId: string
   }>
-}
-
-/**
- * Map error codes to HTTP status codes
- */
-function getStatusCode(code: string): number {
-  switch (code) {
-    case WOReservationErrorCode.WO_NOT_FOUND:
-    case WOReservationErrorCode.RESERVATION_NOT_FOUND:
-      return 404
-    case WOReservationErrorCode.INVALID_WO_STATUS:
-      return 409
-    case WOReservationErrorCode.ALREADY_RELEASED:
-      return 400
-    default:
-      return 500
-  }
 }
 
 /**
@@ -68,7 +52,7 @@ export async function DELETE(
     const result = await WOReservationService.releaseReservation(reservationId, user.id)
 
     if (!result.success) {
-      const statusCode = getStatusCode(result.code || 'DATABASE_ERROR')
+      const statusCode = getWOReservationStatusCode(result.code)
       return NextResponse.json(
         { success: false, error: { code: result.code, message: result.error } },
         { status: statusCode }

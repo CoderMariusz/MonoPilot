@@ -422,12 +422,15 @@ export async function rescheduleWO(
 /**
  * Export Gantt chart to PDF
  * Used by GET /api/planning/work-orders/gantt/export
- * Note: This is a placeholder - actual PDF generation would require a PDF library
+ * Generates a real PDF with Gantt chart visualization using jsPDF
  */
 export async function exportGanttPDF(
   supabase: SupabaseClient,
   params: ExportParams
 ): Promise<Blob> {
+  // Dynamically import jsPDF (server-side compatible)
+  const { jsPDF } = await import('jspdf');
+
   // Get Gantt data
   const ganttData = await getGanttData(supabase, {
     view_by: params.view_by || 'line',
@@ -436,10 +439,204 @@ export async function exportGanttPDF(
     status: params.status,
   });
 
-  // For now, return a simple text representation as a blob
-  // In production, this would use a PDF library like pdf-lib or jspdf
-  const content = JSON.stringify(ganttData, null, 2);
-  const blob = new Blob([content], { type: 'application/pdf' });
+  // Create PDF document (landscape for better Gantt display)
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  // Constants for layout
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
+  const headerHeight = 25;
+  const swimlaneHeight = 20;
+  const timelineHeight = 12;
+  const barHeight = 14;
+
+  // Colors (RGB arrays)
+  const statusColors: Record<string, [number, number, number]> = {
+    draft: [243, 244, 246],       // gray #F3F4F6
+    planned: [219, 234, 254],     // blue #DBEAFE
+    released: [207, 250, 254],    // cyan #CFFAFE
+    in_progress: [237, 233, 254], // purple #EDE9FE
+    on_hold: [254, 215, 170],     // orange #FED7AA
+    completed: [209, 250, 229],   // green #D1FAE5
+    overdue: [254, 226, 226],     // red #FEE2E2
+  };
+
+  // Header
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Work Order Gantt Schedule', margin, margin);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    `Date Range: ${ganttData.date_range.from_date} to ${ganttData.date_range.to_date}`,
+    margin,
+    margin + 7
+  );
+  doc.text(
+    `View By: ${ganttData.filters_applied.view_by} | Generated: ${new Date().toISOString().split('T')[0]}`,
+    margin,
+    margin + 12
+  );
+
+  // Calculate timeline dimensions
+  const fromDate = new Date(ganttData.date_range.from_date);
+  const toDate = new Date(ganttData.date_range.to_date);
+  const totalDays = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  const swimlaneLabelWidth = 45;
+  const chartStartX = margin + swimlaneLabelWidth;
+  const chartWidth = pageWidth - chartStartX - margin;
+  const dayWidth = chartWidth / Math.max(totalDays, 1);
+
+  let currentY = margin + headerHeight;
+
+  // Draw timeline header
+  doc.setFillColor(240, 240, 240);
+  doc.rect(chartStartX, currentY, chartWidth, timelineHeight, 'F');
+
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(60, 60, 60);
+
+  for (let i = 0; i < totalDays && i < 31; i++) {
+    const date = new Date(fromDate);
+    date.setDate(date.getDate() + i);
+    const dayLabel = `${date.getDate()}`;
+    const monthLabel = date.toLocaleDateString('en-US', { month: 'short' });
+    const x = chartStartX + (i * dayWidth) + (dayWidth / 2);
+
+    // Show month for first day or start of month
+    if (i === 0 || date.getDate() === 1) {
+      doc.text(monthLabel, x, currentY + 4, { align: 'center' });
+    }
+    doc.text(dayLabel, x, currentY + 9, { align: 'center' });
+
+    // Draw vertical grid line
+    doc.setDrawColor(220, 220, 220);
+    doc.line(chartStartX + (i * dayWidth), currentY, chartStartX + (i * dayWidth), currentY + timelineHeight);
+  }
+
+  currentY += timelineHeight;
+
+  // Draw swimlanes and WO bars
+  for (const swimlane of ganttData.swimlanes) {
+    // Check if we need a new page
+    if (currentY + swimlaneHeight > pageHeight - margin) {
+      doc.addPage();
+      currentY = margin;
+    }
+
+    // Swimlane background
+    doc.setFillColor(250, 250, 250);
+    doc.rect(margin, currentY, pageWidth - (2 * margin), swimlaneHeight, 'F');
+
+    // Swimlane border
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(margin, currentY, pageWidth - (2 * margin), swimlaneHeight);
+
+    // Swimlane label
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(40, 40, 40);
+    const label = swimlane.name.length > 15
+      ? swimlane.name.substring(0, 14) + '...'
+      : swimlane.name;
+    doc.text(label, margin + 2, currentY + (swimlaneHeight / 2) + 2);
+
+    // Draw WO bars
+    for (const wo of swimlane.work_orders) {
+      if (!wo.scheduled_date) continue;
+
+      const woDate = new Date(wo.scheduled_date);
+      const dayOffset = Math.floor((woDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (dayOffset < 0 || dayOffset >= totalDays) continue;
+
+      // Calculate bar position based on time
+      const startMinutes = timeToMinutes(wo.scheduled_start_time || '08:00');
+      const endMinutes = timeToMinutes(wo.scheduled_end_time || '16:00');
+      const dayFraction = (startMinutes - 480) / 960; // 8:00 = 480, 8:00-24:00 = 960
+      const durationFraction = (endMinutes - startMinutes) / 960;
+
+      const barX = chartStartX + (dayOffset * dayWidth) + (dayFraction * dayWidth);
+      const barWidth = Math.max(durationFraction * dayWidth, dayWidth * 0.3); // Minimum width
+      const barY = currentY + 3;
+
+      // Get status color
+      const status = wo.is_overdue ? 'overdue' : wo.status;
+      const color = statusColors[status] || statusColors.planned;
+
+      // Draw bar
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.roundedRect(barX, barY, barWidth, barHeight, 1, 1, 'F');
+
+      // Draw border
+      doc.setDrawColor(150, 150, 150);
+      doc.roundedRect(barX, barY, barWidth, barHeight, 1, 1);
+
+      // WO label
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      const woLabel = wo.wo_number.replace('WO-', '');
+      if (barWidth > 8) {
+        doc.text(woLabel, barX + 1, barY + 5);
+      }
+
+      // Progress bar for in_progress WOs
+      if (wo.status === 'in_progress' && wo.progress_percent && wo.progress_percent > 0) {
+        const progressWidth = barWidth * (wo.progress_percent / 100);
+        doc.setFillColor(100, 100, 200);
+        doc.rect(barX, barY + barHeight - 2, progressWidth, 2, 'F');
+      }
+    }
+
+    currentY += swimlaneHeight;
+  }
+
+  // Legend
+  if (currentY + 20 > pageHeight - margin) {
+    doc.addPage();
+    currentY = margin;
+  }
+
+  currentY += 5;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(40, 40, 40);
+  doc.text('Legend:', margin, currentY);
+
+  let legendX = margin + 15;
+  const legendY = currentY - 2;
+  const legendEntries = [
+    { label: 'Planned', color: statusColors.planned },
+    { label: 'Released', color: statusColors.released },
+    { label: 'In Progress', color: statusColors.in_progress },
+    { label: 'On Hold', color: statusColors.on_hold },
+    { label: 'Completed', color: statusColors.completed },
+    { label: 'Overdue', color: statusColors.overdue },
+  ];
+
+  doc.setFont('helvetica', 'normal');
+  for (const entry of legendEntries) {
+    doc.setFillColor(entry.color[0], entry.color[1], entry.color[2]);
+    doc.rect(legendX, legendY, 8, 4, 'F');
+    doc.setDrawColor(150, 150, 150);
+    doc.rect(legendX, legendY, 8, 4);
+    doc.setTextColor(60, 60, 60);
+    doc.text(entry.label, legendX + 10, legendY + 3);
+    legendX += 35;
+  }
+
+  // Convert to blob
+  const pdfOutput = doc.output('arraybuffer');
+  const blob = new Blob([pdfOutput], { type: 'application/pdf' });
 
   return blob;
 }
