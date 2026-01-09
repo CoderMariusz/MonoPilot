@@ -3,48 +3,29 @@
  * Story: 01.10 - Machines CRUD
  *
  * Fetches a single machine by ID
+ * Uses React Query for caching
  */
 
-import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { Machine } from '@/lib/types/machine'
 
 /**
- * Fetches single machine by ID
+ * Fetches a single machine by ID
  */
 export function useMachine(id: string | null) {
-  const [data, setData] = useState<Machine | undefined>(undefined)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  return useQuery({
+    queryKey: ['machine', id],
+    queryFn: async () => {
+      const response = await fetch(`/api/v1/settings/machines/${id}`)
 
-  useEffect(() => {
-    if (!id) {
-      setData(undefined)
-      setIsLoading(false)
-      return
-    }
-
-    const fetchMachine = async () => {
-      try {
-        setIsLoading(true)
-
-        const url = `/api/v1/settings/machines/${id}`
-        const response = await fetch(url)
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch machine')
-        }
-
-        const result = await response.json()
-        setData(result.machine)
-      } catch (err) {
-        setError(err as Error)
-      } finally {
-        setIsLoading(false)
+      if (!response.ok) {
+        throw new Error('Failed to fetch machine')
       }
-    }
 
-    fetchMachine()
-  }, [id])
-
-  return { data, isLoading, error }
+      const result = await response.json()
+      return result.machine as Machine
+    },
+    enabled: !!id,
+    staleTime: 2 * 60 * 1000, // 2 minutes cache
+  })
 }

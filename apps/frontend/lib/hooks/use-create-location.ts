@@ -14,7 +14,7 @@ export function useCreateLocation(warehouseId: string) {
   const mutateAsync = async (input: CreateLocationInput): Promise<Location> => {
     setIsPending(true)
     try {
-      const response = await fetch(`/api/settings/warehouses/${warehouseId}/locations`, {
+      const response = await fetch(`/api/v1/settings/warehouses/${warehouseId}/locations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

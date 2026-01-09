@@ -1,0 +1,108 @@
+# Story 01.8 - Warehouses CRUD
+# Type: fullstack
+# Epic: 01-settings
+# Audit Date: 2026-01-08
+
+story:
+  id: "01.8"
+  name: "Warehouses CRUD"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "L"
+
+audit:
+  code_exists: true
+  estimated_completion: 100
+
+  files_found:
+    migrations:
+      - path: "supabase/migrations/008_create_warehouses_table.sql"
+        lines: 96
+        features:
+          - "9 warehouse type enums"
+          - "Single default trigger"
+          - "Code format validation"
+      - path: "supabase/migrations/009_warehouses_rls_policies.sql"
+        lines: 62
+        policies: 4
+
+    services:
+      - path: "apps/frontend/lib/services/warehouse-service.ts"
+        lines: 258
+        methods: 10
+        status: "COMPLETE"
+
+    api_routes:
+      - "GET /api/v1/settings/warehouses"
+      - "POST /api/v1/settings/warehouses"
+      - "GET /api/v1/settings/warehouses/[id]"
+      - "PUT /api/v1/settings/warehouses/[id]"
+      - "DELETE /api/v1/settings/warehouses/[id]"
+      - "PATCH /api/v1/settings/warehouses/[id]/set-default"
+      - "PATCH /api/v1/settings/warehouses/[id]/disable"
+      - "PATCH /api/v1/settings/warehouses/[id]/enable"
+      - "GET /api/v1/settings/warehouses/validate-code"
+      - "GET /api/v1/settings/warehouses/[id]/has-inventory"
+
+    pages:
+      - path: "apps/frontend/app/(authenticated)/settings/warehouses/page.tsx"
+        lines: 268
+        status: "COMPLETE"
+
+    components:
+      - "WarehousesDataTable.tsx"
+      - "WarehouseModal.tsx"
+      - "WarehouseTypeBadge.tsx"
+      - "WarehouseStatusBadge.tsx"
+      - "WarehouseTypeSelect.tsx"
+      - "WarehouseAddressSection.tsx"
+      - "WarehouseContactSection.tsx"
+      - "WarehouseFilters.tsx"
+      - "WarehouseActionsMenu.tsx"
+      - "SetDefaultConfirmDialog.tsx"
+      - "DisableConfirmDialog.tsx"
+
+    validation:
+      - path: "apps/frontend/lib/validation/warehouse-schemas.ts"
+        status: "COMPLETE"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/warehouse-service.test.ts"
+      lines: 786
+    - path: "apps/frontend/__tests__/integration/api/settings/warehouses.test.ts"
+      lines: 1001
+    - path: "apps/frontend/__tests__/e2e/warehouse/warehouse-settings.spec.ts"
+      lines: 657
+  total_test_lines: 2444
+
+acceptance_criteria:
+  list_page: "COMPLETE"
+  create: "COMPLETE"
+  warehouse_types: "COMPLETE"
+  address_contact: "COMPLETE"
+  default_assignment: "COMPLETE"
+  edit: "COMPLETE"
+  disable_enable: "COMPLETE"
+  permissions: "COMPLETE"
+  multi_tenancy: "COMPLETE"
+
+status: DONE
+
+phases:
+  P1: "COMPLETE"
+  P2: "COMPLETE"
+  P3: "COMPLETE"
+  P4: "COMPLETE"
+  P5: "COMPLETE"
+  P6: "COMPLETE"
+  P7: "COMPLETE"
+
+recommendation: |
+  READY FOR IMMEDIATE DEPLOYMENT
+  All 9 acceptance criteria groups fully covered.
+  2,444 lines of comprehensive test coverage.
+  Definition of Done: 23/23 items complete.
+
+next_phase: NONE
+next_agent: DEPLOYMENT

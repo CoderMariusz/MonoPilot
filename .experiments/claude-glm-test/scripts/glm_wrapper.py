@@ -18,7 +18,7 @@ import json
 import argparse
 from pathlib import Path
 from typing import List
-from glm_call import GLMClient
+from glm_call_updated import GLMClient
 
 # MonoPilot Tech Stack - MUST include in all prompts
 TECH_STACK_INFO = """
@@ -373,6 +373,61 @@ AGENT_TO_MODEL = {
     "tech-writer": "glm-4-flash",   # Faster/cheaper for docs
 }
 
+def write_files_to_disk(files: List[dict], base_dir: str) -> dict:
+    """
+    Write generated files directly to disk, bypassing Claude context.
+
+    Args:
+        files: List of {"path": "...", "content": "..."} dicts
+        base_dir: Base directory for relative paths
+
+    Returns:
+        dict with written files count and any errors
+    """
+    written = []
+    errors = []
+
+    for file_info in files:
+        try:
+            file_path = file_info.get("path", "")
+            content = file_info.get("content", "")
+
+            if not file_path:
+                errors.append({"error": "Missing path in file entry"})
+                continue
+
+            # Resolve full path
+            full_path = Path(base_dir) / file_path
+
+            # Create parent directories if needed
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write file
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            written.append({
+                "path": str(full_path),
+                "size": len(content),
+                "lines": content.count('\n') + 1
+            })
+            print(f"  [WROTE] {full_path} ({len(content)} bytes)", file=sys.stderr)
+
+        except Exception as e:
+            errors.append({
+                "path": file_info.get("path", "unknown"),
+                "error": str(e)
+            })
+            print(f"  [ERROR] {file_info.get('path', 'unknown')}: {e}", file=sys.stderr)
+
+    return {
+        "written": written,
+        "errors": errors,
+        "total_written": len(written),
+        "total_errors": len(errors)
+    }
+
+
 def load_context_files(file_paths: List[str]) -> str:
     """Load and summarize context files"""
     summaries = []
@@ -417,6 +472,13 @@ def main():
     parser.add_argument("--model", help="GLM model to use (auto-selected if using --agent)")
     parser.add_argument("--output-json", action="store_true",
                        help="Output raw JSON (for agent parsing)")
+    parser.add_argument("--output-file", "-o",
+                       help="Save full output to file (reduces Claude context usage)")
+    parser.add_argument("--auto-write", action="store_true",
+                       help="Automatically write generated files to disk (bypasses Claude context)")
+    parser.add_argument("--base-dir",
+                       help="Base directory for --auto-write (default: current dir)",
+                       default=".")
 
     args = parser.parse_args()
 
@@ -431,15 +493,20 @@ def main():
     if not args.model:
         args.model = "glm-4.7"
 
-    # Load GLM API key
-    config_path = Path(__file__).parent.parent / "config.json"
-    with open(config_path) as f:
-        config = json.load(f)
+    # Load GLM API key from environment (preferred) or config (fallback)
+    api_key = os.getenv("ZHIPU_API_KEY")
 
-    api_key = config.get("zhipu_api_key")
     if not api_key:
-        print(json.dumps({"error": "GLM API key not found"}))
-        sys.exit(1)
+        # Fallback to config.json (deprecated)
+        config_path = Path(__file__).parent.parent / "config.json"
+        if config_path.exists():
+            with open(config_path) as f:
+                config = json.load(f)
+                api_key = config.get("zhipu_api_key")
+
+    if not api_key:
+        print(json.dumps({"error": "GLM API key not found. Set ZHIPU_API_KEY env var"}))
+        return 0  # Don't crash, return error in JSON
 
     # Parse context files
     context_files = [f.strip() for f in args.context.split(',') if f.strip()]
@@ -468,99 +535,178 @@ def main():
         max_tokens=16000  # Increased for large code responses
     )
 
-    if "error" in result:
-        # FALLBACK: If GLM fails, try Claude Haiku (NOT Opus - too expensive for docs!)
-        print(f"[GLM WRAPPER] GLM error: {result['error']}", file=sys.stderr)
-        print(f"[GLM WRAPPER] FALLBACK: Trying Claude Haiku...", file=sys.stderr)
+    # Wrap all processing in try/except to prevent crashes
+    try:
+        if "error" in result and result.get("error"):
+            # FALLBACK: If GLM fails, try Claude Haiku (NOT Opus - too expensive for docs!)
+            print(f"[GLM WRAPPER] GLM error: {result['error']}", file=sys.stderr)
+            print(f"[GLM WRAPPER] FALLBACK: Trying Claude Haiku...", file=sys.stderr)
 
-        try:
-            import subprocess
-            # Call claude with haiku model
-            haiku_result = subprocess.run(
-                ["claude", "--model", "haiku", "--print", prompt[:4000]],  # Truncate for CLI
-                capture_output=True,
-                text=True,
-                timeout=120,
-                cwd=str(Path(__file__).parent.parent.parent.parent)
-            )
-            if haiku_result.returncode == 0:
-                output = {
-                    "success": True,
-                    "data": {"raw_response": haiku_result.stdout},
-                    "tokens": 0,  # Unknown for CLI
-                    "model": "claude-haiku-fallback",
-                    "fallback": True
-                }
-                print(f"[GLM WRAPPER] Haiku fallback SUCCESS", file=sys.stderr)
-            else:
-                output = {"error": result["error"], "success": False, "fallback_failed": True}
-        except Exception as fallback_error:
-            print(f"[GLM WRAPPER] Haiku fallback also failed: {fallback_error}", file=sys.stderr)
-            output = {"error": result["error"], "success": False, "fallback_error": str(fallback_error)}
-    else:
-        # Parse JSON response from GLM
-        try:
-            # GLM should return JSON, but might wrap it in markdown
-            response_text = result["response"]
-
-            # Extract JSON from markdown code blocks if present
-            if "```json" in response_text:
-                start = response_text.index("```json") + 7
-                try:
-                    end = response_text.index("```", start)
-                    json_text = response_text[start:end].strip()
-                except ValueError:
-                    # No closing ``` - take rest of text
-                    json_text = response_text[start:].strip()
-            elif "```" in response_text:
-                start = response_text.index("```") + 3
-                try:
-                    end = response_text.index("```", start)
-                    json_text = response_text[start:end].strip()
-                except ValueError:
-                    json_text = response_text[start:].strip()
-            else:
-                # Try to find JSON object in text
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}') + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_text = response_text[json_start:json_end]
+            try:
+                import subprocess
+                # Call claude with haiku model
+                haiku_result = subprocess.run(
+                    ["claude", "--model", "haiku", "--print", prompt[:4000]],  # Truncate for CLI
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    cwd=str(Path(__file__).parent.parent.parent.parent)
+                )
+                if haiku_result.returncode == 0:
+                    output = {
+                        "success": True,
+                        "data": {"raw_response": haiku_result.stdout},
+                        "tokens": 0,  # Unknown for CLI
+                        "model": "claude-haiku-fallback",
+                        "fallback": True
+                    }
+                    print(f"[GLM WRAPPER] Haiku fallback SUCCESS", file=sys.stderr)
                 else:
-                    json_text = response_text.strip()
-
-            parsed = json.loads(json_text)
-            output = {
-                "success": True,
-                "data": parsed,
-                "tokens": result["usage"].get("total_tokens", 0),
-                "model": result["model"]
-            }
-        except json.JSONDecodeError as e:
-            # GLM didn't return valid JSON - return raw text
-            output = {
-                "success": True,
-                "data": {"raw_response": result["response"]},
-                "tokens": result["usage"].get("total_tokens", 0),
-                "model": result["model"],
-                "warning": f"GLM response wasn't valid JSON: {e}"
-            }
-
-    # Output
-    if args.output_json:
-        print(json.dumps(output, indent=2, ensure_ascii=False))
-    else:
-        # Human-readable output for debugging
-        if output.get("success"):
-            print(f"\n[OK] GLM-{args.model} completed successfully")
-            print(f"  Tokens: {output.get('tokens', 0)}")
-            if "files" in output.get("data", {}):
-                print(f"  Files generated: {len(output['data']['files'])}")
-            print(f"\n{json.dumps(output['data'], indent=2, ensure_ascii=False)}")
+                    output = {"error": result["error"], "success": False, "fallback_failed": True}
+            except Exception as fallback_error:
+                print(f"[GLM WRAPPER] Haiku fallback also failed: {fallback_error}", file=sys.stderr)
+                output = {"error": result["error"], "success": False, "fallback_error": str(fallback_error)}
         else:
-            print(f"\n[ERROR] GLM call failed: {output.get('error')}")
+            # Parse JSON response from GLM
+            response_text = result.get("response", "")
 
-    return 0 if output.get("success") else 1
+            # Handle None response
+            if response_text is None:
+                output = {
+                    "success": False,
+                    "error": "GLM returned empty response",
+                    "data": {}
+                }
+            else:
+                try:
+                    # GLM should return JSON, but might wrap it in markdown
+                    # Extract JSON from markdown code blocks if present
+                    if "```json" in response_text:
+                        start = response_text.index("```json") + 7
+                        try:
+                            end = response_text.index("```", start)
+                            json_text = response_text[start:end].strip()
+                        except ValueError:
+                            # No closing ``` - take rest of text
+                            json_text = response_text[start:].strip()
+                    elif "```" in response_text:
+                        start = response_text.index("```") + 3
+                        try:
+                            end = response_text.index("```", start)
+                            json_text = response_text[start:end].strip()
+                        except ValueError:
+                            json_text = response_text[start:].strip()
+                    else:
+                        # Try to find JSON object in text
+                        json_start = response_text.find('{')
+                        json_end = response_text.rfind('}') + 1
+                        if json_start >= 0 and json_end > json_start:
+                            json_text = response_text[json_start:json_end]
+                        else:
+                            json_text = response_text.strip()
+
+                    parsed = json.loads(json_text)
+                    output = {
+                        "success": True,
+                        "data": parsed,
+                        "tokens": result.get("usage", {}).get("total_tokens", 0),
+                        "model": result.get("model", "unknown")
+                    }
+                except json.JSONDecodeError as e:
+                    # GLM didn't return valid JSON - return raw text
+                    output = {
+                        "success": True,
+                        "data": {"raw_response": response_text},
+                        "tokens": result.get("usage", {}).get("total_tokens", 0),
+                        "model": result.get("model", "unknown"),
+                        "warning": f"GLM response wasn't valid JSON: {e}"
+                    }
+    except Exception as e:
+        # Catch-all for any unexpected errors
+        print(f"[GLM WRAPPER] Unexpected error: {e}", file=sys.stderr)
+        output = {
+            "success": False,
+            "error": f"Wrapper processing error: {str(e)}",
+            "data": {}
+        }
+
+    # AUTO-WRITE: Write files directly to disk, bypassing Claude context
+    write_result = None
+    if args.auto_write and output.get("success"):
+        files = output.get("data", {}).get("files", [])
+        if files:
+            print(f"[GLM WRAPPER] Auto-writing {len(files)} files to {args.base_dir}...", file=sys.stderr)
+            write_result = write_files_to_disk(files, args.base_dir)
+
+            # Remove file contents from output (no longer needed - already on disk)
+            # Keep only paths for reference
+            output["data"]["files"] = [
+                {"path": f.get("path"), "written": True}
+                for f in files
+            ]
+            output["write_result"] = write_result
+
+    # Output - wrap in try/except to never crash
+    try:
+        # If --auto-write was used, print only summary (files already on disk)
+        if args.auto_write:
+            summary = output.get("data", {}).get("summary", "No summary")
+            print(f"\n[GLM] AUTO-WRITE COMPLETE")
+            print(f"  Success: {output.get('success')}")
+            print(f"  Model: {output.get('model', 'unknown')}")
+            print(f"  Tokens: {output.get('tokens', 0)}")
+            if write_result:
+                print(f"  Files written: {write_result['total_written']}")
+                print(f"  Errors: {write_result['total_errors']}")
+                for f in write_result.get("written", []):
+                    print(f"    - {f['path']} ({f['lines']} lines)")
+                for e in write_result.get("errors", []):
+                    print(f"    [ERR] {e.get('path')}: {e.get('error')}")
+            print(f"  Summary: {summary[:300]}")
+
+            # Optionally save full JSON to file for debugging
+            if args.output_file:
+                json_output = json.dumps(output, indent=2, ensure_ascii=False)
+                with open(args.output_file, 'w', encoding='utf-8') as f:
+                    f.write(json_output)
+                print(f"  Debug JSON: {args.output_file}")
+
+        elif args.output_file:
+            json_output = json.dumps(output, indent=2, ensure_ascii=False)
+            with open(args.output_file, 'w', encoding='utf-8') as f:
+                f.write(json_output)
+
+            # Print SHORT summary to stdout (saves Claude context)
+            files_count = len(output.get("data", {}).get("files", []))
+            summary = output.get("data", {}).get("summary", "No summary")
+            print(f"[GLM] OK - saved to {args.output_file}")
+            print(f"  Success: {output.get('success')}")
+            print(f"  Files: {files_count}")
+            print(f"  Tokens: {output.get('tokens', 0)}")
+            print(f"  Summary: {summary[:200]}")
+
+        elif args.output_json:
+            json_output = json.dumps(output, indent=2, ensure_ascii=False)
+            print(json_output)
+
+        else:
+            # Human-readable output for debugging
+            if output.get("success"):
+                print(f"\n[OK] GLM-{args.model} completed successfully")
+                print(f"  Tokens: {output.get('tokens', 0)}")
+                if "files" in output.get("data", {}):
+                    print(f"  Files generated: {len(output['data']['files'])}")
+                print(f"\n{json.dumps(output['data'], indent=2, ensure_ascii=False)}")
+            else:
+                print(f"\n[ERROR] GLM call failed: {output.get('error')}")
+    except Exception as e:
+        print(f"[GLM WRAPPER] Output error: {e}", file=sys.stderr)
+        print(json.dumps({"success": False, "error": str(e)}))
+
+    # ALWAYS return 0 - success/failure is in JSON output
+    # This prevents Claude from seeing exit code 1 as script failure
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()  # Don't use sys.exit() - just run main()

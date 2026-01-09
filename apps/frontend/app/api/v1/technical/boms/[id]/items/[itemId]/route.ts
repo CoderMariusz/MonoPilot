@@ -118,7 +118,7 @@ export async function PUT(
       }
     }
 
-    // Build update object
+    // Build update object (includes Phase 1B fields)
     const updateData: Record<string, any> = {
       updated_by: user.id,
       updated_at: new Date().toISOString(),
@@ -130,6 +130,15 @@ export async function PUT(
     if (data.operation_seq !== undefined) updateData.operation_seq = data.operation_seq
     if (data.scrap_percent !== undefined) updateData.scrap_percent = data.scrap_percent
     if (data.notes !== undefined) updateData.notes = data.notes
+    // Phase 1B fields
+    if (data.consume_whole_lp !== undefined) updateData.consume_whole_lp = data.consume_whole_lp
+    if (data.line_ids !== undefined) updateData.line_ids = data.line_ids
+    if (data.is_by_product !== undefined) {
+      updateData.is_by_product = data.is_by_product
+      updateData.is_output = data.is_by_product // byproducts are outputs
+    }
+    if (data.yield_percent !== undefined) updateData.yield_percent = data.yield_percent
+    if (data.condition_flags !== undefined) updateData.condition_flags = data.condition_flags
 
     // Update item
     const { data: item, error: updateError } = await supabase

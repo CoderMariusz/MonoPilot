@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Menu, X, Settings } from 'lucide-react'
 
-export type TechnicalPage = 'dashboard' | 'products' | 'boms' | 'routings' | 'tracing'
+export type TechnicalPage = 'dashboard' | 'products' | 'boms' | 'routings' | 'tracing' | 'traceability'
 
 interface TechnicalHeaderProps {
   currentPage?: TechnicalPage
@@ -26,7 +26,7 @@ const navItems = [
   { key: 'products' as const, label: 'Products', href: '/technical/products' },
   { key: 'boms' as const, label: 'BOMs', href: '/technical/boms' },
   { key: 'routings' as const, label: 'Routings', href: '/technical/routings' },
-  { key: 'tracing' as const, label: 'Tracing', href: '/technical/tracing' },
+  { key: 'traceability' as const, label: 'Traceability', href: '/technical/traceability' },
 ]
 
 export function TechnicalHeader({ currentPage }: TechnicalHeaderProps) {
@@ -114,6 +114,7 @@ function detectCurrentPage(pathname: string): TechnicalPage {
   if (pathname.includes('/products')) return 'products'
   if (pathname.includes('/boms')) return 'boms'
   if (pathname.includes('/routings')) return 'routings'
+  if (pathname.includes('/traceability')) return 'traceability'
   if (pathname.includes('/tracing')) return 'tracing'
   return 'dashboard'
 }

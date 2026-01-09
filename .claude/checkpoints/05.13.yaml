@@ -1,0 +1,46 @@
+# Story 05.13 - Over-Receipt Control
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "apps/frontend/lib/validation/warehouse-settings.ts"
+      type: validation
+      status: complete
+      notes: "allow_over_receipt, over_receipt_tolerance_pct fields"
+    - path: "apps/frontend/components/settings/warehouse/Phase1ReceiptSettings.tsx"
+      type: component
+      status: complete
+      notes: "Full UI for over-receipt settings"
+    - path: "apps/frontend/lib/services/asn-receive-service.ts"
+      type: service
+      status: complete
+      notes: "validateOverReceipt() method implemented (lines 79-123)"
+    - path: "apps/frontend/lib/services/__tests__/asn-receive-service.test.ts"
+      type: test
+      status: partial
+      notes: "10+ unit tests for over-receipt validation"
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/asn-receive-service.test.ts"
+      count: 10
+  estimated_completion: 55%
+
+status: PARTIAL
+
+blockers:
+  - "Over-receipt logic in ASNReceiveService, NOT in GRNService"
+  - "grn_items missing over_receipt_flag and over_receipt_percentage columns"
+  - "API routes not enhanced with over-receipt validation"
+  - "GRN integration tests missing"
+
+recommendation: |
+  Core validation logic complete but not integrated with GRN flow:
+  1. Migrate validation logic from ASNReceiveService to GRNService
+  2. Add missing columns to grn_items via migration
+  3. Enhance POST /api/warehouse/grns endpoints
+  4. Write integration tests for GRN flows
+
+next_phase: P3

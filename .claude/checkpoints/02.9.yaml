@@ -1,0 +1,71 @@
+# Story 02.9 - BOM-Routing Costs
+# Type: fullstack
+# Epic: 02-technical
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    # Database
+    - path: "supabase/migrations/028_add_routing_cost_and_code_fields.sql"
+      type: "migration"
+    - path: "supabase/migrations/058_create_product_costs.sql"
+      type: "migration"
+    - path: "supabase/migrations/archive/045_add_routing_id_to_boms.sql"
+      type: "migration"
+    # Services
+    - path: "apps/frontend/lib/services/costing-service.ts"
+      type: "service"
+      lines: 262
+    # API Routes
+    - path: "apps/frontend/app/api/technical/boms/[id]/cost/route.ts"
+      type: "api"
+    # Components (8 total)
+    - path: "apps/frontend/components/technical/bom/cost/CostSummary.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/bom/cost/CostBreakdownChart.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/bom/cost/MarginAnalysis.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/bom/cost/RecalculateButton.tsx"
+      type: "component"
+    # Hooks
+    - path: "apps/frontend/lib/hooks/use-bom-cost.ts"
+      type: "hook"
+    - path: "apps/frontend/lib/hooks/use-recalculate-cost.ts"
+      type: "hook"
+    # Validation & Types
+    - path: "apps/frontend/lib/validation/costing-schema.ts"
+      type: "validation"
+    - path: "apps/frontend/lib/types/costing.ts"
+      type: "types"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/costing-service.test.ts"
+      count: 37
+
+  estimated_completion: 85
+
+status: PARTIAL
+
+recommendation: |
+  Story 02.9 is 85% complete. Core cost calculation works.
+
+  DONE:
+  - Database schema (product_costs, routing cost fields)
+  - Costing service (calculateTotalBOMCost, calculateUnitCost, compareBOMCosts)
+  - GET /api/technical/boms/:id/cost endpoint
+  - 8 UI components (CostSummary, CostBreakdownChart, MarginAnalysis, etc.)
+  - 4 React Query hooks
+  - 37 unit tests
+
+  MISSING:
+  - POST /api/technical/boms/:id/recalculate-cost endpoint
+  - GET /api/technical/routings/:id/cost endpoint
+  - API path mismatch: hooks use /api/v1/ but route is /api/technical/
+
+  Effort to complete: 2-3 hours
+
+next_phase: P3
+P3-FIX: ✓ backend-dev 20:25 files:4 endpoints:2 hooks:2 status:complete

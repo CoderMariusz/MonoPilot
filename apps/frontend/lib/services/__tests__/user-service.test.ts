@@ -19,6 +19,9 @@ import type { CreateUserRequest, UpdateUserRequest, UsersListParams } from '@/li
 
 /**
  * Mock Supabase client
+ *
+ * These individual mock functions are used to configure the Supabase query chain.
+ * mockSupabaseFrom is connected to mockSupabaseClient.from for test configuration.
  */
 const mockSupabaseSelect = vi.fn()
 const mockSupabaseInsert = vi.fn()
@@ -29,55 +32,18 @@ const mockSupabaseRange = vi.fn()
 const mockSupabaseOrder = vi.fn()
 const mockSupabaseOr = vi.fn()
 const mockSupabaseFrom = vi.fn()
+const mockSupabaseGetUser = vi.fn()
 
 /**
- * Mock Supabase - Create chainable mock that mimics Supabase query builder
+ * Mock Supabase client object
+ * - `from` is connected to mockSupabaseFrom for test configuration
+ * - `auth.getUser` is mocked for authentication operations
  */
-const createChainableMock = (): any => {
-  const chain: any = {
-    select: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    not: vi.fn(() => chain),
-    in: vi.fn(() => chain),
-    gte: vi.fn(() => chain),
-    lte: vi.fn(() => chain),
-    gt: vi.fn(() => chain),
-    lt: vi.fn(() => chain),
-    order: vi.fn(() => chain),
-    limit: vi.fn(() => chain),
-    insert: vi.fn(() => chain),
-    update: vi.fn(() => chain),
-    single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-    then: vi.fn((resolve) => resolve({ data: null, error: null })),
-  }
-  return chain
-}
-
-/**
- * Mock Supabase - Create chainable mock that mimics Supabase query builder
- */
-const createChainableMock = (): any => {
-  const chain: any = {
-    select: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    not: vi.fn(() => chain),
-    in: vi.fn(() => chain),
-    gte: vi.fn(() => chain),
-    lte: vi.fn(() => chain),
-    gt: vi.fn(() => chain),
-    lt: vi.fn(() => chain),
-    order: vi.fn(() => chain),
-    limit: vi.fn(() => chain),
-    insert: vi.fn(() => chain),
-    update: vi.fn(() => chain),
-    single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-    then: vi.fn((resolve) => resolve({ data: null, error: null })),
-  }
-  return chain
-}
-
 const mockSupabaseClient = {
-  from: vi.fn(() => createChainableMock()),
+  from: mockSupabaseFrom,
+  auth: {
+    getUser: mockSupabaseGetUser,
+  },
   rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
 }
 
@@ -530,6 +496,11 @@ describe('UserService.getUsers - List Users with Search/Filter/Pagination', () =
 describe('UserService.createUser - Create New User', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Mock auth.getUser for createUser tests
+    mockSupabaseGetUser.mockResolvedValue({
+      data: { user: { id: 'test-auth-user-id' } },
+      error: null,
+    })
   })
 
   it('should create user with valid data', async () => {
@@ -869,6 +840,11 @@ describe('UserService.updateUser - Update Existing User', () => {
 describe('UserService.deactivateUser - Deactivate User with Self-Protection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Mock auth.getUser for deactivateUser tests
+    mockSupabaseGetUser.mockResolvedValue({
+      data: { user: { id: 'test-auth-user-id' } },
+      error: null,
+    })
   })
 
   it('should deactivate active user successfully', async () => {

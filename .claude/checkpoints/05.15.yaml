@@ -1,0 +1,38 @@
+# Story 05.15 - Over-Receipt Handling
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: false
+  files_found:
+    - path: "apps/frontend/lib/services/asn-receive-service.ts"
+      type: service
+      status: partial
+      notes: "Has validateOverReceipt() but no approval workflow"
+    - path: "supabase/migrations/087_create_warehouse_settings.sql"
+      type: migration
+      status: exists
+      notes: "Has over_receipt settings but no approvals table"
+  tests_exist: false
+  test_files: []
+  estimated_completion: 0%
+
+status: NOT_STARTED
+
+blockers:
+  - "No over_receipt_approvals table in migrations"
+  - "No approval workflow API routes"
+  - "No approval UI components"
+  - "Depends on 05.13 (Over-Receipt Control) completion"
+
+recommendation: |
+  This story extends 05.13 with approval workflow:
+  1. Create over_receipt_approvals table migration
+  2. Implement approval service methods
+  3. Create API routes for approve/reject
+  4. Build approval UI (pending list, approve modal)
+  5. Add notifications for approvers
+  6. Write tests
+
+next_phase: P1

@@ -1,0 +1,72 @@
+# Story 02.8 - Routing Operations (Steps) Management
+# Type: fullstack
+# Epic: 02-technical
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    # Database
+    - path: "supabase/migrations/047_create_routing_operations.sql"
+      type: "migration"
+    - path: "supabase/migrations/048_routing_operations_rls.sql"
+      type: "migration"
+    # MISSING: operation_attachments table
+    # Services
+    - path: "apps/frontend/lib/services/routing-operations-service.ts"
+      type: "service"
+      note: "16 functions including attachment methods (will fail without table)"
+    # API Routes
+    - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/reorder/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/attachments/route.ts"
+      type: "api"
+      note: "Blocked - table missing"
+    # Components
+    - path: "apps/frontend/components/technical/routings/operations-table.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/routings/create-operation-modal.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/routings/edit-operation-drawer.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/routings/attachment-upload.tsx"
+      type: "component"
+    # Validation & Types
+    - path: "apps/frontend/lib/validation/operation-schemas.ts"
+      type: "validation"
+    - path: "apps/frontend/lib/types/routing-operation.ts"
+      type: "types"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/app/api/v1/technical/routings/__tests__/operations.route.test.ts"
+      status: "stub"
+
+  estimated_completion: 87
+
+status: PARTIAL
+
+recommendation: |
+  Story 02.8 is 87% complete. All core operations CRUD works.
+
+  WORKING:
+  - Operations CRUD (Create, Read, Update, Delete)
+  - Parallel operations detection and marking
+  - Sequence reordering (up/down arrows)
+  - Time tracking (setup, duration, cleanup)
+  - Labor cost per hour calculation
+  - Machine assignment (nullable)
+  - Summary panel with totals
+
+  BLOCKED (single blocker):
+  - operation_attachments table migration needed (FR-2.45)
+  - Attachment upload/download will fail without table
+
+  Effort to complete: 1-2 hours (create migration)
+
+next_phase: P3
+P3-FIX: backend-dev 20:23 files:1 migration:049_create_operation_attachments.sql blocker:resolved

@@ -1,0 +1,31 @@
+# Story 05.16 - Stock Moves CRUD
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: false
+  files_found: []
+  tests_exist: false
+  test_files: []
+  estimated_completion: 0%
+
+status: NOT_STARTED
+
+blockers:
+  - "No stock_moves table in migrations"
+  - "No StockMoveService"
+  - "No API routes for stock moves"
+  - "No UI components for stock moves"
+  - "No validation schemas"
+
+recommendation: |
+  Story not started. Full implementation needed:
+  1. Create stock_moves table migration
+  2. Implement StockMoveService
+  3. Create API routes (CRUD + execute)
+  4. Add Zod validation schemas
+  5. Build stock moves UI (list, create, execute)
+  6. Write tests
+
+next_phase: P1

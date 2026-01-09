@@ -16,13 +16,23 @@ import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/ser
 export interface Routing {
   id: string
   org_id: string
+  code?: string
   name: string
   description: string | null
+  version?: number
   is_active: boolean
+  is_reusable?: boolean
+  // Cost configuration (ADR-009)
+  setup_cost?: number
+  working_cost_per_unit?: number
+  overhead_percent?: number
+  currency?: string
   created_at: string
   updated_at: string
+  created_by?: string
   operations?: RoutingOperation[]
   operations_count?: number
+  boms_count?: number
 }
 
 export interface RoutingOperation {

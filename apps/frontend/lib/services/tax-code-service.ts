@@ -12,8 +12,8 @@ import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/ser
  * - Cache invalidation events (AC-009.7)
  */
 
-// Type alias for Supabase client
-type SupabaseClient = Awaited<ReturnType<typeof createServerSupabase>>
+// Error codes from PostgreSQL for reference handling
+const DB_ERROR_FK_VIOLATION = '23503'
 
 export interface TaxCode {
   id: string
@@ -66,7 +66,6 @@ export interface TaxCodeListResult {
  */
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
-  const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return null
@@ -106,7 +105,6 @@ export async function seedTaxCodesForOrganization(
 ): Promise<TaxCodeServiceResult<{ count: number }>> {
   try {
     const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Call database function to seed tax codes
     const { data, error } = await supabase.rpc('seed_tax_codes_for_organization', {
@@ -156,7 +154,6 @@ export async function createTaxCode(
   input: CreateTaxCodeInput
 ): Promise<TaxCodeServiceResult> {
   try {
-    const supabase = await createServerSupabase()
     const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
@@ -242,7 +239,6 @@ export async function updateTaxCode(
   input: UpdateTaxCodeInput
 ): Promise<TaxCodeServiceResult> {
   try {
-    const supabase = await createServerSupabase()
     const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
@@ -370,7 +366,6 @@ export async function listTaxCodes(
   filters?: TaxCodeFilters
 ): Promise<TaxCodeListResult> {
   try {
-    const supabase = await createServerSupabase()
     const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
@@ -453,7 +448,6 @@ export async function listTaxCodes(
  */
 export async function deleteTaxCode(id: string): Promise<TaxCodeServiceResult> {
   try {
-    const supabase = await createServerSupabase()
     const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
@@ -480,7 +474,7 @@ export async function deleteTaxCode(id: string): Promise<TaxCodeServiceResult> {
       console.error('Failed to delete tax code:', error)
 
       // AC-009.4: Foreign key constraint violation (Epic 3)
-      if (error.code === '23503') {
+      if (error.code === DB_ERROR_FK_VIOLATION) {
         // TODO Epic 3: Query po_lines to get count of usage
         return {
           success: false,
@@ -536,7 +530,6 @@ async function emitTaxCodeUpdatedEvent(
 ): Promise<void> {
   try {
     const supabase = await createServerSupabase()
-    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Publish to org-specific channel
     const channel = supabase.channel(`org:${orgId}`)

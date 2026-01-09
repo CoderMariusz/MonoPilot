@@ -1,0 +1,42 @@
+# Story 05.11 - GRN from PO
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "supabase/migrations/097_create_grns_table.sql"
+      type: migration
+      status: complete
+    - path: "supabase/migrations/098_create_grn_items_table.sql"
+      type: migration
+      status: complete
+    - path: "apps/frontend/lib/services/grn-service.ts"
+      type: service
+      status: partial
+      notes: "Basic CRUD only, missing validation and PO-specific workflow methods"
+  tests_exist: false
+  test_files: []
+  estimated_completion: 15%
+
+status: PARTIAL
+
+blockers:
+  - "Database migrations created but NOT APPLIED to cloud"
+  - "Missing RPC function create_grn_with_lp()"
+  - "No API routes for PO receipt workflow"
+  - "No receiving wizard UI"
+  - "No validation schemas"
+  - "No tests"
+
+recommendation: |
+  Prerequisites exist but not deployed. Need:
+  1. Apply migrations 097-098 to cloud database
+  2. Implement RPC function create_grn_with_lp()
+  3. Create validation schemas (Zod)
+  4. Implement 6 API routes
+  5. Build 5-step receiving wizard
+  6. Write unit + integration + E2E tests
+
+next_phase: P3

@@ -1,0 +1,79 @@
+{
+  "_comment": "Quality baseline for hybrid GLM/Claude approach. Based on Epic 04 production results.",
+  "created": "2026-01-08",
+  "source": "Epic 04 Stories 04.1, 04.2a, 04.5 via Hybrid GLM/Claude",
+
+  "targets": {
+    "ac_pass_rate": 100.0,
+    "test_pass_rate": 100.0,
+    "code_quality_score": 9.5,
+    "test_coverage": 95.0,
+    "security_score": 10.0,
+    "type_safety_score": 9.5,
+    "documentation_score": 8.5
+  },
+
+  "thresholds": {
+    "ac_pass_rate": {
+      "min": 100.0,
+      "warning": 95.0,
+      "description": "All acceptance criteria must pass"
+    },
+    "test_pass_rate": {
+      "min": 100.0,
+      "warning": 95.0,
+      "description": "All tests must pass before merge"
+    },
+    "code_quality_score": {
+      "min": 8.5,
+      "warning": 9.0,
+      "description": "Code quality (1-10 scale)"
+    },
+    "test_coverage": {
+      "min": 80.0,
+      "warning": 90.0,
+      "description": "Test coverage percentage"
+    },
+    "security_score": {
+      "min": 9.0,
+      "warning": 9.5,
+      "description": "Security audit score (1-10)"
+    },
+    "type_safety_score": {
+      "min": 9.0,
+      "warning": 9.5,
+      "description": "TypeScript strict mode compliance"
+    }
+  },
+
+  "cost_baseline": {
+    "claude_only_per_story": 0.437,
+    "hybrid_per_story": 0.205,
+    "expected_savings_percent": 53,
+    "pricing": {
+      "claude_sonnet_input_per_1m": 3.0,
+      "claude_sonnet_output_per_1m": 15.0,
+      "glm_4.7_input_per_1m": 0.60,
+      "glm_4.7_output_per_1m": 2.20,
+      "glm_4.5_air_input_per_1m": 0.20,
+      "glm_4.5_air_output_per_1m": 1.10
+    }
+  },
+
+  "phase_routing": {
+    "P1": {"model": "claude-sonnet", "reason": "Strategic UX decisions"},
+    "P2": {"model": "glm-4.7", "reason": "Test writing with Deep Thinking"},
+    "P3": {"model": "glm-4.7", "reason": "Code implementation with Deep Thinking"},
+    "P4": {"model": "glm-4.7", "reason": "Refactoring"},
+    "P5": {"model": "claude-sonnet", "reason": "Critical quality gate"},
+    "P6": {"model": "claude-sonnet", "reason": "QA validation"},
+    "P7": {"model": "glm-4.5-air", "reason": "Documentation (faster/cheaper)"}
+  },
+
+  "alerts": {
+    "quality_drop_threshold": -0.5,
+    "cost_increase_threshold": 20,
+    "test_failure_action": "BLOCK_MERGE",
+    "quality_warning_action": "NOTIFY_SENIOR"
+  }
+}

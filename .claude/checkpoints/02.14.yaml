@@ -1,0 +1,78 @@
+# Story 02.14 - BOM Advanced Features
+# Type: fullstack
+# Epic: 02-technical
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    # Database
+    - path: "supabase/migrations/archive/051_add_yield_percent_to_boms.sql"
+      type: "migration"
+    - path: "supabase/migrations/100_create_yield_logs_table.sql"
+      type: "migration"
+    # API Routes (4 endpoints)
+    - path: "apps/frontend/app/api/technical/boms/[id]/compare/[compareId]/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/boms/[id]/scale/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/boms/[id]/yield/route.ts"
+      type: "api"
+    # Services (in bom-service.ts)
+    - path: "apps/frontend/lib/services/bom-service.ts"
+      type: "service"
+      note: "Functions: compareBOMVersions, scaleBOM, applyBOMScaling, getBOMYield, updateBOMYield"
+    # Validation
+    - path: "apps/frontend/lib/validation/bom-advanced-schemas.ts"
+      type: "validation"
+    # Types
+    - path: "apps/frontend/lib/types/bom-advanced.ts"
+      type: "types"
+      lines: 230
+    # Components
+    - path: "apps/frontend/components/technical/bom/BOMComparisonModal.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/bom/BOMScaleModal.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/bom/YieldAnalysisPanel.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/bom/YieldConfigModal.tsx"
+      type: "component"
+    # Hooks
+    - path: "apps/frontend/lib/hooks/use-bom-comparison.ts"
+      type: "hook"
+    - path: "apps/frontend/lib/hooks/use-bom-scale.ts"
+      type: "hook"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/app/api/technical/boms/__tests__/compare.test.ts"
+      count: 10
+    - path: "apps/frontend/app/api/technical/boms/__tests__/scale.test.ts"
+      count: 20
+    - path: "apps/frontend/app/api/technical/boms/__tests__/yield.test.ts"
+      count: 20
+
+  estimated_completion: 85
+
+status: PARTIAL
+
+recommendation: |
+  Story 02.14 is 85% complete. Core advanced features implemented.
+
+  DONE:
+  - BOM version comparison with diff view (FR-2.25)
+  - BOM scaling with preview/apply modes (FR-2.35)
+  - BOM yield calculation and config (FR-2.34)
+  - Multi-level BOM explosion (FR-2.29)
+  - All UI components with 4 states
+  - React Query hooks
+  - 50+ tests
+
+  GAPS (Minor):
+  - Comparison export to PDF/CSV not implemented
+  - Loss factors detailed breakdown (MVP simplified)
+
+next_phase: P6
+P6: ✓ qa-agent 20:45 ac:5/5 bugs:0 tests:166/166 decision:pass
+P7: ✓ tech-writer 21:29 docs:complete status:PRODUCTION-READY

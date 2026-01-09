@@ -1,0 +1,130 @@
+# Story 02.10b - Traceability Queries & Genealogy
+# Type: fullstack
+# Epic: 02-technical
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    # Database Migrations
+    - path: "supabase/migrations/030_create_lp_genealogy_table.sql"
+      type: "migration"
+    - path: "supabase/migrations/032_create_recall_simulations_table.sql"
+      type: "migration"
+    - path: "supabase/migrations/033_create_trace_functions.sql"
+      type: "migration"
+    # Services
+    - path: "apps/frontend/lib/services/genealogy-service.ts"
+      type: "service"
+    - path: "apps/frontend/lib/services/recall-service.ts"
+      type: "service"
+    # API Routes
+    - path: "apps/frontend/app/api/technical/tracing/forward/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/tracing/backward/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/tracing/recall/route.ts"
+      type: "api"
+    # Types & Validation
+    - path: "apps/frontend/lib/types/traceability.ts"
+      type: "types"
+    - path: "apps/frontend/lib/validation/tracing-schemas.ts"
+      type: "validation"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/genealogy-service.test.ts"
+      count: 19
+    - path: "apps/frontend/__tests__/api/technical/tracing.test.ts"
+      count: 23
+
+  estimated_completion: 100
+
+status: PRODUCTION-READY
+
+blockers: []
+
+completion_breakdown:
+  database: 100%
+  backend_services: 100%
+  api_endpoints: 100%
+  validation: 100%
+  unit_tests: 100%
+  types: 100%
+  frontend_components: 100%
+  frontend_pages: 100%
+  jsdoc: 100%
+
+frontend_implemented:
+  components:
+    - path: "apps/frontend/components/technical/traceability/TraceResultsList.tsx"
+      description: "List view of trace results with keyboard navigation (already existed)"
+      jsdoc: true
+    - path: "apps/frontend/components/technical/traceability/TraceResultsTree.tsx"
+      description: "Tree visualization wrapper with all 4 UI states"
+      jsdoc: true
+    - path: "apps/frontend/components/technical/traceability/TraceResultsMatrix.tsx"
+      description: "Sortable table with CSV/PDF export functionality"
+      jsdoc: true
+    - path: "apps/frontend/components/technical/traceability/RecallSimulationPanel.tsx"
+      description: "Full recall simulation display with tabs for summary/genealogy/locations/financial/regulatory"
+      jsdoc: true
+    - path: "apps/frontend/components/technical/traceability/index.ts"
+      description: "Component index for easy imports"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/technical/traceability/page.tsx"
+      description: "Updated main page with forward/backward/recall modes and list/tree/matrix views"
+  navigation:
+    - path: "apps/frontend/components/technical/TechnicalHeader.tsx"
+      description: "Updated header with Traceability nav link"
+
+features:
+  - "Forward trace (where used)"
+  - "Backward trace (what consumed)"
+  - "Recall simulation with impact analysis"
+  - "List view with keyboard navigation"
+  - "Tree visualization using GenealogyTree"
+  - "Matrix view with sorting by depth/LP/product/quantity/status/expiry"
+  - "CSV export with full data"
+  - "PDF export (print-based)"
+  - "All 4 UI states: loading, error, empty, success"
+  - "Accessibility: keyboard navigation, ARIA labels"
+
+jsdoc_verification:
+  TraceResultsList.tsx:
+    - component: "TraceResultsList"
+      description: "Story 02.10b: Traceability Queries UI - Displays trace results as a list/table with LP details"
+    - function: "flattenTraceTree"
+      description: "Flatten trace tree into a list for table display"
+    - function: "getStatusVariant"
+      description: "Get status badge variant"
+  TraceResultsTree.tsx:
+    - component: "TraceResultsTree"
+      description: "Story 02.10b: Traceability Queries UI - Tree visualization wrapper for trace results"
+    - function: "countNodes"
+      description: "Count total nodes in trace tree"
+    - function: "calculateMaxDepth"
+      description: "Calculate max depth of trace tree"
+  TraceResultsMatrix.tsx:
+    - component: "TraceResultsMatrix"
+      description: "Story 02.10b: Traceability Queries UI - Matrix/table view with export functionality"
+    - function: "flattenTraceTree"
+      description: "Flatten trace tree into a list with path info for matrix display"
+    - function: "exportToCSV"
+      description: "Export data to CSV"
+    - function: "exportToPDF"
+      description: "Export data to PDF (simplified - generates HTML that can be printed)"
+  RecallSimulationPanel.tsx:
+    - component: "RecallSimulationPanel"
+      description: "Story 02.10b: Traceability Queries UI - Display panel for recall simulation results"
+    - function: "formatCurrency"
+      description: "Format number as USD currency"
+    - function: "formatDate"
+      description: "Format date string for display"
+    - function: "formatDateTime"
+      description: "Format datetime string for display"
+
+# Checkpoints
+P3: frontend-dev 22:27 files:5 components:4 states:4 a11y:compliant
+P6: qa-agent 22:44 ac:5/5 bugs:0 decision:pass
+P7: tech-writer 08:15 docs:complete jsdoc:verified status:PRODUCTION-READY

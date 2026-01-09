@@ -49,7 +49,7 @@ export function useLocationTree(
         }
 
         const queryString = queryParams.toString()
-        const url = `/api/settings/warehouses/${warehouseId}/locations${queryString ? `?${queryString}` : ''}`
+        const url = `/api/v1/settings/warehouses/${warehouseId}/locations${queryString ? `?${queryString}` : ''}`
 
         const response = await fetch(url, {
           method: 'GET',

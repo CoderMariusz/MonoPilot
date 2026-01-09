@@ -303,12 +303,11 @@ describe('OnboardingWizardModal Component - Story 01.3', () => {
 
       // THEN shows step 3 content
       await waitFor(() => {
-        expect(screen.getByText(/step 3/i)).toBeInTheDocument()
-        expect(screen.getByText(/storage locations/i)).toBeInTheDocument()
+        // Step 3 of 6 progress indicator
+        expect(screen.getByText(/step 3 of 6/i)).toBeInTheDocument()
+        // Storage locations appears (in both title and content)
+        expect(screen.getAllByText(/storage locations/i).length).toBeGreaterThan(0)
       })
-
-      // AND shows progress indicator (Step 3 of 6)
-      expect(screen.getByText(/step 3 of 6/i)).toBeInTheDocument()
 
       // AND shows checkmarks for completed steps 1-2
       const checkmarks = screen.getAllByTestId(/step-complete-/i)
@@ -359,8 +358,8 @@ describe('OnboardingWizardModal Component - Story 01.3', () => {
   })
 
   describe('Navigation', () => {
-    it('should disable Back button on step 1', async () => {
-      // GIVEN step 1
+    it('should not show Back button on step 1 (step 1 uses embedded form navigation)', async () => {
+      // GIVEN step 1 (uses OrganizationProfileStep which has its own navigation)
       vi.mocked(useOnboardingStatus).mockReturnValue({
         step: 1,
         isComplete: false,
@@ -373,11 +372,13 @@ describe('OnboardingWizardModal Component - Story 01.3', () => {
       // WHEN modal renders
       render(<OnboardingWizardModal open={true} />)
 
-      // THEN Back button is disabled
+      // THEN Back button is NOT shown (step 1 uses OrganizationProfileStep with own navigation)
       await waitFor(() => {
-        const backButton = screen.getByRole('button', { name: /back/i })
-        expect(backButton).toBeDisabled()
+        expect(screen.queryByRole('button', { name: /^back$/i })).not.toBeInTheDocument()
       })
+
+      // AND step 1 shows Next and Skip Step buttons from OrganizationProfileStep
+      expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument()
     })
 
     it('should enable Back button on step 3', async () => {

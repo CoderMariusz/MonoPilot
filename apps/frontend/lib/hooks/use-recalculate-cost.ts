@@ -11,7 +11,7 @@ import { bomCostKeys } from './use-bom-cost'
  * Recalculate BOM cost API call
  */
 async function recalculateCostApi(bomId: string): Promise<RecalculateCostResponse> {
-  const response = await fetch(`/api/v1/technical/boms/${bomId}/recalculate-cost`, {
+  const response = await fetch(`/api/technical/boms/${bomId}/recalculate-cost`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })

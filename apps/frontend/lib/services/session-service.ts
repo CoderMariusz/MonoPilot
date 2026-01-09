@@ -210,7 +210,8 @@ export async function terminateAllSessions(
   userId: string,
   exceptCurrent?: string
 ): Promise<number> {
-  const query = supabase
+  // Build base query
+  let query = supabase
     .from('user_sessions')
     .update({
       revoked_at: new Date().toISOString(),
@@ -219,8 +220,9 @@ export async function terminateAllSessions(
     .eq('user_id', userId)
     .is('revoked_at', null)
 
+  // Exclude current session if specified (chain returns new query)
   if (exceptCurrent) {
-    query.neq('id', exceptCurrent)
+    query = query.neq('id', exceptCurrent)
   }
 
   const { data, error } = await query.select('id')

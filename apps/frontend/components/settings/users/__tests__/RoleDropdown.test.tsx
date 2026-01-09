@@ -115,6 +115,7 @@ describe('RoleDropdown Component - Display All Roles', () => {
         currentUser={currentUser}
         selectedRoleId="role-10"
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -123,16 +124,16 @@ describe('RoleDropdown Component - Display All Roles', () => {
     fireEvent.click(trigger)
 
     // THEN all 10 roles shown
-    expect(screen.getByText('Owner')).toBeInTheDocument()
-    expect(screen.getByText('Administrator')).toBeInTheDocument()
-    expect(screen.getByText('Production Manager')).toBeInTheDocument()
-    expect(screen.getByText('Quality Manager')).toBeInTheDocument()
-    expect(screen.getByText('Warehouse Manager')).toBeInTheDocument()
-    expect(screen.getByText('Production Operator')).toBeInTheDocument()
-    expect(screen.getByText('Quality Inspector')).toBeInTheDocument()
-    expect(screen.getByText('Warehouse Operator')).toBeInTheDocument()
-    expect(screen.getByText('Planner')).toBeInTheDocument()
-    expect(screen.getByText('Viewer')).toBeInTheDocument()
+    expect(screen.getAllByText('Owner').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Production Manager').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Quality Manager').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Warehouse Manager').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Production Operator').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Quality Inspector').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Warehouse Operator').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Planner').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Viewer').length).toBeGreaterThan(0)
   })
 
   // AC: Display role names, not codes
@@ -147,6 +148,7 @@ describe('RoleDropdown Component - Display All Roles', () => {
         currentUser={currentUser}
         selectedRoleId="role-6"
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -155,13 +157,13 @@ describe('RoleDropdown Component - Display All Roles', () => {
     fireEvent.click(trigger)
 
     // THEN displays names, not codes
-    expect(screen.getByText('Production Manager')).toBeInTheDocument()
+    expect(screen.getAllByText('Production Manager').length).toBeGreaterThan(0)
     expect(screen.queryByText('production_manager')).not.toBeInTheDocument()
 
-    expect(screen.getByText('Quality Inspector')).toBeInTheDocument()
+    expect(screen.getAllByText('Quality Inspector').length).toBeGreaterThan(0)
     expect(screen.queryByText('quality_inspector')).not.toBeInTheDocument()
 
-    expect(screen.getByText('Warehouse Operator')).toBeInTheDocument()
+    expect(screen.getAllByText('Warehouse Operator').length).toBeGreaterThan(0)
     expect(screen.queryByText('warehouse_operator')).not.toBeInTheDocument()
   })
 
@@ -176,6 +178,7 @@ describe('RoleDropdown Component - Display All Roles', () => {
         currentUser={currentUser}
         selectedRoleId="role-1"
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -211,6 +214,7 @@ describe('RoleDropdown Component - Owner Role Visibility', () => {
         currentUser={currentUser}
         selectedRoleId="role-2"
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -222,9 +226,9 @@ describe('RoleDropdown Component - Owner Role Visibility', () => {
     expect(screen.queryByText('Owner')).not.toBeInTheDocument()
 
     // BUT other roles shown
-    expect(screen.getByText('Administrator')).toBeInTheDocument()
-    expect(screen.getByText('Production Manager')).toBeInTheDocument()
-    expect(screen.getByText('Viewer')).toBeInTheDocument()
+    expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Production Manager').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Viewer').length).toBeGreaterThan(0)
   })
 
   it('should hide owner role when current user is viewer', () => {
@@ -238,6 +242,7 @@ describe('RoleDropdown Component - Owner Role Visibility', () => {
         currentUser={currentUser}
         selectedRoleId="role-10"
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -260,6 +265,7 @@ describe('RoleDropdown Component - Owner Role Visibility', () => {
         currentUser={currentUser}
         selectedRoleId="role-1"
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -268,7 +274,7 @@ describe('RoleDropdown Component - Owner Role Visibility', () => {
     fireEvent.click(trigger)
 
     // THEN owner role shown
-    expect(screen.getByText('Owner')).toBeInTheDocument()
+    expect(screen.getAllByText('Owner').length).toBeGreaterThan(0)
   })
 
   it('should show 9 roles when admin (excluding owner)', () => {
@@ -282,6 +288,7 @@ describe('RoleDropdown Component - Owner Role Visibility', () => {
         currentUser={currentUser}
         selectedRoleId="role-2"
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -312,6 +319,7 @@ describe('RoleDropdown Component - Role Selection', () => {
         currentUser={currentUser}
         selectedRoleId="role-10" // Viewer
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
@@ -339,11 +347,12 @@ describe('RoleDropdown Component - Role Selection', () => {
         currentUser={currentUser}
         selectedRoleId="role-7" // Quality Inspector
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
     // THEN trigger shows selected role name
-    expect(screen.getByText('Quality Inspector')).toBeInTheDocument()
+    expect(screen.getAllByText('Quality Inspector').length).toBeGreaterThan(0)
   })
 
   it('should update display when selectedRoleId prop changes', () => {
@@ -356,11 +365,12 @@ describe('RoleDropdown Component - Role Selection', () => {
         currentUser={currentUser}
         selectedRoleId="role-10" // Viewer
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
     // THEN shows Viewer
-    expect(screen.getByText('Viewer')).toBeInTheDocument()
+    expect(screen.getAllByText('Viewer').length).toBeGreaterThan(0)
 
     // WHEN selectedRoleId prop changes to Admin
     rerender(
@@ -368,11 +378,12 @@ describe('RoleDropdown Component - Role Selection', () => {
         currentUser={currentUser}
         selectedRoleId="role-2" // Admin
         onRoleChange={onRoleChange}
+        roles={mockRoles}
       />
     )
 
     // THEN shows Administrator
-    expect(screen.getByText('Administrator')).toBeInTheDocument()
+    expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0)
   })
 })
 
@@ -393,6 +404,7 @@ describe('RoleDropdown Component - Disabled State', () => {
         selectedRoleId="role-2"
         onRoleChange={onRoleChange}
         disabled={true}
+        roles={mockRoles}
       />
     )
 
@@ -413,6 +425,7 @@ describe('RoleDropdown Component - Disabled State', () => {
         selectedRoleId="role-2"
         onRoleChange={onRoleChange}
         disabled={true}
+        roles={mockRoles}
       />
     )
 
@@ -448,6 +461,8 @@ describe('RoleDropdown Component - Loading State', () => {
         currentUser={currentUser}
         selectedRoleId="role-2"
         onRoleChange={onRoleChange}
+        loading={true}
+        roles={[]}
       />
     )
 

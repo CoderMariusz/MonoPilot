@@ -1,0 +1,42 @@
+# Story 05.17 - LP Split Workflow
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: false
+  files_found:
+    - path: "apps/frontend/lib/services/lp-service.ts"
+      type: service
+      status: exists
+      notes: "LP service exists but no split method found"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-008-lp-split-modal.md"
+      type: wireframe
+      status: complete
+      notes: "UX wireframe designed"
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/context/05.17/_index.yaml"
+      type: context
+      status: exists
+      notes: "Story context defined"
+  tests_exist: false
+  test_files: []
+  estimated_completion: 5%
+
+status: NOT_STARTED
+
+blockers:
+  - "No split_license_plate RPC function"
+  - "No split API route"
+  - "No SplitLPModal component"
+  - "LP service missing splitLP() method"
+
+recommendation: |
+  UX designed, no code. Implementation needed:
+  1. Create split_license_plate RPC function
+  2. Add splitLP() method to LPService
+  3. Create API route POST /api/warehouse/license-plates/[id]/split
+  4. Build SplitLPModal component
+  5. Update LP detail page with split action
+  6. Write tests
+
+next_phase: P2

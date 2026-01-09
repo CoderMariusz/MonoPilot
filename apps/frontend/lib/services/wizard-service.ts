@@ -21,6 +21,15 @@ import type {
 } from '@/lib/validation/wizard-steps'
 import { LOCATION_TEMPLATES } from '@/lib/constants/wizard-templates'
 
+// Constants
+const SPEED_CHAMPION_THRESHOLD_SECONDS = 900 // 15 minutes
+const DEMO_WAREHOUSE_CODE = 'DEMO-WH'
+const DEMO_WAREHOUSE_NAME = 'Demo Warehouse'
+const DEFAULT_LOCATION_CODE = 'DEFAULT'
+const DEFAULT_LOCATION_NAME = 'Default Location'
+const WORK_ORDER_CODE_PREFIX = 'WO-'
+const WORK_ORDER_CODE_PAD_LENGTH = 4
+
 /**
  * Response types for each wizard step
  */
@@ -130,8 +139,8 @@ export class WizardService {
     // Determine warehouse data (demo or user-provided)
     const warehouseData = data.skip
       ? {
-        code: 'DEMO-WH',
-        name: 'Demo Warehouse',
+        code: DEMO_WAREHOUSE_CODE,
+        name: DEMO_WAREHOUSE_NAME,
         type: 'GENERAL',
         is_default: true,
         is_active: true,
@@ -234,8 +243,8 @@ export class WizardService {
       // Create default location
       locationsToCreate = [
         {
-          code: 'DEFAULT',
-          name: 'Default Location',
+          code: DEFAULT_LOCATION_CODE,
+          name: DEFAULT_LOCATION_NAME,
           type: 'bulk',
           zone_enabled: false,
           capacity_enabled: false,
@@ -468,7 +477,7 @@ export class WizardService {
       .limit(1)
 
     const nextNumber = lastWO && lastWO.length > 0 ? parseInt(lastWO[0].code.split('-')[1]) + 1 : 1
-    const code = `WO-${String(nextNumber).padStart(4, '0')}`
+    const code = `${WORK_ORDER_CODE_PREFIX}${String(nextNumber).padStart(WORK_ORDER_CODE_PAD_LENGTH, '0')}`
 
     // Create work order
     const { data: workOrder, error } = await supabase
@@ -726,7 +735,7 @@ export class WizardService {
    * Threshold: 900 seconds (15 minutes)
    */
   static async checkSpeedChampion(durationSeconds: number): Promise<boolean> {
-    return durationSeconds < 900
+    return durationSeconds < SPEED_CHAMPION_THRESHOLD_SECONDS
   }
 
   /**

@@ -1,9 +1,112 @@
-P2: ✓ test-writer 17:54 files:4 tests:98 status:red
-P3: ✓ frontend-dev 18:04 files:8 tests:17/26 notes:radix-select-issue
-P3: ✓ backend-dev 18:05 files:7 tests:14/98 status:partial
-P3: ✓ backend-dev 18:30 files:1 tests:37/37
-P3: ✓ backend-dev 19:07 files:3 tests:14/14 migrations:4 notes:096-099-migrations-ready-for-sql-editor
-P5: ✓ code-reviewer 19:37 issues:16 decision:request_changes block:YES
-P3: ✓ backend-dev 19:46 files:1 tests:65/65
-P6: ✗ qa-agent 19:52 ac:0/12 bugs:1-critical decision:FAIL block:YES
-P5: ✗ code-reviewer 19:55 issues:1-critical,15-api-tests decision:request_changes block:YES
+# Story 05.9 - ASN Receive Workflow
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+# Status: BLOCKED at P6 (qa-agent)
+
+status: BLOCKED
+completion: 80%
+last_phase: P6
+
+blockers:
+  - id: TYPE-001
+    severity: CRITICAL
+    type: type_conflict
+    description: "Duplicate VarianceReason type definitions"
+    files:
+      - "apps/frontend/lib/types/asn-receive.ts (CORRECT)"
+      - "apps/frontend/lib/types/asn.ts (WRONG)"
+    details: |
+      asn-receive.ts: 'damaged' | 'short-shipped' | 'over-shipped' | 'other'
+      asn.ts: 'damaged' | 'short_ship' | 'over_ship' | 'wrong_item' | 'quality_issue' | 'other'
+      Database migration 096 uses hyphenated values (short-shipped).
+      Components import from asn.ts and get wrong enum values.
+    fix: |
+      1. Remove VarianceReason from asn.ts
+      2. Update VARIANCE_REASON_LABELS in asn.ts to use correct keys
+      3. All imports should use asn-receive.ts
+
+  - id: TYPE-002
+    severity: CRITICAL
+    type: type_conflict
+    description: "ASNReceiveRequest has two definitions"
+    files:
+      - "apps/frontend/lib/types/asn-receive.ts (uses ASNReceiveItem[])"
+      - "apps/frontend/lib/types/asn.ts line 213 (uses ReceiveItemInput[])"
+    fix: "Remove ASNReceiveRequest from asn.ts, use asn-receive.ts only"
+
+  - id: IMPORT-001
+    severity: HIGH
+    type: import
+    description: "Components import from wrong types file"
+    files_to_fix:
+      - "apps/frontend/components/warehouse/asns/ReceiveItemRow.tsx"
+      - "apps/frontend/components/warehouse/asns/ReceiveModal.tsx"
+      - "apps/frontend/components/warehouse/asns/ReceiveSummary.tsx"
+      - "apps/frontend/components/warehouse/asns/VarianceBadge.tsx"
+      - "apps/frontend/lib/hooks/use-asn-receive.ts"
+    current: "import from '@/lib/types/asn'"
+    correct: "import from '@/lib/types/asn-receive'"
+
+  - id: LABEL-001
+    severity: MEDIUM
+    type: mismatch
+    description: "VARIANCE_REASON_LABELS uses wrong keys"
+    file: "apps/frontend/lib/types/asn.ts"
+    lines: "244-251"
+    current: |
+      short_ship: 'Short Ship'
+      over_ship: 'Over Ship'
+    correct: |
+      'short-shipped': 'Short Shipped'
+      'over-shipped': 'Over Shipped'
+
+fix_sequence:
+  1: "Remove duplicate types from asn.ts (lines 162-241)"
+  2: "Update VARIANCE_REASON_LABELS to use correct hyphenated keys"
+  3: "Update 5 component files to import from asn-receive.ts"
+  4: "Verify migrations 096-099 are applied"
+  5: "Run pnpm test -- asn-receive"
+  6: "Re-submit to code-reviewer (P5)"
+
+files_to_modify:
+  - path: "apps/frontend/lib/types/asn.ts"
+    action: |
+      Remove lines 162-241:
+      - VarianceReason type
+      - VarianceIndicator type
+      - ASNReceiveItemPreview
+      - ASNReceivePreview
+      - ReceiveItemInput
+      - ASNReceiveRequest
+      - VarianceResult
+      - ASNReceiveResult
+      Update VARIANCE_REASON_LABELS (lines 244-251)
+
+  - path: "apps/frontend/components/warehouse/asns/ReceiveItemRow.tsx"
+    action: "Change import from '@/lib/types/asn' to '@/lib/types/asn-receive'"
+
+  - path: "apps/frontend/components/warehouse/asns/ReceiveModal.tsx"
+    action: "Change import from '@/lib/types/asn' to '@/lib/types/asn-receive'"
+
+  - path: "apps/frontend/components/warehouse/asns/ReceiveSummary.tsx"
+    action: "Change import from '@/lib/types/asn' to '@/lib/types/asn-receive'"
+
+  - path: "apps/frontend/components/warehouse/asns/VarianceBadge.tsx"
+    action: "Change import from '@/lib/types/asn' to '@/lib/types/asn-receive'"
+
+  - path: "apps/frontend/lib/hooks/use-asn-receive.ts"
+    action: "Change import from '@/lib/types/asn' to '@/lib/types/asn-receive'"
+
+migrations_status:
+  096_add_asn_items_variance_columns: "EXISTS - verify applied"
+  097_create_grns_table: "EXISTS"
+  098_create_grn_items_table: "EXISTS"
+  099_fix_warehouse_settings_trigger: "EXISTS"
+
+test_status:
+  unit: "14/24 passing (10 skipped)"
+  api: "0/25 (not running)"
+
+next_phase: P3-FIX
+agent: backend-dev

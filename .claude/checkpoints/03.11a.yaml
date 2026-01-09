@@ -1,0 +1,60 @@
+# Story 03.11a - WO Materials (BOM Snapshot)
+# Type: fullstack
+# Epic: 03-planning
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "supabase/migrations/076_create_wo_materials_table.sql"
+      type: migration
+      lines: 248
+    - path: "apps/frontend/lib/services/wo-snapshot-service.ts"
+      type: service
+      lines: 272
+    - path: "apps/frontend/lib/services/wo-materials-service.ts"
+      type: service
+      lines: 118
+    - path: "apps/frontend/app/api/planning/work-orders/[id]/materials/route.ts"
+      type: api
+    - path: "apps/frontend/app/api/planning/work-orders/[id]/snapshot/route.ts"
+      type: api
+    - path: "apps/frontend/components/planning/work-orders/WOMaterialsTable.tsx"
+      type: component
+      lines: 304
+    - path: "apps/frontend/components/planning/work-orders/RefreshSnapshotButton.tsx"
+      type: component
+    - path: "apps/frontend/lib/hooks/use-wo-materials.ts"
+      type: hook
+    - path: "apps/frontend/lib/types/wo-materials.ts"
+      type: types
+    - path: "apps/frontend/lib/validation/wo-materials.ts"
+      type: validation
+  tests_exist: true
+  test_files:
+    - path: "lib/services/__tests__/wo-snapshot-service.test.ts"
+      count: 16
+    - path: "app/api/planning/work-orders/[id]/materials/__tests__/route.test.ts"
+      count: 6
+    - path: "app/api/planning/work-orders/[id]/snapshot/__tests__/route.test.ts"
+      count: 10
+  estimated_completion: 100%
+
+status: DONE
+
+details:
+  tests_passing: "32/32"
+  acceptance_criteria: "13/13 PASS"
+  qa_decision: "PASS - Ready for Production"
+  total_loc: "1,952 lines"
+  security: "RLS verified, type safety 100%"
+
+recommendation: |
+  Story 03.11a is FULLY IMPLEMENTED and PRODUCTION READY.
+  - 32/32 tests PASSING
+  - 13/13 acceptance criteria PASS
+  - BOM snapshot pattern (ADR-002) correctly implemented
+  - Quantity scaling, by-product handling, immutability verified
+  - Multi-tenant isolation via RLS
+
+next_phase: NONE

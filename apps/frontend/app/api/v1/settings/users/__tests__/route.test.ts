@@ -637,7 +637,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -656,7 +656,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -681,7 +681,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
       })
       mockSupabaseSingle.mockResolvedValue({
         data: {
-          id: 'new-user-id',
+          id: '550e8400-e29b-41d4-a716-446655440003',
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
@@ -695,7 +695,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -719,13 +719,13 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
       })
       mockSupabaseSingle.mockResolvedValue({
         data: {
-          id: 'new-user-id',
+          id: '550e8400-e29b-41d4-a716-446655440003',
           org_id: 'test-org-id',
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
-          role: { id: 'role-viewer-id', code: 'VIEWER', name: 'Viewer' },
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
+          role: { id: '550e8400-e29b-41d4-a716-446655440001', code: 'VIEWER', name: 'Viewer' },
           language: 'en',
           is_active: true,
           created_at: '2025-12-16T10:00:00Z',
@@ -739,7 +739,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
           language: 'en',
         }),
       })
@@ -748,7 +748,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
 
       expect(response.status).toBe(201)
       const data = await response.json()
-      expect(data.id).toBe('new-user-id')
+      expect(data.id).toBe('550e8400-e29b-41d4-a716-446655440003')
       expect(data.email).toBe('new@company.com')
       expect(data.is_active).toBe(true)
     })
@@ -765,7 +765,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
       })
       mockSupabaseSingle.mockResolvedValue({
         data: {
-          id: 'new-user-id',
+          id: '550e8400-e29b-41d4-a716-446655440003',
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
@@ -780,7 +780,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -805,7 +805,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
       })
       mockSupabaseSingle.mockResolvedValue({
         data: {
-          id: 'new-user-id',
+          id: '550e8400-e29b-41d4-a716-446655440003',
           is_active: true,
         },
         error: null,
@@ -817,7 +817,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -857,7 +857,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'existing@company.com',
           first_name: 'Jane',
           last_name: 'Smith',
-          role_id: 'role-admin-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440002',
         }),
       })
 
@@ -876,7 +876,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'invalid@',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -895,7 +895,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: '',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -913,7 +913,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: '',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -946,7 +946,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'A'.repeat(101),
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 
@@ -962,7 +962,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'new@company.com',
           first_name: 'John',
           last_name: 'Doe',
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
           language: 'es', // Spanish not supported
         }),
       })
@@ -1008,7 +1008,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
       })
       mockSupabaseSingle.mockResolvedValue({
         data: {
-          id: 'new-user-id',
+          id: '550e8400-e29b-41d4-a716-446655440003',
           first_name: "François",
           last_name: "O'Brien",
         },
@@ -1021,7 +1021,7 @@ describe('Story 01.5a: POST /api/v1/settings/users - Create User', () => {
           email: 'francois@company.com',
           first_name: "François",
           last_name: "O'Brien",
-          role_id: 'role-viewer-id',
+          role_id: '550e8400-e29b-41d4-a716-446655440001',
         }),
       })
 

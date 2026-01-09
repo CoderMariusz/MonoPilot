@@ -1,13 +1,92 @@
-P2: ✓ test-writer 12:58 files:4 tests:90+ status:red
-P3: ✓ frontend-dev 13:07 files:11 tests:40/46 status:in-progress
-P3: ✓ backend-dev 13:07 files:5 tests:31/31
-P5: ✓ code-reviewer 13:11 issues:3-major decision:request_changes
-P3: ✓ frontend-dev 13:19 files:3 tests:77/77
-P5: ✓ code-reviewer 13:25 05.6:request_changes 05.7:approved issues:1-critical
-P3: ✓ frontend-dev 13:30 files:4 tests:0/0 status:green
-P5: ✗ code-reviewer 13:36 05.6:deferred 05.7:request_changes issues:2-critical decision:blocked
-P3: ✓ backend-dev 13:45 files:3 tests:pass-no-cookie-errors
-P5: ✗ code-reviewer 13:51 05.6+05.7:request_changes issues:4-critical decision:blocked
-P6: ✗ qa-agent 14:08 decision:blocked reason:critical-api-test-failures
-P3: ✓ backend-dev 14:18 files:2 tests:25/25
-P5: ✗ code-reviewer 14:27 05.6:code-ok-but-module-blocked issues:2-critical decision:request_changes
+# Story 05.6 - LP Detail History
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+# Status: BLOCKED at P5 (code-reviewer)
+
+status: BLOCKED
+completion: 70%
+last_phase: P5
+
+blockers:
+  - id: DB-001
+    severity: CRITICAL
+    type: database
+    description: "Missing lp_transactions table"
+    file: "supabase/migrations/ (MISSING)"
+    details: |
+      Service in license-plate-detail-service.ts (lines 204-217, 260-273)
+      tries to insert into lp_transactions table that doesn't exist.
+      Block/unblock audit logging silently fails.
+    fix: |
+      Create migration 102_create_lp_transactions_table.sql:
+      CREATE TABLE lp_transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES organizations(id),
+        lp_id UUID NOT NULL REFERENCES license_plates(id),
+        transaction_type TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        reason TEXT,
+        reference_type TEXT,
+        reference_id UUID,
+        performed_by UUID,
+        performed_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+  - id: DB-002
+    severity: CRITICAL
+    type: database
+    description: "Missing block_reason column in license_plates"
+    file: "supabase/migrations/088_create_license_plates.sql"
+    details: |
+      Service defines block_reason (line 49), page.tsx uses it (line 290),
+      but column doesn't exist in database schema.
+      LPUnblockModal cannot show original block reason.
+    fix: |
+      Create migration 103_add_block_reason_to_license_plates.sql:
+      ALTER TABLE license_plates ADD COLUMN block_reason TEXT;
+
+  - id: CODE-001
+    severity: MAJOR
+    type: code
+    description: "Duplicate block/unblock in main route.ts"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/route.ts"
+    lines: "80-138"
+    details: |
+      Main route handles action='block'/'unblock' but dedicated routes exist:
+      - /[id]/block/route.ts
+      - /[id]/unblock/route.ts
+      Creates duplicate implementations, maintenance issue.
+    fix: "Remove block/unblock handling from main route.ts (lines 80-138)"
+
+  - id: DEP-001
+    severity: MAJOR
+    type: dependency
+    description: "Genealogy API returns mock data"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/genealogy/route.ts"
+    lines: "45-49"
+    details: |
+      TODO comment: "Replace with actual database query"
+      Returns empty mockAncestors/mockDescendants.
+      GenealogyTreePanel shows empty. AC-8 fails.
+    fix: "Complete genealogy queries in Story 05.2 OR mark as Phase 2"
+
+fix_sequence:
+  1: "Create migration 102_create_lp_transactions_table.sql"
+  2: "Create migration 103_add_block_reason_to_license_plates.sql"
+  3: "Apply migrations to Supabase"
+  4: "Remove duplicate code from main route.ts"
+  5: "Run tests to verify"
+  6: "Re-submit to code-reviewer (P5)"
+
+files_to_create:
+  - "supabase/migrations/102_create_lp_transactions_table.sql"
+  - "supabase/migrations/103_add_block_reason_to_license_plates.sql"
+
+files_to_modify:
+  - path: "apps/frontend/app/api/warehouse/license-plates/[id]/route.ts"
+    action: "Remove lines 80-138 (block/unblock handling)"
+
+next_phase: P3-FIX
+agent: backend-dev

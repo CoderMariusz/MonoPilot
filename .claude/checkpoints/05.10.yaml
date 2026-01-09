@@ -1,0 +1,38 @@
+# Story 05.10 - GRN CRUD Items
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "supabase/migrations/097_create_grns_table.sql"
+      type: migration
+      status: complete
+    - path: "supabase/migrations/098_create_grn_items_table.sql"
+      type: migration
+      status: complete
+    - path: "apps/frontend/lib/services/grn-service.ts"
+      type: service
+      status: partial
+      methods: [getGRNs, getGRNById, createGRNWithLP, cancelGRN, getGRNsByPO]
+  tests_exist: false
+  test_files: []
+  estimated_completion: 25%
+
+status: PARTIAL
+
+blockers:
+  - "API routes missing - no /api/warehouse/grns/* endpoints"
+  - "No Zod validation schemas for GRN"
+  - "No frontend pages (receiving list/detail)"
+  - "No dedicated unit tests"
+
+recommendation: |
+  Database and partial service exist. Need:
+  1. Create 6 API routes (list, create, update, complete, cancel, items)
+  2. Add Zod validation schemas
+  3. Build frontend pages and components
+  4. Write comprehensive tests
+
+next_phase: P3

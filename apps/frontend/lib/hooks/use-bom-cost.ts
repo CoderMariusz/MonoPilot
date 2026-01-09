@@ -16,7 +16,7 @@ export const bomCostKeys = {
  * Fetch BOM cost data from API
  */
 async function fetchBOMCost(bomId: string): Promise<BOMCostResponse> {
-  const response = await fetch(`/api/v1/technical/boms/${bomId}/cost`)
+  const response = await fetch(`/api/technical/boms/${bomId}/cost`)
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))

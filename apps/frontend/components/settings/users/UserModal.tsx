@@ -4,7 +4,7 @@
  * Story: 01.5b - User Warehouse Access Restrictions (TD-103)
  *
  * Create/Edit user modal with form validation
- * Includes: Warehouse access multi-select (Story 01.5b)
+ * Includes: Warehouse access multi-select (Story 01.5b - hidden in MVP)
  */
 
 'use client'
@@ -34,6 +34,10 @@ import { CreateUserSchema, UpdateUserSchema } from '@/lib/validation/user-schema
 import { ZodError } from 'zod'
 import { useRoles } from '@/lib/hooks/use-roles'
 import { WarehouseMultiSelect, type Warehouse } from './WarehouseMultiSelect'
+
+// Feature flag for Phase 1B warehouse access (Story 01.5b)
+// Set to true when Phase 1B is ready for deployment
+const ENABLE_WAREHOUSE_ACCESS = false
 
 interface UserModalProps {
   mode: 'create' | 'edit'
@@ -121,9 +125,9 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
     }
   }, [])
 
-  // Load warehouses when modal opens
+  // Load warehouses when modal opens (only when Phase 1B feature is enabled)
   useEffect(() => {
-    if (open) {
+    if (open && ENABLE_WAREHOUSE_ACCESS) {
       fetchWarehouses()
     }
   }, [open, fetchWarehouses])
@@ -140,8 +144,8 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
         warehouse_ids: user.warehouse_access_ids || [],
         all_warehouses: !user.warehouse_access_ids || user.warehouse_access_ids.length === 0,
       })
-      // Fetch current warehouse access in edit mode
-      if (mode === 'edit' && user.id) {
+      // Fetch current warehouse access in edit mode (only when Phase 1B feature is enabled)
+      if (ENABLE_WAREHOUSE_ACCESS && mode === 'edit' && user.id) {
         fetchWarehouseAccess(user.id)
       }
     } else {
@@ -227,9 +231,9 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
 
       schema.parse(baseFormData)
 
-      // Additional warehouse validation (Story 01.5b)
+      // Additional warehouse validation (Story 01.5b) - only when feature is enabled
       // If not admin and not all_warehouses, must have at least one warehouse
-      if (!isAdminRole() && !formData.all_warehouses && formData.warehouse_ids.length === 0) {
+      if (ENABLE_WAREHOUSE_ACCESS && !isAdminRole() && !formData.all_warehouses && formData.warehouse_ids.length === 0) {
         setErrors(prev => ({
           ...prev,
           warehouse_ids: 'Please select at least one warehouse',
@@ -308,26 +312,28 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
         throw new Error(data.error || 'Failed to save user')
       }
 
-      // Update warehouse access (Story 01.5b)
-      const userId = isEditMode ? user?.id : data.id
-      if (userId) {
-        const warehousePayload = {
-          all_warehouses: formData.all_warehouses,
-          warehouse_ids: formData.all_warehouses ? [] : formData.warehouse_ids,
-        }
-
-        const warehouseResponse = await fetch(
-          `/api/v1/settings/users/${userId}/warehouse-access`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(warehousePayload),
+      // Update warehouse access (Story 01.5b) - only when feature is enabled
+      if (ENABLE_WAREHOUSE_ACCESS) {
+        const userId = isEditMode ? user?.id : data.id
+        if (userId) {
+          const warehousePayload = {
+            all_warehouses: formData.all_warehouses,
+            warehouse_ids: formData.all_warehouses ? [] : formData.warehouse_ids,
           }
-        )
 
-        if (!warehouseResponse.ok) {
-          console.error('Failed to update warehouse access')
-          // Continue anyway - user was created/updated successfully
+          const warehouseResponse = await fetch(
+            `/api/v1/settings/users/${userId}/warehouse-access`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(warehousePayload),
+            }
+          )
+
+          if (!warehouseResponse.ok) {
+            console.error('Failed to update warehouse access')
+            // Continue anyway - user was created/updated successfully
+          }
         }
       }
 
@@ -492,57 +498,60 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
           </div>
 
           {/* Warehouse Access field (Story 01.5b - TD-103) */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="warehouse_access">
-                Warehouse Access {!isAdminRole() && <span className="text-destructive">*</span>}
-              </Label>
-              {isAdminRole() && (
-                <span className="text-xs text-muted-foreground">
-                  Admin roles have access to all warehouses
-                </span>
+          {/* Hidden in MVP (Phase 1A) - set ENABLE_WAREHOUSE_ACCESS = true for Phase 1B */}
+          {ENABLE_WAREHOUSE_ACCESS && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="warehouse_access">
+                  Warehouse Access {!isAdminRole() && <span className="text-destructive">*</span>}
+                </Label>
+                {isAdminRole() && (
+                  <span className="text-xs text-muted-foreground">
+                    Admin roles have access to all warehouses
+                  </span>
+                )}
+              </div>
+
+              {/* All Warehouses checkbox */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="all_warehouses"
+                  checked={formData.all_warehouses}
+                  onCheckedChange={handleAllWarehousesChange}
+                  disabled={submitting}
+                />
+                <label
+                  htmlFor="all_warehouses"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  All Warehouses
+                </label>
+              </div>
+
+              {/* Warehouse multi-select (only shown if not all warehouses) */}
+              {!formData.all_warehouses && (
+                <WarehouseMultiSelect
+                  value={formData.warehouse_ids}
+                  onChange={handleWarehouseIdsChange}
+                  warehouses={warehouses}
+                  isLoading={warehousesLoading}
+                  error={warehousesError}
+                  disabled={submitting}
+                  aria-label="Select warehouses this user can access"
+                />
               )}
+
+              {errors.warehouse_ids && (
+                <p className="text-sm text-destructive">{errors.warehouse_ids}</p>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                {formData.all_warehouses
+                  ? 'User will have access to all current and future warehouses.'
+                  : 'Select specific warehouses this user can access.'}
+              </p>
             </div>
-
-            {/* All Warehouses checkbox */}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="all_warehouses"
-                checked={formData.all_warehouses}
-                onCheckedChange={handleAllWarehousesChange}
-                disabled={submitting}
-              />
-              <label
-                htmlFor="all_warehouses"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                All Warehouses
-              </label>
-            </div>
-
-            {/* Warehouse multi-select (only shown if not all warehouses) */}
-            {!formData.all_warehouses && (
-              <WarehouseMultiSelect
-                value={formData.warehouse_ids}
-                onChange={handleWarehouseIdsChange}
-                warehouses={warehouses}
-                isLoading={warehousesLoading}
-                error={warehousesError}
-                disabled={submitting}
-                aria-label="Select warehouses this user can access"
-              />
-            )}
-
-            {errors.warehouse_ids && (
-              <p className="text-sm text-destructive">{errors.warehouse_ids}</p>
-            )}
-
-            <p className="text-xs text-muted-foreground">
-              {formData.all_warehouses
-                ? 'User will have access to all current and future warehouses.'
-                : 'Select specific warehouses this user can access.'}
-            </p>
-          </div>
+          )}
 
           <DialogFooter>
             <Button

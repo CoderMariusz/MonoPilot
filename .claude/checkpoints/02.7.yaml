@@ -1,0 +1,85 @@
+# Story 02.7 - Routings CRUD
+# Type: fullstack
+# Epic: 02-technical
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    # Database
+    - path: "apps/frontend/lib/supabase/migrations/020_create_routings_table.sql"
+      type: "migration"
+    # Services
+    - path: "apps/frontend/lib/services/routing-service.ts"
+      type: "service"
+    # API Routes
+    - path: "apps/frontend/app/api/technical/routings/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/routings/[id]/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/routings/[id]/clone/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/routings/[id]/operations/route.ts"
+      type: "api"
+    # Pages
+    - path: "apps/frontend/app/(authenticated)/technical/routings/page.tsx"
+      type: "page"
+    - path: "apps/frontend/app/(authenticated)/technical/routings/[id]/page.tsx"
+      type: "page"
+    # Components
+    - path: "apps/frontend/components/technical/routings/create-routing-modal.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/routings/edit-routing-drawer.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/routings/clone-routing-modal.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/routings/operations-table.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/routings/routings-data-table.tsx"
+      type: "component"
+    # Validation
+    - path: "apps/frontend/lib/validation/routing-schemas.ts"
+      type: "validation"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/__tests__/api/technical/routings.test.ts"
+      count: 21
+    - path: "apps/frontend/lib/services/__tests__/routing-service.test.ts"
+      count: "extensive"
+    - path: "apps/frontend/e2e/technical/routing-operations.spec.ts"
+      count: "e2e"
+
+  estimated_completion: 95
+
+status: COMPLETE
+
+recommendation: |
+  Story 02.7 is 95% complete. UI migrated to V1 API.
+
+  DONE:
+  - Database: routings table with 4 RLS policies, 4 indexes
+  - Service: 12 functions including clone and operations
+  - API: V1 routes with code/cost fields fully aligned with spec
+  - Pages: List page updated with Code column, search by code/name
+  - Components: Create modal with code + cost fields (ADR-009)
+  - Components: Edit drawer with read-only code, editable cost fields
+  - Components: Data table with Code column
+  - Tests: 15 passing tests
+
+  FIXED (P3-FIX):
+  - Migrated create-routing-modal to V1 API (/api/v1/technical/routings)
+  - Migrated edit-routing-drawer to V1 API
+  - Migrated routings list page to V1 API
+  - Added code field to create form (uppercase alphanumeric + hyphens)
+  - Added cost configuration fields (setup_cost, working_cost_per_unit, overhead_percent, currency)
+  - Added is_reusable toggle
+  - Added Code column to data table
+  - Code shown as read-only in edit form (immutable after creation)
+  - Version badge shown in edit drawer header
+
+  REMAINING GAPS:
+  - Version auto-increment trigger verification (database)
+
+next_phase: P4
+P3-FIX: ✓ frontend-dev 20:27 files:5 migrate-v1-api:done cost-fields:added code-column:added tests:15/15

@@ -1,6 +1,6 @@
 /**
- * BOMItemModal Component (Story 02.5a - MVP)
- * Add/Edit modal for BOM items with MVP fields only
+ * BOMItemModal Component (Story 02.5a - MVP + 02.5b Phase 1B)
+ * Add/Edit modal for BOM items with MVP and Phase 1B fields
  *
  * Features:
  * - Create mode (item = null): Empty form, auto-sequence
@@ -12,6 +12,12 @@
  * - UoM mismatch warning display
  * - All 4 UI states
  *
+ * Phase 1B Features:
+ * - consume_whole_lp checkbox
+ * - is_by_product checkbox with yield_percent calculation
+ * - condition_flags multi-select (ConditionalFlagsSelect)
+ * - line_ids checkboxes (ProductionLinesCheckbox)
+ *
  * Acceptance Criteria:
  * - AC-02-a: Add Item modal opens
  * - AC-02-b: Valid item creation
@@ -21,6 +27,10 @@
  * - AC-06: UoM mismatch warning (non-blocking)
  * - AC-07: Quantity validation
  * - AC-08: Sequence auto-increment
+ * - AC-01 (02.5b): Conditional flags save as JSONB
+ * - AC-03 (02.5b): Line-specific items save line_ids array
+ * - AC-04 (02.5b): Consume whole LP checkbox works
+ * - AC-02 (02.5b): By-products with yield tracking
  */
 
 'use client'
@@ -72,6 +82,14 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { bomItemFormSchema, type BOMItemFormValues } from '@/lib/validation/bom-items'
 import type {
@@ -80,7 +98,12 @@ import type {
   CreateBOMItemRequest,
   UpdateBOMItemRequest,
   RoutingOperationOption,
+  ConditionFlags,
+  ProductionLine,
 } from '@/lib/types/bom'
+import { ConditionalFlagsSelect } from './ConditionalFlagsSelect'
+import { ProductionLinesCheckbox } from './ProductionLinesCheckbox'
+import { BOM_ITEM_DEFAULTS } from '@/lib/constants/bom-items'
 
 // ========================================
 // Type Definitions
@@ -109,6 +132,10 @@ export interface BOMItemModalProps {
   item?: BOMItem | null
   /** Default sequence for new items */
   defaultSequence?: number
+  /** BOM output quantity for yield calculation (Phase 1B) */
+  bomOutputQty?: number
+  /** BOM output UoM for yield display (Phase 1B) */
+  bomOutputUom?: string
   /** Callback on successful save */
   onSave: (data: CreateBOMItemRequest | UpdateBOMItemRequest, itemId?: string) => Promise<{ item: BOMItem; warnings?: BOMItemWarning[] }>
 }
@@ -371,6 +398,8 @@ export function BOMItemModal({
   routingId = null,
   item = null,
   defaultSequence = 10,
+  bomOutputQty = 1,
+  bomOutputUom = 'kg',
   onSave,
 }: BOMItemModalProps) {
   const [saving, setSaving] = useState(false)
@@ -379,6 +408,10 @@ export function BOMItemModal({
   const [loadingOperations, setLoadingOperations] = useState(false)
   const [selectedProductUom, setSelectedProductUom] = useState<string>('')
   const [serverError, setServerError] = useState<string | null>(null)
+
+  // Phase 1B state
+  const [productionLines, setProductionLines] = useState<ProductionLine[]>([])
+  const [loadingLines, setLoadingLines] = useState(false)
 
   const isEdit = mode === 'edit'
 
@@ -393,6 +426,12 @@ export function BOMItemModal({
       operation_seq: item?.operation_seq ?? null,
       scrap_percent: item?.scrap_percent ?? 0,
       notes: item?.notes || '',
+      // Phase 1B fields
+      consume_whole_lp: item?.consume_whole_lp ?? BOM_ITEM_DEFAULTS.CONSUME_WHOLE_LP,
+      line_ids: item?.line_ids ?? BOM_ITEM_DEFAULTS.LINE_IDS,
+      is_by_product: item?.is_by_product ?? BOM_ITEM_DEFAULTS.IS_BY_PRODUCT,
+      yield_percent: item?.yield_percent ?? BOM_ITEM_DEFAULTS.YIELD_PERCENT,
+      condition_flags: item?.condition_flags ?? BOM_ITEM_DEFAULTS.CONDITION_FLAGS,
     },
   })
 
@@ -408,6 +447,12 @@ export function BOMItemModal({
           operation_seq: item.operation_seq,
           scrap_percent: item.scrap_percent,
           notes: item.notes || '',
+          // Phase 1B fields
+          consume_whole_lp: item.consume_whole_lp ?? BOM_ITEM_DEFAULTS.CONSUME_WHOLE_LP,
+          line_ids: item.line_ids ?? BOM_ITEM_DEFAULTS.LINE_IDS,
+          is_by_product: item.is_by_product ?? BOM_ITEM_DEFAULTS.IS_BY_PRODUCT,
+          yield_percent: item.yield_percent ?? BOM_ITEM_DEFAULTS.YIELD_PERCENT,
+          condition_flags: item.condition_flags ?? BOM_ITEM_DEFAULTS.CONDITION_FLAGS,
         })
         setSelectedProductUom(item.product_base_uom)
       } else {
@@ -419,6 +464,12 @@ export function BOMItemModal({
           operation_seq: null,
           scrap_percent: 0,
           notes: '',
+          // Phase 1B fields - defaults
+          consume_whole_lp: BOM_ITEM_DEFAULTS.CONSUME_WHOLE_LP,
+          line_ids: BOM_ITEM_DEFAULTS.LINE_IDS,
+          is_by_product: BOM_ITEM_DEFAULTS.IS_BY_PRODUCT,
+          yield_percent: BOM_ITEM_DEFAULTS.YIELD_PERCENT,
+          condition_flags: BOM_ITEM_DEFAULTS.CONDITION_FLAGS,
         })
         setSelectedProductUom('')
       }
@@ -453,6 +504,24 @@ export function BOMItemModal({
     }
   }, [routingId, open])
 
+  // Fetch production lines for Phase 1B line_ids field
+  useEffect(() => {
+    if (open) {
+      setLoadingLines(true)
+      fetch('/api/v1/settings/production-lines?status=active')
+        .then((res) => res.json())
+        .then((data) => {
+          setProductionLines(data.data || [])
+        })
+        .catch(() => {
+          setProductionLines([])
+        })
+        .finally(() => {
+          setLoadingLines(false)
+        })
+    }
+  }, [open])
+
   // Handle product selection
   const handleProductSelect = useCallback(
     (productId: string, product: Product) => {
@@ -476,6 +545,23 @@ export function BOMItemModal({
     return null
   }, [form.watch('uom'), selectedProductUom])
 
+  // Watch is_by_product to show/hide yield_percent field
+  const isByProduct = form.watch('is_by_product')
+  const watchedQuantity = form.watch('quantity')
+
+  // Calculate yield percent when quantity changes (for by-products)
+  const calculatedYieldPercent = useMemo(() => {
+    if (!isByProduct || !watchedQuantity || bomOutputQty <= 0) return null
+    return Number(((watchedQuantity / bomOutputQty) * 100).toFixed(2))
+  }, [isByProduct, watchedQuantity, bomOutputQty])
+
+  // Auto-update yield_percent when quantity changes for by-products
+  useEffect(() => {
+    if (isByProduct && calculatedYieldPercent !== null) {
+      form.setValue('yield_percent', calculatedYieldPercent)
+    }
+  }, [calculatedYieldPercent, isByProduct, form])
+
   // Handle form submission
   const onSubmit = async (data: BOMItemFormValues) => {
     setSaving(true)
@@ -492,6 +578,12 @@ export function BOMItemModal({
           operation_seq: data.operation_seq,
           scrap_percent: data.scrap_percent,
           notes: data.notes,
+          // Phase 1B fields
+          consume_whole_lp: data.consume_whole_lp,
+          line_ids: data.line_ids,
+          is_by_product: data.is_by_product,
+          yield_percent: data.is_by_product ? data.yield_percent : null,
+          condition_flags: data.condition_flags as ConditionFlags | null,
         }
         const result = await onSave(updateData, item.id)
         if (result.warnings?.length) {
@@ -507,6 +599,12 @@ export function BOMItemModal({
           operation_seq: data.operation_seq,
           scrap_percent: data.scrap_percent,
           notes: data.notes,
+          // Phase 1B fields
+          consume_whole_lp: data.consume_whole_lp,
+          line_ids: data.line_ids,
+          is_by_product: data.is_by_product,
+          yield_percent: data.is_by_product ? data.yield_percent : null,
+          condition_flags: data.condition_flags as ConditionFlags | null,
         }
         const result = await onSave(createData)
         if (result.warnings?.length) {
@@ -777,6 +875,147 @@ export function BOMItemModal({
                 </FormItem>
               )}
             />
+
+            {/* ========================================
+                Phase 1B Fields Section
+                ======================================== */}
+            <Separator className="my-4" />
+
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground">Advanced Options (Phase 1B)</h4>
+
+              {/* Consume Whole LP Checkbox */}
+              <FormField
+                control={form.control}
+                name="consume_whole_lp"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={saving}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <div className="flex items-center gap-2">
+                        <FormLabel className="cursor-pointer">Consume Whole LP</FormLabel>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>
+                                When enabled, production must consume the entire License Plate (LP).
+                                No partial consumption allowed - the full LP quantity will be used.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <FormDescription>
+                        Require full LP consumption during production
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {/* Is By-Product Checkbox + Yield Percent */}
+              <FormField
+                control={form.control}
+                name="is_by_product"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={saving}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none flex-1">
+                      <FormLabel className="cursor-pointer">By-Product (Output)</FormLabel>
+                      <FormDescription>
+                        Mark this item as a by-product output instead of an input ingredient
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {/* Yield Percent (shown only when is_by_product is true) */}
+              {isByProduct && (
+                <FormField
+                  control={form.control}
+                  name="yield_percent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Yield Percent</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            placeholder="0.00"
+                            {...field}
+                            value={field.value ?? ''}
+                            onChange={(e) =>
+                              field.onChange(e.target.value ? parseFloat(e.target.value) : null)
+                            }
+                            className="pr-12"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            %
+                          </span>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Auto-calculated: {watchedQuantity || 0} {form.watch('uom') || 'units'} / {bomOutputQty} {bomOutputUom} = {calculatedYieldPercent ?? 0}%
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Conditional Flags Multi-Select */}
+              <FormField
+                control={form.control}
+                name="condition_flags"
+                render={({ field }) => (
+                  <FormItem>
+                    <ConditionalFlagsSelect
+                      value={field.value as ConditionFlags | null}
+                      onChange={field.onChange}
+                      disabled={saving}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Production Lines Checkboxes */}
+              <FormField
+                control={form.control}
+                name="line_ids"
+                render={({ field }) => (
+                  <FormItem>
+                    <ProductionLinesCheckbox
+                      value={field.value}
+                      onChange={field.onChange}
+                      disabled={saving}
+                      productionLines={productionLines}
+                      loading={loadingLines}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose} disabled={saving}>

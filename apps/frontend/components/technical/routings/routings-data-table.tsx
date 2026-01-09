@@ -4,7 +4,7 @@
  * Wireframe: TEC-007 (Routings List)
  *
  * Displays routings in a responsive table/card layout with:
- * - 5 columns: Name, Description, Status, Operations Count, Actions
+ * - 6 columns: Code, Name, Description, Status, Operations Count, Actions
  * - 4 action buttons: View, Edit, Clone, Delete
  * - 4 states: Loading, Error, Empty, Success
  * - Keyboard navigation and full accessibility
@@ -110,6 +110,7 @@ export function RoutingsDataTable({
         <Table role="table">
           <TableHeader>
             <TableRow>
+              <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
@@ -131,6 +132,7 @@ export function RoutingsDataTable({
                   }
                 }}
               >
+                <TableCell className="font-mono text-sm">{routing.code || '-'}</TableCell>
                 <TableCell className="font-medium">{routing.name}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {truncateDescription(routing.description)}
@@ -234,6 +236,9 @@ export function RoutingsDataTable({
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
+                    {routing.code && (
+                      <span className="font-mono text-xs text-muted-foreground">{routing.code}</span>
+                    )}
                     <h3 className="font-medium">{routing.name}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       {truncateDescription(routing.description)}

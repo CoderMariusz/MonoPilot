@@ -29,9 +29,9 @@ import subprocess
 import anthropic
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Import GLM client
+# Import GLM client and helpers (use updated version with Deep Thinking support)
 sys.path.append(str(Path(__file__).parent))
-from glm_call import GLMClient
+from glm_call_updated import GLMClient, write_files_to_disk, extract_files_from_response
 
 # Phase types
 Phase = Literal["P1", "P2", "P3", "P4", "P5", "P6", "P7"]
@@ -58,6 +58,22 @@ USE_GLM_FOR_PHASE = {
     "P7": True,   # GLM-4.5-Air (documentation)
 }
 
+# GLM model per phase (only used when USE_GLM_FOR_PHASE is True)
+GLM_MODEL_FOR_PHASE = {
+    "P2": "glm-4.7",      # Best model for test writing
+    "P3": "glm-4.7",      # Best model for code implementation
+    "P4": "glm-4.7",      # Best model for refactoring
+    "P7": "glm-4.5-air",  # Cheaper/faster for documentation
+}
+
+# Deep Thinking per phase (complex reasoning tasks)
+DEEP_THINKING_FOR_PHASE = {
+    "P2": True,   # Tests need careful reasoning
+    "P3": True,   # Code implementation needs reasoning
+    "P4": False,  # Refactoring is more mechanical
+    "P7": False,  # Docs don't need deep thinking
+}
+
 class HybridOrchestratorV2:
     """
     Orchestrator for HYBRID V2 pilot execution
@@ -73,9 +89,18 @@ class HybridOrchestratorV2:
         with open(self.config_path) as f:
             self.config = json.load(f)
 
+        # Get API keys from environment (preferred) or config (fallback)
+        zhipu_key = os.getenv("ZHIPU_API_KEY") or self.config.get("zhipu_api_key")
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+
+        if not zhipu_key:
+            raise ValueError("ZHIPU_API_KEY not set in environment or config.json")
+        if not anthropic_key:
+            raise ValueError("ANTHROPIC_API_KEY not set in environment")
+
         # Initialize API clients
-        self.glm_client = GLMClient(self.config["zhipu_api_key"])
-        self.claude_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.glm_client = GLMClient(zhipu_key)
+        self.claude_client = anthropic.Anthropic(api_key=anthropic_key)
 
         # Metrics tracking
         self.metrics = {
@@ -85,6 +110,67 @@ class HybridOrchestratorV2:
             "claude_tokens": 0,
             "glm_tokens": 0,
         }
+
+        # Static file cache - files that don't change during execution
+        # Loaded once, reused across all phases/stories
+        self._static_file_cache = {}
+        self._cache_static_files()
+
+    def _cache_static_files(self):
+        """Pre-cache static reference files used across all phases"""
+        static_files = [
+            ".claude/PATTERNS.md",
+            ".claude/TABLES.md",
+            # Add more static files as needed
+        ]
+
+        print("[CACHE] Loading static reference files...")
+        for rel_path in static_files:
+            full_path = self.project_root / rel_path
+            if full_path.exists():
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self._static_file_cache[rel_path] = content
+                print(f"  ✓ {rel_path} ({len(content)} bytes)")
+            else:
+                print(f"  ⚠ {rel_path} not found")
+
+        print(f"[CACHE] {len(self._static_file_cache)} files cached\n")
+
+    def get_cached_content(self, rel_path: str) -> Optional[str]:
+        """Get content from static cache (if available)"""
+        return self._static_file_cache.get(rel_path)
+
+    def build_context_with_cache(self, context_files: List[str]) -> str:
+        """Build context string, using cache for static files"""
+        context_parts = []
+        cache_hits = 0
+        cache_misses = 0
+
+        for file_path in context_files:
+            # Check cache first (use relative path for matching)
+            rel_path = str(Path(file_path).relative_to(self.project_root)) if str(file_path).startswith(str(self.project_root)) else file_path
+            cached = self.get_cached_content(rel_path)
+
+            if cached is not None:
+                content = cached
+                cache_hits += 1
+            else:
+                # Read from disk
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    cache_misses += 1
+                except Exception as e:
+                    content = f"[ERROR reading {file_path}: {e}]"
+                    cache_misses += 1
+
+            context_parts.append(f"=== FILE: {file_path} ===\n{content}\n")
+
+        if cache_hits > 0:
+            print(f"  [CACHE] {cache_hits} hits, {cache_misses} misses")
+
+        return "\n".join(context_parts)
 
     def get_checkpoint_file(self, story_id: str) -> Path:
         """Get checkpoint file path for story"""
@@ -175,17 +261,44 @@ class HybridOrchestratorV2:
                 "time": time.time() - start_time
             }
 
-    def execute_with_glm(self, prompt: str, context_files: List[str] = None, model: str = "glm-4-plus") -> Dict:
-        """Execute task with GLM API"""
+    def execute_with_glm(self, prompt: str, context_files: List[str] = None, model: str = "glm-4.7",
+                          auto_write: bool = False, base_dir: str = None, enable_thinking: bool = False) -> Dict:
+        """Execute task with GLM API
+
+        Args:
+            prompt: Task prompt
+            context_files: Files to include in context
+            model: GLM model to use
+            auto_write: If True, extract and write files directly to disk (bypasses Claude context)
+            base_dir: Base directory for auto_write (defaults to project_root)
+            enable_thinking: Enable Deep Thinking mode (for glm-4.7, glm-4.5-air)
+        """
         start_time = time.time()
 
+        if base_dir is None:
+            base_dir = str(self.project_root)
+
         try:
+            # Build context using cache for static files
+            if context_files:
+                context = self.build_context_with_cache(context_files)
+                full_prompt = f"""{context}
+
+─────────────────────────────────────
+TASK:
+{prompt}
+"""
+            else:
+                full_prompt = prompt
+
+            # Call GLM without context_files (already embedded in prompt)
             result = self.glm_client.call(
-                prompt=prompt,
-                context_files=context_files,
+                prompt=full_prompt,
+                context_files=None,  # Context already in prompt
                 model=model,
                 temperature=0.7,
-                max_tokens=8000
+                max_tokens=8000,
+                enable_thinking=enable_thinking
             )
 
             elapsed = time.time() - start_time
@@ -205,11 +318,13 @@ class HybridOrchestratorV2:
             total_tokens = usage.get("total_tokens", 0)
             self.metrics["glm_tokens"] += total_tokens
 
-            # Calculate cost (GLM-4.7: $0.14 per 1M tokens)
-            cost = total_tokens / 1_000_000 * 0.14
+            # Calculate cost (GLM-4.7: $0.60 input, $2.20 output per 1M tokens)
+            input_tokens = usage.get("prompt_tokens", 0)
+            output_tokens = usage.get("completion_tokens", 0)
+            cost = (input_tokens / 1_000_000 * 0.60) + (output_tokens / 1_000_000 * 2.20)
             self.metrics["total_cost"] += cost
 
-            return {
+            response_data = {
                 "success": True,
                 "response": result["response"],
                 "model": model,
@@ -221,6 +336,26 @@ class HybridOrchestratorV2:
                 "cost": cost,
                 "time": elapsed
             }
+
+            # AUTO-WRITE: Extract files and write directly to disk
+            if auto_write:
+                response_text = result.get("response", "")
+                files = extract_files_from_response(response_text)
+
+                if files:
+                    print(f"  [AUTO-WRITE] Writing {len(files)} files directly to disk...")
+                    write_result = write_files_to_disk(files, base_dir)
+                    response_data["write_result"] = write_result
+                    response_data["files_written"] = write_result["total_written"]
+
+                    # Replace full response with summary (saves context)
+                    response_data["response"] = f"[AUTO-WRITTEN] {write_result['total_written']} files to disk. See write_result for details."
+
+                    for f in write_result.get("written", []):
+                        print(f"    ✓ {f['path']} ({f['lines']} lines)")
+
+            return response_data
+
         except Exception as e:
             return {
                 "success": False,
@@ -350,10 +485,28 @@ Output: Documentation markdown files.
         prompt = self.build_phase_prompt(story_id, phase)
 
         if use_glm:
-            print(f"   Using GLM-4.7 (cost optimization)")
+            # Get model and settings for this phase
+            model = GLM_MODEL_FOR_PHASE.get(phase, "glm-4.7")
+            enable_thinking = DEEP_THINKING_FOR_PHASE.get(phase, False)
+
+            thinking_str = " + Deep Thinking" if enable_thinking else ""
+            print(f"   Using {model}{thinking_str} (cost optimization)")
+
             # Get context files for GLM
             context_files = self.get_context_files_for_story(story_id, phase)
-            result = self.execute_with_glm(prompt, context_files, model="glm-4-plus")
+
+            # Enable auto_write for file-generating phases (P2=tests, P3=code, P4=refactor, P7=docs)
+            # This bypasses Claude context - files written directly to disk
+            auto_write = phase in ["P2", "P3", "P4", "P7"]
+            if auto_write:
+                print(f"   [AUTO-WRITE ENABLED] Files will be written directly to disk")
+
+            result = self.execute_with_glm(
+                prompt, context_files,
+                model=model,
+                auto_write=auto_write,
+                enable_thinking=enable_thinking
+            )
         else:
             print(f"   Using Claude Sonnet 4.5 (quality gate)")
             result = self.execute_with_claude(prompt)
@@ -384,7 +537,12 @@ Output: Documentation markdown files.
         """Execute phase for multiple stories in parallel using threading"""
         print(f"\n{'='*70}")
         print(f"PHASE {phase}: {PHASE_AGENTS[phase]} (Parallel: {len(story_ids)} stories)")
-        print(f"Model: {'GLM-4.7' if USE_GLM_FOR_PHASE[phase] else 'Claude Sonnet 4.5'}")
+        if USE_GLM_FOR_PHASE[phase]:
+            model = GLM_MODEL_FOR_PHASE.get(phase, "glm-4.7")
+            thinking = " + Deep Thinking" if DEEP_THINKING_FOR_PHASE.get(phase, False) else ""
+            print(f"Model: {model}{thinking}")
+        else:
+            print(f"Model: Claude Sonnet 4.5")
         print(f"{'='*70}")
 
         phase_start = time.time()
@@ -560,6 +718,8 @@ def main():
     parser.add_argument("--start-phase", default="P1", choices=["P1", "P2", "P3", "P4", "P5", "P6", "P7"],
                        help="Starting phase (default: P1)")
     parser.add_argument("--project-root", default=".", help="Project root directory")
+    parser.add_argument("--dry-run", action="store_true",
+                       help="Test parallel execution without actual API calls")
 
     args = parser.parse_args()
 
@@ -572,6 +732,56 @@ def main():
         print(f"ERROR: Invalid project root: {project_root}")
         print("Expected .experiments/claude-glm-test/ directory")
         sys.exit(1)
+
+    # Dry run mode - test parallel execution without API calls
+    if args.dry_run:
+        print("=" * 70)
+        print("DRY RUN MODE - Testing parallel execution")
+        print("=" * 70)
+        print(f"Stories: {story_ids}")
+        print(f"Start phase: {args.start_phase}")
+        print(f"Project root: {project_root}")
+        print()
+
+        # Test ThreadPoolExecutor with fake tasks
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import random
+
+        def fake_task(story_id, phase):
+            """Simulate API call with random delay"""
+            delay = random.uniform(0.5, 2.0)
+            time.sleep(delay)
+            return {"story": story_id, "phase": phase, "time": delay, "success": True}
+
+        phases_to_test = ["P2", "P3"]  # Test 2 phases
+        for phase in phases_to_test:
+            print(f"\n{'='*70}")
+            print(f"PHASE {phase}: Testing parallel execution ({len(story_ids)} stories)")
+            print("=" * 70)
+
+            start = time.time()
+            results = {}
+
+            with ThreadPoolExecutor(max_workers=min(len(story_ids), 4)) as executor:
+                futures = {
+                    executor.submit(fake_task, sid, phase): sid
+                    for sid in story_ids
+                }
+                for future in as_completed(futures):
+                    story_id = futures[future]
+                    result = future.result()
+                    results[story_id] = result
+                    print(f"  [OK] {story_id} completed in {result['time']:.2f}s")
+
+            elapsed = time.time() - start
+            print(f"\nPhase {phase} completed in {elapsed:.2f}s (parallel)")
+            print(f"  Sequential would take: {sum(r['time'] for r in results.values()):.2f}s")
+            print(f"  Speedup: {sum(r['time'] for r in results.values()) / elapsed:.1f}x")
+
+        print("\n" + "=" * 70)
+        print("[SUCCESS] DRY RUN COMPLETE - Parallel execution works!")
+        print("=" * 70)
+        return
 
     # Check for API keys
     if not os.getenv("ANTHROPIC_API_KEY"):

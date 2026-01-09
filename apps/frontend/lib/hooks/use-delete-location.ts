@@ -13,7 +13,7 @@ export function useDeleteLocation(warehouseId: string) {
   const mutateAsync = async (locationId: string): Promise<void> => {
     setIsPending(true)
     try {
-      const response = await fetch(`/api/settings/warehouses/${warehouseId}/locations/${locationId}`, {
+      const response = await fetch(`/api/v1/settings/warehouses/${warehouseId}/locations/${locationId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       })

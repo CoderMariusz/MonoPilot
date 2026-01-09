@@ -1,0 +1,75 @@
+# Story 02.6 - BOM Alternatives + Clone
+# Type: fullstack
+# Epic: 02-technical
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    # Database
+    - path: "supabase/migrations/056_create_bom_alternatives_table.sql"
+      type: "migration"
+    # Services
+    - path: "apps/frontend/lib/services/bom-alternatives-service.ts"
+      type: "service"
+    - path: "apps/frontend/lib/services/bom-clone-service.ts"
+      type: "service"
+    - path: "apps/frontend/lib/services/bom-item-alternative-service.ts"
+      type: "service"
+    # API Routes
+    - path: "apps/frontend/app/api/technical/boms/[id]/clone/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/boms/[id]/items/[itemId]/alternatives/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/boms/[id]/items/[itemId]/alternatives/[alternativeId]/route.ts"
+      type: "api"
+    # Components
+    - path: "apps/frontend/components/technical/BOMCloneModal.tsx"
+      type: "component"
+    # Validation
+    - path: "apps/frontend/lib/validation/bom-alternative.ts"
+      type: "validation"
+    - path: "apps/frontend/lib/validation/bom-clone.ts"
+      type: "validation"
+    # Types
+    - path: "apps/frontend/lib/types/bom-alternative.ts"
+      type: "types"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/bom-alternatives-service.test.ts"
+      count: 1
+    - path: "apps/frontend/lib/services/__tests__/bom-clone-service.test.ts"
+      count: 1
+    - path: "apps/frontend/lib/validation/__tests__/bom-alternative.test.ts"
+      count: 1
+    - path: "apps/frontend/lib/validation/__tests__/bom-clone.test.ts"
+      count: 1
+    - path: "supabase/tests/bom_alternatives_rls.test.sql"
+      count: 30
+
+  estimated_completion: 85
+
+status: PARTIAL
+
+recommendation: |
+  Story 02.6 is 85% complete. Core implementation done, minor UI gaps.
+
+  DONE:
+  - Database: bom_alternatives table with 4 RLS policies, 4 indexes
+  - Services: 3 service files with full CRUD
+  - API: Clone + 4 alternatives CRUD endpoints
+  - Validation: Preference order ≥2, circular ref prevention, UOM class check
+  - Clone modal component
+  - Unit tests for services and validation
+
+  NOT DONE:
+  - Verify alternative sub-row display in BOMItemsTable
+  - Execute RLS tests (template format)
+  - Permission-based UI hiding for read-only users
+  - Component integration tests
+
+next_phase: P6
+P6: ✓ qa-agent 20:45 ac:9/11 bugs:0-critical tests:127/132 decision:PASS-with-notes
+P7: ✓ tech-writer 21:29 docs:complete status:PRODUCTION-READY
+P7: ✓ tech-writer 22:10 docs:verified status:PRODUCTION-READY

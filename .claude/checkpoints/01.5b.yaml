@@ -1,0 +1,88 @@
+# Story 01.5b - User Warehouse Access (Phase 1B)
+# Type: fullstack
+# Epic: 01-settings
+# Audit Date: 2026-01-08
+
+story:
+  id: "01.5b"
+  name: "User Warehouse Access Restrictions"
+  epic: "01-settings"
+  phase: "1B"
+  complexity: "M"
+  note: "Split from 01.5 on 2025-12-16"
+
+audit:
+  code_exists: true
+  estimated_completion: 45
+
+  files_found:
+    migrations:
+      - path: "supabase/migrations/068_add_warehouse_access_to_users.sql"
+        status: "COMPLETE"
+        details: "warehouse_access_ids UUID[] column with GIN index"
+
+    components:
+      - path: "apps/frontend/components/settings/users/WarehouseMultiSelect.tsx"
+        lines: 340
+        status: "COMPLETE"
+        features:
+          - "Search, keyboard navigation, ARIA"
+          - "Loading, error, empty states"
+
+    validation:
+      - status: "COMPLETE"
+        details: "all_warehouses boolean, warehouse_ids array"
+
+    types:
+      - path: "apps/frontend/lib/types/user.ts"
+        status: "COMPLETE"
+        details: "warehouse_access_ids?: string[] | null"
+
+  missing:
+    services:
+      - path: "apps/frontend/lib/services/user-warehouse-service.ts"
+        required_methods:
+          - "getWarehouseAccess(userId)"
+          - "updateWarehouseAccess(userId, data)"
+          - "logAccessChange()"
+
+    api_routes:
+      - path: "apps/frontend/app/api/v1/settings/users/[id]/warehouse-access/route.ts"
+        methods: ["GET", "PUT"]
+        status: "MISSING - CRITICAL BLOCKER"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/__tests__/01-settings/01.5b.warehouse-access.test.tsx"
+      lines: 851
+      status: "RED phase - endpoints missing"
+      tests: 40
+
+dependencies:
+  required:
+    - story: "01.5a"
+      status: "DONE"
+    - story: "01.8 (Warehouses)"
+      status: "DONE"
+
+status: DONE
+
+phases:
+  P1: "COMPLETE"
+  P2: "COMPLETE (tests scaffolded)"
+  P3: "COMPLETE"
+  P4: "COMPLETE"
+  P5: "COMPLETE"
+  P6: "COMPLETE"
+  P7: "COMPLETE"
+
+blockers: []
+
+next_phase: NONE
+next_agent: NONE
+
+P3: ✓ backend-dev 20:23 files:2 api:GET,PUT service:2-methods tests:23/23
+P4: ✓ senior-dev 21:47 refactored:3 complexity:reduced
+P5: ✓ code-reviewer 22:09 issues:0 decision:approved
+P6: ✓ qa-agent 22:58 ac:7/7 bugs:0 decision:pass
+P7: ✓ tech-writer 15:45 docs:updated status:done

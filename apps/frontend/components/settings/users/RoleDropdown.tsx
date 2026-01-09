@@ -27,6 +27,10 @@ export interface RoleDropdownProps {
   onRoleChange: (roleId: string) => void
   /** Whether the dropdown is disabled */
   disabled?: boolean
+  /** Available roles to display (passed from parent or hook) */
+  roles?: Role[]
+  /** Loading state for roles */
+  loading?: boolean
 }
 
 /**
@@ -43,15 +47,15 @@ export function RoleDropdown({
   selectedRoleId,
   onRoleChange,
   disabled = false,
+  roles: propRoles,
+  loading = false,
 }: RoleDropdownProps) {
-  // Placeholder: Will fetch roles from API
-  // For now, show placeholder text
   const isOwner = currentUser?.role?.code === 'owner'
 
-  // Mock roles for placeholder
-  const roles: Role[] = []
+  // Use roles from props or empty array
+  const roles: Role[] = propRoles || []
 
-  if (roles.length === 0) {
+  if (loading || roles.length === 0) {
     return (
       <Select
         value={selectedRoleId}

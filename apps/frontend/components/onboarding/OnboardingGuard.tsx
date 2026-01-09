@@ -33,9 +33,14 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   // Loading state
   if (isLoading || onboardingStatus.loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div
+        className="flex min-h-screen items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
         <div className="text-center space-y-4">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" aria-hidden="true" />
           <p className="text-muted-foreground">Loading your organization...</p>
         </div>
       </div>
@@ -52,9 +57,13 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="max-w-md space-y-4">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="rounded-lg border border-red-200 bg-red-50 p-6"
+          >
             <div className="flex gap-3">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-600" />
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-600" aria-hidden="true" />
               <div>
                 <h3 className="font-semibold text-red-900">Error</h3>
                 <p className="mt-1 text-sm text-red-700">{errorMessage}</p>
@@ -62,7 +71,7 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
             </div>
           </div>
           <div className="flex justify-center">
-            <Button onClick={refetch} variant="outline">
+            <Button onClick={() => refetch()} variant="outline">
               Try Again
             </Button>
           </div>

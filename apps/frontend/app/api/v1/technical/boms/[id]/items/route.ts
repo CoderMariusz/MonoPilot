@@ -43,7 +43,7 @@ export async function GET(
       return NextResponse.json({ error: 'BOM not found' }, { status: 404 })
     }
 
-    // Fetch items with product join
+    // Fetch items with product join (includes Phase 1B fields)
     const { data: items, error: itemsError } = await supabase
       .from('bom_items')
       .select(`
@@ -58,6 +58,12 @@ export async function GET(
         notes,
         created_at,
         updated_at,
+        consume_whole_lp,
+        line_ids,
+        is_by_product,
+        is_output,
+        yield_percent,
+        condition_flags,
         product:products!product_id (
           id,
           code,
@@ -245,7 +251,7 @@ export async function POST(
       return NextResponse.json({ error: 'Component product not found' }, { status: 404 })
     }
 
-    // Insert item
+    // Insert item (includes Phase 1B fields)
     const { data: item, error: insertError } = await supabase
       .from('bom_items')
       .insert({
@@ -257,6 +263,13 @@ export async function POST(
         operation_seq: data.operation_seq || null,
         scrap_percent: data.scrap_percent || 0,
         notes: data.notes || null,
+        // Phase 1B fields
+        consume_whole_lp: data.consume_whole_lp ?? false,
+        line_ids: data.line_ids || null,
+        is_by_product: data.is_by_product ?? false,
+        is_output: data.is_by_product ?? false, // byproducts are outputs
+        yield_percent: data.yield_percent ?? null,
+        condition_flags: data.condition_flags || null,
         created_by: user.id,
         updated_by: user.id,
       })

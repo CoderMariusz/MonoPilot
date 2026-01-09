@@ -1,0 +1,37 @@
+# Story 03.14 - WO Advanced Scheduling (APS Lite)
+# Type: fullstack
+# Epic: 03-planning
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: false
+  files_found:
+    - path: "Foundation from 03.15 only"
+      type: note
+  tests_exist: false
+  estimated_completion: 5%
+
+status: BLOCKED
+
+details:
+  deferral_reason: "Blocked on Epic 04 (Production) and Epic 05 (Warehouse/Inventory)"
+  hard_dependencies:
+    - "Epic 04: Line capacity, shift schedules, machine availability (~60% complete)"
+    - "Epic 05: License Plate inventory for material availability (not started)"
+  database_schema: "NOT CREATED - 3 tables, 2 functions, triggers missing"
+  schedule_optimization_engine: "0% - Algorithm not implemented"
+  api_endpoints: "0% - Optimize/Apply/Capacity endpoints missing"
+  ui_components: "0% - Modal, Heatmap, Conflict dialog missing"
+
+recommendation: |
+  Story 03.14 is DEFERRED and essentially unstarted.
+  Only the foundation (Story 03.15 Gantt View) is ~85% complete.
+
+  CANNOT PROCEED UNTIL:
+  1. Epic 04 (Production) is complete - capacity validation
+  2. Epic 05 (Warehouse/Inventory) is complete - material validation
+  3. Database schema is created
+
+  Estimated effort when unblocked: 7-10 days
+
+next_phase: BLOCKED

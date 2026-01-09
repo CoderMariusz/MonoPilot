@@ -14,7 +14,7 @@ export function useUpdateLocation(warehouseId: string) {
   const mutateAsync = async ({ id, input }: { id: string; input: UpdateLocationInput }): Promise<Location> => {
     setIsPending(true)
     try {
-      const response = await fetch(`/api/settings/warehouses/${warehouseId}/locations/${id}`, {
+      const response = await fetch(`/api/v1/settings/warehouses/${warehouseId}/locations/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

@@ -1,0 +1,52 @@
+# Story 03.12 - WO Operations (Routing Copy)
+# Type: fullstack
+# Epic: 03-planning
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "supabase/migrations/080_create_wo_operations_table.sql"
+      type: migration
+    - path: "apps/frontend/lib/services/wo-operations-service.ts"
+      type: service
+    - path: "apps/frontend/app/api/planning/work-orders/[id]/operations/route.ts"
+      type: api
+    - path: "apps/frontend/components/planning/work-orders/WOOperationsTimeline.tsx"
+      type: component
+    - path: "apps/frontend/components/planning/work-orders/WOOperationCard.tsx"
+      type: component
+    - path: "apps/frontend/components/planning/work-orders/WOOperationStatusBadge.tsx"
+      type: component
+    - path: "apps/frontend/lib/types/wo-operation.ts"
+      type: types
+    - path: "apps/frontend/lib/hooks/use-wo-operations.ts"
+      type: hook
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/wo-operations-service.test.ts"
+      count: 27
+  estimated_completion: 75%
+
+status: PARTIAL
+
+details:
+  database: "100% complete - table, functions, triggers, RLS"
+  services: "80% complete - core methods implemented"
+  api: "50% complete - list endpoint done, detail & manual copy missing"
+  components: "60% complete - timeline done, detail panel incomplete"
+  validation: "0% - Zod schemas missing"
+
+recommendation: |
+  Story 03.12 is ~75% complete with solid foundations.
+
+  NEEDS:
+  - Detail endpoint: GET /api/.../operations/[op_id]
+  - Manual copy endpoint: POST /api/.../copy-routing
+  - Validation schemas (5 Zod schemas)
+  - Complete WOOperationDetailPanel component
+  - Integration and E2E tests
+
+  Estimated remaining effort: 2-3 days
+
+next_phase: P3

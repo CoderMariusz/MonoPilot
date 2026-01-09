@@ -1,7 +1,13 @@
 /**
  * Routings List Page
- * Story: 2.24 Routing Restructure
- * Routings are now independent templates (no product binding)
+ * Story: 02.7 Routings CRUD
+ * Wireframe: TEC-007 (Routings List)
+ *
+ * Features:
+ * - List routings with code, name, description, status, operations count
+ * - Search by code and name
+ * - Filter by active/inactive status
+ * - Create, view, delete actions
  */
 
 'use client'
@@ -43,15 +49,17 @@ export default function RoutingsPage() {
 
   const { toast } = useToast()
 
-  // Fetch routings with filters
+  // Fetch routings with filters - using V1 API
   const fetchRoutings = async () => {
     try {
       setLoading(true)
 
       const params = new URLSearchParams()
       if (activeFilter !== 'all') params.append('is_active', activeFilter)
+      if (searchTerm) params.append('search', searchTerm)
 
-      const response = await fetch(`/api/technical/routings?${params.toString()}`)
+      // Use V1 API endpoint
+      const response = await fetch(`/api/v1/technical/routings?${params.toString()}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch routings')
@@ -84,14 +92,15 @@ export default function RoutingsPage() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // Delete routing
+  // Delete routing - using V1 API
   const handleDelete = async (routing: Routing) => {
-    if (!confirm(`Delete routing "${routing.name}"? This will also delete all operations. This action cannot be undone.`)) {
+    if (!confirm(`Delete routing "${routing.code || routing.name}"? This will also delete all operations. This action cannot be undone.`)) {
       return
     }
 
     try {
-      const response = await fetch(`/api/technical/routings/${routing.id}`, {
+      // Use V1 API endpoint
+      const response = await fetch(`/api/v1/technical/routings/${routing.id}`, {
         method: 'DELETE',
       })
 
@@ -122,11 +131,12 @@ export default function RoutingsPage() {
     fetchRoutings()
   }
 
-  // Filter by search term (client-side)
+  // Filter by search term (client-side fallback, server already filters)
   const filteredRoutings = routings.filter((routing) => {
     if (!searchTerm) return true
     const term = searchTerm.toLowerCase()
     return (
+      (routing.code && routing.code.toLowerCase().includes(term)) ||
       routing.name.toLowerCase().includes(term) ||
       (routing.description && routing.description.toLowerCase().includes(term))
     )
@@ -160,7 +170,7 @@ export default function RoutingsPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by name..."
+                    placeholder="Search by code or name..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-9"
@@ -196,6 +206,7 @@ export default function RoutingsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Code</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Status</TableHead>
@@ -206,8 +217,9 @@ export default function RoutingsPage() {
                 <TableBody>
                   {filteredRoutings.map((routing) => (
                     <TableRow key={routing.id}>
+                      <TableCell className="font-mono text-sm">{routing.code || '-'}</TableCell>
                       <TableCell className="font-semibold">{routing.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground max-w-[200px] truncate">
                         {routing.description || '-'}
                       </TableCell>
                       <TableCell>

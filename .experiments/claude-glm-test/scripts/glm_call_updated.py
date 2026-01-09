@@ -11,13 +11,118 @@ import argparse
 from pathlib import Path
 from typing import List, Optional
 
+
+def write_files_to_disk(files: List[dict], base_dir: str) -> dict:
+    """
+    Write generated files directly to disk, bypassing Claude context.
+
+    Args:
+        files: List of {"path": "...", "content": "..."} dicts
+        base_dir: Base directory for relative paths
+
+    Returns:
+        dict with written files count and any errors
+    """
+    written = []
+    errors = []
+
+    for file_info in files:
+        try:
+            file_path = file_info.get("path", "")
+            content = file_info.get("content", "")
+
+            if not file_path:
+                errors.append({"error": "Missing path in file entry"})
+                continue
+
+            # Resolve full path
+            full_path = Path(base_dir) / file_path
+
+            # Create parent directories if needed
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write file
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            written.append({
+                "path": str(full_path),
+                "size": len(content),
+                "lines": content.count('\n') + 1
+            })
+            print(f"  [WROTE] {full_path} ({len(content)} bytes)", file=sys.stderr)
+
+        except Exception as e:
+            errors.append({
+                "path": file_info.get("path", "unknown"),
+                "error": str(e)
+            })
+            print(f"  [ERROR] {file_info.get('path', 'unknown')}: {e}", file=sys.stderr)
+
+    return {
+        "written": written,
+        "errors": errors,
+        "total_written": len(written),
+        "total_errors": len(errors)
+    }
+
+
+def extract_files_from_response(response_text: str) -> List[dict]:
+    """
+    Extract files array from GLM response (JSON or markdown code blocks).
+
+    Returns list of {"path": ..., "content": ...} dicts
+    """
+    if not response_text:
+        return []
+
+    try:
+        # Try to find JSON in response
+        json_text = response_text
+
+        # Extract from markdown code blocks
+        if "```json" in response_text:
+            start = response_text.index("```json") + 7
+            try:
+                end = response_text.index("```", start)
+                json_text = response_text[start:end].strip()
+            except ValueError:
+                json_text = response_text[start:].strip()
+        elif "```" in response_text:
+            start = response_text.index("```") + 3
+            try:
+                end = response_text.index("```", start)
+                json_text = response_text[start:end].strip()
+            except ValueError:
+                json_text = response_text[start:].strip()
+        else:
+            # Try to find JSON object
+            json_start = response_text.find('{')
+            json_end = response_text.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                json_text = response_text[json_start:json_end]
+
+        parsed = json.loads(json_text)
+
+        # Return files array if present
+        if isinstance(parsed, dict) and "files" in parsed:
+            return parsed["files"]
+        elif isinstance(parsed, list):
+            return parsed
+
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    return []
+
+
 class GLMClient:
     """Client for ZhipuAI GLM API"""
 
     # Base URLs for different providers
     BASE_URLS = {
         "bigmodel": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-        "zai": "https://api.zai.chat/v1/chat/completions"
+        "zai": "https://api.z.ai/api/paas/v4/chat/completions"  # Z.AI global endpoint
     }
 
     # Model to provider mapping
@@ -110,9 +215,9 @@ TASK:
             "max_tokens": max_tokens
         }
 
-        # Add Deep Thinking parameter if enabled
+        # Add Deep Thinking parameter if enabled (Z.AI API format)
         if enable_thinking:
-            payload["enable_thinking"] = True
+            payload["thinking"] = {"type": "enabled"}
             print(f"[DEBUG] Deep Thinking enabled for {model}", file=sys.stderr)
 
         # Get appropriate base URL for the model
@@ -127,7 +232,7 @@ TASK:
                 base_url,
                 headers=self.headers,
                 json=payload,
-                timeout=120  # Increased timeout for Deep Thinking
+                timeout=1200  # 20 min timeout for long code generation
             )
             print(f"[DEBUG] Response status: {response.status_code}", file=sys.stderr)
 
@@ -226,23 +331,26 @@ Examples:
                        help="Return full JSON with metadata (including reasoning)")
     parser.add_argument("--provider", choices=["bigmodel", "zai"],
                        help="Force specific provider (auto-detected by default)")
+    parser.add_argument("--auto-write", action="store_true",
+                       help="Auto-write generated files to disk (bypasses Claude context)")
+    parser.add_argument("--base-dir", default=".",
+                       help="Base directory for --auto-write (default: current dir)")
 
     args = parser.parse_args()
 
-    # Get API key from config or environment
-    config_path = Path(__file__).parent.parent / "config.json"
-    api_key = None
-
-    if config_path.exists():
-        with open(config_path) as f:
-            config = json.load(f)
-            api_key = config.get("zhipu_api_key")
+    # Get API key from environment (preferred) or config (fallback)
+    api_key = os.getenv("ZHIPU_API_KEY")
 
     if not api_key:
-        api_key = os.getenv("ZHIPU_API_KEY")
+        # Fallback to config.json (deprecated - use env var instead)
+        config_path = Path(__file__).parent.parent / "config.json"
+        if config_path.exists():
+            with open(config_path) as f:
+                config = json.load(f)
+                api_key = config.get("zhipu_api_key")
 
     if not api_key:
-        print("ERROR: No API key! Set ZHIPU_API_KEY or add to config.json", file=sys.stderr)
+        print("ERROR: No API key! Set ZHIPU_API_KEY environment variable", file=sys.stderr)
         sys.exit(1)
 
     # Get prompt
@@ -265,9 +373,53 @@ Examples:
     # Handle errors
     if "error" in result and result["error"]:
         print(f"ERROR: {result['error']}", file=sys.stderr)
-        sys.exit(1)
+        # Don't exit with 1 - return error in output instead
+        print(json.dumps({"success": False, "error": result["error"]}))
+        return
 
-    # Output
+    # AUTO-WRITE MODE: Extract files from response and write directly to disk
+    if args.auto_write:
+        response_text = result.get("response", "")
+        files = extract_files_from_response(response_text)
+
+        if files:
+            print(f"[AUTO-WRITE] Extracting {len(files)} files from response...", file=sys.stderr)
+            write_result = write_files_to_disk(files, args.base_dir)
+
+            # Print summary only (no file contents in output)
+            usage = result.get('usage', {})
+            print(f"\n[GLM] AUTO-WRITE COMPLETE")
+            print(f"  Model: {result.get('model', args.model)}")
+            print(f"  Tokens: {usage.get('total_tokens', '?')} (prompt: {usage.get('prompt_tokens', '?')}, completion: {usage.get('completion_tokens', '?')})")
+            print(f"  Files written: {write_result['total_written']}")
+            print(f"  Errors: {write_result['total_errors']}")
+            for f in write_result.get("written", []):
+                print(f"    - {f['path']} ({f['lines']} lines, {f['size']} bytes)")
+            for e in write_result.get("errors", []):
+                print(f"    [ERR] {e.get('path')}: {e.get('error')}")
+
+            # Optionally save full JSON for debugging
+            if args.output:
+                debug_output = {
+                    "success": True,
+                    "model": result.get("model"),
+                    "usage": usage,
+                    "write_result": write_result,
+                    "files_written": [f["path"] for f in write_result.get("written", [])]
+                }
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    f.write(json.dumps(debug_output, indent=2, ensure_ascii=False))
+                print(f"  Debug JSON: {args.output}")
+        else:
+            print(f"[AUTO-WRITE] No files found in response. Raw response saved.", file=sys.stderr)
+            if args.output:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    f.write(result.get("response", ""))
+            else:
+                print(result.get("response", ""))
+        return
+
+    # Standard output mode
     if args.json:
         output = json.dumps(result, indent=2, ensure_ascii=False)
     else:

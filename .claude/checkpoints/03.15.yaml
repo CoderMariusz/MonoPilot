@@ -1,0 +1,74 @@
+# Story 03.15 - Work Order Gantt Chart View
+# Type: fullstack
+# Epic: 03-planning
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    - path: "apps/frontend/lib/services/gantt-service.ts"
+      type: service
+      lines: 600
+    - path: "apps/frontend/lib/types/gantt.ts"
+      type: types
+      lines: 312
+    - path: "apps/frontend/lib/validation/gantt-schemas.ts"
+      type: validation
+      lines: 217
+    - path: "apps/frontend/app/api/planning/work-orders/gantt/route.ts"
+      type: api
+    - path: "apps/frontend/app/api/planning/work-orders/gantt/export/route.ts"
+      type: api
+    - path: "apps/frontend/app/api/planning/work-orders/[id]/reschedule/route.ts"
+      type: api
+    - path: "supabase/migrations/083_add_gantt_indexes.sql"
+      type: migration
+    - path: "apps/frontend/lib/hooks/use-gantt-data.ts"
+      type: hook
+    - path: "apps/frontend/lib/hooks/use-gantt-drag-drop.ts"
+      type: hook
+    - path: "apps/frontend/lib/hooks/use-gantt-zoom.ts"
+      type: hook
+    - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/page.tsx"
+      type: page
+    - path: "Gantt components (15 files)"
+      type: component
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/gantt-service.test.ts"
+      count: 20
+    - path: "apps/frontend/lib/validation/__tests__/gantt-schemas.test.ts"
+      count: 15
+    - path: "e2e/planning/gantt-chart.spec.ts"
+      count: 8
+  estimated_completion: 77%
+
+status: PARTIAL
+
+details:
+  backend: "100% complete"
+  api: "100% complete (4 routes)"
+  components: "100% complete (15 components)"
+  database_indexes: "100% complete"
+  tests: "85% complete"
+  acceptance_criteria: "14/16 ACs fully covered (87.5%)"
+
+gaps:
+  - id: "PDF-EXPORT"
+    severity: "medium"
+    details: "Currently returns JSON blob, needs pdf-lib or jspdf"
+  - id: "MATERIAL-STATUS"
+    severity: "low"
+    details: "Always returns 'ok', needs wo_materials join"
+
+recommendation: |
+  Story 03.15 is ~77% complete with all code artifacts implemented.
+  Custom Gantt implementation (no external library).
+
+  NEEDS:
+  - Implement true PDF export (pdf-lib or jspdf)
+  - Implement material status calculation from wo_materials
+  - Run full E2E test suite against staging
+  - Performance testing with 50+ WOs
+
+next_phase: P5

@@ -3,7 +3,15 @@ import type {
   CreateLocationInput as BaseCreateLocationInput,
   UpdateLocationInput as BaseUpdateLocationInput,
   LocationListParams as BaseLocationFilters,
+  LocationLevel,
 } from '../validation/location-schemas'
+import type {
+  Location as HierarchicalLocation,
+  LocationNode,
+  LocationTreeResponse,
+  CanDeleteResult,
+  MoveValidationResult,
+} from '../types/location'
 
 // Extended filters type with additional fields
 type LocationFilters = BaseLocationFilters & {
@@ -11,74 +19,40 @@ type LocationFilters = BaseLocationFilters & {
   is_active?: boolean
 }
 
-// Extended input type with additional fields for service operations
+// Extended input type for hierarchical locations (Story 01.9)
 type CreateLocationInput = BaseCreateLocationInput & {
-  warehouse_id: string
-  barcode?: string
-  type?: string
-  zone?: string
-  zone_enabled?: boolean
-  capacity?: number
-  capacity_enabled?: boolean
+  warehouse_id?: string
 }
 
-// Extended update input type with additional fields
-type UpdateLocationInput = BaseUpdateLocationInput & {
-  code?: string
-  barcode?: string
-  zone?: string
-  zone_enabled?: boolean
-  capacity?: number
-  capacity_enabled?: boolean
-}
-import {
-  generateLocationBarcode,
-  generateQRCode,
-  validateBarcodeUniqueness,
-} from './barcode-generator-service'
+// Extended update input type
+type UpdateLocationInput = BaseUpdateLocationInput
 
 /**
  * Location Management Service
- * Story: 1.6 Location Management
- * Task 3: Location Service - Core Logic (AC: 005.1, 005.2, 005.4, 005.5)
+ * Story: 01.9 - Warehouse Locations Management (Hierarchical)
  *
- * Handles location CRUD operations with validation and cache events
+ * Handles hierarchical location CRUD operations with tree structure
+ * Supports: zone > aisle > rack > bin hierarchy
  */
 
-export interface Location {
-  id: string
-  org_id: string
-  warehouse_id: string
-  code: string
-  name: string
-  type: string
-  zone: string | null
-  zone_enabled: boolean
-  capacity: number | null
-  capacity_enabled: boolean
-  barcode: string
-  is_active: boolean
-  created_by: string | null
-  updated_by: string | null
-  created_at: string
-  updated_at: string
-  // Joined data
-  warehouse?: {
-    code: string
-    name: string
-  }
-  qr_code_url?: string // Generated on demand
-}
+// Re-export Location type from types/location for consistency
+export type { HierarchicalLocation as Location }
 
 export interface LocationServiceResult {
   success: boolean
-  data?: Location
+  data?: HierarchicalLocation
   error?: string
 }
 
 export interface LocationsListResult {
   success: boolean
-  data?: Location[]
+  data?: HierarchicalLocation[]
+  error?: string
+}
+
+export interface LocationTreeResult {
+  success: boolean
+  data?: LocationTreeResponse
   error?: string
 }
 
@@ -87,19 +61,492 @@ export interface DeleteResult {
   error?: string
 }
 
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+/** Valid hierarchy: what level can be under what parent level */
+const HIERARCHY_RULES: Record<string, string> = {
+  zone: 'aisle',
+  aisle: 'rack',
+  rack: 'bin',
+}
+
+/** Human-readable names for hierarchy error messages */
+const LEVEL_CHILD_NAMES: Record<string, string> = {
+  zone: 'aisles',
+  aisle: 'racks',
+  rack: 'bins',
+  bin: 'nothing (bins are leaf nodes)',
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
 /**
- * Creates a new location with auto-generated barcode
+ * Calculate capacity percentage for a location
+ */
+function calculateCapacityPercent(currentPallets: number, maxPallets: number | null): number | null {
+  if (!maxPallets || maxPallets === 0) return null
+  return Math.round((currentPallets / maxPallets) * 100)
+}
+
+/**
+ * Convert raw location data to LocationNode with computed fields
+ */
+function toLocationNode(loc: HierarchicalLocation): LocationNode {
+  return {
+    ...loc,
+    children: [],
+    children_count: 0,
+    capacity_percent: calculateCapacityPercent(loc.current_pallets, loc.max_pallets),
+  }
+}
+
+/**
+ * Build tree structure from flat location array
+ * Returns root nodes with nested children
+ */
+function buildLocationTree(locations: HierarchicalLocation[]): LocationNode[] {
+  const locationMap = new Map<string, LocationNode>()
+  const rootNodes: LocationNode[] = []
+
+  // First pass: create nodes
+  for (const loc of locations) {
+    locationMap.set(loc.id, toLocationNode(loc))
+  }
+
+  // Second pass: build hierarchy
+  for (const loc of locations) {
+    const node = locationMap.get(loc.id)!
+    if (loc.parent_id && locationMap.has(loc.parent_id)) {
+      const parent = locationMap.get(loc.parent_id)!
+      parent.children.push(node)
+      parent.children_count = (parent.children_count || 0) + 1
+    } else if (!loc.parent_id) {
+      rootNodes.push(node)
+    }
+  }
+
+  return rootNodes
+}
+
+/**
+ * Get subtree starting from a specific node
+ */
+function getSubtree(locationMap: Map<string, LocationNode>, parentId: string): LocationNode[] {
+  const subtreeRoot = locationMap.get(parentId)
+  return subtreeRoot ? [subtreeRoot] : []
+}
+
+// =============================================================================
+// HIERARCHICAL TREE OPERATIONS (Story 01.9)
+// =============================================================================
+
+/**
+ * Get location tree for a warehouse
+ * Returns nested structure with children
  *
- * AC-005.1: Admin can create location
- * AC-005.2: Zone/capacity optional fields with toggle validation
- * AC-005.3: Barcode auto-generated
+ * @param warehouseId - Warehouse UUID
+ * @param orgId - Organization ID from JWT
+ * @param parentId - Optional parent ID to get subtree
+ */
+export async function getTree(
+  warehouseId: string,
+  orgId: string,
+  parentId?: string | null
+): Promise<LocationTreeResult> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Fetch all locations for the warehouse
+    const { data: locations, error } = await supabaseAdmin
+      .from('locations')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('warehouse_id', warehouseId)
+      .order('full_path', { ascending: true })
+
+    if (error) {
+      console.error('Failed to fetch location tree:', error)
+      return { success: false, error: 'Failed to fetch location tree' }
+    }
+
+    const typedLocations = (locations || []) as HierarchicalLocation[]
+
+    // Build tree and optionally get subtree
+    const rootNodes = buildLocationTree(typedLocations)
+    let resultNodes = rootNodes
+
+    if (parentId) {
+      // Create map for subtree lookup
+      const locationMap = new Map<string, LocationNode>()
+      for (const loc of typedLocations) {
+        locationMap.set(loc.id, toLocationNode(loc))
+      }
+      // Rebuild to get the node with children
+      const fullTree = buildLocationTree(typedLocations)
+      const findNode = (nodes: LocationNode[], id: string): LocationNode | null => {
+        for (const node of nodes) {
+          if (node.id === id) return node
+          const found = findNode(node.children, id)
+          if (found) return found
+        }
+        return null
+      }
+      const subtreeRoot = findNode(fullTree, parentId)
+      resultNodes = subtreeRoot ? [subtreeRoot] : []
+    }
+
+    return {
+      success: true,
+      data: {
+        locations: resultNodes,
+        total_count: typedLocations.length,
+      },
+    }
+  } catch (error) {
+    console.error('Error in getTree:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Get ancestors (parent chain) for a location
  *
+ * @param locationId - Location UUID
+ * @param orgId - Organization ID from JWT
+ */
+export async function getAncestors(
+  locationId: string,
+  orgId: string
+): Promise<LocationsListResult> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    const ancestors: HierarchicalLocation[] = []
+    let currentId: string | null = locationId
+
+    // Walk up the tree
+    while (currentId) {
+      const { data: locationData, error } = await supabaseAdmin
+        .from('locations')
+        .select('*')
+        .eq('id', currentId)
+        .eq('org_id', orgId)
+        .single()
+
+      if (error || !locationData) break
+
+      const typedLocation = locationData as HierarchicalLocation
+
+      if (currentId !== locationId) {
+        ancestors.unshift(typedLocation) // Add to front
+      }
+      currentId = typedLocation.parent_id
+    }
+
+    return { success: true, data: ancestors }
+  } catch (error) {
+    console.error('Error in getAncestors:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Get descendants (all children recursively) for a location
+ *
+ * @param locationId - Location UUID
+ * @param orgId - Organization ID from JWT
+ */
+export async function getDescendants(
+  locationId: string,
+  orgId: string
+): Promise<LocationsListResult> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get the location's full_path
+    const { data: location, error: locError } = await supabaseAdmin
+      .from('locations')
+      .select('full_path')
+      .eq('id', locationId)
+      .eq('org_id', orgId)
+      .single()
+
+    if (locError || !location) {
+      return { success: false, error: 'Location not found' }
+    }
+
+    // Get all descendants by matching full_path prefix
+    const { data: descendants, error } = await supabaseAdmin
+      .from('locations')
+      .select('*')
+      .eq('org_id', orgId)
+      .like('full_path', `${location.full_path}/%`)
+      .order('full_path', { ascending: true })
+
+    if (error) {
+      console.error('Failed to fetch descendants:', error)
+      return { success: false, error: 'Failed to fetch descendants' }
+    }
+
+    return { success: true, data: (descendants || []) as HierarchicalLocation[] }
+  } catch (error) {
+    console.error('Error in getDescendants:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Move a location to a new parent
+ * Validates hierarchy rules before moving
+ *
+ * @param locationId - Location UUID to move
+ * @param newParentId - New parent location UUID (null for root)
+ * @param userId - User making the change
+ * @param orgId - Organization ID from JWT
+ */
+export async function moveLocation(
+  locationId: string,
+  newParentId: string | null,
+  userId: string,
+  orgId: string
+): Promise<LocationServiceResult> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get current location
+    const { data: location, error: locError } = await supabaseAdmin
+      .from('locations')
+      .select('*')
+      .eq('id', locationId)
+      .eq('org_id', orgId)
+      .single()
+
+    if (locError || !location) {
+      return { success: false, error: 'Location not found' }
+    }
+
+    // Validate hierarchy
+    const validationResult = await validateHierarchy(
+      newParentId,
+      location.level as LocationLevel,
+      orgId
+    )
+
+    if (!validationResult.valid) {
+      return { success: false, error: validationResult.reason || 'Invalid hierarchy' }
+    }
+
+    // Check for circular reference
+    if (newParentId) {
+      const { data: descendants } = await supabaseAdmin
+        .from('locations')
+        .select('id')
+        .eq('org_id', orgId)
+        .like('full_path', `${location.full_path}/%`)
+
+      const descendantIds = (descendants || []).map((d) => d.id)
+      if (descendantIds.includes(newParentId)) {
+        return { success: false, error: 'Cannot move location under its own descendant' }
+      }
+    }
+
+    // Update location
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('locations')
+      .update({
+        parent_id: newParentId,
+        updated_by: userId,
+      })
+      .eq('id', locationId)
+      .eq('org_id', orgId)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Failed to move location:', updateError)
+      return { success: false, error: 'Failed to move location' }
+    }
+
+    return { success: true, data: updated as HierarchicalLocation }
+  } catch (error) {
+    console.error('Error in moveLocation:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Validate hierarchy rules for parent-child relationship
+ *
+ * @param parentId - Parent location UUID (null for root)
+ * @param level - Level of the child location
+ * @param orgId - Organization ID from JWT
+ */
+export async function validateHierarchy(
+  parentId: string | null,
+  level: LocationLevel,
+  orgId: string
+): Promise<MoveValidationResult> {
+  try {
+    // Root locations must be zones
+    if (!parentId) {
+      if (level !== 'zone') {
+        return {
+          valid: false,
+          can_move: false,
+          reason: 'Root locations must be zones',
+          conflicts: [
+            {
+              type: 'LEVEL_MISMATCH',
+              message: 'Root locations must be zones',
+              blocking: true,
+            },
+          ],
+          warnings: [],
+        }
+      }
+      return { valid: true, can_move: true, conflicts: [], warnings: [] }
+    }
+
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get parent location
+    const { data: parent, error } = await supabaseAdmin
+      .from('locations')
+      .select('level')
+      .eq('id', parentId)
+      .eq('org_id', orgId)
+      .single()
+
+    if (error || !parent) {
+      return {
+        valid: false,
+        can_move: false,
+        reason: 'Parent location not found',
+        conflicts: [],
+        warnings: [],
+      }
+    }
+
+    // Validate hierarchy: zone > aisle > rack > bin
+    const expectedLevel = HIERARCHY_RULES[parent.level as string]
+    if (!expectedLevel || expectedLevel !== level) {
+      return {
+        valid: false,
+        can_move: false,
+        reason: `Locations under ${parent.level}s must be ${LEVEL_CHILD_NAMES[parent.level as string] || 'invalid'}`,
+        conflicts: [
+          {
+            type: 'LEVEL_MISMATCH',
+            message: `Invalid hierarchy: ${level} cannot be under ${parent.level}`,
+            blocking: true,
+          },
+        ],
+        warnings: [],
+      }
+    }
+
+    return { valid: true, can_move: true, conflicts: [], warnings: [] }
+  } catch (error) {
+    console.error('Error in validateHierarchy:', error)
+    return {
+      valid: false,
+      can_move: false,
+      reason: error instanceof Error ? error.message : 'Unknown error',
+      conflicts: [],
+      warnings: [],
+    }
+  }
+}
+
+/**
+ * Check if a location can be deleted
+ * Returns reason if deletion is blocked
+ *
+ * @param locationId - Location UUID
+ * @param orgId - Organization ID from JWT
+ */
+export async function canDelete(
+  locationId: string,
+  orgId: string
+): Promise<CanDeleteResult> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Check for children
+    const { data: children, error: childError } = await supabaseAdmin
+      .from('locations')
+      .select('id')
+      .eq('parent_id', locationId)
+      .eq('org_id', orgId)
+      .limit(1)
+
+    if (childError) {
+      console.error('Error checking children:', childError)
+      return { can: false, reason: 'HAS_CHILDREN' }
+    }
+
+    if (children && children.length > 0) {
+      return { can: false, reason: 'HAS_CHILDREN' }
+    }
+
+    // Check for inventory (license plates)
+    const { data: lps, error: lpError } = await supabaseAdmin
+      .from('license_plates')
+      .select('id')
+      .eq('location_id', locationId)
+      .limit(1)
+
+    // If table doesn't exist or no data, allow deletion
+    if (!lpError && lps && lps.length > 0) {
+      const { count } = await supabaseAdmin
+        .from('license_plates')
+        .select('id', { count: 'exact', head: true })
+        .eq('location_id', locationId)
+
+      return { can: false, reason: 'HAS_INVENTORY', count: count || 0 }
+    }
+
+    return { can: true }
+  } catch (error) {
+    console.error('Error in canDelete:', error)
+    return { can: false }
+  }
+}
+
+// =============================================================================
+// ORIGINAL CRUD OPERATIONS (updated for hierarchical schema)
+// =============================================================================
+
+/**
+ * Creates a new hierarchical location
+ * Story: 01.9 - Warehouse Locations Management
+ *
+ * Validates hierarchy rules and code uniqueness
+ *
+ * @param warehouseId - Warehouse UUID
  * @param input - CreateLocationInput from form
  * @param userId - UUID of current user (for created_by)
  * @param orgId - Organization ID from JWT
  * @returns LocationServiceResult with created location
  */
 export async function createLocation(
+  warehouseId: string,
   input: CreateLocationInput,
   userId: string,
   orgId: string
@@ -107,21 +554,31 @@ export async function createLocation(
   try {
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Step 1: Validate code uniqueness within warehouse
+    // Step 1: Validate warehouse exists and belongs to org
+    const { data: warehouse, error: warehouseError } = await supabaseAdmin
+      .from('warehouses')
+      .select('id, code')
+      .eq('id', warehouseId)
+      .eq('org_id', orgId)
+      .single()
+
+    if (warehouseError || !warehouse) {
+      console.error('Warehouse not found:', warehouseError)
+      return { success: false, error: 'Warehouse not found' }
+    }
+
+    // Step 2: Validate code uniqueness within warehouse
     const { data: existing, error: checkError } = await supabaseAdmin
       .from('locations')
       .select('id')
       .eq('org_id', orgId)
-      .eq('warehouse_id', input.warehouse_id)
+      .eq('warehouse_id', warehouseId)
       .eq('code', input.code)
       .limit(1)
 
     if (checkError) {
       console.error('Error checking location code uniqueness:', checkError)
-      return {
-        success: false,
-        error: 'Failed to validate location code',
-      }
+      return { success: false, error: 'Failed to validate location code' }
     }
 
     if (existing && existing.length > 0) {
@@ -131,62 +588,49 @@ export async function createLocation(
       }
     }
 
-    // Step 2: Get warehouse code for barcode generation
-    const { data: warehouse, error: warehouseError } = await supabaseAdmin
-      .from('warehouses')
-      .select('code')
-      .eq('id', input.warehouse_id)
-      .eq('org_id', orgId)
-      .single()
+    // Step 3: Validate hierarchy rules
+    const validationResult = await validateHierarchy(
+      input.parent_id || null,
+      input.level,
+      orgId
+    )
 
-    if (warehouseError || !warehouse) {
-      console.error('Failed to find warehouse:', warehouseError)
-      return {
-        success: false,
-        error: 'Warehouse not found',
+    if (!validationResult.valid) {
+      return { success: false, error: validationResult.reason || 'Invalid hierarchy' }
+    }
+
+    // Step 4: If parent specified, verify it belongs to same warehouse
+    if (input.parent_id) {
+      const { data: parent, error: parentError } = await supabaseAdmin
+        .from('locations')
+        .select('warehouse_id')
+        .eq('id', input.parent_id)
+        .eq('org_id', orgId)
+        .single()
+
+      if (parentError || !parent) {
+        return { success: false, error: 'Parent location not found' }
+      }
+
+      if (parent.warehouse_id !== warehouseId) {
+        return { success: false, error: 'Parent location must be in the same warehouse' }
       }
     }
 
-    // Step 3: Generate barcode if not provided
-    let barcode = input.barcode
-
-    if (!barcode) {
-      const barcodeResult = await generateLocationBarcode(warehouse.code, orgId)
-
-      if (!barcodeResult.success || !barcodeResult.barcode) {
-        return {
-          success: false,
-          error: barcodeResult.error || 'Failed to generate barcode',
-        }
-      }
-
-      barcode = barcodeResult.barcode
-    } else {
-      // Validate manual barcode is globally unique
-      const isUnique = await validateBarcodeUniqueness(barcode)
-
-      if (!isUnique) {
-        return {
-          success: false,
-          error: `Barcode "${barcode}" is already in use`,
-        }
-      }
-    }
-
-    // Step 4: Insert location record - use admin client to bypass RLS
+    // Step 5: Insert location record
     const { data: location, error: insertError } = await supabaseAdmin
       .from('locations')
       .insert({
         org_id: orgId,
-        warehouse_id: input.warehouse_id,
+        warehouse_id: warehouseId,
+        parent_id: input.parent_id || null,
         code: input.code,
         name: input.name,
-        type: input.type,
-        zone: input.zone_enabled ? input.zone : null,
-        zone_enabled: input.zone_enabled,
-        capacity: input.capacity_enabled ? input.capacity : null,
-        capacity_enabled: input.capacity_enabled,
-        barcode,
+        description: input.description || null,
+        level: input.level,
+        location_type: input.location_type || 'shelf',
+        max_pallets: input.max_pallets || null,
+        max_weight_kg: input.max_weight_kg || null,
         is_active: input.is_active ?? true,
         created_by: userId,
         updated_by: userId,
@@ -196,28 +640,19 @@ export async function createLocation(
 
     if (insertError || !location) {
       console.error('Failed to insert location:', insertError)
-      return {
-        success: false,
-        error: 'Failed to create location',
+      // Check for specific database errors
+      if (insertError?.message?.includes('Root locations must be zones')) {
+        return { success: false, error: 'Root locations must be zones' }
       }
+      if (insertError?.message?.includes('must be')) {
+        return { success: false, error: insertError.message }
+      }
+      return { success: false, error: 'Failed to create location' }
     }
-
-    // Step 5: Generate QR code
-    const qrResult = await generateQRCode(barcode)
-    const locationWithQR = {
-      ...location,
-      qr_code_url: qrResult.success ? qrResult.dataUrl : undefined,
-    }
-
-    // TODO: Step 6: Emit cache invalidation event (AC-005.8)
-    // await emitCacheEvent('location.created', orgId, input.warehouse_id, location.id)
 
     console.log(`Location created: ${location.id} (${location.code})`)
 
-    return {
-      success: true,
-      data: locationWithQR as Location,
-    }
+    return { success: true, data: location as HierarchicalLocation }
   } catch (error) {
     console.error('Error in createLocation:', error)
     return {
@@ -228,11 +663,12 @@ export async function createLocation(
 }
 
 /**
- * Updates an existing location
+ * Updates an existing hierarchical location
+ * Story: 01.9 - Warehouse Locations Management
  *
- * AC-005.1: Admin can update location
- * AC-005.2: Zone/capacity validation on update
+ * Note: code, level, parent_id are immutable (cannot be changed)
  *
+ * @param warehouseId - Warehouse UUID
  * @param id - Location UUID
  * @param input - UpdateLocationInput from form
  * @param userId - UUID of current user (for updated_by)
@@ -240,109 +676,59 @@ export async function createLocation(
  * @returns LocationServiceResult with updated location
  */
 export async function updateLocation(
+  warehouseId: string,
   id: string,
   input: UpdateLocationInput,
   userId: string,
   orgId: string
 ): Promise<LocationServiceResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Step 1: Verify location exists and belongs to org
-    const { data: existing, error: fetchError } = await supabase
+    // Step 1: Verify location exists and belongs to org/warehouse
+    const { data: existing, error: fetchError } = await supabaseAdmin
       .from('locations')
       .select('*')
       .eq('id', id)
       .eq('org_id', orgId)
+      .eq('warehouse_id', warehouseId)
       .single()
 
     if (fetchError || !existing) {
       console.error('Location not found:', fetchError)
-      return {
-        success: false,
-        error: 'Location not found',
-      }
+      return { success: false, error: 'Location not found' }
     }
 
-    // Step 2: If code is changing, validate uniqueness within warehouse
-    if (input.code && input.code !== existing.code) {
-      const { data: codeCheck, error: checkError } = await supabase
-        .from('locations')
-        .select('id')
-        .eq('org_id', orgId)
-        .eq('warehouse_id', existing.warehouse_id)
-        .eq('code', input.code)
-        .neq('id', id)
-        .limit(1)
-
-      if (checkError) {
-        console.error('Error checking code uniqueness:', checkError)
-        return {
-          success: false,
-          error: 'Failed to validate location code',
-        }
-      }
-
-      if (codeCheck && codeCheck.length > 0) {
-        return {
-          success: false,
-          error: `Location code "${input.code}" already exists in this warehouse`,
-        }
-      }
-    }
-
-    // Step 3: If barcode is changing, validate global uniqueness
-    if (input.barcode && input.barcode !== existing.barcode) {
-      const isUnique = await validateBarcodeUniqueness(input.barcode)
-
-      if (!isUnique) {
-        return {
-          success: false,
-          error: `Barcode "${input.barcode}" is already in use`,
-        }
-      }
-    }
-
-    // Step 4: Update location record
-    const updateData: Partial<typeof existing> = {
-      ...input,
-      zone: input.zone_enabled === true ? input.zone : (input.zone_enabled === false ? null : existing.zone),
-      capacity: input.capacity_enabled === true ? input.capacity : (input.capacity_enabled === false ? null : existing.capacity),
+    // Step 2: Build update data (only allowed fields)
+    const updateData: Record<string, unknown> = {
       updated_by: userId,
     }
 
-    const { data: updated, error: updateError } = await supabase
+    if (input.name !== undefined) updateData.name = input.name
+    if (input.description !== undefined) updateData.description = input.description
+    if (input.location_type !== undefined) updateData.location_type = input.location_type
+    if (input.max_pallets !== undefined) updateData.max_pallets = input.max_pallets
+    if (input.max_weight_kg !== undefined) updateData.max_weight_kg = input.max_weight_kg
+    if (input.is_active !== undefined) updateData.is_active = input.is_active
+
+    // Step 3: Update location record
+    const { data: updated, error: updateError } = await supabaseAdmin
       .from('locations')
       .update(updateData)
       .eq('id', id)
       .eq('org_id', orgId)
+      .eq('warehouse_id', warehouseId)
       .select()
       .single()
 
     if (updateError || !updated) {
       console.error('Failed to update location:', updateError)
-      return {
-        success: false,
-        error: 'Failed to update location',
-      }
+      return { success: false, error: 'Failed to update location' }
     }
-
-    // Step 5: Generate QR code with updated barcode
-    const qrResult = await generateQRCode(updated.barcode)
-    const locationWithQR = {
-      ...updated,
-      qr_code_url: qrResult.success ? qrResult.dataUrl : undefined,
-    }
-
-    // TODO: Step 6: Emit cache invalidation event (AC-005.8)
-    // await emitCacheEvent('location.updated', orgId, updated.warehouse_id, updated.id)
 
     console.log(`Location updated: ${updated.id} (${updated.code})`)
 
-    return {
-      success: true,
-      data: locationWithQR as Location,
-    }
+    return { success: true, data: updated as HierarchicalLocation }
   } catch (error) {
     console.error('Error in updateLocation:', error)
     return {
@@ -353,65 +739,86 @@ export async function updateLocation(
 }
 
 /**
- * Gets locations with optional filtering
+ * Gets locations with optional filtering (flat list or tree)
+ * Story: 01.9 - Warehouse Locations Management
  *
- * AC-005.4: Locations table with filtering and sorting
- *
- * @param filters - Optional filters (warehouse_id, type, is_active, search)
+ * @param warehouseId - Warehouse UUID
+ * @param filters - Optional filters (level, type, parent_id, search)
  * @param orgId - Organization ID from JWT
- * @returns LocationsListResult with locations array
+ * @returns LocationTreeResult with locations tree or flat list
  */
 export async function getLocations(
+  warehouseId: string,
   filters: LocationFilters,
   orgId: string
-): Promise<LocationsListResult> {
+): Promise<LocationTreeResult> {
   try {
     const supabaseAdmin = createServerSupabaseAdmin()
 
     let query = supabaseAdmin
       .from('locations')
-      .select(
-        `
-        *,
-        warehouse:warehouses!locations_warehouse_id_fkey(code, name)
-      `
-      )
+      .select('*')
       .eq('org_id', orgId)
+      .eq('warehouse_id', warehouseId)
 
     // Apply filters
-    if (filters.warehouse_id) {
-      query = query.eq('warehouse_id', filters.warehouse_id)
+    if (filters.level) {
+      query = query.eq('level', filters.level)
     }
 
     if (filters.type) {
-      query = query.eq('type', filters.type)
+      query = query.eq('location_type', filters.type)
     }
 
     if (filters.is_active !== undefined) {
       query = query.eq('is_active', filters.is_active)
     }
 
-    if (filters.search) {
-      const searchTerm = `%${filters.search}%`
-      query = query.or(`code.ilike.${searchTerm},name.ilike.${searchTerm}`)
-    }
-
-    // Default sort by code
-    query = query.order('code', { ascending: true })
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error('Failed to fetch locations:', error)
-      return {
-        success: false,
-        error: 'Failed to fetch locations',
+    if (filters.parent_id !== undefined) {
+      if (filters.parent_id === null) {
+        query = query.is('parent_id', null)
+      } else {
+        query = query.eq('parent_id', filters.parent_id)
       }
     }
 
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`
+      query = query.or(`code.ilike.${searchTerm},name.ilike.${searchTerm},full_path.ilike.${searchTerm}`)
+    }
+
+    // Sort by full_path for consistent hierarchy
+    query = query.order('full_path', { ascending: true })
+
+    const { data: locations, error } = await query
+
+    if (error) {
+      console.error('Failed to fetch locations:', error)
+      return { success: false, error: 'Failed to fetch locations' }
+    }
+
+    const typedLocations = (locations || []) as HierarchicalLocation[]
+
+    // If view is 'flat', return as-is with computed fields
+    if (filters.view === 'flat') {
+      return {
+        success: true,
+        data: {
+          locations: typedLocations.map(toLocationNode),
+          total_count: typedLocations.length,
+        },
+      }
+    }
+
+    // Build tree structure (default)
+    const rootNodes = buildLocationTree(typedLocations)
+
     return {
       success: true,
-      data: (data || []) as Location[],
+      data: {
+        locations: rootNodes,
+        total_count: typedLocations.length,
+      },
     }
   } catch (error) {
     console.error('Error in getLocations:', error)
@@ -423,15 +830,16 @@ export async function getLocations(
 }
 
 /**
- * Gets a single location by ID with QR code
+ * Gets a single location by ID
+ * Story: 01.9 - Warehouse Locations Management
  *
- * AC-005.6: Location detail page with QR code
- *
+ * @param warehouseId - Warehouse UUID
  * @param id - Location UUID
  * @param orgId - Organization ID from JWT
- * @returns LocationServiceResult with location and QR code
+ * @returns LocationServiceResult with location
  */
 export async function getLocationById(
+  warehouseId: string,
   id: string,
   orgId: string
 ): Promise<LocationServiceResult> {
@@ -440,35 +848,18 @@ export async function getLocationById(
 
     const { data, error } = await supabaseAdmin
       .from('locations')
-      .select(
-        `
-        *,
-        warehouse:warehouses!locations_warehouse_id_fkey(code, name)
-      `
-      )
+      .select('*')
       .eq('id', id)
       .eq('org_id', orgId)
+      .eq('warehouse_id', warehouseId)
       .single()
 
     if (error || !data) {
       console.error('Location not found:', error)
-      return {
-        success: false,
-        error: 'Location not found',
-      }
+      return { success: false, error: 'Location not found' }
     }
 
-    // Generate QR code
-    const qrResult = await generateQRCode(data.barcode)
-    const locationWithQR = {
-      ...data,
-      qr_code_url: qrResult.success ? qrResult.dataUrl : undefined,
-    }
-
-    return {
-      success: true,
-      data: locationWithQR as Location,
-    }
+    return { success: true, data: data as HierarchicalLocation }
   } catch (error) {
     console.error('Error in getLocationById:', error)
     return {
@@ -479,108 +870,76 @@ export async function getLocationById(
 }
 
 /**
- * Deletes a location (soft or hard delete)
+ * Deletes a hierarchical location
+ * Story: 01.9 - Warehouse Locations Management
  *
- * AC-005.5: Cannot delete location if used as warehouse default
- * AC-005.5: FK constraint ON DELETE RESTRICT prevents deletion
- * AC-005.5: Archive option (is_active = false)
+ * Validates that location has no children or inventory before deletion
  *
+ * @param warehouseId - Warehouse UUID
  * @param id - Location UUID
  * @param orgId - Organization ID from JWT
- * @param softDelete - If true, set is_active = false instead of deleting
  * @returns DeleteResult with success status
  */
 export async function deleteLocation(
+  warehouseId: string,
   id: string,
-  orgId: string,
-  softDelete = false
+  orgId: string
 ): Promise<DeleteResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Step 1: Check if location is used as warehouse default
-    // FIXED: Use parameterized queries - fetch all warehouses then check in JS
-    const { data: allWarehouses, error: checkError } = await supabase
-      .from('warehouses')
-      .select('id, code, name, default_receiving_location_id, default_shipping_location_id, transit_location_id')
+    // Step 1: Verify location exists
+    const { data: location, error: locError } = await supabaseAdmin
+      .from('locations')
+      .select('id, code')
+      .eq('id', id)
       .eq('org_id', orgId)
+      .eq('warehouse_id', warehouseId)
+      .single()
 
-    if (checkError) {
-      console.error('Error checking warehouse defaults:', checkError)
-      return {
-        success: false,
-        error: 'Failed to check dependencies',
-      }
+    if (locError || !location) {
+      return { success: false, error: 'Location not found' }
     }
 
-    // Check if location is used as warehouse default (application-level, not SQL injection)
-    const usedAsDefault = allWarehouses?.filter(w =>
-      w.default_receiving_location_id === id ||
-      w.default_shipping_location_id === id ||
-      w.transit_location_id === id
-    ) || []
+    // Step 2: Check if deletion is allowed
+    const canDeleteResult = await canDelete(id, orgId)
 
-    if (usedAsDefault && usedAsDefault.length > 0) {
-      const warehouse = usedAsDefault[0]
-      let defaultType = 'default'
-
-      if (warehouse.default_receiving_location_id === id) {
-        defaultType = 'default receiving'
-      } else if (warehouse.default_shipping_location_id === id) {
-        defaultType = 'default shipping'
-      } else if (warehouse.transit_location_id === id) {
-        defaultType = 'transit'
+    if (!canDeleteResult.can) {
+      if (canDeleteResult.reason === 'HAS_CHILDREN') {
+        return { success: false, error: 'Delete child locations first' }
       }
-
-      return {
-        success: false,
-        error: `Cannot delete - this is the ${defaultType} location for Warehouse ${warehouse.name} (${warehouse.code}). Change warehouse default first, then delete or archive this location.`,
-      }
-    }
-
-    // Step 2: Perform delete or soft delete
-    if (softDelete) {
-      // Soft delete: set is_active = false
-      const { error: updateError } = await supabase
-        .from('locations')
-        .update({ is_active: false })
-        .eq('id', id)
-        .eq('org_id', orgId)
-
-      if (updateError) {
-        console.error('Failed to archive location:', updateError)
+      if (canDeleteResult.reason === 'HAS_INVENTORY') {
         return {
           success: false,
-          error: 'Failed to archive location',
+          error: `Location has inventory (${canDeleteResult.count} items). Relocate first.`,
         }
       }
+      return { success: false, error: 'Cannot delete location' }
+    }
 
-      console.log(`Location archived: ${id}`)
-    } else {
-      // Hard delete
-      const { error: deleteError } = await supabase
-        .from('locations')
-        .delete()
-        .eq('id', id)
-        .eq('org_id', orgId)
+    // Step 3: Delete location
+    const { error: deleteError } = await supabaseAdmin
+      .from('locations')
+      .delete()
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .eq('warehouse_id', warehouseId)
 
-      if (deleteError) {
-        console.error('Failed to delete location:', deleteError)
+    if (deleteError) {
+      console.error('Failed to delete location:', deleteError)
+      // Check for FK constraint errors
+      if (deleteError.code === '23503') {
         return {
           success: false,
-          error: 'Failed to delete location. This location may be referenced by other records.',
+          error: 'Location is referenced by other records. Remove references first.',
         }
       }
-
-      console.log(`Location deleted: ${id}`)
+      return { success: false, error: 'Failed to delete location' }
     }
 
-    // TODO: Step 3: Emit cache invalidation event (AC-005.8)
-    // await emitCacheEvent('location.deleted', orgId, warehouse_id, id)
+    console.log(`Location deleted: ${id} (${location.code})`)
 
-    return {
-      success: true,
-    }
+    return { success: true }
   } catch (error) {
     console.error('Error in deleteLocation:', error)
     return {

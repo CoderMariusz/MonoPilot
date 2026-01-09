@@ -1,0 +1,54 @@
+# Story 05.12 - GRN from TO
+# Type: fullstack
+# Epic: 05-warehouse
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: false
+  files_found:
+    - path: "supabase/migrations/097_create_grns_table.sql"
+      type: migration
+      status: exists
+      notes: "grns table with source_type='to' support ready"
+    - path: "supabase/migrations/098_create_grn_items_table.sql"
+      type: migration
+      status: incomplete
+      notes: "MISSING to_line_id FK column - BLOCKER"
+    - path: "supabase/migrations/063_create_transfer_orders.sql"
+      type: migration
+      status: complete
+    - path: "apps/frontend/lib/services/grn-service.ts"
+      type: service
+      status: exists_incomplete
+      notes: "Only has PO receipt support, needs TO methods"
+  tests_exist: false
+  test_files: []
+  estimated_completion: 0%
+
+status: NOT_STARTED
+
+blockers:
+  - id: "DB-001"
+    description: "grn_items table missing to_line_id FK column"
+    severity: CRITICAL
+  - id: "SERVICE-001"
+    description: "GRNService missing TO receipt methods (7 new methods)"
+    severity: CRITICAL
+  - id: "API-001"
+    description: "API route /api/warehouse/grns/from-to/:toId missing"
+    severity: CRITICAL
+  - id: "FRONTEND-001"
+    description: "Receive TO wizard pages and components missing"
+    severity: HIGH
+
+recommendation: |
+  BLOCKED - Cannot proceed without database migration.
+
+  Priority sequence:
+  1. Create migration to add to_line_id FK to grn_items
+  2. Extend GRNService with 7 TO receipt methods
+  3. Implement 3 API routes
+  4. Build receive wizard (5 steps)
+  5. Write tests
+
+next_phase: P1

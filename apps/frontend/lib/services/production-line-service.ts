@@ -18,7 +18,33 @@ import type {
   Product,
 } from '@/lib/types/production-line'
 
+// Constants
+const DEFAULT_PAGE_LIMIT = 25
+
 export class ProductionLineService {
+  /**
+   * Transform raw machine join data to LineMachine array (sorted by sequence)
+   * @private
+   */
+  private static transformMachines(rawMachines: any[]): LineMachine[] {
+    if (!rawMachines) return []
+    return rawMachines
+      .map((m: any) => ({
+        ...m.machine,
+        sequence_order: m.sequence_order,
+      }))
+      .sort((a: any, b: any) => a.sequence_order - b.sequence_order)
+  }
+
+  /**
+   * Transform raw product join data to Product array
+   * @private
+   */
+  private static transformProducts(rawProducts: any[]): Product[] {
+    if (!rawProducts) return []
+    return rawProducts.map((p: any) => p.product)
+  }
+
   /**
    * List production lines with filters, search, and pagination
    */
@@ -33,7 +59,7 @@ export class ProductionLineService {
         status,
         search,
         page = 1,
-        limit = 25,
+        limit = DEFAULT_PAGE_LIMIT,
       } = params
 
       // Build query
@@ -83,22 +109,16 @@ export class ProductionLineService {
       if (error) throw error
 
       // Transform data
-      const lines = data?.map((line: any) => ({
-        ...line,
-        machines: line.machines
-          ?.map((m: any) => ({
-            ...m.machine,
-            sequence_order: m.sequence_order,
-          }))
-          .sort((a: any, b: any) => a.sequence_order - b.sequence_order) || [],
-        compatible_products: line.compatible_products?.map((p: any) => p.product) || [],
-        ...this.calculateBottleneckCapacity(
-          line.machines?.map((m: any) => ({
-            ...m.machine,
-            sequence_order: m.sequence_order,
-          })) || []
-        ),
-      }))
+      const lines = data?.map((line: any) => {
+        const machines = this.transformMachines(line.machines)
+        const capacityData = this.calculateBottleneckCapacity(machines)
+        return {
+          ...line,
+          machines,
+          compatible_products: this.transformProducts(line.compatible_products),
+          ...capacityData,
+        }
+      })
 
       return {
         success: true,
@@ -151,20 +171,14 @@ export class ProductionLineService {
         throw error
       }
 
-      // Transform data
-      const machines = data.machines
-        ?.map((m: any) => ({
-          ...m.machine,
-          sequence_order: m.sequence_order,
-        }))
-        .sort((a: any, b: any) => a.sequence_order - b.sequence_order) || []
-
+      // Transform data using shared helper methods
+      const machines = this.transformMachines(data.machines)
       const capacityData = this.calculateBottleneckCapacity(machines)
 
       const line: ProductionLine = {
         ...data,
         machines,
-        compatible_products: data.compatible_products?.map((p: any) => p.product) || [],
+        compatible_products: this.transformProducts(data.compatible_products),
         calculated_capacity: capacityData.capacity,
         bottleneck_machine_id: capacityData.bottleneck_machine_id,
         bottleneck_machine_code: capacityData.bottleneck_machine_code,

@@ -1,0 +1,78 @@
+# Story 02.15 - Cost History + Variance
+# Type: fullstack
+# Epic: 02-technical
+# Audit Date: 2026-01-08
+
+audit:
+  code_exists: true
+  files_found:
+    # Database
+    - path: "supabase/migrations/058_create_product_costs.sql"
+      type: "migration"
+    # MISSING: cost_variances table migration
+    # Services
+    - path: "apps/frontend/lib/services/cost-history-service.ts"
+      type: "service"
+    - path: "apps/frontend/lib/services/variance-analysis-service.ts"
+      type: "service"
+    # API Routes
+    - path: "apps/frontend/app/api/technical/costing/products/[id]/history/route.ts"
+      type: "api"
+    - path: "apps/frontend/app/api/technical/costing/variance/report/route.ts"
+      type: "api"
+      note: "Queries cost_variances table which doesn't exist"
+    # Page
+    - path: "apps/frontend/app/(authenticated)/technical/costing/products/[id]/history/page.tsx"
+      type: "page"
+    # Components (10 total)
+    - path: "apps/frontend/components/technical/costing/CostHistoryPage.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/costing/CostTrendChart.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/costing/CostHistoryFilters.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/costing/ExportOptionsModal.tsx"
+      type: "component"
+    - path: "apps/frontend/components/technical/costing/VarianceAnalysisSection.tsx"
+      type: "component"
+    # Hooks
+    - path: "apps/frontend/lib/hooks/use-cost-history.ts"
+      type: "hook"
+    - path: "apps/frontend/lib/hooks/use-variance-report.ts"
+      type: "hook"
+    # Types
+    - path: "apps/frontend/lib/types/cost-history.ts"
+      type: "types"
+    - path: "apps/frontend/lib/types/variance.ts"
+      type: "types"
+
+  tests_exist: true
+  test_files:
+    - path: "apps/frontend/lib/services/__tests__/cost-history-service.test.ts"
+      count: 50
+
+  estimated_completion: 85
+
+status: PARTIAL
+
+recommendation: |
+  Story 02.15 is 85% complete. Frontend done, DB migration missing.
+
+  DONE:
+  - Services: cost-history-service.ts + variance-analysis-service.ts
+  - API: 2 endpoints (history + variance report)
+  - Components: 10 UI components with all states
+  - Page: Cost history page at /technical/costing/products/:id/history
+  - Hooks: React Query integration
+  - Types: Complete definitions
+
+  CRITICAL BLOCKER:
+  - cost_variances table migration MISSING
+  - Variance report API will fail at runtime
+
+  MISSING:
+  - Export API endpoint (POST /history/export)
+  - PDF/PNG/Excel export (only CSV)
+
+next_phase: P3
+P3-FIX: ✓ backend-dev 20:23 files:1 migration:102_create_cost_variances.sql blocker:resolved
