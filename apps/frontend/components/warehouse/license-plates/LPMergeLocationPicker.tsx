@@ -5,7 +5,7 @@
  * Features:
  * - Filters locations by warehouse
  * - Shows location full path
- * - Default option uses first source LP's location
+ * - Default option uses first source LP&apos;s location
  *
  * Per AC-20
  */
@@ -57,12 +57,12 @@ export function LPMergeLocationPicker({
             {selectedLocationId
               ? locations.find((l) => l.id === selectedLocationId)?.name ||
                 'Unknown'
-              : "Use first LP's location (default)"}
+              : "Use first LP&apos;s location (default)"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="default">
-            Use first LP's location (default)
+            Use first LP&apos;s location (default)
           </SelectItem>
           {locations.map((location) => (
             <SelectItem key={location.id} value={location.id}>
@@ -81,7 +81,7 @@ export function LPMergeLocationPicker({
         {selectedLocationId
           ? locations.find((l) => l.id === selectedLocationId)?.name ||
             'Selected location'
-          : "First source LP's location"}
+          : "First source LP&apos;s location"}
       </p>
     </div>
   )
