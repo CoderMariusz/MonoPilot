@@ -441,12 +441,15 @@ export class ASNReceiveService {
         .single()
 
       variances.push({
+        asn_item_id: receiveItem.asn_item_id,
         product_name: product?.name || 'Unknown',
         expected_qty: asnItem.expected_qty,
         received_qty: receiveItem.received_qty,
         variance: variance.variance,
         variance_percent: variance.variance_percent,
         variance_indicator: variance.indicator,
+        variance_reason: receiveItem.variance_reason,
+        variance_notes: receiveItem.variance_notes,
       })
 
       // Update ASN item

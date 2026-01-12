@@ -161,91 +161,19 @@ export const ASN_STATUS_LABELS: Record<ASNStatus, string> = {
 
 // =============================================================================
 // Story 05.9: ASN Receive Workflow Types
+// NOTE: Primary types are in asn-receive.ts. Import from there.
 // =============================================================================
 
-// Variance Reason
-export type VarianceReason = 'damaged' | 'short_ship' | 'over_ship' | 'wrong_item' | 'quality_issue' | 'other'
+// Re-export from asn-receive.ts for backward compatibility
+export type {
+  VarianceReason,
+  VarianceIndicator,
+  ASNReceiveItemPreview,
+  ASNReceivePreview,
+  ASNReceiveItem,
+  ASNReceiveRequest,
+  VarianceItem,
+  ASNReceiveResult,
+} from './asn-receive'
 
-// Variance Indicator
-export type VarianceIndicator = 'under' | 'over' | 'exact'
-
-// ASN Receive Item Preview
-export interface ASNReceiveItemPreview {
-  id: string
-  product_id: string
-  product_name: string
-  product_sku: string
-  expected_qty: number
-  received_qty: number
-  remaining_qty: number
-  uom: string
-  supplier_batch_number?: string | null
-  gtin?: string | null
-  expiry_date?: string | null
-}
-
-// ASN Receive Preview
-export interface ASNReceivePreview {
-  asn: {
-    id: string
-    asn_number: string
-    status: ASNStatus
-    expected_date: string
-    po_number: string
-    supplier_name: string
-  }
-  items: ASNReceiveItemPreview[]
-}
-
-// Receive Item Input
-export interface ReceiveItemInput {
-  asn_item_id: string
-  received_qty: number
-  batch_number?: string
-  supplier_batch_number?: string
-  expiry_date?: string
-  manufacture_date?: string
-  variance_reason?: VarianceReason
-  variance_notes?: string
-}
-
-// ASN Receive Request
-export interface ASNReceiveRequest {
-  warehouse_id: string
-  location_id: string
-  items: ReceiveItemInput[]
-  notes?: string
-}
-
-// Variance Result
-export interface VarianceResult {
-  asn_item_id: string
-  product_name: string
-  expected_qty: number
-  received_qty: number
-  variance: number
-  variance_percent: number
-  variance_indicator: VarianceIndicator
-  variance_reason?: VarianceReason
-  variance_notes?: string
-}
-
-// ASN Receive Result
-export interface ASNReceiveResult {
-  grn_id: string
-  grn_number: string
-  status: string
-  lps_created: number
-  asn_status: ASNStatus
-  variances: VarianceResult[]
-}
-
-// Variance Reason Labels
-export const VARIANCE_REASON_LABELS: Record<VarianceReason, string> = {
-  damaged: 'Damaged',
-  short_ship: 'Short Ship',
-  over_ship: 'Over Ship',
-  wrong_item: 'Wrong Item',
-  quality_issue: 'Quality Issue',
-  other: 'Other',
-}
+export { VARIANCE_REASON_LABELS } from './asn-receive'

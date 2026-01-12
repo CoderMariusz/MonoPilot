@@ -66,12 +66,15 @@ export interface ASNReceiveRequest {
 
 // Variance Item (in result)
 export interface VarianceItem {
+  asn_item_id: string
   product_name: string
   expected_qty: number
   received_qty: number
   variance: number
   variance_percent: number
   variance_indicator: VarianceIndicator
+  variance_reason?: VarianceReason
+  variance_notes?: string
 }
 
 // ASN Receive Result (POST response)
@@ -95,4 +98,12 @@ export interface OverReceiptValidation {
 export interface ASNStatusUpdate {
   status: 'pending' | 'partial' | 'received'
   actual_date: string | null
+}
+
+// Variance Reason Labels (matching database enum values)
+export const VARIANCE_REASON_LABELS: Record<VarianceReason, string> = {
+  damaged: 'Damaged',
+  'short-shipped': 'Short Shipped',
+  'over-shipped': 'Over Shipped',
+  other: 'Other',
 }

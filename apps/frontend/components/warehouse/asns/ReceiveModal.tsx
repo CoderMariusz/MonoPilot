@@ -21,7 +21,7 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import { useASNReceivePreview, useASNReceive } from '@/lib/hooks/use-asn-receive'
 import { ReceiveItemRow } from './ReceiveItemRow'
 import { ReceiveSummary } from './ReceiveSummary'
-import type { ReceiveItemInput, ASNReceiveResult } from '@/lib/types/asn'
+import type { ASNReceiveItem, ASNReceiveResult } from '@/lib/types/asn-receive'
 
 interface ReceiveModalProps {
   asnId: string
@@ -40,14 +40,14 @@ export function ReceiveModal({ asnId, isOpen, onClose, onSuccess }: ReceiveModal
   // Form state
   const [warehouseId, setWarehouseId] = useState('')
   const [locationId, setLocationId] = useState('')
-  const [items, setItems] = useState<Map<string, ReceiveItemInput>>(new Map())
+  const [items, setItems] = useState<Map<string, ASNReceiveItem>>(new Map())
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [result, setResult] = useState<ASNReceiveResult | null>(null)
 
   // Initialize items when preview loads
   useEffect(() => {
     if (preview?.items) {
-      const initialItems = new Map<string, ReceiveItemInput>()
+      const initialItems = new Map<string, ASNReceiveItem>()
       preview.items.forEach((item) => {
         initialItems.set(item.id, {
           asn_item_id: item.id,
@@ -61,7 +61,7 @@ export function ReceiveModal({ asnId, isOpen, onClose, onSuccess }: ReceiveModal
   }, [preview])
 
   // Handle item change
-  const handleItemChange = (itemId: string, value: ReceiveItemInput) => {
+  const handleItemChange = (itemId: string, value: ASNReceiveItem) => {
     setItems((prev) => {
       const newItems = new Map(prev)
       newItems.set(itemId, value)

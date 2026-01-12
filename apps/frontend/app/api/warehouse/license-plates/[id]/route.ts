@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getLPDetail, blockLP, unblockLP, getLPTransactions } from '@/lib/services/license-plate-detail-service'
+import { getLPDetail, getLPTransactions } from '@/lib/services/license-plate-detail-service'
 
 export async function GET(
   request: NextRequest,
@@ -76,60 +76,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Handle block action
-    if (action === 'block') {
-      const body = await request.json()
-      const { reason } = body
-
-      if (!reason || reason.trim().length === 0) {
-        return NextResponse.json(
-          { error: 'Reason is required' },
-          { status: 400 }
-        )
-      }
-
-      if (reason.length > 500) {
-        return NextResponse.json(
-          { error: 'Reason must be 500 characters or less' },
-          { status: 400 }
-        )
-      }
-
-      try {
-        const lp = await blockLP(supabase, { lpId: id, reason })
-        return NextResponse.json(lp)
-      } catch (error: any) {
-        if (error.message.includes('cannot be blocked')) {
-          return NextResponse.json(
-            { error: error.message },
-            { status: 400 }
-          )
-        }
-        return NextResponse.json(
-          { error: 'License Plate not found' },
-          { status: 404 }
-        )
-      }
-    }
-
-    // Handle unblock action
-    if (action === 'unblock') {
-      try {
-        const lp = await unblockLP(supabase, id)
-        return NextResponse.json(lp)
-      } catch (error: any) {
-        if (error.message.includes('cannot be unblocked')) {
-          return NextResponse.json(
-            { error: error.message },
-            { status: 400 }
-          )
-        }
-        return NextResponse.json(
-          { error: 'License Plate not found' },
-          { status: 404 }
-        )
-      }
-    }
+    // Block/unblock actions are handled by dedicated routes:
+    // PUT /api/warehouse/license-plates/:id/block
+    // PUT /api/warehouse/license-plates/:id/unblock
 
     // Default PUT (not implemented)
     return NextResponse.json(

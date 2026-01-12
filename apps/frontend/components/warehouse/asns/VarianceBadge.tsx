@@ -5,7 +5,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Check, TrendingDown, TrendingUp } from 'lucide-react'
-import type { VarianceIndicator } from '@/lib/types/asn'
+import type { VarianceIndicator } from '@/lib/types/asn-receive'
 
 interface VarianceBadgeProps {
   variance: number

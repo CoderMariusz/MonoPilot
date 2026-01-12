@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Scissors, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLicensePlate } from '@/lib/hooks/use-license-plates'
@@ -23,6 +23,8 @@ import {
   LPBlockModal,
   LPUnblockModal,
 } from '@/components/warehouse/license-plates/detail'
+import { SplitLPModal } from '@/components/warehouse/license-plates/SplitLPModal'
+import { PrintLabelButton } from '@/components/warehouse/license-plates/PrintLabelButton'
 
 interface PageProps {
   params: {
@@ -36,6 +38,7 @@ export default function LicensePlateDetailPage({ params }: PageProps) {
   const [activeTab, setActiveTab] = useState('overview')
   const [blockModalOpen, setBlockModalOpen] = useState(false)
   const [unblockModalOpen, setUnblockModalOpen] = useState(false)
+  const [splitModalOpen, setSplitModalOpen] = useState(false)
 
   // Loading state handled by loading.tsx
   if (isLoading) {
@@ -109,9 +112,23 @@ export default function LicensePlateDetailPage({ params }: PageProps) {
             Unblock LP
           </Button>
         )}
-        <Button variant="outline" size="sm" disabled>
-          Print Label (Phase 1)
-        </Button>
+        {/* Split LP Button - only available for 'available' status */}
+        {lp.status === 'available' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSplitModalOpen(true)}
+            className="gap-2"
+          >
+            <Scissors className="h-4 w-4" />
+            Split LP
+          </Button>
+        )}
+        <PrintLabelButton
+          lpId={params.id}
+          lpNumber={lp.lp_number}
+          onPrintComplete={() => refetch()}
+        />
         <Button variant="outline" size="sm" onClick={() => setActiveTab('history')}>
           View History
         </Button>
@@ -296,6 +313,17 @@ export default function LicensePlateDetailPage({ params }: PageProps) {
           }}
         />
       )}
+
+      {/* Split LP Modal */}
+      <SplitLPModal
+        open={splitModalOpen}
+        lp={lp}
+        onClose={() => setSplitModalOpen(false)}
+        onSuccess={() => {
+          setSplitModalOpen(false)
+          refetch()
+        }}
+      />
     </div>
   )
 }

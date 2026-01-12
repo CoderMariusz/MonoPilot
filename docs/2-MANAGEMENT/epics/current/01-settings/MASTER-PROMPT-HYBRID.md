@@ -2,8 +2,8 @@
 
 ## TARGET
 ```yaml
-Epic: {{EPIC_ID}}
-Stories: {{STORY_IDS}}
+Epic: {{EPIC_ID}} {{EPIC_NAME}} 04-production
+Stories: {{STORY_IDS}} 04.5 04.1 04.2a
 Mode: Hybrid (Claude Agents + GLM Implementation)
 ```
 
@@ -156,7 +156,7 @@ Exit: PASS or FAIL with reproduction steps
 5. **Run tests after P3** - `pnpm test` before P4
 6. **Max 4 parallel agents**
 7. **Phase skip = orchestrator decision** (agents don't skip)
-8. **Micro-handoff ≤50 tokens** from agents to orchestrator
+8. **Micro-handoff ≤150 tokens** from agents to orchestrator
 
 ## START
 

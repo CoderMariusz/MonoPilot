@@ -1,0 +1,802 @@
+# MonoPilot - Implementation Roadmap
+# Generated: 2026-01-09
+# Purpose: Unified roadmap for remaining implementation work across all epics
+# Last checkpoint scan: 2026-01-09 (all .claude/checkpoints/*.yaml verified)
+
+meta:
+  generated: "2026-01-09"
+  scan_method: "Direct checkpoint file analysis (not summary files)"
+  total_epics: 5
+  total_stories_tracked: 87
+
+# =============================================================================
+# EXECUTIVE SUMMARY
+# =============================================================================
+
+summary:
+  overall_completion: "~75%"
+  stories_complete: 65
+  stories_partial: 14
+  stories_blocked: 4
+  stories_not_started: 6
+
+  by_epic:
+    epic_01_settings:
+      total: 16
+      complete: 13
+      partial: 3
+      percent: "81%"
+    epic_02_technical:
+      total: 15
+      complete: 9
+      partial: 6
+      percent: "60%"
+    epic_03_planning:
+      total: 20
+      complete: 18
+      partial: 1
+      blocked: 1
+      percent: "90%"
+    epic_04_production_phase_0:
+      total: 7
+      complete: 7
+      partial: 0
+      percent: "100%"
+    epic_04_production_phase_1:
+      total: 10
+      complete: 0
+      blocked: 10
+      percent: "0%"
+    epic_05_warehouse:
+      total: 19
+      complete: 14
+      partial: 1
+      blocked: 2
+      not_started: 6
+      percent: "47%"
+
+# =============================================================================
+# CRITICAL PATH
+# =============================================================================
+
+critical_path:
+  description: "Shortest path to unblock Epic 04 Phase 1 (Production full)"
+  total_days: "3-5 days"
+
+  steps:
+    - step: 1
+      name: "Fix Epic 03.13 + Epic 05 blockers"
+      duration: "2-3 days"
+      tasks:
+        - "03.13 - Material Availability Check (P4-P7)"
+        - "05.6 - Fix missing lp_transactions table migration"
+        - "05.9 - Fix duplicate VarianceReason type conflict"
+      deliverables:
+        - "Epic 03: 95% complete (19/20)"
+        - "Epic 05: 2 blockers resolved"
+
+    - step: 2
+      name: "Complete Epic 05 Phase 0 NOT_STARTED"
+      duration: "1-2 days"
+      tasks:
+        - "05.12 - Batch/Expiry Tracking (quick story)"
+        - "05.15 - Warehouse Dashboard (quick story)"
+      optional_defer:
+        - "05.16-05.19 - Scanner workflows (defer to Phase 2)"
+      deliverables:
+        - "Epic 05 Phase 0: Core foundation 100%"
+
+    - step: 3
+      name: "UNBLOCKED: Epic 04 Phase 1"
+      duration: "18-24 days"
+      stories: 10
+      description: "Material consumption + Output registration + Reservations"
+
+# =============================================================================
+# EPIC 01 - SETTINGS (81% Complete)
+# =============================================================================
+
+epic_01_settings:
+  status: "MOSTLY_COMPLETE"
+  total_stories: 16
+  complete: 13
+  partial: 3
+  completion_percentage: 81
+
+  complete_stories:
+    - id: "01.1"
+      name: "Org + Multi-Tenancy"
+      status: DONE
+      checkpoint: "next_phase: NONE"
+
+    - id: "01.2"
+      name: "Settings Shell + Navigation"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.3"
+      name: "Users CRUD"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.4"
+      name: "Roles & Permissions"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.5a"
+      name: "Tax Codes"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.5b"
+      name: "Payment Terms"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.6"
+      name: "Currencies"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.7"
+      name: "UoM"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.8"
+      name: "Locations"
+      status: DONE
+      checkpoint: "next_phase: NONE"
+
+    - id: "01.11"
+      name: "Production Lines"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.12"
+      name: "Quality Settings"
+      status: DONE
+      checkpoint: "next_phase: NONE"
+
+    - id: "01.13"
+      name: "Warehouse Settings"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.15"
+      name: "Integration Settings"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "01.16"
+      name: "Notification Settings"
+      status: DONE
+      checkpoint: "next_phase: NONE"
+
+  partial_stories:
+    - id: "01.9"
+      name: "Warehouses CRUD"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL"
+      needs: "P5-P7 phases"
+      priority: MEDIUM
+      effort_days: 1
+
+    - id: "01.10"
+      name: "Machines CRUD"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL"
+      needs: "P5-P7 phases"
+      priority: LOW
+      effort_days: 1
+
+    - id: "01.14"
+      name: "Shipping Settings"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL"
+      needs: "P5-P7 phases"
+      priority: LOW
+      effort_days: 1
+
+  next_steps:
+    - "Complete 01.9 (Warehouses) - needed for multi-warehouse operations"
+    - "Defer 01.10, 01.14 to later (low priority)"
+
+# =============================================================================
+# EPIC 02 - TECHNICAL (60% Complete)
+# =============================================================================
+
+epic_02_technical:
+  status: "PARTIAL"
+  total_stories: 15
+  complete: 9
+  partial: 6
+  completion_percentage: 60
+
+  complete_stories:
+    - id: "02.1"
+      name: "Products CRUD"
+      status: PRODUCTION-READY
+      checkpoint: "P7 done"
+
+    - id: "02.2"
+      name: "Product Variants"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "02.3"
+      name: "Product Categories"
+      status: PRODUCTION-READY
+      checkpoint: "P7 done"
+
+    - id: "02.4"
+      name: "BOMs CRUD"
+      status: DONE
+      checkpoint: "P7 done"
+
+    - id: "02.5a"
+      name: "BOM Items Core"
+      status: DONE
+      checkpoint: "audit exists"
+
+    - id: "02.5b"
+      name: "BOM Calculator"
+      status: PRODUCTION-READY
+      checkpoint: "P7 done"
+
+    - id: "02.7"
+      name: "Routings CRUD"
+      status: COMPLETE
+      checkpoint: "status: COMPLETE"
+
+    - id: "02.10a"
+      name: "Traceability Settings"
+      status: PRODUCTION-READY
+      checkpoint: "P7 done"
+
+    - id: "02.11"
+      name: "Allergen Management"
+      status: DONE
+      checkpoint: "P7 done"
+
+  partial_stories:
+    - id: "02.6"
+      name: "Costing Methods"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL, P7 done"
+      needs: "Missing features or tests"
+      priority: MEDIUM
+      effort_days: 2
+
+    - id: "02.8"
+      name: "Routing Operations"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL"
+      blocker: "Missing operation_attachments table"
+      needs: "Create migration + complete implementation"
+      priority: HIGH
+      effort_days: 2
+
+    - id: "02.9"
+      name: "Production Costing"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL"
+      needs: "Complete implementation + tests"
+      priority: MEDIUM
+      effort_days: 3
+
+    - id: "02.12"
+      name: "Product Search"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL, P7 done"
+      needs: "Complete implementation"
+      priority: LOW
+      effort_days: 2
+
+    - id: "02.13"
+      name: "Nutrition Calculation"
+      status: PRODUCTION-READY
+      checkpoint: "status: PRODUCTION-READY"
+      needs: "Verify production readiness"
+      priority: LOW
+      effort_days: 1
+
+    - id: "02.14"
+      name: "Product Reports"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL, P7 done"
+      needs: "Complete reports"
+      priority: LOW
+      effort_days: 2
+
+    - id: "02.15"
+      name: "Cost History + Variance"
+      status: PARTIAL
+      checkpoint: "status: PARTIAL"
+      blocker: "Missing cost_variances table migration"
+      needs: "Create migration + complete implementation"
+      priority: MEDIUM
+      effort_days: 2
+
+  deferred:
+    - id: "02.10b"
+      name: "Traceability Queries"
+      status: PRODUCTION-READY
+      note: "Deferred until Epic 05 (Warehouse/LP) complete"
+      checkpoint: "status: PRODUCTION-READY"
+
+  next_steps:
+    priority_high:
+      - "02.8 - Create operation_attachments migration"
+      - "02.15 - Create cost_variances migration"
+    priority_medium:
+      - "02.6, 02.9 - Complete implementation"
+    priority_low:
+      - "02.12, 02.13, 02.14 - Complete when time allows"
+
+# =============================================================================
+# EPIC 03 - PLANNING (90% Complete)
+# =============================================================================
+
+epic_03_planning:
+  status: "NEARLY_COMPLETE"
+  total_stories: 20
+  complete: 18
+  partial: 1
+  blocked: 1
+  completion_percentage: 90
+
+  complete_stories:
+    - {id: "03.1", name: "Suppliers CRUD", status: DONE}
+    - {id: "03.2", name: "Supplier Products", status: COMPLETE}
+    - {id: "03.3", name: "PO CRUD & Lines", status: DONE}
+    - {id: "03.4", name: "PO Calculations", status: COMPLETE}
+    - {id: "03.5a", name: "PO Approval Setup", status: COMPLETE}
+    - {id: "03.5b", name: "PO Approval Workflow", status: COMPLETE}
+    - {id: "03.6", name: "PO Bulk Operations", status: COMPLETE}
+    - {id: "03.7", name: "PO Status Lifecycle", status: COMPLETE}
+    - {id: "03.8", name: "TO CRUD & Lines", status: COMPLETE}
+    - {id: "03.9a", name: "TO Partial Shipments", status: COMPLETE}
+    - {id: "03.9b", name: "TO LP Pre-selection", status: COMPLETE}
+    - {id: "03.10", name: "WO CRUD Foundation", status: COMPLETE}
+    - {id: "03.11a", name: "WO BOM Snapshot", status: DONE}
+    - {id: "03.11b", name: "WO Material Reservations", status: COMPLETE}
+    - {id: "03.12", name: "WO Operations Copy", status: COMPLETE}
+    - {id: "03.15", name: "WO Gantt Chart", status: COMPLETE}
+    - {id: "03.16", name: "Planning Dashboard", status: COMPLETE}
+    - {id: "03.17", name: "Planning Settings", status: COMPLETE}
+
+  partial_stories:
+    - id: "03.13"
+      name: "Material Availability Check"
+      status: PARTIAL
+      completion: 30%
+      checkpoint: "P3: backend-dev done (82/82 tests)"
+      needs: "P4 (frontend) + P5-P7"
+      priority: HIGH
+      effort_days: 2
+      blocking: "Epic 04 operations need this for validation"
+
+  blocked_stories:
+    - id: "03.14"
+      name: "WO Scheduling (APS Lite)"
+      status: BLOCKED
+      checkpoint: "status: BLOCKED"
+      blockers:
+        - "Epic 04 (Production) ~60% complete"
+        - "Epic 05 (Warehouse/Inventory) not fully complete"
+      defer: "Phase 2 - complex scheduling after core production works"
+      priority: LOW
+
+  next_steps:
+    - "Complete 03.13 (Material Availability) - 2 days"
+    - "Defer 03.14 until Epic 04 + Epic 05 stable"
+    - "Epic 03 will be 95% complete (19/20)"
+
+# =============================================================================
+# EPIC 04 - PRODUCTION
+# =============================================================================
+
+epic_04_production:
+  phase_0_mvp_core:
+    status: "COMPLETE"
+    total_stories: 7
+    complete: 7
+    completion_percentage: 100
+
+    stories:
+      - {id: "04.1", name: "Production Dashboard", status: COMPLETE}
+      - {id: "04.2a", name: "WO Start", status: COMPLETE}
+      - {id: "04.2b", name: "WO Pause/Resume", status: COMPLETE}
+      - {id: "04.2c", name: "WO Complete", status: COMPLETE}
+      - {id: "04.3", name: "Operation Start/Complete", status: COMPLETE}
+      - {id: "04.4", name: "Yield Tracking", status: COMPLETE}
+      - {id: "04.5", name: "Production Settings", status: COMPLETE}
+
+    notes: "Phase 0 MVP Core is 100% done. Can track WO lifecycle and operations."
+
+  phase_1_full_production:
+    status: "BLOCKED"
+    total_stories: 10
+    blocked: 10
+    completion_percentage: 0
+
+    blocker: "All stories require Epic 05 License Plates table and services"
+
+    stories:
+      - {id: "04.6a", name: "Material Consumption Desktop", requires: "Epic 05 LP"}
+      - {id: "04.6b", name: "Material Consumption Scanner", requires: "Epic 05 LP"}
+      - {id: "04.6c", name: "1:1 Consumption", requires: "Epic 05 LP"}
+      - {id: "04.6d", name: "Consumption Correction", requires: "Epic 05 LP"}
+      - {id: "04.6e", name: "Over-Consumption Control", requires: "Epic 05 LP"}
+      - {id: "04.7a", name: "Output Registration Desktop", requires: "Epic 05 LP"}
+      - {id: "04.7b", name: "Output Registration Scanner", requires: "Epic 05 LP"}
+      - {id: "04.7c", name: "By-Product Registration", requires: "Epic 05 LP"}
+      - {id: "04.7d", name: "Multiple Outputs per WO", requires: "Epic 05 LP"}
+      - {id: "04.8", name: "Material Reservations", requires: "Epic 05 LP"}
+
+    effort_estimate: "18-24 days after unblock"
+
+    unblock_requirements:
+      - "Epic 05.1 - LP Table + Services (DONE ✓)"
+      - "Epic 05.2-05.5 - LP Genealogy, Reservations, FIFO, CRUD"
+      - "Fix Epic 05.6, 05.9 blockers"
+
+  phase_2_oee_analytics:
+    status: "NOT_STARTED"
+    total_stories: 11
+    description: "OEE calculation, downtime tracking, analytics reports"
+    defer: "After Phase 1 complete"
+    stories:
+      - "04.9a - OEE Calculation (L)"
+      - "04.9b - Downtime Tracking (M)"
+      - "04.9c - Machine Integration (M)"
+      - "04.9d - Shift Management (M)"
+      - "04.10a-04.10g - 7 Analytics Reports (S each)"
+
+# =============================================================================
+# EPIC 05 - WAREHOUSE (47% Complete)
+# =============================================================================
+
+epic_05_warehouse:
+  status: "PARTIAL"
+  total_stories: 19
+  complete: 14
+  partial: 1
+  blocked: 2
+  not_started: 6
+  completion_percentage: 47
+
+  phase_0_foundation:
+    status: "MOSTLY_COMPLETE"
+    description: "License Plate core + foundation"
+
+    complete:
+      - id: "05.0"
+        name: "Warehouse Settings"
+        status: complete
+        checkpoint: "P7 done"
+
+      - id: "05.1"
+        name: "LP Table + Basic Service"
+        status: complete
+        checkpoint: "P7 done"
+        note: "CRITICAL - Unblocks Epic 04 Phase 1"
+
+      - id: "05.2"
+        name: "LP Genealogy"
+        status: complete
+        checkpoint: "P7 done"
+
+      - id: "05.3"
+        name: "LP Reservations"
+        status: complete
+        checkpoint: "P7 done"
+
+      - id: "05.4"
+        name: "FIFO/FEFO Pick Suggestions"
+        status: complete
+        checkpoint: "P7 done"
+
+      - id: "05.5"
+        name: "LP CRUD Desktop"
+        status: complete
+        checkpoint: "P7 done"
+
+      - id: "05.7"
+        name: "QA Status Management"
+        status: complete
+        checkpoint: "P7 done"
+
+      - id: "05.8"
+        name: "LP Stock Moves"
+        status: complete
+        checkpoint: "P7 done"
+
+    blocked:
+      - id: "05.6"
+        name: "LP Detail History"
+        status: BLOCKED
+        completion: 70%
+        last_phase: P5
+        blocker: "Missing lp_transactions table migration"
+        fix: "Create migration 105_create_lp_transactions_table.sql"
+        priority: HIGH
+        effort_days: 1
+        note: "Service code exists, just needs DB table"
+
+      - id: "05.9"
+        name: "ASN Receive Workflow"
+        status: BLOCKED
+        completion: 80%
+        last_phase: P6
+        blocker: "Duplicate VarianceReason type definitions"
+        fix: "Remove duplicate from asn.ts, keep only asn-receive.ts version"
+        priority: HIGH
+        effort_days: 0.5
+        note: "Simple type conflict, easy fix"
+
+  phase_1_goods_receipt:
+    status: "PARTIAL"
+
+    complete:
+      - id: "05.10"
+        name: "GRN CRUD Items"
+        status: COMPLETE
+        checkpoint: "audit: code_exists: true"
+
+      - id: "05.11"
+        name: "GRN from PO"
+        status: COMPLETE
+        checkpoint: "audit: code_exists: true"
+
+      - id: "05.13"
+        name: "Over-Receipt Control"
+        status: COMPLETE
+        checkpoint: "audit: code_exists: true"
+
+      - id: "05.14"
+        name: "LP Label Printing"
+        status: COMPLETE
+        checkpoint: "status: COMPLETE"
+
+    partial:
+      - id: "05.14"
+        name: "LP Label Printing"
+        status: PARTIAL
+        checkpoint: "status: PARTIAL (actually COMPLETE in checkpoint)"
+        note: "Checkpoint says COMPLETE - verify"
+        priority: LOW
+
+    not_started:
+      - id: "05.12"
+        name: "Batch/Expiry Tracking"
+        status: NOT_STARTED
+        priority: MEDIUM
+        effort_days: 2
+        note: "Foundation exists, needs implementation"
+
+      - id: "05.15"
+        name: "Warehouse Dashboard"
+        status: NOT_STARTED
+        priority: MEDIUM
+        effort_days: 2
+        note: "KPI dashboard for warehouse operations"
+
+  phase_2_scanner_workflows:
+    status: "NOT_STARTED"
+    defer: "After Phase 1 complete"
+
+    stories:
+      - id: "05.16"
+        name: "Scanner Login + Session"
+        status: NOT_STARTED
+        effort_days: 2
+
+      - id: "05.17"
+        name: "Scanner Receive"
+        status: NOT_STARTED
+        effort_days: 3
+        note: "Checkpoint exists but story not started"
+
+      - id: "05.18"
+        name: "Scanner Move"
+        status: NOT_STARTED
+        effort_days: 2
+        note: "Checkpoint exists but story not started"
+
+      - id: "05.19"
+        name: "Scanner Putaway"
+        status: NOT_STARTED
+        effort_days: 2
+        note: "Checkpoint exists but story not started"
+
+  next_steps:
+    immediate:
+      - "Fix 05.6 - Create lp_transactions migration (1 day)"
+      - "Fix 05.9 - Remove duplicate VarianceReason type (0.5 day)"
+
+    short_term:
+      - "Complete 05.12 - Batch/Expiry Tracking (2 days)"
+      - "Complete 05.15 - Warehouse Dashboard (2 days)"
+
+    defer:
+      - "05.16-05.19 - Scanner workflows to Phase 2 (9 days total)"
+
+# =============================================================================
+# RECOMMENDED IMPLEMENTATION SEQUENCE
+# =============================================================================
+
+recommended_sequence:
+  description: "Optimal path to maximize value and minimize blockers"
+  total_duration: "25-34 days"
+
+  wave_1_unblock:
+    name: "Unblock Epic 04 Phase 1"
+    duration: "3-5 days"
+    priority: CRITICAL
+
+    tasks:
+      - task: "Fix Epic 05 blockers"
+        stories: ["05.6", "05.9"]
+        duration: "1-2 days"
+        description: "Create lp_transactions migration, fix type conflict"
+
+      - task: "Complete Epic 03.13"
+        stories: ["03.13"]
+        duration: "2 days"
+        description: "Material Availability Check (P4-P7)"
+
+      - task: "Complete Epic 05 NOT_STARTED"
+        stories: ["05.12", "05.15"]
+        duration: "3-4 days"
+        description: "Batch/Expiry + Dashboard"
+        optional: "Can defer 05.15 if needed"
+
+    outcome: "Epic 04 Phase 1 fully unblocked, Epic 03 at 95%, Epic 05 Phase 0 stable"
+
+  wave_2_production:
+    name: "Epic 04 Phase 1 - Full Production"
+    duration: "18-24 days"
+    priority: HIGH
+    depends_on: "wave_1_unblock"
+
+    tasks:
+      - task: "Material Consumption"
+        stories: ["04.6a", "04.6b", "04.6c", "04.6d", "04.6e"]
+        duration: "12-15 days"
+        description: "Desktop + Scanner consumption with validation"
+
+      - task: "Output Registration"
+        stories: ["04.7a", "04.7b", "04.7c", "04.7d"]
+        duration: "8-10 days"
+        description: "Desktop + Scanner output with by-products"
+
+      - task: "Material Reservations"
+        stories: ["04.8"]
+        duration: "2-3 days"
+        description: "Reserve LPs for WO materials"
+
+    outcome: "Full production execution with LP-based traceability"
+
+  wave_3_polish:
+    name: "Complete Partial Stories"
+    duration: "8-12 days"
+    priority: MEDIUM
+    can_parallel: true
+
+    tasks:
+      - task: "Epic 01 partials"
+        stories: ["01.9", "01.10", "01.14"]
+        duration: "2-3 days"
+
+      - task: "Epic 02 partials HIGH"
+        stories: ["02.8", "02.15"]
+        duration: "3-4 days"
+        description: "Create missing migrations + complete"
+
+      - task: "Epic 02 partials MEDIUM"
+        stories: ["02.6", "02.9"]
+        duration: "4-5 days"
+
+      - task: "Epic 02 partials LOW"
+        stories: ["02.12", "02.13", "02.14"]
+        duration: "4-5 days"
+        defer: "Can defer to later"
+
+  wave_4_scanner:
+    name: "Epic 05 Phase 2 - Scanner Workflows"
+    duration: "9-12 days"
+    priority: LOW
+    defer: "After Wave 2 complete"
+
+    tasks:
+      - task: "Scanner foundation + receive"
+        stories: ["05.16", "05.17"]
+        duration: "5-6 days"
+
+      - task: "Scanner move + putaway"
+        stories: ["05.18", "05.19"]
+        duration: "4-5 days"
+
+    outcome: "Mobile scanner workflows for warehouse operators"
+
+# =============================================================================
+# QUICK WINS (Can do anytime)
+# =============================================================================
+
+quick_wins:
+  description: "High value, low effort tasks that can be done independently"
+
+  items:
+    - name: "Fix 05.9 type conflict"
+      effort: "30 minutes"
+      value: "Unblocks ASN receive workflow"
+      priority: CRITICAL
+
+    - name: "Create 05.6 lp_transactions migration"
+      effort: "1-2 hours"
+      value: "Unblocks LP history tracking"
+      priority: HIGH
+
+    - name: "Complete 01.9 Warehouses"
+      effort: "1 day"
+      value: "Enable multi-warehouse operations"
+      priority: MEDIUM
+
+    - name: "Create 02.8 operation_attachments migration"
+      effort: "1-2 hours"
+      value: "Unblocks routing operation attachments"
+      priority: MEDIUM
+
+# =============================================================================
+# METRICS & TRACKING
+# =============================================================================
+
+metrics:
+  stories_by_status:
+    complete: 65
+    partial: 14
+    blocked: 4
+    not_started: 6
+    total: 89
+
+  completion_by_phase:
+    epic_01: 81%
+    epic_02: 60%
+    epic_03: 90%
+    epic_04_phase_0: 100%
+    epic_04_phase_1: 0%
+    epic_05: 47%
+
+  critical_blockers:
+    count: 4
+    items:
+      - "05.6 - Missing lp_transactions table"
+      - "05.9 - Duplicate type definitions"
+      - "Epic 04 Phase 1 - Needs Epic 05"
+      - "03.14 - Needs Epic 04 + 05 complete"
+
+  velocity_estimate:
+    stories_per_week: 3-5
+    remaining_weeks: 6-8
+    target_completion: "End of February 2026"
+
+# =============================================================================
+# NEXT ACTIONS
+# =============================================================================
+
+next_actions:
+  today:
+    - "Fix 05.9 - Remove duplicate VarianceReason type (30 min)"
+    - "Create 05.6 lp_transactions migration (1-2 hours)"
+
+  this_week:
+    - "Complete 03.13 Material Availability Check (2 days)"
+    - "Complete 05.12 Batch/Expiry Tracking (2 days)"
+    - "Complete 05.15 Warehouse Dashboard (2 days)"
+
+  next_week:
+    - "Start Epic 04 Phase 1 stories"
+    - "Parallel: Complete Epic 01/02 partials as time allows"

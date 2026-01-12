@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2 } from 'lucide-react'
-import type { ASNReceiveResult } from '@/lib/types/asn'
+import type { ASNReceiveResult } from '@/lib/types/asn-receive'
 import { VarianceBadge } from './VarianceBadge'
 
 interface ReceiveSummaryProps {

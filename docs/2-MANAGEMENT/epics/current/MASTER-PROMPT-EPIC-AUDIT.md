@@ -2,9 +2,9 @@
 
 ## 🎯 TARGET
 ```yaml
-Epic: {{EPIC_ID}}        03-PLANNING
-Folder: {{EPIC_FOLDER}}  03-planning
-Prefix: {{PREFIX}}       03
+Epic: {{EPIC_ID}}        05-warehouse 
+Folder: {{EPIC_FOLDER}}  05-warehouse
+Prefix: {{PREFIX}}       05
 Mode: COMPLETE   # AUDIT=tylko sprawdź, COMPLETE=dokończ stories
 ```
 

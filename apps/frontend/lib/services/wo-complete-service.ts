@@ -1,6 +1,19 @@
 /**
- * WO Complete Service (Story 4.6)
+ * WO Complete Service (Story 04.2c)
  * Handles work order completion with atomic status transition
+ *
+ * Phase 0 Scope:
+ * - Manual WO completion with status transition
+ * - Timestamp tracking (completed_at, completed_by_user_id)
+ * - Yield calculation (produced_qty / planned_qty * 100)
+ * - Auto-complete based on setting (no output validation in Phase 0)
+ * - Operation sequence validation (if enabled)
+ * - Release material reservations (placeholder for Phase 1)
+ *
+ * Deferred to Phase 1 (Story 04.7):
+ * - Output registration requirement validation
+ * - By-product registration validation
+ * - Actual produced quantity from output LPs
  */
 
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -26,7 +39,8 @@ export class WOCompleteError extends Error {
   }
 }
 
-const ALLOWED_ROLES = ['admin', 'manager', 'operator']
+// Roles allowed to complete work orders
+const ALLOWED_ROLES = ['admin', 'manager', 'operator', 'SUPER_ADMIN', 'ADMIN', 'PLANNER', 'PROD_MANAGER', 'OPERATOR']
 
 export interface WOCompleteResult {
   id: string
@@ -40,15 +54,23 @@ export interface WOCompleteResult {
     last_name: string | null
   }
   planned_qty: number
+  produced_qty: number
+  actual_yield_percent: number
   operations_count: number
-  genealogy_warnings: string[] | null
+  auto_completed?: boolean
+  message: string
 }
 
 export interface WOCompletionPreview {
   wo_id: string
   wo_number: string
+  product_name: string
   status: string
   planned_qty: number
+  produced_qty: number
+  yield_percent: number
+  yield_color: 'green' | 'yellow' | 'red'
+  low_yield_warning: boolean
   operations: {
     id: string
     sequence: number
@@ -57,14 +79,37 @@ export interface WOCompletionPreview {
   }[]
   all_operations_completed: boolean
   incomplete_operations: string[]
-  has_output_lps: boolean
-  output_lps_count: number
+  require_operation_sequence: boolean
   can_complete: boolean
   warnings: string[]
 }
 
 /**
+ * Calculate yield percentage
+ * Formula: (produced_qty / planned_qty) * 100
+ * Rounded to 2 decimal places
+ */
+export function calculateYieldPercent(producedQty: number, plannedQty: number): number {
+  if (plannedQty <= 0) return 0
+  const yield_percent = (producedQty / plannedQty) * 100
+  return Math.round(yield_percent * 100) / 100 // Round to 2 decimals
+}
+
+/**
+ * Get yield color indicator
+ * green: >= 80%
+ * yellow: 70-79%
+ * red: < 70%
+ */
+export function getYieldColor(yieldPercent: number): 'green' | 'yellow' | 'red' {
+  if (yieldPercent >= 80) return 'green'
+  if (yieldPercent >= 70) return 'yellow'
+  return 'red'
+}
+
+/**
  * Get completion preview for WO Complete modal
+ * AC-12: Shows WO Number, Product Name, Planned vs Produced, Yield %, Warnings
  */
 export async function getWOCompletionPreview(
   woId: string,
@@ -72,10 +117,14 @@ export async function getWOCompletionPreview(
 ): Promise<WOCompletionPreview> {
   const supabase = await createServerSupabase()
 
-  // Get WO details
+  // Get WO details with product name
   const { data: wo, error: woError } = await supabase
     .from('work_orders')
-    .select('id, wo_number, status, org_id, planned_qty')
+    .select(`
+      id, wo_number, status, org_id,
+      planned_quantity, produced_quantity, yield_percent,
+      products!inner(name)
+    `)
     .eq('id', woId)
     .single()
 
@@ -86,6 +135,15 @@ export async function getWOCompletionPreview(
   if (wo.org_id !== orgId) {
     throw new WOCompleteError('NOT_FOUND', 404, 'Work order not found')
   }
+
+  // Get production settings
+  const { data: settings } = await supabase
+    .from('production_settings')
+    .select('require_operation_sequence')
+    .eq('org_id', orgId)
+    .single()
+
+  const requireOperationSequence = settings?.require_operation_sequence ?? true
 
   // Get operations
   const { data: operations } = await supabase
@@ -97,59 +155,62 @@ export async function getWOCompletionPreview(
 
   const ops = operations || []
   const incompleteOps = ops.filter((op) => op.status !== 'completed')
-  const allCompleted = incompleteOps.length === 0
+  const allCompleted = ops.length === 0 || incompleteOps.length === 0
 
   const warnings: string[] = []
 
-  // Check genealogy (if table exists)
-  const { data: genealogy } = await supabase
-    .from('lp_genealogy')
-    .select('id, child_lp_id')
-    .eq('wo_id', woId)
+  // Calculate yield
+  const plannedQty = Number(wo.planned_quantity) || 0
+  const producedQty = Number(wo.produced_quantity) || 0
+  const yieldPercent = calculateYieldPercent(producedQty, plannedQty)
+  const yieldColor = getYieldColor(yieldPercent)
+  const lowYieldWarning = yieldPercent > 0 && yieldPercent < 80
 
-  if (genealogy && genealogy.length > 0) {
-    const incompleteGenealogy = genealogy.filter((g) => !g.child_lp_id)
-    if (incompleteGenealogy.length > 0) {
-      warnings.push(`${incompleteGenealogy.length} genealogy record(s) incomplete (material not fully linked to outputs)`)
-    }
+  // AC-13: Low yield warning
+  if (lowYieldWarning) {
+    warnings.push(`Low yield detected (${yieldPercent.toFixed(1)}%). Please verify before completing.`)
   }
 
-  // Check output LPs
-  const { data: outputLps } = await supabase
-    .from('wo_output_lps')
-    .select('id')
-    .eq('wo_id', woId)
-    .eq('organization_id', orgId)
-
-  const hasOutputLps = !!(outputLps && outputLps.length > 0)
-  const outputLpsCount = outputLps?.length || 0
-
-  if (!hasOutputLps) {
-    warnings.push('No output LPs registered - required before completing')
+  // AC-4: Operation sequence validation warning (if enabled)
+  if (requireOperationSequence && incompleteOps.length > 0) {
+    warnings.push(`All operations must be completed before closing the WO`)
   }
 
-  const canComplete =
-    (wo.status === 'in_progress' || wo.status === 'paused') &&
-    (ops.length === 0 || allCompleted) &&
-    hasOutputLps
+  // Determine if completion is allowed
+  // Phase 0: No output LP requirement, only status and operations (if setting enabled)
+  const validStatus = wo.status === 'in_progress' || wo.status === 'paused'
+  const operationsOk = !requireOperationSequence || allCompleted
+  const canComplete = validStatus && operationsOk
 
   return {
     wo_id: wo.id,
     wo_number: wo.wo_number,
+    product_name: (wo.products as { name: string })?.name || 'Unknown Product',
     status: wo.status,
-    planned_qty: Number(wo.planned_qty) || 0,
+    planned_qty: plannedQty,
+    produced_qty: producedQty,
+    yield_percent: yieldPercent,
+    yield_color: yieldColor,
+    low_yield_warning: lowYieldWarning,
     operations: ops,
     all_operations_completed: allCompleted,
     incomplete_operations: incompleteOps.map((op) => op.operation_name),
-    has_output_lps: hasOutputLps,
-    output_lps_count: outputLpsCount,
+    require_operation_sequence: requireOperationSequence,
     can_complete: canComplete,
     warnings,
   }
 }
 
 /**
- * Complete a work order (Story 4.6)
+ * Complete a work order (Story 04.2c)
+ *
+ * AC-1: Basic WO Completion - status -> completed, timestamps set
+ * AC-2: Invalid Status Prevention - must be in_progress
+ * AC-4/5: Operation Sequence Validation (based on settings)
+ * AC-6: Yield Calculation - (produced/planned)*100
+ * AC-9: Timestamp Accuracy - server time within +/- 1 second
+ * AC-10: Permission Validation
+ * AC-11: Material Reservations Release Placeholder
  */
 export async function completeWorkOrder(
   woId: string,
@@ -159,15 +220,16 @@ export async function completeWorkOrder(
 ): Promise<WOCompleteResult> {
   const supabase = await createServerSupabase()
 
-  // Check role permission
-  if (!ALLOWED_ROLES.includes(userRole)) {
+  // AC-10: Check role permission
+  const normalizedRole = userRole?.toLowerCase()
+  if (!ALLOWED_ROLES.some(r => r.toLowerCase() === normalizedRole)) {
     throw new WOCompleteError('FORBIDDEN', 403, 'You do not have permission to complete work orders')
   }
 
-  // Get WO with lock (SELECT FOR UPDATE equivalent - we'll use optimistic locking)
+  // Get WO with current data
   const { data: wo, error: woError } = await supabase
     .from('work_orders')
-    .select('id, wo_number, status, org_id, planned_qty')
+    .select('id, wo_number, status, org_id, planned_quantity, produced_quantity')
     .eq('id', woId)
     .single()
 
@@ -175,23 +237,35 @@ export async function completeWorkOrder(
     throw new WOCompleteError('NOT_FOUND', 404, 'Work order not found')
   }
 
+  // RLS check
   if (wo.org_id !== orgId) {
     throw new WOCompleteError('NOT_FOUND', 404, 'Work order not found')
   }
 
+  // AC-3: Already completed check
   if (wo.status === 'completed') {
     throw new WOCompleteError('ALREADY_COMPLETED', 400, `Work order ${wo.wo_number} is already completed`)
   }
 
+  // AC-2: Invalid status prevention - must be in_progress (or paused per business rules)
   if (wo.status !== 'in_progress' && wo.status !== 'paused') {
     throw new WOCompleteError(
       'INVALID_WO_STATUS',
       400,
-      `Cannot complete work order with status '${wo.status}'. WO must be in_progress or paused.`,
+      'WO must be In Progress to complete',
     )
   }
 
-  // Get operations and validate all completed
+  // Get production settings for operation sequence validation
+  const { data: settings } = await supabase
+    .from('production_settings')
+    .select('require_operation_sequence')
+    .eq('org_id', orgId)
+    .single()
+
+  const requireOperationSequence = settings?.require_operation_sequence ?? true
+
+  // Get operations
   const { data: operations } = await supabase
     .from('wo_operations')
     .select('id, sequence, operation_name, status')
@@ -202,79 +276,67 @@ export async function completeWorkOrder(
   const ops = operations || []
   const incompleteOps = ops.filter((op) => op.status !== 'completed')
 
-  if (ops.length > 0 && incompleteOps.length > 0) {
+  // AC-4: Operation Sequence Validation (if enabled)
+  if (requireOperationSequence && ops.length > 0 && incompleteOps.length > 0) {
     throw new WOCompleteError(
       'OPERATIONS_INCOMPLETE',
       400,
-      `Cannot complete: ${incompleteOps.length} operation(s) not completed (${incompleteOps.map((o) => o.operation_name).join(', ')})`,
+      'All operations must be completed before closing the WO',
       { incomplete_operations: incompleteOps.map((o) => o.operation_name) },
     )
   }
 
-  // AC-4.6.1c: Validate at least one output LP exists
-  const { data: outputLps, error: outputError } = await supabase
-    .from('wo_output_lps')
-    .select('id')
-    .eq('wo_id', woId)
-    .eq('organization_id', orgId)
-
-  if (!outputError && (!outputLps || outputLps.length === 0)) {
-    throw new WOCompleteError(
-      'NO_OUTPUT',
-      400,
-      'Register at least one output LP before completing',
-    )
-  }
-
+  // AC-9: Timestamp accuracy - use server time
   const now = new Date().toISOString()
 
-  // Check genealogy warnings
-  const genealogyWarnings: string[] = []
-  const { data: genealogy } = await supabase
-    .from('lp_genealogy')
-    .select('id, child_lp_id')
-    .eq('wo_id', woId)
+  // AC-6: Calculate yield
+  const plannedQty = Number(wo.planned_quantity) || 0
+  const producedQty = Number(wo.produced_quantity) || 0
+  const actualYieldPercent = calculateYieldPercent(producedQty, plannedQty)
 
-  if (genealogy && genealogy.length > 0) {
-    const incompleteGenealogy = genealogy.filter((g) => !g.child_lp_id)
-    if (incompleteGenealogy.length > 0) {
-      genealogyWarnings.push(
-        `${incompleteGenealogy.length} genealogy record(s) incomplete`,
-      )
-    }
-  }
+  // AC-11: Material reservation release placeholder
+  // Phase 0: Just log, actual release in Phase 1 (Story 04.6a)
+  console.log(`Material reservation release skipped - Epic 05 required (WO: ${wo.wo_number})`)
 
-  // Update WO status (atomic with optimistic locking)
+  // AC-1: Update WO status with optimistic locking
   const { error: updateError } = await supabase
     .from('work_orders')
     .update({
       status: 'completed',
       completed_at: now,
       completed_by_user_id: userId,
+      actual_yield_percent: actualYieldPercent,
       updated_at: now,
     })
     .eq('id', woId)
     .in('status', ['in_progress', 'paused']) // Optimistic lock
 
   if (updateError) {
+    console.error('Failed to complete WO:', updateError)
     throw new WOCompleteError('INTERNAL_ERROR', 500, 'Failed to complete work order')
   }
 
   // Log activity
-  await supabase.from('activity_logs').insert({
-    org_id: orgId,
-    user_id: userId,
-    activity_type: 'wo_completed',
-    entity_type: 'work_order',
-    entity_id: woId,
-    entity_code: wo.wo_number,
-    description: `Work order ${wo.wo_number} completed`,
-    metadata: {
-      planned_qty: wo.planned_qty,
-      operations_count: ops.length,
-      genealogy_warnings: genealogyWarnings.length > 0 ? genealogyWarnings : null,
-    },
-  })
+  try {
+    await supabase.from('activity_logs').insert({
+      org_id: orgId,
+      user_id: userId,
+      activity_type: 'wo_completed',
+      entity_type: 'work_order',
+      entity_id: woId,
+      entity_code: wo.wo_number,
+      description: `Work order ${wo.wo_number} completed`,
+      metadata: {
+        planned_qty: plannedQty,
+        produced_qty: producedQty,
+        actual_yield_percent: actualYieldPercent,
+        operations_count: ops.length,
+      },
+    })
+  } catch (logError) {
+    // Don't fail completion if logging fails
+    console.error('Failed to log activity:', logError)
+  }
 
   // Get user info for response
   const { data: user } = await supabase
@@ -290,8 +352,104 @@ export async function completeWorkOrder(
     completed_at: now,
     completed_by_user_id: userId,
     completed_by_user: user || undefined,
-    planned_qty: Number(wo.planned_qty) || 0,
+    planned_qty: plannedQty,
+    produced_qty: producedQty,
+    actual_yield_percent: actualYieldPercent,
     operations_count: ops.length,
-    genealogy_warnings: genealogyWarnings.length > 0 ? genealogyWarnings : null,
+    message: `Work order ${wo.wo_number} completed successfully`,
   }
+}
+
+/**
+ * Check if WO should auto-complete (AC-7, AC-8)
+ * Called after produced_qty update (Story 04.4)
+ *
+ * AC-7: If auto_complete_wo = true AND produced_qty >= planned_qty, auto-complete
+ * AC-8: If auto_complete_wo = false, no auto-complete
+ *
+ * @param woId Work order ID
+ * @param userId User who triggered the update
+ * @param orgId Organization ID
+ * @returns true if auto-completed, false otherwise
+ */
+export async function checkAutoComplete(
+  woId: string,
+  userId: string,
+  orgId: string,
+): Promise<{ autoCompleted: boolean; result?: WOCompleteResult }> {
+  const supabase = await createServerSupabase()
+
+  // Get production settings
+  const { data: settings } = await supabase
+    .from('production_settings')
+    .select('auto_complete_wo')
+    .eq('org_id', orgId)
+    .single()
+
+  // AC-8: If auto_complete_wo is false or not set, don't auto-complete
+  if (!settings?.auto_complete_wo) {
+    return { autoCompleted: false }
+  }
+
+  // Get WO details
+  const { data: wo, error: woError } = await supabase
+    .from('work_orders')
+    .select('id, status, planned_quantity, produced_quantity')
+    .eq('id', woId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (woError || !wo) {
+    return { autoCompleted: false }
+  }
+
+  // Only auto-complete if in_progress
+  if (wo.status !== 'in_progress') {
+    return { autoCompleted: false }
+  }
+
+  const plannedQty = Number(wo.planned_quantity) || 0
+  const producedQty = Number(wo.produced_quantity) || 0
+
+  // AC-7: Check if produced_qty >= planned_qty
+  if (producedQty < plannedQty) {
+    return { autoCompleted: false }
+  }
+
+  // Get user role for permission check
+  const { data: user } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .single()
+
+  const userRole = user?.role || 'operator'
+
+  try {
+    // Auto-complete the WO
+    const result = await completeWorkOrder(woId, userId, userRole, orgId)
+    return {
+      autoCompleted: true,
+      result: { ...result, auto_completed: true }
+    }
+  } catch (error) {
+    // If auto-complete fails (e.g., operations incomplete), don't error
+    console.log('Auto-complete skipped:', error instanceof Error ? error.message : 'Unknown error')
+    return { autoCompleted: false }
+  }
+}
+
+/**
+ * Release material reservations (placeholder for Phase 1)
+ * Will be implemented in Story 04.6a when LP system is available
+ *
+ * @param woId Work order ID
+ * @param orgId Organization ID
+ */
+export async function releaseMaterialReservations(
+  woId: string,
+  orgId: string,
+): Promise<void> {
+  // Phase 0: Just log, no actual implementation
+  console.log(`Material reservation release skipped - Epic 05 required (WO: ${woId}, Org: ${orgId})`)
 }

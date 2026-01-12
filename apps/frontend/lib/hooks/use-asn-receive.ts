@@ -8,7 +8,7 @@ import type {
   ASNReceivePreview,
   ASNReceiveRequest,
   ASNReceiveResult,
-} from '@/lib/types/asn'
+} from '@/lib/types/asn-receive'
 import { asnKeys } from './use-asns'
 
 // =============================================================================

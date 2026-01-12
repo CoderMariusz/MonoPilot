@@ -72,7 +72,7 @@ describe('ASN Receive API Routes (Story 05.9)', () => {
     }
 
     mockContext = {
-      params: { id: 'asn-001' },
+      params: Promise.resolve({ id: 'asn-001' }),
     }
 
     ;(createServerSupabase as any).mockReturnValue(mockSupabase)
@@ -143,7 +143,7 @@ describe('ASN Receive API Routes (Story 05.9)', () => {
       )
 
       const request = new NextRequest('http://localhost/api/warehouse/asns/invalid-uuid/receive')
-      const response = await GET(request, { params: { id: 'invalid-uuid' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'invalid-uuid' }) })
 
       expect(response.status).toBe(404)
 
@@ -183,7 +183,7 @@ describe('ASN Receive API Routes (Story 05.9)', () => {
       )
 
       const request = new NextRequest('http://localhost/api/warehouse/asns/asn-from-org-B/receive')
-      const response = await GET(request, { params: { id: 'asn-from-org-B' } })
+      const response = await GET(request, { params: Promise.resolve({ id: 'asn-from-org-B' }) })
 
       expect(response.status).toBe(404)
     })
@@ -527,7 +527,7 @@ describe('ASN Receive API Routes (Story 05.9)', () => {
         body: JSON.stringify(requestBody),
       })
 
-      const response = await POST(request, { params: { id: 'asn-from-org-B' } })
+      const response = await POST(request, { params: Promise.resolve({ id: 'asn-from-org-B' }) })
 
       expect(response.status).toBe(404)
     })

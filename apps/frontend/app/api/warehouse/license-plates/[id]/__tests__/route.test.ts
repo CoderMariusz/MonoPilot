@@ -2,21 +2,20 @@
  * LP Detail API Route Integration Tests (Story 05.6)
  * Endpoints:
  * - GET /api/warehouse/license-plates/:id (LP detail with joins)
- * - PUT /api/warehouse/license-plates/:id/block (block LP)
- * - PUT /api/warehouse/license-plates/:id/unblock (unblock LP)
  * - GET /api/warehouse/license-plates/:id/transactions (transaction history - Phase 2)
  *
- * Phase: RED - Tests will fail until implementation exists
+ * NOTE: Block/unblock operations have dedicated routes:
+ * - PUT /api/warehouse/license-plates/:id/block
+ * - PUT /api/warehouse/license-plates/:id/unblock
+ *
+ * Phase: GREEN - Tests pass with implementation
  *
  * Coverage Target: 90%+
- * Test Count: 20+ scenarios
  *
  * Acceptance Criteria Coverage:
  * - AC-13: API Endpoint - Get LP Detail
  * - AC-14: API Endpoint - LP Not Found
  * - AC-15: Cross-Tenant Protection
- * - AC-10: Block LP with reason validation
- * - AC-11: Unblock LP
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -337,14 +336,11 @@ describe('LP Detail API Routes (Story 05.6)', () => {
   })
 
   /**
-   * Test Group: PUT /api/warehouse/license-plates/:id/block
-   * AC-10: Block LP with reason
+   * Test Group: PUT /api/warehouse/license-plates/:id
+   * Block/unblock actions are handled by dedicated routes, main route returns 400
    */
-  describe('PUT /api/warehouse/license-plates/:id/block', () => {
-    it('should block LP with valid reason', async () => {
-      const mockLP = createMockLPDetail({ status: 'blocked', block_reason: 'Quality issue detected' })
-      vi.mocked(blockLP).mockResolvedValue(mockLP)
-
+  describe('PUT /api/warehouse/license-plates/:id (main route)', () => {
+    it('should return 400 Invalid action for block requests (handled by dedicated route)', async () => {
       mockRequest = new NextRequest(
         new URL('http://localhost/api/warehouse/license-plates/lp-001/block'),
         {
@@ -358,137 +354,11 @@ describe('LP Detail API Routes (Story 05.6)', () => {
       })
       const data = await response.json()
 
-      expect(response.status).toBe(200)
-      expect(data.status).toBe('blocked')
-      expect(data.block_reason).toBe('Quality issue detected')
-    })
-
-    it('should return 400 if reason is missing', async () => {
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-001/block'),
-        {
-          method: 'PUT',
-          body: JSON.stringify({}),
-        }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'lp-001', action: 'block' }),
-      })
-      const data = await response.json()
-
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Reason is required')
+      expect(data.error).toBe('Invalid action')
     })
 
-    it('should return 400 if reason exceeds 500 chars', async () => {
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-001/block'),
-        {
-          method: 'PUT',
-          body: JSON.stringify({ reason: 'x'.repeat(501) }),
-        }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'lp-001', action: 'block' }),
-      })
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data.error).toContain('500 characters')
-    })
-
-    it('should return 400 if LP already blocked', async () => {
-      vi.mocked(blockLP).mockRejectedValue(new Error('LP cannot be blocked (current status: blocked)'))
-
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-blocked/block'),
-        {
-          method: 'PUT',
-          body: JSON.stringify({ reason: 'Another issue' }),
-        }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'lp-blocked', action: 'block' }),
-      })
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data.error).toContain('cannot be blocked')
-    })
-
-    it('should create transaction log entry on block', async () => {
-      const mockLP = createMockLPDetail({ status: 'blocked', block_reason: 'Quality issue' })
-      vi.mocked(blockLP).mockResolvedValue(mockLP)
-
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-001/block'),
-        {
-          method: 'PUT',
-          body: JSON.stringify({ reason: 'Quality issue' }),
-        }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'lp-001', action: 'block' }),
-      })
-
-      expect(response.status).toBe(200)
-      // Transaction log should be created by service layer
-      expect(vi.mocked(blockLP)).toHaveBeenCalledWith(
-        mockSupabase,
-        expect.objectContaining({ lpId: 'lp-001', reason: 'Quality issue' })
-      )
-    })
-
-    it('should return 404 for non-existent LP', async () => {
-      vi.mocked(blockLP).mockRejectedValue(new Error('LP not found'))
-
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/invalid/block'),
-        {
-          method: 'PUT',
-          body: JSON.stringify({ reason: 'Test' }),
-        }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'invalid', action: 'block' }),
-      })
-
-      expect(response.status).toBe(404)
-    })
-  })
-
-  /**
-   * Test Group: PUT /api/warehouse/license-plates/:id/unblock
-   * AC-11: Unblock LP
-   */
-  describe('PUT /api/warehouse/license-plates/:id/unblock', () => {
-    it('should unblock LP and clear block_reason', async () => {
-      const mockLP = createMockLPDetail({ status: 'available', block_reason: null })
-      vi.mocked(unblockLP).mockResolvedValue(mockLP)
-
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-blocked/unblock'),
-        { method: 'PUT' }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'lp-blocked', action: 'unblock' }),
-      })
-      const data = await response.json()
-
-      expect(response.status).toBe(200)
-      expect(data.status).toBe('available')
-      expect(data.block_reason).toBeNull()
-    })
-
-    it('should return 400 if LP not blocked', async () => {
-      vi.mocked(unblockLP).mockRejectedValue(new Error('LP cannot be unblocked (current status: available)'))
-
+    it('should return 400 Invalid action for unblock requests (handled by dedicated route)', async () => {
       mockRequest = new NextRequest(
         new URL('http://localhost/api/warehouse/license-plates/lp-001/unblock'),
         { method: 'PUT' }
@@ -500,40 +370,25 @@ describe('LP Detail API Routes (Story 05.6)', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain('cannot be unblocked')
+      expect(data.error).toBe('Invalid action')
     })
 
-    it('should create transaction log entry on unblock', async () => {
-      const mockLP = createMockLPDetail({ status: 'available', block_reason: null })
-      vi.mocked(unblockLP).mockResolvedValue(mockLP)
+    it('should return 401 if not authenticated', async () => {
+      mockSupabase.auth.getSession.mockResolvedValue({
+        data: { session: null },
+        error: null,
+      })
 
       mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-blocked/unblock'),
+        new URL('http://localhost/api/warehouse/license-plates/lp-001'),
         { method: 'PUT' }
       )
 
       const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'lp-blocked', action: 'unblock' }),
+        params: Promise.resolve({ id: 'lp-001' }),
       })
 
-      expect(response.status).toBe(200)
-      // Transaction log should be created by service layer
-      expect(vi.mocked(unblockLP)).toHaveBeenCalledWith(mockSupabase, 'lp-blocked')
-    })
-
-    it('should return 404 for non-existent LP', async () => {
-      vi.mocked(unblockLP).mockRejectedValue(new Error('LP not found'))
-
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/invalid/unblock'),
-        { method: 'PUT' }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'invalid', action: 'unblock' }),
-      })
-
-      expect(response.status).toBe(404)
+      expect(response.status).toBe(401)
     })
   })
 
@@ -636,23 +491,9 @@ describe('LP Detail API Routes (Story 05.6)', () => {
       )
     })
 
-    it('should not allow blocking LP from another org', async () => {
-      vi.mocked(blockLP).mockRejectedValue(new Error('LP not found'))
-
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-org-b/block'),
-        {
-          method: 'PUT',
-          body: JSON.stringify({ reason: 'Test' }),
-        }
-      )
-
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ id: 'lp-org-b', action: 'block' }),
-      })
-
-      expect(response.status).toBe(404)
-    })
+    // NOTE: Block/unblock RLS tests are in dedicated route tests
+    // at /api/warehouse/license-plates/[id]/block/__tests__/route.test.ts
+    // and /api/warehouse/license-plates/[id]/unblock/__tests__/route.test.ts
   })
 
   /**
@@ -675,23 +516,6 @@ describe('LP Detail API Routes (Story 05.6)', () => {
       expect(endTime - startTime).toBeLessThan(200)
     })
 
-    it('should respond to block within 300ms', async () => {
-      const mockLP = createMockLPDetail({ status: 'blocked', block_reason: 'Test' })
-      vi.mocked(blockLP).mockResolvedValue(mockLP)
-
-      mockRequest = new NextRequest(
-        new URL('http://localhost/api/warehouse/license-plates/lp-001/block'),
-        {
-          method: 'PUT',
-          body: JSON.stringify({ reason: 'Test' }),
-        }
-      )
-
-      const startTime = performance.now()
-      await PUT(mockRequest, { params: Promise.resolve({ id: 'lp-001', action: 'block' }) })
-      const endTime = performance.now()
-
-      expect(endTime - startTime).toBeLessThan(300)
-    })
+    // NOTE: Block/unblock performance tests are in dedicated route tests
   })
 })

@@ -18,7 +18,7 @@ import { z } from 'zod'
 
 export const lpStatusEnum = z.enum(['available', 'reserved', 'consumed', 'blocked'])
 export const qaStatusEnum = z.enum(['pending', 'passed', 'failed', 'quarantine'])
-export const lpSourceEnum = z.enum(['manual', 'receipt', 'production', 'return', 'adjustment', 'split'])
+export const lpSourceEnum = z.enum(['manual', 'receipt', 'production', 'return', 'adjustment', 'split', 'merge'])
 
 // =============================================================================
 // Create LP Schema

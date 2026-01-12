@@ -7,13 +7,13 @@ import { TableRow, TableCell } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { VarianceBadge } from './VarianceBadge'
-import type { ASNReceiveItemPreview, ReceiveItemInput, VarianceReason, VARIANCE_REASON_LABELS } from '@/lib/types/asn'
-import { VARIANCE_REASON_LABELS } from '@/lib/types/asn'
+import type { ASNReceiveItemPreview, ASNReceiveItem, VarianceReason } from '@/lib/types/asn-receive'
+import { VARIANCE_REASON_LABELS } from '@/lib/types/asn-receive'
 
 interface ReceiveItemRowProps {
   item: ASNReceiveItemPreview
-  value: ReceiveItemInput
-  onChange: (value: ReceiveItemInput) => void
+  value: ASNReceiveItem
+  onChange: (value: ASNReceiveItem) => void
   errors?: Record<string, string>
 }
 
