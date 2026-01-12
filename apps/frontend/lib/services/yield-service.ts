@@ -301,7 +301,7 @@ export class YieldService {
 
     // Map to include user_name from joined users table or directly from log
     return (logs || []).map((log) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const logAny = log as any
       const user = logAny.users as { first_name?: string; last_name?: string } | null
       // Check for user_name directly on log (mock tests) or from joined users table

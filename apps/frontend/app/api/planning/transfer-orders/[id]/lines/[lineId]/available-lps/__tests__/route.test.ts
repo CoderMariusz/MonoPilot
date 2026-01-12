@@ -154,13 +154,13 @@ describe('GET /api/planning/transfer-orders/:id/lines/:lineId/available-lps (Sto
   describe('Response Structure Types', () => {
     it('should export AvailableLP type structure', async () => {
       // Type verification - if module loads, types are valid
-      const module = await import('@/lib/services/to-lp-service')
-      expect(module).toBeDefined()
+      const importedModule = await import('@/lib/services/to-lp-service')
+      expect(importedModule).toBeDefined()
     })
 
     it('should export AvailableLPsResult type structure', async () => {
-      const module = await import('@/lib/services/to-lp-service')
-      expect(module).toBeDefined()
+      const importedModule = await import('@/lib/services/to-lp-service')
+      expect(importedModule).toBeDefined()
     })
   })
 })

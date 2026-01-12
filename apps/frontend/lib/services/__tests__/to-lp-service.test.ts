@@ -232,23 +232,23 @@ describe('TOLPService (Story 03.9b)', () => {
   describe('Type exports', () => {
     it('should export LPAssignmentInput type', async () => {
       // Type imports are compile-time only, so we just verify the module imports correctly
-      const module = await import('@/lib/services/to-lp-service')
-      expect(module).toBeDefined()
+      const importedModule = await import('@/lib/services/to-lp-service')
+      expect(importedModule).toBeDefined()
     })
 
     it('should export TOLineLPAssignment type', async () => {
-      const module = await import('@/lib/services/to-lp-service')
-      expect(module).toBeDefined()
+      const importedModule = await import('@/lib/services/to-lp-service')
+      expect(importedModule).toBeDefined()
     })
 
     it('should export AvailableLP type', async () => {
-      const module = await import('@/lib/services/to-lp-service')
-      expect(module).toBeDefined()
+      const importedModule = await import('@/lib/services/to-lp-service')
+      expect(importedModule).toBeDefined()
     })
 
     it('should export ServiceResult type', async () => {
-      const module = await import('@/lib/services/to-lp-service')
-      expect(module).toBeDefined()
+      const importedModule = await import('@/lib/services/to-lp-service')
+      expect(importedModule).toBeDefined()
     })
   })
 
