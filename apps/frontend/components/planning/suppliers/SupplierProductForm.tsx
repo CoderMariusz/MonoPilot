@@ -82,7 +82,7 @@ export function SupplierProductForm({
     control,
     watch,
     formState: { errors },
-  } = useForm<FormData>({
+  } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       product_id: initialData?.product_id || '',
@@ -99,7 +99,8 @@ export function SupplierProductForm({
 
   const notesValue = watch('notes')
 
-  const onFormSubmit = async (data: FormData) => {
+  const onFormSubmit = async (rawData: unknown) => {
+    const data = rawData as FormData;
     // Clean up and prepare the data
     const cleanedData = {
       ...data,

@@ -564,11 +564,11 @@ export async function getOperationLogs(
     old_status: log.old_status,
     new_status: log.new_status,
     user_id: log.user_id,
-    changed_by_user: log.changed_by_user as {
+    changed_by_user: (log.changed_by_user as unknown as {
       id: string
       first_name: string | null
       last_name: string | null
-    } | null,
+    } | null),
     metadata: (log.metadata as Record<string, unknown>) || {},
     notes: log.notes,
     created_at: log.created_at,

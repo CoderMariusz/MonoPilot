@@ -47,7 +47,7 @@ import {
   Printer,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { POStatusBadge } from './POStatusBadge'
+import { LegacyPOStatusBadge as POStatusBadge } from './POStatusBadge'
 import type { POListItem, POStatus } from '@/lib/types/purchase-order'
 import { getRelativeDeliveryDate, isOverdue, canEditPO } from '@/lib/types/purchase-order'
 
@@ -118,12 +118,13 @@ export function PODataTable({
 
   // Update selection callback
   const handleSelectionChange = useCallback(
-    (selection: RowSelectionState) => {
-      setRowSelection(selection)
-      const selectedIds = Object.keys(selection).filter((key) => selection[key])
+    (updaterOrValue: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
+      const newSelection = typeof updaterOrValue === 'function' ? updaterOrValue(rowSelection) : updaterOrValue;
+      setRowSelection(newSelection)
+      const selectedIds = Object.keys(newSelection).filter((key) => newSelection[key])
       onSelectionChange?.(selectedIds.map((idx) => data[parseInt(idx)]?.id).filter(Boolean))
     },
-    [data, onSelectionChange]
+    [data, onSelectionChange, rowSelection]
   )
 
   const columns: ColumnDef<POListItem>[] = useMemo(

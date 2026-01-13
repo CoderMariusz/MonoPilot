@@ -141,8 +141,12 @@ export async function PUT(
       )
     }
 
+    // Extract role code from joined data
+    const roleData = currentUser.role as unknown as { code: string } | null
+    const userRole = roleData?.code?.toLowerCase() || ''
+
     // Check write permission
-    if (!['admin', 'technical', 'production_manager'].includes(currentUser.role)) {
+    if (!['admin', 'technical', 'production_manager'].includes(userRole)) {
       return NextResponse.json(
         { error: 'Cannot modify BOM', code: 'FORBIDDEN' },
         { status: 403 }

@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { POStatusBadge } from './POStatusBadge'
+import { LegacyPOStatusBadge as POStatusBadge } from './POStatusBadge'
 import type { PurchaseOrderWithLines, POStatus } from '@/lib/types/purchase-order'
 import { getRelativeDeliveryDate } from '@/lib/types/purchase-order'
 

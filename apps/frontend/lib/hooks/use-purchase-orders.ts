@@ -11,7 +11,6 @@ import type {
   POListItem,
   POLine,
   POSummary,
-  POStatusHistory,
   POListParams,
   PaginatedPOResult,
   CreatePOInput,
@@ -21,6 +20,7 @@ import type {
   PriceInfo,
   SupplierDefaults,
 } from '@/lib/types/purchase-order'
+import type { POStatusHistory } from '@/lib/services/purchase-order-service'
 
 // ============================================================================
 // QUERY KEYS

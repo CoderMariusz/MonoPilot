@@ -133,7 +133,7 @@ export function POApprovalSettings({
     setValue,
     trigger,
     formState: { errors, isValid },
-  } = useForm<FormValues>({
+  } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       po_require_approval: settings.po_require_approval,
@@ -158,11 +158,12 @@ export function POApprovalSettings({
   }, [settings, setValue]);
 
   // Handle form submission
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = (data: unknown) => {
+    const formData = data as FormValues;
     const updates: PlanningSettingsUpdate = {
-      po_require_approval: data.po_require_approval,
-      po_approval_threshold: data.po_approval_threshold,
-      po_approval_roles: data.po_approval_roles,
+      po_require_approval: formData.po_require_approval,
+      po_approval_threshold: formData.po_approval_threshold,
+      po_approval_roles: formData.po_approval_roles,
     };
     onSave(updates);
   };

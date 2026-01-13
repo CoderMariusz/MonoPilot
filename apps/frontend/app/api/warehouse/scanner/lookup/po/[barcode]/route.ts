@@ -3,8 +3,7 @@
  * GET /api/warehouse/scanner/lookup/po/[barcode] - Lookup PO by barcode
  */
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ScannerReceiveService } from '@/lib/services/scanner-receive-service'
 
@@ -13,7 +12,7 @@ export async function GET(
   { params }: { params: { barcode: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     // Check authentication
     const {

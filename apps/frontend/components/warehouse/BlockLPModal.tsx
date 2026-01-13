@@ -283,7 +283,7 @@ export function BlockLPModal({ lp, open, onOpenChange, onSuccess }: BlockLPModal
                 {lp.location && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Location:</span>
-                    <span className="font-medium">{lp.location.name}</span>
+                    <span className="font-medium">{lp.location.full_path}</span>
                   </div>
                 )}
               </div>

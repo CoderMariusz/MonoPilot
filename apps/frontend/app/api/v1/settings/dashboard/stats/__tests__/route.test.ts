@@ -17,11 +17,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '../route'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: vi.fn(),
+  createClient: vi.fn(),
 }))
 
 describe('GET /api/v1/settings/dashboard/stats', () => {
@@ -38,7 +38,7 @@ describe('GET /api/v1/settings/dashboard/stats', () => {
       rpc: vi.fn(),
     }
 
-    vi.mocked(createServerClient).mockResolvedValue(mockSupabase)
+    vi.mocked(createClient).mockResolvedValue(mockSupabase)
   })
 
   // AC-01: Success - Admin gets all stats

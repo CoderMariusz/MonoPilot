@@ -299,10 +299,13 @@ export default function PurchaseOrdersPage() {
 
   // Story 03.6: Row selection handler
   const handleRowSelect = useCallback(
-    (po: POListItem, checked: boolean) => {
-      toggleSelection(po.id, po.status)
+    (id: string, selected: boolean) => {
+      const po = pos.find(p => p.id === id)
+      if (po) {
+        toggleSelection(po.id, po.status)
+      }
     },
-    [toggleSelection]
+    [toggleSelection, pos]
   )
 
   const handleSelectAll = useCallback(() => {

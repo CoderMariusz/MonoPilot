@@ -6,7 +6,8 @@
  */
 
 import { useMutation } from '@tanstack/react-query';
-import { checkAvailability } from '@/lib/services/gantt-service';
+import { checkLineAvailability } from '@/lib/services/gantt-service';
+import { createClient } from '@/lib/supabase/client';
 import type { AvailabilityCheckParams, AvailabilityCheckResponse } from '@/lib/types/gantt';
 
 /**
@@ -18,7 +19,10 @@ import type { AvailabilityCheckParams, AvailabilityCheckResponse } from '@/lib/t
  */
 export function useCheckAvailability() {
   return useMutation<AvailabilityCheckResponse, Error, AvailabilityCheckParams>({
-    mutationFn: (params) => checkAvailability(params),
+    mutationFn: async (params) => {
+      const supabase = createClient();
+      return checkLineAvailability(supabase, params);
+    },
     // No toast on error - handled by UI (ghost bar color)
   });
 }

@@ -11,11 +11,14 @@ import { z } from 'zod'
 /**
  * Organization Profile Step Schema
  *
- * MVP validates 4 fields:
+ * Validates all fields for wizard step 1:
  * - name: Organization name (2-100 characters, required)
  * - timezone: IANA timezone string (required, must be valid)
  * - language: ISO 639-1 language code (pl, en, de, fr, required)
  * - currency: ISO 4217 currency code (PLN, EUR, USD, GBP, required)
+ * - date_format: Date display format (required)
+ * - address_line1, address_line2, city, postal_code, country: Address fields (optional)
+ * - contact_email, contact_phone: Contact fields (optional)
  */
 export const organizationProfileStepSchema = z.object({
   name: z
@@ -50,6 +53,19 @@ export const organizationProfileStepSchema = z.object({
     .enum(['PLN', 'EUR', 'USD', 'GBP'], {
       errorMap: () => ({ message: 'Invalid currency selection' }),
     }),
+
+  date_format: z
+    .enum(['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY'], {
+      errorMap: () => ({ message: 'Invalid date format selection' }),
+    }),
+
+  address_line1: z.string(),
+  address_line2: z.string(),
+  city: z.string(),
+  postal_code: z.string(),
+  country: z.string(),
+  contact_email: z.string().email().or(z.literal('')),
+  contact_phone: z.string(),
 })
 
 /**
@@ -65,4 +81,12 @@ export const organizationProfileStepDefaults: Partial<OrganizationProfileStepDat
   timezone: 'Europe/Warsaw',
   language: 'en',
   currency: 'EUR',
+  date_format: 'YYYY-MM-DD',
+  address_line1: '',
+  address_line2: '',
+  city: '',
+  postal_code: '',
+  country: '',
+  contact_email: '',
+  contact_phone: '',
 }

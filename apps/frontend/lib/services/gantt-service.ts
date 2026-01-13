@@ -144,7 +144,7 @@ export async function getGanttData(
       id: machine.id,
       name: machine.name,
       type: 'machine' as const,
-      capacity_hours_per_day: null,
+      capacity_hours_per_day: undefined,
       work_orders: [],
     }));
   }

@@ -672,7 +672,7 @@ export const POStatusTimeline = memo(function POStatusTimeline({
 // ============================================================================
 
 // Re-export the legacy types and component for backwards compatibility
-export { POStatusHistory } from '@/lib/types/purchase-order'
+export type { POStatusHistory } from '@/lib/types/purchase-order'
 
 import type { POStatusHistory as LegacyPOStatusHistory } from '@/lib/types/purchase-order'
 import {

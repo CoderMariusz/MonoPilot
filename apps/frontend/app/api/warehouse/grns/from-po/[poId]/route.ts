@@ -36,10 +36,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { createGRNFromPOSchema } from '@/lib/validation/grn'
-import { GRNFromPOService } from '@/lib/services/grn-po-service'
+import { GRNFromPOService, CreateGRNFromPOInput, CreateGRNItemInput } from '@/lib/services/grn-po-service'
 
 interface RouteParams {
   params: Promise<{ poId: string }>
@@ -59,8 +58,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // 2. Create Supabase client with auth
-    const cookieStore = await cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = await createServerSupabase()
 
     // 3. Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -101,9 +99,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    const input = {
-      ...validationResult.data,
+    // Convert validated data to service input format
+    // Map null values to undefined to match service type expectations
+    const validatedData = validationResult.data
+    const input: CreateGRNFromPOInput = {
       po_id: poId,
+      warehouse_id: validatedData.warehouse_id,
+      location_id: validatedData.location_id,
+      notes: validatedData.notes,
+      items: validatedData.items.map((item): CreateGRNItemInput => ({
+        po_line_id: item.po_line_id,
+        received_qty: item.received_qty,
+        batch_number: item.batch_number ?? undefined,
+        supplier_batch_number: item.supplier_batch_number ?? undefined,
+        expiry_date: item.expiry_date ?? undefined,
+        manufacture_date: item.manufacture_date ?? undefined,
+        location_id: item.location_id,
+        notes: item.notes ?? undefined,
+      })),
     }
 
     // 6. Validate receipt before creating
@@ -170,8 +183,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // 2. Create Supabase client
-    const cookieStore = await cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = await createServerSupabase()
 
     // 3. Auth check
     const { data: { user }, error: authError } = await supabase.auth.getUser()

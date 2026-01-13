@@ -91,10 +91,10 @@ describe('GET /api/warehouse/dashboard/kpis', () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: mockUserId } },
         error: null,
-      })
+      });
 
-      // Mock org lookup failure (simulates permission check)
-      mockSupabase.from.mockReturnValueOnce({
+      // Mock org lookup failure (simulates permission check) - use type assertion for error case mock
+      (mockSupabase.from as ReturnType<typeof vi.fn>).mockReturnValueOnce({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
             single: vi.fn(() => Promise.resolve({
@@ -209,8 +209,8 @@ describe('GET /api/warehouse/dashboard/kpis', () => {
       const { getDashboardKPIs } = await import('@/lib/services/warehouse-dashboard-service')
       vi.mocked(getDashboardKPIs).mockRejectedValueOnce(new Error('Test error'))
 
-      const originalEnv = process.env.NODE_ENV
-      process.env.NODE_ENV = 'development'
+      // Use vi.stubEnv for NODE_ENV since direct assignment is read-only
+      vi.stubEnv('NODE_ENV', 'development')
 
       const request = new NextRequest('http://localhost/api/warehouse/dashboard/kpis')
       const response = await GET(request)
@@ -220,7 +220,7 @@ describe('GET /api/warehouse/dashboard/kpis', () => {
         expect(data).toHaveProperty('debug')
       }
 
-      process.env.NODE_ENV = originalEnv
+      vi.unstubAllEnvs()
     })
   })
 

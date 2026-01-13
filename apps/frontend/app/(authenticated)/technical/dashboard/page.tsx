@@ -362,24 +362,23 @@ export default function TechnicalDashboardPage() {
       </div>
 
       {/* Product Form Modal */}
-      {productModalOpen && (
-        <ProductFormModal
-          product={selectedProduct ? {
-            id: selectedProduct.id,
-            code: selectedProduct.code,
-            name: selectedProduct.name,
-            type: selectedProduct.type,
-            uom: selectedProduct.uom || 'pcs',
-            version: selectedProduct.version,
-            status: selectedProduct.status as 'active' | 'inactive' | 'obsolete'
-          } : null}
-          onClose={closeProductModal}
-          onSuccess={() => {
-            closeProductModal()
-            fetchDashboard(false)
-          }}
-        />
-      )}
+      <ProductFormModal
+        open={productModalOpen}
+        product={selectedProduct ? {
+          id: selectedProduct.id,
+          code: selectedProduct.code,
+          name: selectedProduct.name,
+          type: selectedProduct.type,
+          uom: selectedProduct.uom || 'pcs',
+          version: selectedProduct.version,
+          status: selectedProduct.status as 'active' | 'inactive' | 'obsolete'
+        } : null}
+        onClose={closeProductModal}
+        onSuccess={() => {
+          closeProductModal()
+          fetchDashboard(false)
+        }}
+      />
     </div>
   )
 }

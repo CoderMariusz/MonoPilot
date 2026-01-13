@@ -185,7 +185,7 @@ export async function getWOCompletionPreview(
   return {
     wo_id: wo.id,
     wo_number: wo.wo_number,
-    product_name: (wo.products as { name: string })?.name || 'Unknown Product',
+    product_name: (wo.products as unknown as { name: string } | null)?.name || 'Unknown Product',
     status: wo.status,
     planned_qty: plannedQty,
     produced_qty: producedQty,

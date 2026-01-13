@@ -25,8 +25,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { receivablePOsQuerySchema } from '@/lib/validation/grn'
 
 const RECEIVABLE_STATUSES = ['approved', 'confirmed', 'partial']
@@ -34,8 +33,7 @@ const RECEIVABLE_STATUSES = ['approved', 'confirmed', 'partial']
 export async function GET(request: NextRequest) {
   try {
     // 1. Create Supabase client
-    const cookieStore = await cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = await createClient()
 
     // 2. Auth check
     const { data: { user }, error: authError } = await supabase.auth.getUser()

@@ -153,7 +153,7 @@ function LPInfoSection({ lp }: { lp: LicensePlate }) {
         {lp.location && (
           <div className="flex justify-between">
             <span className="text-gray-500">Location:</span>
-            <span className="font-medium">{lp.location.name}</span>
+            <span className="font-medium">{lp.location.full_path}</span>
           </div>
         )}
       </div>
@@ -429,7 +429,7 @@ export function ChangeLPStatusModal({
     watch,
     formState: { errors },
     reset,
-  } = useForm<ChangeStatusFormData>({
+  } = useForm({
     resolver: zodResolver(changeStatusSchema),
     defaultValues: {
       sendNotification: false,
@@ -449,9 +449,10 @@ export function ChangeLPStatusModal({
     onOpenChange(false);
   };
 
-  const onSubmit = async (data: ChangeStatusFormData) => {
+  const onSubmit = async (data: unknown) => {
+    const formData = data as ChangeStatusFormData;
     // Validate transition
-    const transitionError = getTransitionError(lp.status, data.newStatus);
+    const transitionError = getTransitionError(lp.status, formData.newStatus);
     if (transitionError) {
       toast({
         title: 'Invalid Status Transition',
@@ -469,9 +470,9 @@ export function ChangeLPStatusModal({
       //   method: 'PUT',
       //   headers: { 'Content-Type': 'application/json' },
       //   body: JSON.stringify({
-      //     status: data.newStatus,
-      //     reason: data.reason,
-      //     send_notification: data.sendNotification,
+      //     status: formData.newStatus,
+      //     reason: formData.reason,
+      //     send_notification: formData.sendNotification,
       //   }),
       // });
 
@@ -480,8 +481,8 @@ export function ChangeLPStatusModal({
 
       setSubmittedData({
         oldStatus: lp.status,
-        newStatus: data.newStatus,
-        reason: data.reason,
+        newStatus: formData.newStatus,
+        reason: formData.reason,
       });
       setIsSuccess(true);
       onSuccess();

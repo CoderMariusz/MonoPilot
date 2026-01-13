@@ -42,7 +42,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Mock utilities and handlers (will be created by DEV/BACKEND-DEV)
 vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: vi.fn(),
+  createClient: vi.fn(),
 }))
 
 vi.mock('@/lib/services/auth-context-service', () => ({
@@ -52,7 +52,7 @@ vi.mock('@/lib/services/auth-context-service', () => ({
 }))
 
 import {
-  createServerClient,
+  createClient,
 } from '@/lib/supabase/server'
 import {
   getCurrentOrgId,
@@ -105,7 +105,7 @@ describe('Traceability Config API Routes (Story 02.10a)', () => {
       },
     }
 
-    vi.mocked(createServerClient).mockReturnValue(mockSupabase)
+    vi.mocked(createClient).mockReturnValue(mockSupabase)
     vi.mocked(getCurrentOrgId).mockResolvedValue('org-123')
     vi.mocked(getCurrentUserId).mockResolvedValue('user-123')
   })

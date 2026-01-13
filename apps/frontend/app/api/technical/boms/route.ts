@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract role code from joined data
-    const roleData = currentUser.role as { code: string } | null
-    const userRole = roleData?.code || ''
+    const roleData = currentUser.role as unknown as { code: string } | null
+    const userRole = roleData?.code?.toLowerCase() || ''
 
     // Check authorization: Admin or Technical only
     if (!['admin', 'technical'].includes(userRole)) {

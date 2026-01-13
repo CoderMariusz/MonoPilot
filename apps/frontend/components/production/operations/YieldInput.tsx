@@ -84,8 +84,8 @@ export function YieldInput({
   const descriptionId = `${id}-description`
   const yieldColor = getYieldColor(value)
 
-  const handleSliderChange = (values: number[]) => {
-    onChange(values[0])
+  const handleSliderChange = (newValue: number) => {
+    onChange(newValue)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,8 +113,8 @@ export function YieldInput({
         <div className="flex-1">
           <Slider
             id={id}
-            value={[value]}
-            onValueChange={handleSliderChange}
+            value={value}
+            onChange={handleSliderChange}
             min={min}
             max={max}
             step={step}

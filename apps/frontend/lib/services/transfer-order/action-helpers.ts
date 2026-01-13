@@ -39,7 +39,7 @@ interface ActionContext {
 interface ValidationResult {
   success: boolean
   error?: string
-  code?: ErrorCode
+  code?: typeof ErrorCode[keyof typeof ErrorCode]
   lines?: TOLineData[]
   existingTo?: {
     status: string
@@ -108,8 +108,8 @@ export async function validateTransferOrderState(
     success: true,
     existingTo: {
       status: existingTo.status,
-      action_date: existingTo[dateField],
-      action_by: existingTo[byField],
+      action_date: (existingTo as Record<string, unknown>)[dateField] as string | null,
+      action_by: (existingTo as Record<string, unknown>)[byField] as string | null,
     },
   }
 }

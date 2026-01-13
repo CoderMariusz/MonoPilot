@@ -19,77 +19,89 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { GET } from '../route'
 
 /**
- * Mock createServerClient from @supabase/ssr
+ * Mock Supabase client
  */
-const createServerClient = vi.fn()
+const mockOrgId = '123e4567-e89b-12d3-a456-426614174000'
+const mockUserId = '223e4567-e89b-12d3-a456-426614174000'
 
-/**
- * Mock Next.js cookies
- */
-vi.mock('next/headers', () => ({
-  cookies: vi.fn(() => ({
-    get: vi.fn(),
-    set: vi.fn(),
-    getAll: vi.fn(() => []),
+const mockSupabase = {
+  auth: {
+    getUser: vi.fn(),
+  },
+  from: vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        is: vi.fn(() => ({
+          single: vi.fn(() => Promise.resolve({
+            data: { id: 'prod-001', org_id: mockOrgId },
+            error: null
+          })),
+        })),
+        order: vi.fn().mockReturnThis(),
+        range: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+          count: 0
+        })),
+        single: vi.fn(() => Promise.resolve({
+          data: null,
+          error: null
+        })),
+      })),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn(() => Promise.resolve({
+        data: [],
+        error: null,
+        count: 0
+      })),
+    })),
   })),
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createServerSupabase: vi.fn(() => Promise.resolve(mockSupabase)),
 }))
 
-/**
- * Mock Supabase SSR client
- */
-vi.mock('@supabase/ssr', () => ({
-  createServerClient: vi.fn(),
-}))
+// Helper to create a chainable query mock
+function createChainableMock() {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    is: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    range: vi.fn(() => Promise.resolve({ data: [], error: null, count: 0 })),
+    single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  }
+  return chain
+}
 
 describe('GET /api/v1/technical/products/:id/versions (Story 02.2)', () => {
-  let mockSupabase: any
   let mockQuery: any
-  let mockAuth: any
 
   beforeEach(() => {
     vi.clearAllMocks()
 
     // Create chainable query mock
-    mockQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-        count: 0,
-      }),
-      single: vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      }),
-    }
+    mockQuery = createChainableMock()
 
-    // Mock auth response
-    mockAuth = {
-      getUser: vi.fn().mockResolvedValue({
-        data: {
-          user: {
-            id: 'user-123',
-            email: 'test@example.com',
-          },
+    // Default: authenticated user
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: {
+        user: {
+          id: mockUserId,
+          email: 'test@example.com',
         },
-        error: null,
-      }),
-    }
+      },
+      error: null,
+    })
 
-    // Create mock Supabase client
-    mockSupabase = {
-      from: vi.fn(() => mockQuery),
-      auth: mockAuth,
-    }
-
-    ;(createServerClient as any).mockReturnValue(mockSupabase)
+    // Default: from returns the chainable mock
+    mockSupabase.from.mockImplementation(() => mockQuery)
   })
 
   describe('Authentication (AC-20)', () => {
     it('should return 401 when user is not authenticated', async () => {
-      mockAuth.getUser.mockResolvedValueOnce({
+      mockSupabase.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'Not authenticated' },
       })
@@ -103,7 +115,7 @@ describe('GET /api/v1/technical/products/:id/versions (Story 02.2)', () => {
     })
 
     it('should return 401 when auth token is invalid', async () => {
-      mockAuth.getUser.mockResolvedValueOnce({
+      mockSupabase.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'Invalid token' },
       })

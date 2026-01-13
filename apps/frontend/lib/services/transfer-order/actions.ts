@@ -50,8 +50,10 @@ export async function shipTransferOrder(
       transferOrderId,
       userId,
       actionType: 'ship',
-      date: input.actual_ship_date || new Date().toISOString().split('T')[0],
-      notes: input.notes,
+      date: input.actual_ship_date
+        ? (input.actual_ship_date instanceof Date ? input.actual_ship_date.toISOString().split('T')[0] : input.actual_ship_date)
+        : new Date().toISOString().split('T')[0],
+      notes: (input as unknown as { notes?: string }).notes,
     },
     lineQuantities
   )

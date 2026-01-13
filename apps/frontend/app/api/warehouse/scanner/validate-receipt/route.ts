@@ -3,8 +3,7 @@
  * POST /api/warehouse/scanner/validate-receipt - Pre-validate receipt data
  */
 
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { validateReceiptSchema } from '@/lib/validation/scanner-receive'
@@ -12,7 +11,7 @@ import { ScannerReceiveService } from '@/lib/services/scanner-receive-service'
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     // Check authentication
     const {

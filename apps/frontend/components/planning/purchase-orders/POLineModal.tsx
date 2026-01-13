@@ -69,7 +69,7 @@ const poLineSchema = z.object({
   quantity: z.number().positive({ message: 'Quantity must be greater than 0' }),
   unit_price: z.number().min(0, { message: 'Unit price cannot be negative' }),
   tax_code_id: z.string().uuid({ message: 'Please select a tax code' }),
-  discount_percent: z.number().min(0).max(100).optional().default(0),
+  discount_percent: z.number().min(0).max(100),
   notes: z.string().max(500).optional().nullable(),
 })
 

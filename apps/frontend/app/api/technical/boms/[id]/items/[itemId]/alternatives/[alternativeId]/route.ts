@@ -41,8 +41,12 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Extract role code from joined data
+    const roleData = currentUser.role as unknown as { code: string } | null
+    const userRole = roleData?.code?.toLowerCase() || ''
+
     // Check authorization: Admin or Technical only
-    if (!['admin', 'technical'].includes(currentUser.role)) {
+    if (!['admin', 'technical'].includes(userRole)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }
@@ -124,8 +128,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Extract role code from joined data
+    const deleteRoleData = currentUser.role as unknown as { code: string } | null
+    const deleteUserRole = deleteRoleData?.code?.toLowerCase() || ''
+
     // Check authorization: Admin or Technical only
-    if (!['admin', 'technical'].includes(currentUser.role)) {
+    if (!['admin', 'technical'].includes(deleteUserRole)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }

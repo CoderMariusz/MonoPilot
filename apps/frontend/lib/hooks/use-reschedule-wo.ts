@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { rescheduleWO } from '@/lib/services/gantt-service';
+import { rescheduleWOClient as rescheduleWO } from '@/lib/services/gantt-service';
 import { ganttKeys } from './use-gantt-data';
 import { workOrderKeys } from './use-work-orders';
 import { toast } from 'sonner';

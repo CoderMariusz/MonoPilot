@@ -36,6 +36,14 @@
   ],
   "exclude": [
     "node_modules",
-    "__tests__/**/*"
+    "__tests__/**/*",
+    "**/__tests__/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "e2e/**/*",
+    "vitest.config.ts",
+    "lib/testing/**/*"
   ]
 }

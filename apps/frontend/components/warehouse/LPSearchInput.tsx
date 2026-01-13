@@ -35,7 +35,7 @@ export function LPSearchInput({
   debounceMs = 300,
 }: LPSearchInputProps) {
   const [localValue, setLocalValue] = useState(value)
-  const debounceTimer = useRef<NodeJS.Timeout>()
+  const debounceTimer = useRef<NodeJS.Timeout>(undefined)
 
   // Sync local value with prop value
   useEffect(() => {

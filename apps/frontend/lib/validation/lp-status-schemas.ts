@@ -188,8 +188,4 @@ export const validateConsumptionSchema = z.object({
 
 export type ValidateConsumptionInput = z.infer<typeof validateConsumptionSchema>
 
-// ============================================================================
-// Type Exports
-// ============================================================================
-
-export type { LPStatus, QAStatus }
+// Types LPStatus and QAStatus are already exported above with their definitions

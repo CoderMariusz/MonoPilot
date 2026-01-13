@@ -90,10 +90,10 @@ describe('GET /api/warehouse/dashboard/alerts', () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: mockUserId } },
         error: null,
-      })
+      });
 
-      // Mock org lookup failure
-      mockSupabase.from.mockReturnValueOnce({
+      // Mock org lookup failure - use type assertion for error case mock
+      (mockSupabase.from as ReturnType<typeof vi.fn>).mockReturnValueOnce({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
             single: vi.fn(() => Promise.resolve({

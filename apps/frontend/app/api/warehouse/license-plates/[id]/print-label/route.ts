@@ -105,14 +105,14 @@ export async function POST(
     // Prepare label data
     const labelData = {
       lp_number: lp.lp_number,
-      product_name: (lp.products as { name: string })?.name || 'Unknown Product',
+      product_name: (lp.products as unknown as { name: string } | null)?.name || 'Unknown Product',
       product_id: lp.product_id,
       quantity: lp.quantity,
       uom: lp.uom,
       batch_number: lp.batch_number,
       expiry_date: lp.expiry_date,
       manufacture_date: lp.manufacture_date,
-      location_path: (lp.locations as { full_path: string })?.full_path || null,
+      location_path: (lp.locations as unknown as { full_path: string } | null)?.full_path || null,
     }
 
     // Validate label data

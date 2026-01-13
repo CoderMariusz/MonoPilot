@@ -59,7 +59,7 @@ const woFormSchema = z.object({
   scheduled_end_time: z.string().nullable().optional(),
   production_line_id: z.string().uuid().nullable().optional(),
   machine_id: z.string().uuid().nullable().optional(),
-  priority: z.enum(['low', 'normal', 'high', 'critical']).default('normal'),
+  priority: z.enum(['low', 'normal', 'high', 'critical']),
   notes: z.string().max(2000).nullable().optional(),
 }).refine(
   (data) => {

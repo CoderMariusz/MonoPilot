@@ -90,14 +90,14 @@ export async function POST(request: NextRequest) {
     // Prepare label data for each LP
     const labelDataArray = lps.map((lp) => ({
       lp_number: lp.lp_number,
-      product_name: (lp.products as { name: string })?.name || 'Unknown Product',
+      product_name: (lp.products as unknown as { name: string } | null)?.name || 'Unknown Product',
       product_id: lp.product_id,
       quantity: lp.quantity,
       uom: lp.uom,
       batch_number: lp.batch_number,
       expiry_date: lp.expiry_date,
       manufacture_date: lp.manufacture_date,
-      location_path: (lp.locations as { full_path: string })?.full_path || null,
+      location_path: (lp.locations as unknown as { full_path: string } | null)?.full_path || null,
     }))
 
     // Generate ZPL for each LP
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(zipBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',

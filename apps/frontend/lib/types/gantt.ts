@@ -68,8 +68,8 @@ export interface GetGanttDataParams {
   from_date?: string;
   to_date?: string;
   status?: string[];
-  line_id?: string;
-  product_id?: string;
+  line_id?: string | null;
+  product_id?: string | null;
   search?: string;
 }
 

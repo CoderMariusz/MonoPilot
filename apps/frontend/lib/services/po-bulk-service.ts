@@ -656,7 +656,7 @@ export class POBulkService {
       }
 
       // Check unit price
-      if (row.unit_price !== undefined && row.unit_price < 0) {
+      if (row.unit_price !== undefined && row.unit_price !== null && row.unit_price < 0) {
         rowErrors.push('Unit price cannot be negative')
       }
 

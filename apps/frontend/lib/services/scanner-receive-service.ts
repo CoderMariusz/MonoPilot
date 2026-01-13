@@ -448,7 +448,7 @@ export class ScannerReceiveService {
       return {
         id: po.id,
         po_number: po.po_number,
-        supplier_name: (po.supplier as { name: string } | null)?.name || 'Unknown',
+        supplier_name: (po.supplier as unknown as { name: string } | null)?.name || 'Unknown',
         expected_date: po.expected_date,
         lines_total: linesTotal,
         lines_pending: linesPending,
@@ -519,7 +519,7 @@ export class ScannerReceiveService {
       return null
     }
 
-    return data as Location
+    return data as unknown as Location
   }
 
   /**
@@ -581,4 +581,4 @@ export class ScannerReceiveService {
   }
 }
 
-export type { ScannerReceiveInput, PurchaseOrder, POLine, Product, Location, WarehouseSettings }
+export type { PurchaseOrder, POLine, Product, Location, WarehouseSettings }

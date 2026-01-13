@@ -13,7 +13,7 @@
  * Epic 04 Production for material consumption validation.
  */
 
-import { createBrowserClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import type { LPStatus, QAStatus } from '../validation/lp-status-schemas'
 
 // ============================================================================
@@ -161,7 +161,7 @@ export class LPStatusService {
    * - LP must exist and belong to user's org (RLS enforced)
    */
   static async validateLPForConsumption(lpId: string): Promise<StatusValidationResult> {
-    const supabase = createBrowserClient()
+    const supabase = createClient()
 
     // Get LP with status fields
     const { data: lp, error } = await supabase
@@ -249,7 +249,7 @@ export class LPStatusService {
     newStatus: LPStatus,
     reason?: string
   ): Promise<LicensePlate> {
-    const supabase = createBrowserClient()
+    const supabase = createClient()
 
     // Get current LP
     const { data: currentLP, error: fetchError } = await supabase
@@ -321,7 +321,7 @@ export class LPStatusService {
     newQAStatus: QAStatus,
     reason?: string
   ): Promise<LicensePlate> {
-    const supabase = createBrowserClient()
+    const supabase = createClient()
 
     // Get current LP
     const { data: currentLP, error: fetchError } = await supabase
@@ -407,7 +407,7 @@ export class LPStatusService {
    * @returns Updated license plate
    */
   static async blockLP(lpId: string, reason: string): Promise<LicensePlate> {
-    const supabase = createBrowserClient()
+    const supabase = createClient()
 
     // Get current LP
     const { data: currentLP, error: fetchError } = await supabase
@@ -460,7 +460,7 @@ export class LPStatusService {
    * @returns Updated license plate
    */
   static async unblockLP(lpId: string, reason?: string): Promise<LicensePlate> {
-    const supabase = createBrowserClient()
+    const supabase = createClient()
 
     // Get current LP
     const { data: currentLP, error: fetchError } = await supabase
@@ -518,7 +518,7 @@ export class LPStatusService {
    * Performance: Must complete in <200ms (AC-17)
    */
   static async getStatusAuditTrail(lpId: string): Promise<StatusAuditEntry[]> {
-    const supabase = createBrowserClient()
+    const supabase = createClient()
 
     const { data: auditEntries, error } = await supabase
       .from('lp_status_audit')

@@ -8,7 +8,8 @@
 
 import { useMemo, useCallback, useEffect, useState, useRef } from 'react'
 import { useOrgContext } from './useOrgContext'
-import { PERMISSION_MATRIX, ROLES, canAccess, hasAction, type Module, type Action, type SystemRole } from '@/lib/constants/permissions'
+import { PERMISSION_MATRIX, ROLES, canAccess, hasAction, type Module, type Action } from '@/lib/constants/permissions'
+import type { SystemRole } from '@/lib/constants/roles'
 
 // Permission actions
 export type PermissionAction = 'C' | 'R' | 'U' | 'D'
@@ -78,7 +79,8 @@ export function usePermissions(options?: {
   // First, try to get from OrgContext
   try {
     const orgContext = useOrgContext()
-    user = orgContext?.user
+    // Get user from data property - OrgContext contains the user info directly
+    user = orgContext?.data ? { role: orgContext.data.role_code } : null
   } catch (e) {
     // useOrgContext not available or threw error
     // This is expected in tests
@@ -94,7 +96,7 @@ export function usePermissions(options?: {
   // Use ref for cache to avoid state updates in callbacks
   const permissionCacheRef = useRef<Map<string, boolean>>(new Map())
 
-  const userRole = (user?.role as SystemRole) || null
+  const userRole: SystemRole | null = user?.role || null
 
   // Listen for real-time permission updates
   useEffect(() => {
@@ -103,16 +105,16 @@ export function usePermissions(options?: {
       const { newRole, oldRole } = customEvent.detail
 
       if (oldRole && newRole && oldRole !== newRole) {
-        const oldRoleObj = ROLES[oldRole]
-        const newRoleObj = ROLES[newRole]
+        const oldRoleObj = ROLES[oldRole as SystemRole]
+        const newRoleObj = ROLES[newRole as SystemRole]
 
         // Determine if it's an upgrade or downgrade based on display order
         const isUpgrade = newRoleObj.display_order < oldRoleObj.display_order
 
         options?.onPermissionChange?.({
           type: isUpgrade ? 'upgrade' : 'downgrade',
-          oldRole,
-          newRole,
+          oldRole: oldRole as SystemRole,
+          newRole: newRole as SystemRole,
           message: `Permissions updated to ${newRoleObj.name}`,
         })
       }

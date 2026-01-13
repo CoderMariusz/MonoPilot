@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import {
   POErrorState,
   POCancelConfirmDialog,
   POLineModal,
+  type TimelineEntry,
 } from '@/components/planning/purchase-orders'
 import {
   usePurchaseOrder,
@@ -75,6 +76,27 @@ export default function PurchaseOrderDetailsPage({
   const { data: history, isLoading: historyLoading } = usePOStatusHistory(paramsId)
   const { data: taxCodesData } = useTaxCodes()
   const taxCodes = taxCodesData?.data || []
+
+  // Transform POStatusHistory to TimelineEntry format
+  const timelineEntries = useMemo((): TimelineEntry[] => {
+    if (!history) return []
+    return history.map((h) => ({
+      id: h.id,
+      from_status: h.from_status,
+      to_status: h.to_status,
+      changed_by: h.changed_by
+        ? {
+            id: h.changed_by,
+            name: h.user
+              ? `${h.user.first_name} ${h.user.last_name}`
+              : 'Unknown User',
+            email: '', // Email not available in history response
+          }
+        : null,
+      changed_at: h.changed_at,
+      notes: h.notes,
+    }))
+  }, [history])
 
   // Mutations
   const submitPO = useSubmitPO()
@@ -416,7 +438,7 @@ export default function PurchaseOrderDetailsPage({
             <div className="border rounded-lg p-6">
               <h3 className="font-medium mb-4">Status History</h3>
               <POStatusTimeline
-                entries={history || []}
+                entries={timelineEntries}
                 loading={historyLoading}
               />
             </div>

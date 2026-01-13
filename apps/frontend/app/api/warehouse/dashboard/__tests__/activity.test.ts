@@ -82,8 +82,8 @@ describe('GET /api/warehouse/dashboard/activity', () => {
     })
 
     it('should return 403 for users without warehouse permission', async () => {
-      // Mock org lookup failure
-      mockSupabase.from.mockReturnValueOnce({
+      // Mock org lookup failure - use type assertion for error case mock
+      (mockSupabase.from as ReturnType<typeof vi.fn>).mockReturnValueOnce({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
             single: vi.fn(() => Promise.resolve({

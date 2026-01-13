@@ -7,6 +7,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { getGanttData } from '@/lib/services/gantt-service';
+import { createClient } from '@/lib/supabase/client';
 import type { GanttFilters, GanttDataResponse } from '@/lib/types/gantt';
 
 // Query keys for cache management
@@ -24,7 +25,10 @@ export const ganttKeys = {
 export function useGanttData(filters: GanttFilters) {
   return useQuery<GanttDataResponse, Error>({
     queryKey: ganttKeys.data(filters),
-    queryFn: () => getGanttData(filters),
+    queryFn: () => {
+      const supabase = createClient();
+      return getGanttData(supabase, filters);
+    },
     staleTime: 2 * 60 * 1000, // 2 minutes (per spec)
     refetchOnWindowFocus: true,
     refetchInterval: false, // Manual refresh only
