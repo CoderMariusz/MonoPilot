@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest) {
 
     // Authorization: Admin only (per AC-4.17.8)
     // Role is an object from join: { code: string }
-    const roleCode = (currentUser.role as { code: string } | null)?.code?.toLowerCase()
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase()
     if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },

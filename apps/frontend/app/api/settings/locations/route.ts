@@ -54,14 +54,25 @@ export async function GET(request: NextRequest) {
 
     // Validate filters
     const filters = LocationFiltersSchema.parse({
-      warehouse_id: warehouse_id || undefined,
       type: type || undefined,
-      is_active: is_active === 'true' ? true : is_active === 'false' ? false : undefined,
       search: search || undefined,
     })
 
-    // Call service to get locations
-    const result = await getLocations(filters, currentUser.org_id)
+    // Call service to get locations (warehouseId required, default to first warehouse if not specified)
+    let warehouseId = warehouse_id || ''
+    if (!warehouseId) {
+      // Get the first warehouse for the org if not specified
+      const { data: warehouse } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('org_id', currentUser.org_id)
+        .limit(1)
+        .single()
+      if (warehouse) {
+        warehouseId = warehouse.id
+      }
+    }
+    const result = await getLocations(warehouseId, filters, currentUser.org_id)
 
     if (!result.success) {
       return NextResponse.json(
@@ -118,7 +129,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check authorization: Admin only (AC-005.1)
-    if (currentUser.role !== 'admin') {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }
@@ -129,9 +141,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = CreateLocationSchema.parse(body)
 
-    // Call service to create location (add warehouse_id from body)
+    // warehouse_id is required for creating a location
+    if (!body.warehouse_id) {
+      return NextResponse.json(
+        { error: 'warehouse_id is required' },
+        { status: 400 }
+      )
+    }
+
+    // Call service to create location
     const result = await createLocation(
-      { ...validatedData, warehouse_id: body.warehouse_id } as Parameters<typeof createLocation>[0],
+      body.warehouse_id,
+      validatedData,
       session.user.id,
       currentUser.org_id
     )

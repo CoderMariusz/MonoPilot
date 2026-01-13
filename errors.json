@@ -1,0 +1,12 @@
+ WARN  Unsupported engine: wanted: {"node":"20.x || 22.x"} (current: {"node":"v24.11.1","pnpm":"8.15.0"})
+
+> monopilot@1.0.0 type-check:json /workspaces/MonoPilot
+> bash scripts/type-check-monitor.sh json
+
+  .next/types/validator.ts(720,31): error TS2344: Type 'typeof import("/workspaces/MonoPilot/apps/frontend/app/api/planning/products/[id]/default-supplier/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/planning/products/[id]/default-supplier">'.
+  Types of property 'GET' are incompatible.
+  Type '(request: NextRequest, { params }: { params: Promise<{ productId: string; }>; }) => Promise<NextResponse<{ success: boolean; error: string; }> | NextResponse<{ success: boolean; data: null; }> | NextResponse<...>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ id: string; }>; }) => void | Response | Promise<void | Response>'.
+  Types of parameters '__1' and 'context' are incompatible.
+  Type '{ params: Promise<{ id: string; }>; }' is not assignable to type '{ params: Promise<{ productId: string; }>; }'.
+[]
+ ELIFECYCLE  Command failed with exit code 1.

@@ -14,10 +14,10 @@ import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ productId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { productId } = await params
+    const { id: productId } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication

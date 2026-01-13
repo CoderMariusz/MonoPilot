@@ -50,7 +50,8 @@ export async function PUT(
     }
 
     // Check authorization: Admin only (AC-002.3)
-    if (currentUser.role !== 'admin') {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }
@@ -182,7 +183,8 @@ export async function DELETE(
     }
 
     // Check authorization: Admin only (AC-002.4)
-    if (currentUser.role !== 'admin') {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }

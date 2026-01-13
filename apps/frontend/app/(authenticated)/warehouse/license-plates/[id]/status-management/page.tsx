@@ -52,7 +52,6 @@ function getMockLP(id: string): LicensePlate {
       id: 'prod-1',
       code: 'RM-FLOUR-001',
       name: 'Flour Type A',
-      type: 'raw_material',
     },
     batch_number: 'BATCH-2024-456',
     quantity: 500,
@@ -60,14 +59,29 @@ function getMockLP(id: string): LicensePlate {
     status: 'available',
     qa_status: 'passed',
     location_id: 'loc-1',
+    warehouse_id: 'wh-1',
     location: {
       id: 'loc-1',
-      name: 'A-01-R03-B05',
-      code: 'A-01-R03-B05',
-      warehouse_id: 'wh-1',
-      warehouse_name: 'Main Warehouse',
+      full_path: 'Main Warehouse / A-01-R03-B05',
+      bin_code: 'A-01-R03-B05',
     },
     org_id: 'org-1',
+    source: 'receipt',
+    supplier_batch_number: null,
+    expiry_date: null,
+    manufacture_date: null,
+    po_number: null,
+    grn_id: null,
+    asn_id: null,
+    wo_id: null,
+    consumed_by_wo_id: null,
+    parent_lp_id: null,
+    pallet_id: null,
+    gtin: null,
+    sscc: null,
+    catch_weight_kg: null,
+    block_reason: null,
+    created_by: 'user-1',
     created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
     updated_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
   };
@@ -259,7 +273,7 @@ export default function LPStatusManagementPage() {
             {lp.location && (
               <div>
                 <span className="text-sm text-gray-500">Location</span>
-                <p className="text-lg font-semibold">{lp.location.name}</p>
+                <p className="text-lg font-semibold">{lp.location.full_path}</p>
               </div>
             )}
           </div>

@@ -21,6 +21,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import SettingsPage from '../page'
 import { useOrgContext } from '@/lib/hooks/useOrgContext'
+import { createMockOrgContextOrganization } from '@/lib/test/factories'
 
 // Mock dependencies
 vi.mock('@/lib/hooks/useOrgContext')
@@ -48,22 +49,17 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Acme Food Manufacturing',
             slug: 'acme-food',
-            logo_url: 'https://example.com/logo.png',
-            city: 'Warsaw',
-            country: 'Poland',
             timezone: 'Europe/Warsaw',
-            contact_email: 'admin@acme.com',
-            contact_phone: '+48 123 456 789',
             locale: 'en',
             currency: 'PLN',
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -105,7 +101,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -115,7 +111,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -171,7 +167,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -181,7 +177,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -239,7 +235,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -249,7 +245,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -296,7 +292,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -306,7 +302,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -334,7 +330,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -342,9 +338,9 @@ describe('Settings Landing Page (SET-000)', () => {
             locale: 'en',
             currency: 'PLN',
             onboarding_step: 0,
-            onboarding_completed_at: null,
+            onboarding_completed_at: undefined,
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -373,7 +369,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -381,9 +377,9 @@ describe('Settings Landing Page (SET-000)', () => {
             locale: 'en',
             currency: 'PLN',
             onboarding_step: 0,
-            onboarding_completed_at: null,
+            onboarding_completed_at: undefined,
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -426,7 +422,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -436,7 +432,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -467,7 +463,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'warehouse_manager',
           role_name: 'Warehouse Manager',
           permissions: { warehouse: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -477,7 +473,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -515,7 +511,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'viewer',
           role_name: 'Viewer',
           permissions: {},
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -525,7 +521,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -555,7 +551,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -565,7 +561,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,
@@ -606,7 +602,7 @@ describe('Settings Landing Page (SET-000)', () => {
           role_code: 'admin',
           role_name: 'Administrator',
           permissions: { settings: 'CRUD' },
-          organization: {
+          organization: createMockOrgContextOrganization({
             id: 'org-123',
             name: 'Test Org',
             slug: 'test-org',
@@ -616,7 +612,7 @@ describe('Settings Landing Page (SET-000)', () => {
             onboarding_step: 6,
             onboarding_completed_at: new Date().toISOString(),
             is_active: true,
-          },
+          }),
         },
         isLoading: false,
         error: null,

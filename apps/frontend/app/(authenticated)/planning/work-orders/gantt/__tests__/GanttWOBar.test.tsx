@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { GanttWOBar } from '../components/GanttWOBar';
-import type { GanttWorkOrder, ZoomLevel } from '@/lib/types/gantt';
+import type { GanttWorkOrder, ZoomLevel, WOStatus, MaterialStatus } from '@/lib/types/gantt';
+import { createMockGanttWO } from '@/lib/test/factories';
 
 describe('GanttWOBar Component', () => {
-  const mockWorkOrder: GanttWorkOrder = {
+  const mockWorkOrder: GanttWorkOrder = createMockGanttWO({
     id: 'wo-156',
     wo_number: 'WO-00156',
     product: {
@@ -13,7 +14,7 @@ describe('GanttWOBar Component', () => {
       code: 'FG-CHOC-001',
       name: 'Chocolate Bar',
     },
-    status: 'planned',
+    status: 'planned' as WOStatus,
     priority: 'normal',
     quantity: 1000,
     uom: 'pc',
@@ -22,10 +23,10 @@ describe('GanttWOBar Component', () => {
     scheduled_end_time: '16:00',
     duration_hours: 8,
     progress_percent: null,
-    material_status: 'ok',
+    material_status: 'ok' as MaterialStatus,
     is_overdue: false,
     created_at: '2024-12-14T09:30:00Z',
-  };
+  });
 
   const mockProps = {
     workOrder: mockWorkOrder,
@@ -42,7 +43,7 @@ describe('GanttWOBar Component', () => {
   describe('Status Colors', () => {
     it('should render draft WO with gray background', () => {
       // Unit test: getStatusColor returns correct color for draft
-      const draftWO = { ...mockWorkOrder, status: 'draft' };
+      const draftWO = createMockGanttWO({ ...mockWorkOrder, status: 'draft' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={draftWO} />
       );
@@ -52,14 +53,16 @@ describe('GanttWOBar Component', () => {
         const bgColor = window
           .getComputedStyle(barElement)
           .getPropertyValue('background-color');
-        expect(bgColor).toContain('243') || expect(bgColor).toContain('#F3F4F6');
+        // Check for either RGB value (243) or hex color
+        const isGrayColor = bgColor.includes('243') || bgColor.includes('#F3F4F6');
+        expect(isGrayColor).toBe(true);
       }
     });
 
     it('should render planned WO with blue background', () => {
       // AC-05: WO Bar Status Colors
       // Unit test: getStatusColor returns correct color for planned
-      const plannedWO = { ...mockWorkOrder, status: 'planned' };
+      const plannedWO = createMockGanttWO({ ...mockWorkOrder, status: 'planned' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={plannedWO} />
       );
@@ -70,7 +73,7 @@ describe('GanttWOBar Component', () => {
 
     it('should render released WO with cyan background', () => {
       // Unit test: getStatusColor returns correct color for released
-      const releasedWO = { ...mockWorkOrder, status: 'released' };
+      const releasedWO = createMockGanttWO({ ...mockWorkOrder, status: 'released' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={releasedWO} />
       );
@@ -81,7 +84,7 @@ describe('GanttWOBar Component', () => {
 
     it('should render in_progress WO with purple background', () => {
       // Unit test: getStatusColor returns correct color for in_progress
-      const inProgressWO = { ...mockWorkOrder, status: 'in_progress' };
+      const inProgressWO = createMockGanttWO({ ...mockWorkOrder, status: 'in_progress' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={inProgressWO} />
       );
@@ -92,7 +95,7 @@ describe('GanttWOBar Component', () => {
 
     it('should render on_hold WO with orange background', () => {
       // Unit test: getStatusColor returns correct color for on_hold
-      const onHoldWO = { ...mockWorkOrder, status: 'on_hold' };
+      const onHoldWO = createMockGanttWO({ ...mockWorkOrder, status: 'on_hold' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={onHoldWO} />
       );
@@ -103,7 +106,7 @@ describe('GanttWOBar Component', () => {
 
     it('should render completed WO with green background', () => {
       // Unit test: getStatusColor returns correct color for completed
-      const completedWO = { ...mockWorkOrder, status: 'completed' };
+      const completedWO = createMockGanttWO({ ...mockWorkOrder, status: 'completed' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={completedWO} />
       );
@@ -115,7 +118,7 @@ describe('GanttWOBar Component', () => {
     it('should render overdue WO with red background and icon', () => {
       // AC-06: Overdue WO Indicator
       // Unit test: getStatusColor returns correct color for overdue
-      const overdueWO = { ...mockWorkOrder, is_overdue: true };
+      const overdueWO = createMockGanttWO({ ...mockWorkOrder, is_overdue: true });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={overdueWO} />
       );
@@ -134,12 +137,12 @@ describe('GanttWOBar Component', () => {
   describe('Overdue Detection', () => {
     it('should show red background for overdue WO', () => {
       // Unit test: isOverdue returns true when end time passed and not completed
-      const overdueWO = {
+      const overdueWO = createMockGanttWO({
         ...mockWorkOrder,
         scheduled_date: '2024-12-15',
         scheduled_end_time: '10:00',
         is_overdue: true,
-      };
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={overdueWO} />
       );
@@ -150,11 +153,11 @@ describe('GanttWOBar Component', () => {
 
     it('should not show overdue indicator for completed WO', () => {
       // Unit test: isOverdue returns false for completed WO
-      const completedOverdueWO = {
+      const completedOverdueWO = createMockGanttWO({
         ...mockWorkOrder,
         is_overdue: true,
-        status: 'completed',
-      };
+        status: 'completed' as WOStatus,
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={completedOverdueWO} />
       );
@@ -169,7 +172,7 @@ describe('GanttWOBar Component', () => {
     });
 
     it('should show warning icon for overdue WOs', () => {
-      const overdueWO = { ...mockWorkOrder, is_overdue: true };
+      const overdueWO = createMockGanttWO({ ...mockWorkOrder, is_overdue: true });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={overdueWO} />
       );
@@ -184,11 +187,11 @@ describe('GanttWOBar Component', () => {
   describe('Progress Bar', () => {
     it('should show progress bar for in_progress WO', () => {
       // AC-07: In-Progress Progress Bar
-      const inProgressWO = {
+      const inProgressWO = createMockGanttWO({
         ...mockWorkOrder,
-        status: 'in_progress',
+        status: 'in_progress' as WOStatus,
         progress_percent: 65,
-      };
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={inProgressWO} />
       );
@@ -201,11 +204,11 @@ describe('GanttWOBar Component', () => {
 
     it('should show correct progress percentage', () => {
       // Unit test: progress bar overlay shows correct percentage
-      const inProgressWO = {
+      const inProgressWO = createMockGanttWO({
         ...mockWorkOrder,
-        status: 'in_progress',
+        status: 'in_progress' as WOStatus,
         progress_percent: 65,
-      };
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={inProgressWO} />
       );
@@ -218,7 +221,7 @@ describe('GanttWOBar Component', () => {
     });
 
     it('should not show progress bar for planned WO', () => {
-      const plannedWO = { ...mockWorkOrder, status: 'planned' };
+      const plannedWO = createMockGanttWO({ ...mockWorkOrder, status: 'planned' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={plannedWO} />
       );
@@ -230,11 +233,11 @@ describe('GanttWOBar Component', () => {
     });
 
     it('should fill correct percentage of bar width', () => {
-      const inProgressWO = {
+      const inProgressWO = createMockGanttWO({
         ...mockWorkOrder,
-        status: 'in_progress',
+        status: 'in_progress' as WOStatus,
         progress_percent: 65,
-      };
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={inProgressWO} />
       );
@@ -444,10 +447,10 @@ describe('GanttWOBar Component', () => {
 
   describe('Material Status Indicator', () => {
     it('should not show indicator when material_status is ok', () => {
-      const woWithOkMaterial = {
+      const woWithOkMaterial = createMockGanttWO({
         ...mockWorkOrder,
-        material_status: 'ok',
-      };
+        material_status: 'ok' as MaterialStatus,
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={woWithOkMaterial} />
       );
@@ -459,10 +462,10 @@ describe('GanttWOBar Component', () => {
     });
 
     it('should show indicator when material_status is low', () => {
-      const woWithLowMaterial = {
+      const woWithLowMaterial = createMockGanttWO({
         ...mockWorkOrder,
-        material_status: 'low',
-      };
+        material_status: 'low' as MaterialStatus,
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={woWithLowMaterial} />
       );
@@ -474,10 +477,10 @@ describe('GanttWOBar Component', () => {
     });
 
     it('should show indicator when material_status is insufficient', () => {
-      const woWithInsufficientMaterial = {
+      const woWithInsufficientMaterial = createMockGanttWO({
         ...mockWorkOrder,
-        material_status: 'insufficient',
-      };
+        material_status: 'insufficient' as MaterialStatus,
+      });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={woWithInsufficientMaterial} />
       );
@@ -491,7 +494,7 @@ describe('GanttWOBar Component', () => {
 
   describe('Border Styling', () => {
     it('should have solid border for confirmed statuses', () => {
-      const confirmedWO = { ...mockWorkOrder, status: 'planned' };
+      const confirmedWO = createMockGanttWO({ ...mockWorkOrder, status: 'planned' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={confirmedWO} />
       );
@@ -502,7 +505,7 @@ describe('GanttWOBar Component', () => {
     });
 
     it('should have dashed border for draft status', () => {
-      const draftWO = { ...mockWorkOrder, status: 'draft' };
+      const draftWO = createMockGanttWO({ ...mockWorkOrder, status: 'draft' as WOStatus });
       const { container } = render(
         <GanttWOBar {...mockProps} workOrder={draftWO} />
       );

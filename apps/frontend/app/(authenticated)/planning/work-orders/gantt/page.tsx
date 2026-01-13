@@ -242,14 +242,14 @@ export default function GanttPage() {
           />
         ) : isMobile ? (
           <GanttMobileView
-            data={data}
+            data={data!}
             onWOClick={handleWOClick}
             onWOReschedule={(wo) => setSelectedWO(wo)}
           />
         ) : (
           <div className="bg-white rounded-lg border shadow-sm min-h-[500px]">
             <GanttChart
-              data={data}
+              data={data!}
               zoomLevel={zoomLevel}
               onZoomChange={setZoomLevel}
               onReschedule={handleReschedule}

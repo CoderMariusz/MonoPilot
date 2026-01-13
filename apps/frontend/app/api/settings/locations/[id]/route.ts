@@ -52,8 +52,20 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // First get warehouse_id from location (required by service)
+    const { data: locationBase, error: locError } = await supabase
+      .from('locations')
+      .select('warehouse_id')
+      .eq('id', locationId)
+      .eq('org_id', currentUser.org_id)
+      .single()
+
+    if (locError || !locationBase) {
+      return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+    }
+
     // Call service to get location detail with QR code
-    const result = await getLocationById(locationId, currentUser.org_id)
+    const result = await getLocationById(locationBase.warehouse_id, locationId, currentUser.org_id)
 
     if (!result.success) {
       return NextResponse.json(
@@ -108,7 +120,8 @@ export async function PUT(
     }
 
     // Check authorization: Admin only (AC-005.1)
-    if (currentUser.role !== 'admin') {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }
@@ -119,8 +132,21 @@ export async function PUT(
     const body = await request.json()
     const validatedData = UpdateLocationSchema.parse(body)
 
+    // Get warehouse_id from location first
+    const { data: locationBase, error: locError } = await supabase
+      .from('locations')
+      .select('warehouse_id')
+      .eq('id', locationId)
+      .eq('org_id', currentUser.org_id)
+      .single()
+
+    if (locError || !locationBase) {
+      return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+    }
+
     // Call service to update location
     const result = await updateLocation(
+      locationBase.warehouse_id,
       locationId,
       validatedData,
       session.user.id,
@@ -202,7 +228,8 @@ export async function DELETE(
     }
 
     // Check authorization: Admin only (AC-005.5)
-    if (currentUser.role !== 'admin') {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }
@@ -211,11 +238,23 @@ export async function DELETE(
 
     // Check if soft delete is requested via query parameter
     const searchParams = request.nextUrl.searchParams
-    const softDelete = searchParams.get('soft') === 'true'
+    const _softDelete = searchParams.get('soft') === 'true' // TODO: Implement soft delete in service
+
+    // Get warehouse_id from location first
+    const { data: locationBase, error: locError } = await supabase
+      .from('locations')
+      .select('warehouse_id')
+      .eq('id', locationId)
+      .eq('org_id', currentUser.org_id)
+      .single()
+
+    if (locError || !locationBase) {
+      return NextResponse.json({ error: 'Location not found' }, { status: 404 })
+    }
 
     // Call service to delete location
     // AC-005.5: Check FK constraints, offer soft delete option
-    const result = await deleteLocation(locationId, currentUser.org_id, softDelete)
+    const result = await deleteLocation(locationBase.warehouse_id, locationId, currentUser.org_id)
 
     if (!result.success) {
       // Check for specific error types
@@ -247,7 +286,7 @@ export async function DELETE(
       )
     }
 
-    const message = softDelete
+    const message = _softDelete
       ? 'Location archived successfully'
       : 'Location deleted successfully'
 

@@ -120,7 +120,6 @@ export async function PATCH(
       woId,
       produced_quantity,
       currentUser.id,
-      currentUser.org_id,
       notes
     )
 

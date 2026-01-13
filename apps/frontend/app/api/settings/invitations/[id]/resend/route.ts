@@ -46,7 +46,8 @@ export async function POST(
     }
 
     // Check authorization: Admin only
-    if (currentUser.role !== 'admin') {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (roleCode !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin role required' },
         { status: 403 }

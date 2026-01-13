@@ -66,6 +66,7 @@ export async function POST(
     const supabaseAdmin = createServerSupabaseAdmin()
     const service = new MaterialReservationService(supabaseAdmin)
 
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code ?? ''
     const { data, error } = await service.reserveMaterial(
       {
         woId,
@@ -76,7 +77,7 @@ export async function POST(
         userId: session.user.id,
         orgId: currentUser.org_id,
       },
-      currentUser.role
+      roleCode
     )
 
     if (error) {

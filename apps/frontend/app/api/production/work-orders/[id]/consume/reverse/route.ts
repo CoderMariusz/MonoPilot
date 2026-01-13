@@ -58,7 +58,8 @@ export async function POST(
 
     // AC-4.10.4: Role-based access - Manager and Admin only
     const allowedRoles = ['admin', 'manager']
-    if (!allowedRoles.includes(currentUser.role.toLowerCase())) {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (!allowedRoles.includes(roleCode)) {
       return NextResponse.json(
         {
           error: 'Forbidden: Only Manager or Admin can reverse consumption',

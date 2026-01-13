@@ -41,6 +41,7 @@ export async function DELETE(
     const supabaseAdmin = createServerSupabaseAdmin()
     const service = new MaterialReservationService(supabaseAdmin)
 
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code ?? ''
     const { data, error } = await service.unreserveMaterial(
       {
         reservationId,
@@ -48,7 +49,7 @@ export async function DELETE(
         userId: session.user.id,
         orgId: currentUser.org_id,
       },
-      currentUser.role
+      roleCode
     )
 
     if (error) {

@@ -83,7 +83,9 @@ interface APIResponse<T> {
 /**
  * Mock Responses
  */
-const createMockSupplierProductWithProduct = (): SupplierProductWithProduct => ({
+const createMockSupplierProductWithProduct = (
+  overrides: Partial<SupplierProductWithProduct> = {}
+): SupplierProductWithProduct => ({
   id: 'sp-001',
   supplier_id: 'sup-001',
   product_id: 'prod-001',
@@ -106,9 +108,12 @@ const createMockSupplierProductWithProduct = (): SupplierProductWithProduct => (
     uom: 'kg',
     supplier_lead_time_days: 5,
   },
+  ...overrides,
 })
 
-const createMockSupplierProductWithSupplier = (): SupplierProductWithSupplier => ({
+const createMockSupplierProductWithSupplier = (
+  overrides: Partial<SupplierProductWithSupplier> = {}
+): SupplierProductWithSupplier => ({
   id: 'sp-001',
   supplier_id: 'sup-001',
   product_id: 'prod-001',
@@ -130,6 +135,7 @@ const createMockSupplierProductWithSupplier = (): SupplierProductWithSupplier =>
     name: 'Mill Co',
     currency: 'PLN',
   },
+  ...overrides,
 })
 
 describe('Supplier Products API', () => {

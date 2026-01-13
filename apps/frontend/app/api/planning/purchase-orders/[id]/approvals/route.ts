@@ -109,7 +109,8 @@ export async function POST(
     }
 
     // Authorization: Manager, Admin only (can approve POs)
-    if (!['manager', 'admin'].includes(currentUser.role.toLowerCase())) {
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
+    if (!['manager', 'admin'].includes(roleCode)) {
       return NextResponse.json(
         { error: 'Forbidden: Manager role or higher required to approve/reject POs' },
         { status: 403 }

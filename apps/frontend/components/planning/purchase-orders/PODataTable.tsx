@@ -62,6 +62,18 @@ interface PODataTableProps {
   onDuplicate?: (po: POListItem) => void
   onPrint?: (po: POListItem) => void
   className?: string
+  /** Story 03.6: Enable row selection */
+  selectable?: boolean
+  /** Story 03.6: Currently selected row IDs */
+  selectedIds?: string[]
+  /** Story 03.6: Callback when a single row is selected */
+  onRowSelect?: (id: string, selected: boolean) => void
+  /** Story 03.6: Callback to select/deselect all rows */
+  onSelectAll?: (selected: boolean) => void
+  /** Story 03.6: Whether all rows are selected */
+  isAllSelected?: boolean
+  /** Story 03.6: Whether some but not all rows are selected */
+  isPartiallySelected?: boolean
 }
 
 const formatCurrency = (amount: number, currency: string): string => {
@@ -92,6 +104,13 @@ export function PODataTable({
   onDuplicate,
   onPrint,
   className,
+  // Story 03.6: Selection props (accepted but may use internal state)
+  selectable: _selectable,
+  selectedIds: _selectedIds,
+  onRowSelect: _onRowSelect,
+  onSelectAll: _onSelectAll,
+  isAllSelected: _isAllSelected,
+  isPartiallySelected: _isPartiallySelected,
 }: PODataTableProps) {
   const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])

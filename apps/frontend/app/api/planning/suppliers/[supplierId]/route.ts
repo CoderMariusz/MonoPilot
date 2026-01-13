@@ -24,10 +24,10 @@ import { validateOrigin, createCsrfErrorResponse } from '@/lib/csrf'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ supplierId: string }> }
 ) {
   try {
-    const { id } = await params
+    const { supplierId: id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -88,7 +88,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ supplierId: string }> }
 ) {
   try {
     // CSRF Protection: Validate request origin
@@ -99,7 +99,7 @@ export async function PUT(
       )
     }
 
-    const { id } = await params
+    const { supplierId: id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -220,7 +220,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ supplierId: string }> }
 ) {
   try {
     // CSRF Protection: Validate request origin
@@ -231,7 +231,7 @@ export async function DELETE(
       )
     }
 
-    const { id } = await params
+    const { supplierId: id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication

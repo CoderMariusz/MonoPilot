@@ -416,8 +416,8 @@ export default function PurchaseOrderDetailsPage({
             <div className="border rounded-lg p-6">
               <h3 className="font-medium mb-4">Status History</h3>
               <POStatusTimeline
-                history={history || []}
-                isLoading={historyLoading}
+                entries={history || []}
+                loading={historyLoading}
               />
             </div>
           </TabsContent>

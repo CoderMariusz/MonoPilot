@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const filename = `POs_Export_${timestamp}.xlsx`
 
-    // Return Excel file
-    return new NextResponse(excelBuffer, {
+    // Return Excel file - convert Buffer to Uint8Array for BodyInit compatibility
+    return new NextResponse(new Uint8Array(excelBuffer), {
       status: 200,
       headers: {
         'Content-Type':

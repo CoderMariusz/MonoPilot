@@ -20,6 +20,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { POApprovalSettings } from '@/components/settings/POApprovalSettings'
 import type { PlanningSettings, PlanningSettingsUpdate } from '@/lib/types/planning-settings'
+import { createMockPlanningSettings } from '@/lib/test/factories'
 
 /**
  * Mock roles hook
@@ -39,23 +40,14 @@ vi.mock('@/lib/hooks/use-roles', () => ({
 }))
 
 /**
- * Helper: Create mock PlanningSettings
+ * Helper: Create mock PlanningSettings - uses factory
  */
 function createMockSettings(overrides?: Partial<PlanningSettings>): PlanningSettings {
-  return {
-    id: 'settings-id',
-    org_id: 'org-id',
-    po_require_approval: false,
-    po_approval_threshold: null,
-    po_approval_roles: ['admin', 'manager'],
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-01T00:00:00Z',
-    ...overrides,
-  }
+  return createMockPlanningSettings(overrides)
 }
 
 describe('POApprovalSettings Component', () => {
-  let mockOnSave: ReturnType<typeof vi.fn>
+  let mockOnSave: (updates: PlanningSettingsUpdate) => void
 
   beforeEach(() => {
     mockOnSave = vi.fn()

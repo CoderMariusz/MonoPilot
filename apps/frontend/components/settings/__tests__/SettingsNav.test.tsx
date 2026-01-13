@@ -20,6 +20,7 @@ import { render, screen } from '@testing-library/react'
 import { SettingsNav } from '../SettingsNav'
 import { useOrgContext } from '@/lib/hooks/useOrgContext'
 import { usePathname } from 'next/navigation'
+import { createMockOrgContextOrganization } from '@/lib/test/factories'
 
 // Mock dependencies
 vi.mock('@/lib/hooks/useOrgContext')
@@ -48,7 +49,7 @@ describe('SettingsNav', () => {
           production: 'CRUD',
           quality: 'CRUD',
         },
-        organization: {
+        organization: createMockOrgContextOrganization({
           id: 'org-123',
           name: 'Test Org',
           slug: 'test-org',
@@ -56,9 +57,9 @@ describe('SettingsNav', () => {
           locale: 'en',
           currency: 'PLN',
           onboarding_step: 0,
-          onboarding_completed_at: null,
+          onboarding_completed_at: undefined,
           is_active: true,
-        },
+        }),
       },
       isLoading: false,
       error: null,
@@ -88,7 +89,7 @@ describe('SettingsNav', () => {
           settings: 'R',
           warehouse: 'CRUD',
         },
-        organization: {
+        organization: createMockOrgContextOrganization({
           id: 'org-123',
           name: 'Test Org',
           slug: 'test-org',
@@ -96,9 +97,9 @@ describe('SettingsNav', () => {
           locale: 'en',
           currency: 'PLN',
           onboarding_step: 0,
-          onboarding_completed_at: null,
+          onboarding_completed_at: undefined,
           is_active: true,
-        },
+        }),
       },
       isLoading: false,
       error: null,
@@ -155,7 +156,7 @@ describe('SettingsNav', () => {
         role_code: 'admin',
         role_name: 'Administrator',
         permissions: { settings: 'CRUD' },
-        organization: {
+        organization: createMockOrgContextOrganization({
           id: 'org-123',
           name: 'Test Org',
           slug: 'test-org',
@@ -163,9 +164,9 @@ describe('SettingsNav', () => {
           locale: 'en',
           currency: 'PLN',
           onboarding_step: 0,
-          onboarding_completed_at: null,
+          onboarding_completed_at: undefined,
           is_active: true,
-        },
+        }),
       },
       isLoading: false,
       error: null,
@@ -192,7 +193,7 @@ describe('SettingsNav', () => {
           technical: 'CRUD',
           // warehouse module disabled (no permission)
         },
-        organization: {
+        organization: createMockOrgContextOrganization({
           id: 'org-123',
           name: 'Test Org',
           slug: 'test-org',
@@ -200,9 +201,9 @@ describe('SettingsNav', () => {
           locale: 'en',
           currency: 'PLN',
           onboarding_step: 0,
-          onboarding_completed_at: null,
+          onboarding_completed_at: undefined,
           is_active: true,
-        },
+        }),
       },
       isLoading: false,
       error: null,

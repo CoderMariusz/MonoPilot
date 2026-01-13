@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Authorization: Purchasing, Manager, Admin
-    if (!['purchasing', 'manager', 'admin'].includes(currentUser.role.toLowerCase())) {
+    if (!['purchasing', 'manager', 'admin'].includes(((currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''))) {
       return NextResponse.json(
         { error: 'Forbidden: Purchasing role or higher required' },
         { status: 403 }
@@ -257,7 +257,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Authorization: Purchasing, Manager, Admin
-    if (!['purchasing', 'manager', 'admin'].includes(currentUser.role.toLowerCase())) {
+    if (!['purchasing', 'manager', 'admin'].includes(((currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''))) {
       return NextResponse.json(
         { error: 'Forbidden: Purchasing role or higher required' },
         { status: 403 }
