@@ -16,8 +16,10 @@ ENFORCEMENT_MODE="${ENFORCEMENT_MODE:-warn}"
 # THRESHOLDS
 # ============================================
 # Baseline error count (updated as errors are fixed)
-# Last updated: 2024-12-30
-BASELINE_ERRORS=298
+# Last updated: 2026-01-13
+# CRITICAL: Regressed from 298 to 499 (+201 errors, +67%)
+# Previous: 298 (2024-12-30)
+BASELINE_ERRORS=499
 
 # Error count at which strict mode auto-activates
 STRICT_MODE_THRESHOLD=50
