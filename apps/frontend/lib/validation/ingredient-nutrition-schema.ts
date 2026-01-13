@@ -100,8 +100,12 @@ export const ingredientNutritionSchema = z.object({
 
   // Source (required)
   source: z.enum(INGREDIENT_SOURCES, {
-    required_error: 'Source is required',
-    errorMap: () => ({ message: `Invalid source. Must be one of: ${INGREDIENT_SOURCES.join(', ')}` }),
+    errorMap: (issue, ctx) => {
+      if (issue.code === 'invalid_type' && ctx.data === undefined) {
+        return { message: 'Source is required' }
+      }
+      return { message: `Invalid source. Must be one of: ${INGREDIENT_SOURCES.join(', ')}` }
+    },
   }),
 
   // Source ID (optional)

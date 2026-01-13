@@ -61,6 +61,7 @@
     "html-to-image": "^1.11.13",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.4",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.554.0",
     "next": "^15.1.4",
     "qrcode": "^1.5.4",
