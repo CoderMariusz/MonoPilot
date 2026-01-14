@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Define public routes (no auth required)
@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
       error,
     } = await supabase.auth.getUser()
 
-    console.log('[Middleware]', {
+    console.log('[Proxy]', {
       pathname,
       hasUser: !!user,
       userId: user?.id,
@@ -68,7 +68,7 @@ export async function middleware(request: NextRequest) {
 
     // If there's an auth error, allow public routes, redirect others to login
     if (error) {
-      console.error('[Middleware] Auth error:', error.message)
+      console.error('[Proxy] Auth error:', error.message)
       if (isPublicRoute) {
         return supabaseResponse
       }
@@ -77,7 +77,7 @@ export async function middleware(request: NextRequest) {
 
     // If not authenticated and trying to access protected route
     if (!user && !isPublicRoute) {
-      console.log('[Middleware] No user, redirecting to /login')
+      console.log('[Proxy] No user, redirecting to /login')
       const redirectUrl = new URL('/login', request.url)
       // Preserve original URL for redirect after login
       if (pathname !== '/' && pathname !== '/login') {
@@ -88,15 +88,15 @@ export async function middleware(request: NextRequest) {
 
     // If authenticated and trying to access auth pages, redirect to dashboard
     if (user && isPublicRoute && pathname !== '/auth/callback') {
-      console.log('[Middleware] User authenticated on public route, redirecting to /dashboard')
+      console.log('[Proxy] User authenticated on public route, redirecting to /dashboard')
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    console.log('[Middleware] Allowing request to continue')
+    console.log('[Proxy] Allowing request to continue')
     return supabaseResponse
   } catch (error) {
     // If anything fails, allow public routes
-    console.error('Middleware error:', error)
+    console.error('Proxy error:', error)
     if (isPublicRoute) {
       return NextResponse.next()
     }
