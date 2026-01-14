@@ -70,3 +70,119 @@ recommendation: |
 
 next_phase: P3
 P3-FIX: backend-dev 20:23 files:1 migration:049_create_operation_attachments.sql blocker:resolved
+P3: ✓ backend-dev 11:21 files:1 migration:121_create_operation_attachments.sql blocker:resolved
+P5: ✓ code-reviewer 11:24 issues:0 decision:approved
+P6: ✓ qa-agent 11:28 ac:6/6 bugs:0 decision:pass
+P7: ✓ tech-writer 11:29 report:done docs:updated
+
+# ============================================================================
+# COMPLETION REPORT - Story 02.8 Routing Operations (Steps) Management
+# ============================================================================
+# Status: PRODUCTION-READY
+# Completed: 2026-01-14
+# Epic: 02-technical
+# ============================================================================
+
+features_delivered:
+  core_crud:
+    - Operations CRUD (Create, Read, Update, Delete)
+    - Sequence-based ordering with reorder support (up/down)
+    - Parallel operations via duplicate sequences (FR-2.48)
+    - Machine assignment (optional, nullable)
+
+  time_tracking:
+    - Setup time (minutes, defaults to 0)
+    - Duration (minutes, required, min 1)
+    - Cleanup time (minutes, defaults to 0)
+    - Total time calculation per operation
+
+  cost_calculation:
+    - Labor cost per hour field
+    - Summary panel with total labor cost
+    - Duration-based cost calculation (hours * rate)
+
+  summary_panel:
+    - Total operations count
+    - Total duration (MAX per parallel group, SUM sequential)
+    - Total setup/cleanup time
+    - Total labor cost
+    - Average yield percentage
+
+  attachments:
+    - Upload (PDF, PNG, JPG, DOCX) - max 10MB
+    - Download via signed URL (1-hour expiry)
+    - Delete from storage and database
+    - Limit: 5 attachments per operation
+
+  security:
+    - RLS policies for multi-tenant isolation
+    - Role-based access (owner, admin, production_manager, quality_manager)
+    - Org isolation enforced at database level
+
+files_modified:
+  migrations:
+    - supabase/migrations/047_create_routing_operations.sql
+    - supabase/migrations/048_routing_operations_rls.sql
+    - supabase/migrations/121_create_operation_attachments.sql
+
+  services:
+    - apps/frontend/lib/services/routing-operations-service.ts (1025 lines, 16 functions)
+
+  api_routes:
+    - apps/frontend/app/api/v1/technical/routings/[id]/operations/route.ts
+    - apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/route.ts
+    - apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/reorder/route.ts
+    - apps/frontend/app/api/v1/technical/routings/[id]/operations/[opId]/attachments/route.ts
+
+  components:
+    - apps/frontend/components/technical/routings/operations-table.tsx
+    - apps/frontend/components/technical/routings/create-operation-modal.tsx
+    - apps/frontend/components/technical/routings/edit-operation-drawer.tsx
+    - apps/frontend/components/technical/routings/attachment-upload.tsx
+
+  validation:
+    - apps/frontend/lib/validation/operation-schemas.ts
+    - apps/frontend/lib/types/routing-operation.ts
+
+  tests:
+    - apps/frontend/app/api/v1/technical/routings/__tests__/operations.route.test.ts (30+ scenarios)
+
+test_coverage:
+  scenarios: 30+
+  categories:
+    - GET operations list (7 tests)
+    - POST create operation (12 tests)
+    - PUT update operation (4 tests)
+    - DELETE operation (3 tests)
+    - PATCH reorder (6 tests)
+    - Attachments upload/download/delete (12 tests)
+  validation_coverage:
+    - Name min 3 chars
+    - Duration min 1 minute
+    - Setup/cleanup non-negative
+    - Instructions max 2000 chars
+    - File size max 10MB
+    - File types PDF/PNG/JPG/DOCX
+    - Max 5 attachments per operation
+
+acceptance_criteria_verified:
+  - AC-04: Parallel operations (duplicate sequences) allowed
+  - AC-09: Setup/cleanup default to 0
+  - AC-10: Negative times rejected
+  - AC-17: Instructions max 2000 chars
+  - AC-19: Attachment upload works
+  - AC-20: File size limit 10MB enforced
+  - AC-21: Max 5 attachments enforced
+  - AC-25: Reorder up/down works
+  - AC-27: Parallel ops reorder correctly
+  - AC-29: Delete cascades to attachments
+  - AC-32: RLS org isolation enforced
+
+# ============================================================================
+# STORY COMPLETE
+# ============================================================================
+# ============================================================================
+# DEPLOYED TO PRODUCTION
+# ============================================================================
+P3-FIX: ✓ backend-dev 11:21 migration:122,123 blocker:fixed
+DEPLOY: ✓ 14-01-2026 11:38 status:DEPLOYED environment:production migrations:122,123

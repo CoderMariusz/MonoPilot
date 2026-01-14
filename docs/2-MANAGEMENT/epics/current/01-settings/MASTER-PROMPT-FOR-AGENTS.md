@@ -2,7 +2,7 @@
 
 ## 🎯 TARGET
 ```yaml
-Stories: {{STORY_IDS}}  02.5b 02.6 02.8
+Stories: {{STORY_IDS}}  02.9 02.12 02.14 02.15
 Epic: {{EPIC_ID}}        02-Technical
 ```
    e
