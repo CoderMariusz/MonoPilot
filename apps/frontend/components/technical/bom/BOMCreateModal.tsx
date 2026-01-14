@@ -526,7 +526,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                     <h3 className="font-medium">
                       {editingItemId ? 'Edit' : 'Add'} {itemForm.is_output ? 'Byproduct' : 'Component'}
                     </h3>
-                    <Button variant="ghost" size="sm" onClick={() => { setShowItemForm(false); resetItemForm(); }}>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { setShowItemForm(false); resetItemForm(); }}>
                       Cancel
                     </Button>
                   </div>
@@ -645,11 +645,11 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
 
                   {/* Buttons */}
                   <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => handleSaveItem(false)}>
+                    <Button type="button" variant="outline" onClick={() => handleSaveItem(false)}>
                       Save Item
                     </Button>
                     {!editingItemId && (
-                      <Button onClick={() => handleSaveItem(true)}>
+                      <Button type="button" onClick={() => handleSaveItem(true)}>
                         Save & Add More
                       </Button>
                     )}
@@ -657,11 +657,11 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <Button onClick={() => openItemForm(null, false)}>
+                  <Button type="button" onClick={() => openItemForm(null, false)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Component
                   </Button>
-                  <Button variant="outline" onClick={() => openItemForm(null, true)}>
+                  <Button type="button" variant="outline" onClick={() => openItemForm(null, true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Byproduct
                   </Button>
@@ -710,6 +710,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                           <TableCell>
                             <div className="flex gap-1">
                               <Button
+                                type="button"
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => openItemForm(item)}
@@ -717,6 +718,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                                 <Edit2 className="h-4 w-4" />
                               </Button>
                               <Button
+                                type="button"
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteItem(item.id)}
@@ -757,10 +759,10 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                             <TableCell>{item.uom}</TableCell>
                             <TableCell>
                               <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={() => openItemForm(item)}>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => openItemForm(item)}>
                                   <Edit2 className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleDeleteItem(item.id)}>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleDeleteItem(item.id)}>
                                   <Trash2 className="h-4 w-4 text-red-500" />
                                 </Button>
                               </div>
@@ -840,10 +842,11 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => handleSave(true)}
                 disabled={saving || !productId || inputItems.length === 0}
@@ -852,6 +855,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                 Save Draft
               </Button>
               <Button
+                type="button"
                 onClick={() => handleSave(false)}
                 disabled={saving || !productId || inputItems.length === 0}
               >
