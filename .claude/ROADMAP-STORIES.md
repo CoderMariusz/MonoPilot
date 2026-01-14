@@ -10,7 +10,7 @@
 
 | Epic | Modul | Stories | Zaimplementowane | Status | % |
 |------|-------|---------|------------------|--------|---|
-| 01 | Settings | 16 | 16 | COMPLETE | 100% |
+| 01 | Settings | 26 (16+10) | 16 MVP done | MVP COMPLETE + Phase 1B-3 defined | 62% impl / 100% def |
 | 02 | Technical | 23 (17+6) | 17 MVP done | MVP COMPLETE + Phase 2 defined | 74% impl / 100% def |
 | 03 | Planning | 20 | 18 done + 1 partial | NEAR COMPLETE | 95% |
 | 04 Phase 0 | Production MVP | 7 | 7 | COMPLETE | 100% |
@@ -20,14 +20,18 @@
 | 07 | Shipping | 16 | 0 | NOT STARTED | 0% |
 | 08-11 | Premium | 78-97 | 0 | NO STORIES | 0% |
 
-**TOTAL:** 78/86 stories zaimplementowanych w Epic 01-05 (~91%)
-**Note:** Epic 02 now has 6 Phase 2 stories defined (02.16-02.21) covering remaining P2 FR
+**TOTAL:** 78/96 stories zaimplementowanych w Epic 01-05 (~81%)
+**Note:**
+- Epic 01 has 10 Phase 1B-3 stories defined (01.17-01.26) for security, integrations, enterprise
+- Epic 02 has 6 Phase 2 stories defined (02.16-02.21) covering remaining P2 FR
 
 ---
 
-## EPIC 01 - SETTINGS COMPLETE 100%
+## EPIC 01 - SETTINGS 100% STORY DEFINITION | 62% IMPLEMENTED
 
-**Status:** Wszystkie 16 stories zaimplementowane i przetestowane
+**Status:** MVP COMPLETE (16/16 Phase 1A stories) + 10 Phase 1B-3 stories defined
+
+### Phase 1A: MVP Core (COMPLETE)
 
 | Story | Nazwa | Status | Testy | AC | Fazy |
 |-------|-------|--------|-------|-----|------|
@@ -49,10 +53,48 @@
 | 01.15 | Session & Password | DONE | 83 | pass | P1-P7 |
 | 01.16 | User Invitations | DONE | 335 LOC | 9/9 | P1-P7 |
 
-**Metryki:**
+### Phase 1B: MVP Polish (STORIES DEFINED)
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 01.17 | Audit Trail | NOT STARTED | 5 FR | L (3-4d) | Complete event logging, audit log viewer |
+| 01.18 | Security Policies | NOT STARTED | 3 FR | M (1-2d) | Session timeout, password policies, lockout |
+| 01.19 | MFA/2FA Support | NOT STARTED | 1 FR | M (2-3d) | TOTP via Supabase Auth |
+| 01.20a | Multi-Language Core | NOT STARTED | 4 FR | M (2-3d) | PL/EN/DE/FR translations |
+| 01.20b | Multi-Language Formatting | NOT STARTED | 3 FR | S (1d) | Date/number/currency locale |
+
+### Phase 2: Growth/Integrations (STORIES DEFINED)
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 01.21 | API Keys Management | NOT STARTED | 6 FR | M (2-3d) | Generate/revoke keys, scopes, rate limiting |
+| 01.22 | Webhooks Management | NOT STARTED | 6 FR | L (3-4d) | Event subscriptions, HMAC, retry logic |
+| 01.23 | Notification Settings | NOT STARTED | 4 FR | M (1-2d) | Email/in-app preferences, templates |
+
+### Phase 3: Enterprise (STORIES DEFINED)
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 01.24a | Subscription Core | NOT STARTED | 4 FR | M (2-3d) | Stripe integration, plan selection |
+| 01.24b | Billing & Usage Tracking | NOT STARTED | 3 FR | M (1-2d) | Invoice history, usage metrics |
+| 01.25 | Import/Export & Backup | NOT STARTED | 6 FR | L (2-3d) | CSV/Excel import/export, full backup |
+| 01.26 | IP Whitelist + GDPR | NOT STARTED | 2 FR | M (1-2d) | IP restrictions, data export/erasure |
+
+**Metryki Phase 1A:**
 - Lacznie testow: ~13,500+ linii kodu testowego
 - Wszystkie P7 zakonczone
-- Gotowe do produkcji
+- Gotowe do produkcji ✅
+
+**Metryki Phase 1B-3:**
+- Stories defined: 10 (complete markdown + AC + Technical spec)
+- Estimated effort: 21-32 days
+- FR coverage: 24 additional FR (88/95 total = 93%)
+
+**Status:**
+- MVP (Phase 1A): 100% DEPLOYED ✅ Ready for production
+- Phase 1B: 100% STORIES DEFINED ✅ Implementation pending
+- Phase 2-3: 100% STORIES DEFINED ✅ Implementation pending
+- Epic 01: 100% story definition complete | 62% implemented (16/26 stories)
 
 ---
 
@@ -324,14 +366,16 @@ Potem: Implementacja
 ## CHECKSUM
 
 ```
-Wygenerowano: 2026-01-14 21:05 UTC
-Zrodlo: .claude/checkpoints/*.yaml + Epic 02 gap analysis
-Stories zaimplementowane: 78/86 (Epic 01-05)
-Stories do implementacji: 8 (Epic 04 Phase 1) + 6 (Epic 02 Phase 2)
+Wygenerowano: 2026-01-14 21:12 UTC
+Zrodlo: .claude/checkpoints/*.yaml + Epic 01-02 gap analysis
+Stories zaimplementowane: 78/96 (Epic 01-05)
+Stories do implementacji: 8 (Epic 04 Phase 1) + 10 (Epic 01 Phase 1B-3) + 6 (Epic 02 Phase 2)
 Stories do napisania: 78-97 (Epic 08-11)
-Epic 02 story definition: 100% complete (6 Phase 2 stories added)
+Epic 01 story definition: 100% complete (26 stories total: 16 MVP + 10 Phase 1B-3)
+Epic 01 implementation: 62% (16/26 MVP done, 10 Phase 1B-3 pending)
+Epic 02 story definition: 100% complete (23 stories total: 17 MVP + 6 Phase 2)
 Epic 02 implementation: 74% (17/23 MVP done, 6 Phase 2 pending)
 Epic 05 completion date: 2026-01-09
-Epic 02 Phase 2 stories created: 2026-01-14 (184KB, 6 files)
-Story 02.16-02.21: Phase 2 stories (NOT STARTED)
+Epic 01 Phase 1B-3 stories: 01.17-01.26 (security, integrations, enterprise)
+Epic 02 Phase 2 stories: 02.16-02.21 (created 2026-01-14, 184KB)
 ```
