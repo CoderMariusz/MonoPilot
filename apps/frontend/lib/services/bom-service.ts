@@ -56,24 +56,17 @@ export interface BOMFilters {
 
 /**
  * Version increment logic
- * 1.0 → 1.1, 1.9 → 2.0 (rollover at 9)
+ * Simple integer increment: 1 → 2 → 3
  */
-export function incrementVersion(version: string): string {
-  const [major, minor] = version.split('.').map(Number)
-
-  if (minor >= 9) {
-    // Rollover: 1.9 → 2.0
-    return `${major + 1}.0`
-  } else {
-    // Normal increment: 1.0 → 1.1
-    return `${major}.${minor + 1}`
-  }
+export function incrementVersion(version: number | string): number {
+  const numVersion = typeof version === 'string' ? parseInt(version, 10) : version
+  return (numVersion || 0) + 1
 }
 
 /**
  * Get max version for a product
  */
-async function getMaxVersion(productId: string, orgId: string): Promise<string | null> {
+async function getMaxVersion(productId: string, orgId: string): Promise<number | null> {
   const supabase = createServerSupabaseAdmin()
 
   const { data, error } = await supabase
@@ -89,7 +82,9 @@ async function getMaxVersion(productId: string, orgId: string): Promise<string |
     return null
   }
 
-  return data.version
+  // Ensure we return a number
+  const version = data.version
+  return typeof version === 'string' ? parseInt(version, 10) : version
 }
 
 /**
@@ -293,7 +288,7 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
 
   // Get max version for this product
   const maxVersion = await getMaxVersion(input.product_id, org_id)
-  const newVersion = maxVersion ? incrementVersion(maxVersion) : '1.0'
+  const newVersion = maxVersion !== null ? incrementVersion(maxVersion) : 1
 
   // Convert dates to ISO string if they are Date objects
   const effective_from = input.effective_from instanceof Date

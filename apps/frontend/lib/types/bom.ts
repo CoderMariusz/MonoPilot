@@ -19,6 +19,7 @@ export interface BOM {
   output_uom: string
   units_per_box: number | null
   boxes_per_pallet: number | null
+  yield_percent: number
   notes: string | null
   created_at: string
   updated_at: string
@@ -62,6 +63,7 @@ export interface CreateBOMRequest {
   status?: 'draft' | 'active'
   output_qty: number
   output_uom: string
+  yield_percent?: number
   notes?: string | null
 }
 
@@ -71,6 +73,7 @@ export interface UpdateBOMRequest {
   status?: BOMStatus
   output_qty?: number
   output_uom?: string
+  yield_percent?: number
   notes?: string | null
 }
 
@@ -104,6 +107,7 @@ export interface BOMFormData {
   status: 'draft' | 'active'
   output_qty: number
   output_uom: string
+  yield_percent: number
   notes: string | null
 }
 

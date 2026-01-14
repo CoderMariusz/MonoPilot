@@ -76,6 +76,10 @@ const bomFormSchema = z
       .string()
       .min(1, 'Unit of measure is required')
       .max(20, 'Unit of measure too long'),
+    yield_percent: z.coerce
+      .number()
+      .min(0.01, 'Yield must be at least 0.01%')
+      .max(100, 'Yield cannot exceed 100%'),
     notes: z.string().max(2000, 'Notes too long').nullable().optional(),
   })
   .refine(
@@ -138,6 +142,7 @@ export function BOMHeaderForm({
       status: bom?.status === 'active' ? 'active' : 'draft',
       output_qty: bom?.output_qty || 1,
       output_uom: bom?.output_uom || selectedProduct?.uom || 'EA',
+      yield_percent: (bom as any)?.yield_percent || 100,
       notes: bom?.notes || '',
     },
   })
@@ -173,6 +178,7 @@ export function BOMHeaderForm({
       status: values.status,
       output_qty: values.output_qty,
       output_uom: values.output_uom,
+      yield_percent: values.yield_percent,
       notes: values.notes || null,
     }
 
@@ -413,6 +419,31 @@ export function BOMHeaderForm({
             )}
           />
         </div>
+
+        {/* Yield Percent */}
+        <FormField
+          control={form.control}
+          name="yield_percent"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Expected Yield %</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max="100"
+                  {...field}
+                  onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                />
+              </FormControl>
+              <FormDescription>
+                Expected yield percentage (0.01-100%). Default 100% means no waste.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Notes */}
         <FormField

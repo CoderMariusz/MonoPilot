@@ -51,6 +51,7 @@ export default function CreateBOMPage() {
         status: data.status,
         output_qty: data.output_qty,
         output_uom: data.output_uom,
+        yield_percent: data.yield_percent,
         notes: data.notes || undefined,
       })
 
