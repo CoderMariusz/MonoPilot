@@ -93,6 +93,19 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     if (error) {
       console.error('Error fetching version history:', error)
+      // If table doesn't exist in schema cache, return empty result gracefully
+      if (error.message.includes('schema cache') || error.code === 'PGRST204') {
+        return NextResponse.json({
+          data: [],
+          pagination: {
+            page: params.page,
+            limit: params.limit,
+            total: 0,
+            totalPages: 0
+          },
+          warning: 'Version history table not available'
+        })
+      }
       return NextResponse.json(
         { error: 'Failed to fetch version history', details: error.message },
         { status: 500 }

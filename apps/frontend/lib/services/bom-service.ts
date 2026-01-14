@@ -179,8 +179,8 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
         id,
         code,
         name,
-        type,
-        uom
+        base_uom,
+        product_type:product_types(id, code, name)
       ),
       items:bom_items (
         *,
@@ -188,8 +188,8 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
           id,
           code,
           name,
-          type,
-          uom
+          base_uom,
+          product_type:product_types(id, code, name)
         )
       ),
       production_lines:bom_production_lines (
@@ -220,8 +220,8 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
         id,
         code,
         name,
-        type,
-        uom
+        base_uom,
+        product_type:product_types(id, code, name)
       ),
       production_lines:bom_production_lines (
         id,
