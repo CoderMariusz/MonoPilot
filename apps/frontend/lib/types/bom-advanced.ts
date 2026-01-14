@@ -43,7 +43,7 @@ export interface ModifiedItem {
 
 export interface BomVersionSummary {
   id: string
-  version: string
+  version: number
   effective_from: string
   effective_to: string | null
   output_qty: number
@@ -209,7 +209,7 @@ export interface ExplosionTreeNode extends ExplosionItem {
 // BOM version for selector dropdown
 export interface BomVersionOption {
   id: string
-  version: string
+  version: number
   status: string
   effective_from: string
   effective_to: string | null

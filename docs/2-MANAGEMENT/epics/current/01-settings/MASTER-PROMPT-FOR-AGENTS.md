@@ -2,8 +2,8 @@
 
 ## 🎯 TARGET
 ```yaml
-Stories: {{STORY_IDS}}  03.11b 03.13
-Epic: {{EPIC_ID}}        03-planning
+Stories: {{STORY_IDS}}  02.5b 02.6 02.8
+Epic: {{EPIC_ID}}        02-Technical
 ```
    e
 ## 📋 7-PHASE FLOW
@@ -19,6 +19,7 @@ Epic: {{EPIC_ID}}        03-planning
 | P7 | tech-writer | Never | No |
 
 **Agents append checkpoints. Orchestrator reads + routes.**
+**check what need to be fix/done**
 
 ## 🔄 CHECKPOINT SYSTEM
 
@@ -65,12 +66,17 @@ Exit: {condition}
 2. **No reports until P7** - Agents work, tech-writer reports
 3. **Max 4 parallel agents**
 4. **Phase skip = orchestrator decision** (agents don't skip)
-5. **Micro-handoff ≤50 tokens** from agents
-6. **check UX in cataloge 3-Architecture/ux/wireframe**
+5. **Micro-handoff ≤150 tokens** from agents
+6. **check UX in cataloge 3-Architecture/ux/wireframe do not relay on code! make sure you are doing how project show wireframe** 
 7. **check context make sure you dont runout if there is posibility /compact context or close subagent and run next after short handover**
+8. **Aways one soties per Agent!**
 
 ---
 
-**Full docs:** `.claude/agents/ORCHESTRATOR.md`
+**Full docs:** 
+
+`.claude/agents/ORCHESTRATOR.md`
+`.claude/ROADMAP-STORIES.MD`
+`.claude/IMPLEMENTATION-ROADMAP.yaml`
 
 **START. NO QUESTIONS. DELEGATE IMMEDIATELY.**

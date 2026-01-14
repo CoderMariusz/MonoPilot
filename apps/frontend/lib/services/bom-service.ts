@@ -279,7 +279,7 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
     throw new Error('Product not found')
   }
 
-  const productType = product.product_type as { id: string; code: string; name: string } | null
+  const productType = product.product_type as unknown as { id: string; code: string; name: string } | null
   const allowedTypes = ['FG', 'WIP']
 
   if (!productType || !allowedTypes.includes(productType.code)) {
@@ -1648,7 +1648,7 @@ export async function updateBOMYield(
  */
 export async function getBOMVersionsForProduct(productId: string): Promise<Array<{
   id: string
-  version: string
+  version: number
   effective_from: string
   effective_to: string | null
   status: string

@@ -56,7 +56,7 @@ export interface BOM {
   id: string
   org_id: string
   product_id: string
-  version: string
+  version: number
   effective_from: string | Date
   effective_to: string | Date | null
   status: BOMStatus
@@ -269,7 +269,7 @@ export interface BOMWithItems extends BOM {
 export interface BOMTimelineData {
   boms: Array<{
     id: string;
-    version: string;
+    version: number;
     effective_from: string;
     effective_to: string | null;
     status: BOMStatus;

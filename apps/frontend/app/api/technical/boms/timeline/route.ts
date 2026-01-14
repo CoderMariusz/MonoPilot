@@ -16,13 +16,13 @@ import { ZodError } from 'zod';
 
 function getStatusColor(status: BOMStatus): string {
   switch (status) {
-    case 'Active':
+    case 'active':
       return 'green';
-    case 'Draft':
+    case 'draft':
       return 'gray';
-    case 'Phased Out':
+    case 'phased_out':
       return 'orange';
-    case 'Inactive':
+    case 'inactive':
       return 'red';
     default:
       return 'gray';
