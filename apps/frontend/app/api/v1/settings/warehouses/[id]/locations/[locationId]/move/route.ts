@@ -1,5 +1,5 @@
 /**
- * API Route: /api/v1/settings/warehouses/[warehouseId]/locations/[id]/move
+ * API Route: /api/v1/settings/warehouses/[id]/locations/[locationId]/move
  * Story: 01.9 - Warehouse Locations Management (Hierarchical)
  * Methods: POST (move location to new parent)
  */
@@ -16,7 +16,7 @@ const moveLocationSchema = z.object({
 })
 
 /**
- * POST /api/v1/settings/warehouses/:warehouseId/locations/:id/move
+ * POST /api/v1/settings/warehouses/:id/locations/:locationId/move
  * Move location to a new parent
  *
  * Request Body:
@@ -26,7 +26,7 @@ const moveLocationSchema = z.object({
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ warehouseId: string; id: string }> }
+  { params }: { params: Promise<{ id: string; locationId: string }> }
 ) {
   try {
     // CSRF protection: validate request origin
@@ -35,7 +35,7 @@ export async function POST(
       return originError
     }
 
-    const { warehouseId, id } = await params
+    const { id: warehouseId, locationId } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user context
@@ -58,7 +58,7 @@ export async function POST(
     const { new_parent_id } = moveLocationSchema.parse(body)
 
     // Move location
-    const result = await moveLocation(id, new_parent_id, userId, orgId)
+    const result = await moveLocation(locationId, new_parent_id, userId, orgId)
 
     if (!result.success) {
       // Determine appropriate status code
@@ -82,7 +82,7 @@ export async function POST(
       )
     }
 
-    console.error('Error in POST /api/v1/settings/warehouses/:warehouseId/locations/:id/move:', error)
+    console.error('Error in POST /api/v1/settings/warehouses/:id/locations/:locationId/move:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

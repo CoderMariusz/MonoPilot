@@ -1,5 +1,5 @@
 /**
- * API Route: /api/v1/settings/warehouses/[warehouseId]/locations/[id]/tree
+ * API Route: /api/v1/settings/warehouses/[id]/locations/[locationId]/tree
  * Story: 01.9 - Warehouse Locations Management (Hierarchical)
  * Methods: GET (get subtree under location)
  */
@@ -10,17 +10,17 @@ import { getAuthContext } from '@/lib/api/auth-helpers'
 import { getTree } from '@/lib/services/location-service'
 
 /**
- * GET /api/v1/settings/warehouses/:warehouseId/locations/:id/tree
+ * GET /api/v1/settings/warehouses/:id/locations/:locationId/tree
  * Get subtree under a specific location
  *
  * Returns the location and all its descendants in tree structure
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ warehouseId: string; id: string }> }
+  { params }: { params: Promise<{ id: string; locationId: string }> }
 ) {
   try {
-    const { warehouseId, id } = await params
+    const { id: warehouseId, locationId } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user context
@@ -32,7 +32,7 @@ export async function GET(
     const { orgId } = authContext
 
     // Get subtree starting from the specified location
-    const result = await getTree(warehouseId, orgId, id)
+    const result = await getTree(warehouseId, orgId, locationId)
 
     if (!result.success) {
       return NextResponse.json(
@@ -51,7 +51,7 @@ export async function GET(
 
     return NextResponse.json(result.data)
   } catch (error) {
-    console.error('Error in GET /api/v1/settings/warehouses/:warehouseId/locations/:id/tree:', error)
+    console.error('Error in GET /api/v1/settings/warehouses/:id/locations/:locationId/tree:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

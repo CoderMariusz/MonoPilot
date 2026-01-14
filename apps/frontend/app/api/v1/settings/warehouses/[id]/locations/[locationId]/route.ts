@@ -1,5 +1,5 @@
 /**
- * API Route: /api/v1/settings/warehouses/[warehouseId]/locations/[id]
+ * API Route: /api/v1/settings/warehouses/[id]/locations/[locationId]
  * Story: 01.9 - Warehouse Locations Management (Hierarchical)
  * Methods: GET (getById), PUT (update), DELETE (delete)
  */
@@ -12,17 +12,17 @@ import { getLocationById, updateLocation, deleteLocation } from '@/lib/services/
 import { ZodError } from 'zod'
 
 /**
- * GET /api/v1/settings/warehouses/:warehouseId/locations/:id
+ * GET /api/v1/settings/warehouses/:id/locations/:locationId
  * Get single location by ID
  *
  * Returns 404 for cross-org access (not 403) - security best practice
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ warehouseId: string; id: string }> }
+  { params }: { params: Promise<{ id: string; locationId: string }> }
 ) {
   try {
-    const { warehouseId, id } = await params
+    const { id: warehouseId, locationId } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user context
@@ -34,7 +34,7 @@ export async function GET(
     const { orgId } = authContext
 
     // Get location
-    const result = await getLocationById(warehouseId, id, orgId)
+    const result = await getLocationById(warehouseId, locationId, orgId)
 
     if (!result.success) {
       return NextResponse.json(
@@ -45,13 +45,13 @@ export async function GET(
 
     return NextResponse.json(result.data)
   } catch (error) {
-    console.error('Error in GET /api/v1/settings/warehouses/:warehouseId/locations/:id:', error)
+    console.error('Error in GET /api/v1/settings/warehouses/:id/locations/:locationId:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 /**
- * PUT /api/v1/settings/warehouses/:warehouseId/locations/:id
+ * PUT /api/v1/settings/warehouses/:id/locations/:locationId
  * Update location
  *
  * Request Body: UpdateLocationInput
@@ -61,7 +61,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ warehouseId: string; id: string }> }
+  { params }: { params: Promise<{ id: string; locationId: string }> }
 ) {
   try {
     // CSRF protection: validate request origin
@@ -70,7 +70,7 @@ export async function PUT(
       return originError
     }
 
-    const { warehouseId, id } = await params
+    const { id: warehouseId, locationId } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user context
@@ -93,7 +93,7 @@ export async function PUT(
     const validatedData = updateLocationSchema.parse(body)
 
     // Update location
-    const result = await updateLocation(warehouseId, id, validatedData, userId, orgId)
+    const result = await updateLocation(warehouseId, locationId, validatedData, userId, orgId)
 
     if (!result.success) {
       const status = result.error?.includes('not found') ? 404 : 500
@@ -113,13 +113,13 @@ export async function PUT(
       )
     }
 
-    console.error('Error in PUT /api/v1/settings/warehouses/:warehouseId/locations/:id:', error)
+    console.error('Error in PUT /api/v1/settings/warehouses/:id/locations/:locationId:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 /**
- * DELETE /api/v1/settings/warehouses/:warehouseId/locations/:id
+ * DELETE /api/v1/settings/warehouses/:id/locations/:locationId
  * Delete location
  *
  * Blocked if location has children or inventory
@@ -128,10 +128,10 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ warehouseId: string; id: string }> }
+  { params }: { params: Promise<{ id: string; locationId: string }> }
 ) {
   try {
-    const { warehouseId, id } = await params
+    const { id: warehouseId, locationId } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user context
@@ -150,7 +150,7 @@ export async function DELETE(
     const { orgId } = authContext
 
     // Delete location
-    const result = await deleteLocation(warehouseId, id, orgId)
+    const result = await deleteLocation(warehouseId, locationId, orgId)
 
     if (!result.success) {
       // Determine appropriate status code
@@ -167,7 +167,7 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
-    console.error('Error in DELETE /api/v1/settings/warehouses/:warehouseId/locations/:id:', error)
+    console.error('Error in DELETE /api/v1/settings/warehouses/:id/locations/:locationId:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

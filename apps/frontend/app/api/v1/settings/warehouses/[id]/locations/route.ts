@@ -1,5 +1,5 @@
 /**
- * API Route: /api/v1/settings/warehouses/[warehouseId]/locations
+ * API Route: /api/v1/settings/warehouses/[id]/locations
  * Story: 01.9 - Warehouse Locations Management (Hierarchical)
  * Methods: GET (list/tree), POST (create)
  */
@@ -12,7 +12,7 @@ import { createLocation, getLocations } from '@/lib/services/location-service'
 import { ZodError } from 'zod'
 
 /**
- * GET /api/v1/settings/warehouses/:warehouseId/locations
+ * GET /api/v1/settings/warehouses/:id/locations
  * List locations for warehouse (tree or flat view)
  *
  * Query Parameters:
@@ -25,10 +25,10 @@ import { ZodError } from 'zod'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ warehouseId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { warehouseId } = await params
+    const { id: warehouseId } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user context
@@ -74,13 +74,13 @@ export async function GET(
 
     return NextResponse.json(result.data)
   } catch (error) {
-    console.error('Error in GET /api/v1/settings/warehouses/:warehouseId/locations:', error)
+    console.error('Error in GET /api/v1/settings/warehouses/:id/locations:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 /**
- * POST /api/v1/settings/warehouses/:warehouseId/locations
+ * POST /api/v1/settings/warehouses/:id/locations
  * Create new location
  *
  * Request Body: CreateLocationInput
@@ -89,7 +89,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ warehouseId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // CSRF protection: validate request origin
@@ -98,7 +98,7 @@ export async function POST(
       return originError
     }
 
-    const { warehouseId } = await params
+    const { id: warehouseId } = await params
     const supabase = await createServerSupabase()
 
     // Get authenticated user context
@@ -144,7 +144,7 @@ export async function POST(
       )
     }
 
-    console.error('Error in POST /api/v1/settings/warehouses/:warehouseId/locations:', error)
+    console.error('Error in POST /api/v1/settings/warehouses/:id/locations:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
