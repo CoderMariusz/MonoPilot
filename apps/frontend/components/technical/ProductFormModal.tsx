@@ -253,7 +253,7 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
       }
 
       if (formData.description) dataToValidate.description = formData.description
-      if (formData.category) dataToValidate.category = formData.category
+      // Note: category field removed - table has category_id (UUID) but no categories table exists yet
       if (formData.shelf_life_days) dataToValidate.shelf_life_days = parseInt(formData.shelf_life_days)
       if (formData.min_stock_qty) dataToValidate.min_stock_qty = parseFloat(formData.min_stock_qty)
       if (formData.max_stock_qty) dataToValidate.max_stock_qty = parseFloat(formData.max_stock_qty)
@@ -314,7 +314,7 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
       }
 
       if (formData.description) payload.description = formData.description
-      if (formData.category) payload.category = formData.category
+      // Note: category field removed - table has category_id (UUID) but no categories table exists yet
       if (formData.shelf_life_days) payload.shelf_life_days = parseInt(formData.shelf_life_days)
       if (formData.min_stock_qty) payload.min_stock_qty = parseFloat(formData.min_stock_qty)
       if (formData.max_stock_qty) payload.max_stock_qty = parseFloat(formData.max_stock_qty)
@@ -534,7 +534,7 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {/* Category */}
+              {/* Category - TODO: Enable when categories table is created
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Input
@@ -544,6 +544,7 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
                   placeholder="e.g., Dry Goods, Dairy"
                 />
               </div>
+              */}
 
               {/* Shelf Life */}
               <div className="space-y-2">
