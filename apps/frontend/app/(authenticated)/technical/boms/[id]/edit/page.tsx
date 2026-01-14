@@ -78,11 +78,18 @@ import { TechnicalHeader } from '@/components/technical/TechnicalHeader'
 import { useToast } from '@/hooks/use-toast'
 
 // Types
+interface ProductType {
+  id: string
+  code: string
+  name: string
+}
+
 interface Product {
   id: string
   code: string
   name: string
-  type: string
+  type?: string // mapped from product_type.code
+  product_type?: ProductType
   uom: string
 }
 
@@ -212,7 +219,12 @@ export default function EditBOMPage({ params }: PageProps) {
         const response = await fetch('/api/technical/products?limit=1000&status=active')
         if (response.ok) {
           const data = await response.json()
-          const productList = data.data || data.products || []
+          const rawProducts = data.data || data.products || []
+          // Map product_type.code to type for easier access
+          const productList = rawProducts.map((p: Product) => ({
+            ...p,
+            type: p.product_type?.code || p.type || 'unknown'
+          }))
           setAllProducts(productList)
         }
       } catch (error) {
@@ -406,7 +418,7 @@ export default function EditBOMPage({ params }: PageProps) {
 
   // Get component products (RM, ING, PKG for items)
   const componentProducts = allProducts.filter(p =>
-    ['RM', 'ING', 'PKG', 'WIP'].includes(p.type)
+    p.type && ['RM', 'ING', 'PKG', 'WIP'].includes(p.type)
   )
 
   // Auto-fill UoM when component selected
