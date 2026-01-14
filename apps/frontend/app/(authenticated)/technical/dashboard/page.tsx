@@ -582,7 +582,8 @@ function RecentActivityFeed({
           </div>
         )}
         <div className="mt-4 pt-4 border-t">
-          <Link href="/technical/audit-log" className="text-sm text-blue-600 hover:underline">
+{/* TODO: Create /settings/audit-logs page */}
+          <Link href="/settings" className="text-sm text-blue-600 hover:underline">
             View All Activity →
           </Link>
         </div>

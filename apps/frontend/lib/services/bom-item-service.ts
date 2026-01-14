@@ -411,7 +411,7 @@ export async function getInputsForOperation(
     .from('bom_items')
     .select(`
       *,
-      component:products!component_id (id, code, name, uom, type)
+      component:products!component_id (id, code, name, base_uom, product_type:product_types(code))
     `)
     .eq('bom_id', bomId)
     .eq('operation_seq', operationSeq)
@@ -439,7 +439,7 @@ export async function getOutputsForOperation(
     .from('bom_items')
     .select(`
       *,
-      component:products!component_id (id, code, name, uom, type)
+      component:products!component_id (id, code, name, base_uom, product_type:product_types(code))
     `)
     .eq('bom_id', bomId)
     .eq('operation_seq', operationSeq)
@@ -468,7 +468,7 @@ export async function getItemsForLine(
     .from('bom_items')
     .select(`
       *,
-      component:products!component_id (id, code, name, uom, type)
+      component:products!component_id (id, code, name, base_uom, product_type:product_types(code))
     `)
     .eq('bom_id', bomId)
     .or(`line_ids.is.null,line_ids.cs.{${lineId}}`)

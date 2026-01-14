@@ -211,8 +211,9 @@ export function RecentActivityPanel({
 
         {/* View All Link */}
         <div className="mt-4 pt-4 border-t">
+{/* TODO: Create /settings/audit-logs page */}
           <Link
-            href="/technical/audit-log"
+            href="/settings"
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
           >
             View All Activity

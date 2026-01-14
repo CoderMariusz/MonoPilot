@@ -123,7 +123,7 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
     const fetchAllergens = async () => {
       try {
         setLoadingAllergens(true)
-        const response = await fetch('/api/settings/allergens')
+        const response = await fetch('/api/v1/settings/allergens')
         if (response.ok) {
           const data = await response.json()
           setAllergens(data.allergens || [])
