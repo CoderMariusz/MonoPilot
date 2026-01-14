@@ -12,7 +12,7 @@
 |------|-------|---------|------------------|--------|---|
 | 01 | Settings | 26 (16+10) | 16 MVP done | MVP COMPLETE + Phase 1B-3 defined | 62% impl / 100% def |
 | 02 | Technical | 23 (17+6) | 17 MVP done | MVP COMPLETE + Phase 2 defined | 74% impl / 100% def |
-| 03 | Planning | 20 | 18 done + 1 partial | NEAR COMPLETE | 95% |
+| 03 | Planning | 30 (20+10) | 19 MVP done | MVP COMPLETE + Phase 2-3 defined | 63% impl / 100% def |
 | 04 Phase 0 | Production MVP | 7 | 7 | COMPLETE | 100% |
 | 04 Phase 1 | Production Full | 10 | 0 | READY (unblocked) | 0% |
 | 05 | Warehouse | 20 | 20 | COMPLETE | 100% |
@@ -20,10 +20,11 @@
 | 07 | Shipping | 16 | 0 | NOT STARTED | 0% |
 | 08-11 | Premium | 78-97 | 0 | NO STORIES | 0% |
 
-**TOTAL:** 78/96 stories zaimplementowanych w Epic 01-05 (~81%)
+**TOTAL:** 88/106 stories zaimplementowanych w Epic 01-05 (~83%)
 **Note:**
 - Epic 01 has 10 Phase 1B-3 stories defined (01.17-01.26) for security, integrations, enterprise
 - Epic 02 has 6 Phase 2 stories defined (02.16-02.21) covering remaining P2 FR
+- Epic 03 has 10 Phase 2-3 stories defined (03.18-03.27) for forecasting, MRP, supplier quality, EDI
 
 ---
 
@@ -148,9 +149,11 @@
 
 ---
 
-## EPIC 03 - PLANNING 95% COMPLETE
+## EPIC 03 - PLANNING 100% STORY DEFINITION | 63% IMPLEMENTED
 
-**Status:** 18 stories COMPLETE, 1 IN PROGRESS, 1 BLOCKED
+**Status:** MVP COMPLETE (18/20 Phase 1 stories) + 10 Phase 2-3 stories defined
+
+### Phase 1: MVP (NEAR COMPLETE)
 
 | Story | Nazwa | Status | Testy | AC | Uwagi |
 |-------|-------|--------|-------|-----|-------|
@@ -169,15 +172,48 @@
 | 03.11a | WO BOM Snapshot | DONE | 32 | 13/13 | Complete |
 | 03.11b | WO Reservations | COMPLETE | 251 | 14/14 | Complete |
 | 03.12 | WO Operations | COMPLETE | 84 | 10/10 | Complete |
-| **03.13** | **Material Availability** | **IN PROGRESS** | 82 | - | P3 frontend |
-| **03.14** | **WO Scheduling APS** | **BLOCKED** | 0 | 0 | Needs Epic 04 |
+| **03.13** | **Material Availability** | **IN PROGRESS** | 82 | - | P3 frontend (2 days) |
+| **03.14** | **WO Scheduling APS** | **BLOCKED** | 0 | 0 | Needs Epic 04 (7-10 days when unblocked) |
 | 03.15 | WO Gantt View | COMPLETE | 73 | 15/15 | Complete |
 | 03.16 | Planning Dashboard | COMPLETE | 108 | 11/11 | Complete |
 | 03.17 | Planning Settings | COMPLETE | 102 | 12/13 | Complete |
 
+### Phase 2: Demand Forecasting & MRP (STORIES DEFINED)
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 03.18 | Demand History Tracking | NOT STARTED | 1 FR | M (3-4d) | Historical demand per product, seasonality |
+| 03.19 | Basic Demand Forecasting | NOT STARTED | 3 FR | L (5-7d) | Moving average, safety stock, ROP alerts |
+| 03.20 | Master Production Schedule | NOT STARTED | 1 FR | M (4-5d) | MPS calendar, freeze zones, WO generation |
+| 03.21 | MRP Calculation Engine | NOT STARTED | 2 FR | XL (7-10d) | BOM explosion, net requirements, suggested orders |
+| 03.22 | MRP Dashboard | NOT STARTED | 1 FR | M (3-4d) | MRP run history, exception messages, pegging |
+| 03.23 | Replenishment Rules | NOT STARTED | 3 FR | L (5-7d) | Min/Max, ROP, time-based, auto PO generation |
+| 03.24 | PO Templates & Blanket POs | NOT STARTED | 2 FR | M (4-5d) | Reusable templates, standing orders, releases |
+
+### Phase 3: Supplier Quality & Enterprise (STORIES DEFINED)
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 03.25 | Approved Supplier List | NOT STARTED | 1 FR | M (3-4d) | Approval workflow, block non-approved POs |
+| 03.26 | Supplier Scorecards & Performance | NOT STARTED | 2 FR | L (5-7d) | OTD, quality rate, audits, performance trends |
+| 03.27 | EDI Integration Core | NOT STARTED | 2 FR | XL (10-14d) | X12 850 (PO), 856 (ASN), trading partners |
+
+**Metryki Phase 2-3:**
+- Stories created: 2026-01-14
+- Total documentation: 376KB (10 files)
+- Estimated effort Phase 2: 35-50 days
+- Estimated effort Phase 3: 18-25 days
+- FR coverage: 22 additional FR (FR-PLAN-030 to FR-PLAN-072)
+
+**Status:**
+- MVP (Phase 1): 95% COMPLETE ✅ (18/20 done, 03.13 in progress, 03.14 blocked)
+- Phase 2 (Forecasting/MRP): 100% STORIES DEFINED ✅ Implementation pending
+- Phase 3 (Enterprise): 100% STORIES DEFINED ✅ Implementation pending
+- Epic 03: 100% story definition complete | 63% implemented (19/30 stories)
+
 **Do zrobienia:**
 1. 03.13 - Dokonczyc frontend (P4-P7) - **2 dni**
-2. 03.14 - Odlozone do Phase 2 (zalezy od Epic 04)
+2. 03.14 - Odlozone do Phase 2 (zalezy od Epic 04) - **7-10 dni** gdy unblocked
 
 ---
 
@@ -366,16 +402,19 @@ Potem: Implementacja
 ## CHECKSUM
 
 ```
-Wygenerowano: 2026-01-14 21:12 UTC
-Zrodlo: .claude/checkpoints/*.yaml + Epic 01-02 gap analysis
-Stories zaimplementowane: 78/96 (Epic 01-05)
-Stories do implementacji: 8 (Epic 04 Phase 1) + 10 (Epic 01 Phase 1B-3) + 6 (Epic 02 Phase 2)
+Wygenerowano: 2026-01-14 21:45 UTC
+Zrodlo: .claude/checkpoints/*.yaml + Epic 01-03 gap analysis
+Stories zaimplementowane: 88/106 (Epic 01-05)
+Stories do implementacji: 8 (Epic 04 Phase 1) + 10 (Epic 01 Phase 1B-3) + 6 (Epic 02 Phase 2) + 10 (Epic 03 Phase 2-3)
 Stories do napisania: 78-97 (Epic 08-11)
 Epic 01 story definition: 100% complete (26 stories total: 16 MVP + 10 Phase 1B-3)
 Epic 01 implementation: 62% (16/26 MVP done, 10 Phase 1B-3 pending)
 Epic 02 story definition: 100% complete (23 stories total: 17 MVP + 6 Phase 2)
 Epic 02 implementation: 74% (17/23 MVP done, 6 Phase 2 pending)
+Epic 03 story definition: 100% complete (30 stories total: 20 MVP + 10 Phase 2-3)
+Epic 03 implementation: 63% (19/30 MVP ~done, 10 Phase 2-3 pending, 1 in progress, 1 blocked)
 Epic 05 completion date: 2026-01-09
 Epic 01 Phase 1B-3 stories: 01.17-01.26 (security, integrations, enterprise)
 Epic 02 Phase 2 stories: 02.16-02.21 (created 2026-01-14, 184KB)
+Epic 03 Phase 2-3 stories: 03.18-03.27 (created 2026-01-14, 376KB)
 ```

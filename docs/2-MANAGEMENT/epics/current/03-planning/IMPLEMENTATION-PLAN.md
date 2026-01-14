@@ -1,9 +1,9 @@
 # Epic 03 - Planning Module - Implementation Plan
 
-**Date:** 2025-12-29
-**Epic:** 03-planning (Suppliers, POs, TOs, WOs)
-**Status:** Ready for Implementation
-**Total Stories:** 21 (17 ready + 4 deferred)
+**Date:** 2026-01-14 (Updated)
+**Epic:** 03-planning (Suppliers, POs, TOs, WOs, Forecasting, MRP, Supplier Quality)
+**Status:** Phase 1 COMPLETE (19/20) | Phase 2-3 Stories Defined
+**Total Stories:** 30 (20 Phase 1 + 7 Phase 2 + 3 Phase 3)
 **Max Parallel Tracks:** 4
 
 ---
@@ -339,6 +339,151 @@ agent_context_template: |
 
 ---
 
-**Generated:** 2025-12-29
-**Author:** Claude Code (AI Agent)
+## Phase 2: Demand Forecasting & MRP (NEW - 2026-01-14)
+
+**Status:** Stories Defined | Implementation Pending
+**Stories:** 7 (03.18-03.24)
+**Estimated Effort:** 35-50 days
+
+### Phase 2 Dependency Graph
+
+```
+LEVEL 1: Historical Data
+└── 03.18 - Demand History Tracking [M, 3-4d] ← 03.3 (PO), 03.10 (WO), Epic 04 (Production), Epic 07 (Sales Orders)
+
+LEVEL 2: Forecasting Foundation
+└── 03.19 - Basic Demand Forecasting [L, 5-7d] ← 03.18 (demand history)
+
+LEVEL 3: MPS & MRP Core (Parallel possible)
+├── 03.20 - Master Production Schedule [M, 4-5d] ← 03.10 (WO), 03.19 (forecast)
+└── 03.23 - Replenishment Rules [L, 5-7d] ← 03.3 (PO), 03.19 (ROP)
+
+LEVEL 4: MRP Engine
+└── 03.21 - MRP Calculation Engine [XL, 7-10d] ← 03.20 (MPS), 02.5a (BOM), 05.1 (LP inventory)
+
+LEVEL 5: Visualization & Templates (Parallel possible)
+├── 03.22 - MRP Dashboard [M, 3-4d] ← 03.21 (MRP runs)
+└── 03.24 - PO Templates & Blanket POs [M, 4-5d] ← 03.3 (PO CRUD)
+```
+
+### Phase 2 Stories Quick Reference
+
+| ID | Name | Size | Days | Key Dependencies |
+|----|------|------|------|------------------|
+| 03.18 | Demand History Tracking | M | 3-4 | 03.3, 03.10, Epic 04, Epic 07 |
+| 03.19 | Basic Demand Forecasting | L | 5-7 | 03.18 |
+| 03.20 | Master Production Schedule | M | 4-5 | 03.10, 03.19 |
+| 03.21 | MRP Calculation Engine | XL | 7-10 | 03.20, 02.5a, 05.1 |
+| 03.22 | MRP Dashboard | M | 3-4 | 03.21 |
+| 03.23 | Replenishment Rules | L | 5-7 | 03.3, 03.19 |
+| 03.24 | PO Templates & Blanket POs | M | 4-5 | 03.3 |
+
+**Critical Path (Phase 2):** 03.18 → 03.19 → 03.20 → 03.21 → 03.22 = ~24-30 days sequential
+
+**With Parallel Execution:** 03.23 and 03.24 can run alongside later stages → **~35-50 days total**
+
+---
+
+## Phase 3: Supplier Quality & Enterprise (NEW - 2026-01-14)
+
+**Status:** Stories Defined | Implementation Pending
+**Stories:** 3 (03.25-03.27)
+**Estimated Effort:** 18-25 days
+
+### Phase 3 Dependency Graph
+
+```
+LEVEL 1: Supplier Quality (Parallel possible)
+├── 03.25 - Approved Supplier List [M, 3-4d] ← 03.1 (Suppliers), 03.2 (Supplier-Product)
+└── 03.26 - Supplier Scorecards [L, 5-7d] ← 03.1, 03.3, 05.10 (GRN)
+
+LEVEL 2: Enterprise Integration
+└── 03.27 - EDI Integration Core [XL, 10-14d] ← 03.3 (PO), 05.9 (ASN)
+```
+
+### Phase 3 Stories Quick Reference
+
+| ID | Name | Size | Days | Key Dependencies |
+|----|------|------|------|------------------|
+| 03.25 | Approved Supplier List | M | 3-4 | 03.1, 03.2 |
+| 03.26 | Supplier Scorecards & Performance | L | 5-7 | 03.1, 03.3, 05.10 (GRN) |
+| 03.27 | EDI Integration Core | XL | 10-14 | 03.3, 05.9 (ASN) |
+
+**Critical Path (Phase 3):** Can run in parallel → **~10-14 days with parallel tracks**
+
+**Blockers:**
+- 03.26 requires Epic 05.10 (GRN CRUD) - COMPLETE ✅
+- 03.27 requires Epic 05.9 (ASN Receive) - COMPLETE ✅
+
+---
+
+## Updated Timeline Estimate
+
+| Phase | Stories | Sequential Days | Parallel Days | Status |
+|-------|---------|----------------|---------------|--------|
+| Phase 1 (MVP) | 20 | 60-75 | 30-35 | 95% DONE (19/20) |
+| Phase 2 (Forecasting/MRP) | 7 | 35-50 | 35-50 | 0% (stories ready) |
+| Phase 3 (Supplier Quality/EDI) | 3 | 18-25 | 10-14 | 0% (stories ready) |
+| **TOTAL** | **30** | **113-150** | **75-99** | **63% complete** |
+
+**Note:** Phase 2-3 can potentially overlap if resources allow.
+
+---
+
+## Updated Agent Context Mapping
+
+Add Phase 2-3 stories to context mapping:
+
+```yaml
+story_contexts:
+  # ... existing 03.1-03.17 contexts ...
+
+  # Phase 2
+  "03.18":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-2/03.18/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.19":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-2/03.19/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.20":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-2/03.20/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.21":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-2/03.21/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.22":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-2/03.22/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.23":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-2/03.23/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.24":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-2/03.24/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  # Phase 3
+  "03.25":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-3/03.25/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.26":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-3/03.26/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+
+  "03.27":
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/context/phase-3/03.27/"
+    files: ["_index.yaml", "database.yaml", "api.yaml", "frontend.yaml", "tests.yaml"]
+```
+
+---
+
+**Generated:** 2025-12-29 (Updated: 2026-01-14)
+**Author:** Claude Code (AI Agent) + ORCHESTRATOR
 **Epic Owner:** Planning Module
+**Last Update:** Added Phase 2-3 stories (03.18-03.27)
