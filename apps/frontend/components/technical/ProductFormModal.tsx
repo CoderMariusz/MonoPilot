@@ -124,12 +124,19 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
         if (response.ok) {
           const data = await response.json()
           setProductTypes(data.data || [])
-          // Set default product type if not in edit mode and no type selected
-          if (!product && data.data?.length > 0 && !formData.product_type_id) {
-            const rmType = data.data.find((t: ProductType) => t.code === 'RM')
-            if (rmType) {
-              setFormData(prev => ({ ...prev, product_type_id: rmType.id }))
-            }
+          // Set default product type ONLY if not in edit mode and no type selected
+          // Use functional update to check CURRENT state (avoid stale closure)
+          if (!product && data.data?.length > 0) {
+            setFormData(prev => {
+              // Only set default if user hasn't already selected a type
+              if (!prev.product_type_id) {
+                const rmType = data.data.find((t: ProductType) => t.code === 'RM')
+                if (rmType) {
+                  return { ...prev, product_type_id: rmType.id }
+                }
+              }
+              return prev
+            })
           }
         }
       } catch (error) {
