@@ -3,7 +3,7 @@
 ## 🎯 TARGET
 ```yaml
 Stories: {{STORY_IDS}}  02.9 02.12 02.14 02.15
-Epic: {{EPIC_ID}}        02-Technical
+Epic: {{EPIC_ID}}        02-TECHNICAL
 ```
    e
 ## 📋 7-PHASE FLOW

@@ -123,7 +123,8 @@ CREATE POLICY cost_variances_org_isolation_insert
   FOR INSERT
   WITH CHECK (
     org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-    AND (SELECT role FROM users WHERE id = auth.uid()) IN ('admin', 'org_admin', 'finance_manager', 'technical_manager')
+    AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+        IN ('owner', 'admin', 'finance_manager', 'technical_manager')
   );
 
 -- UPDATE: Users can only update variances in their organization
@@ -135,7 +136,8 @@ CREATE POLICY cost_variances_org_isolation_update
     org_id = (SELECT org_id FROM users WHERE id = auth.uid())
     AND (
       created_by = auth.uid()
-      OR (SELECT role FROM users WHERE id = auth.uid()) IN ('admin', 'org_admin', 'finance_manager')
+      OR (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+         IN ('owner', 'admin', 'finance_manager')
     )
   );
 
@@ -145,7 +147,8 @@ CREATE POLICY cost_variances_org_isolation_delete
   FOR DELETE
   USING (
     org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-    AND (SELECT role FROM users WHERE id = auth.uid()) IN ('admin', 'org_admin')
+    AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+        IN ('owner', 'admin')
   );
 
 -- =============================================================================

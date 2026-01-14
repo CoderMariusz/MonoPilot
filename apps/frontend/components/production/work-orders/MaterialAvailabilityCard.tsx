@@ -58,18 +58,10 @@ function getStatusColor(percent: number): string {
 }
 
 /**
- * Get background color for progress bar
+ * Get background color class for indicators and progress bars
+ * Used by both the status indicator dot and progress bar
  */
-function getProgressBgColor(percent: number): string {
-  if (percent >= 100) return 'bg-green-500'
-  if (percent >= 50) return 'bg-yellow-500'
-  return 'bg-red-500'
-}
-
-/**
- * Get indicator class based on percentage
- */
-function getIndicatorClass(percent: number): string {
+function getIndicatorBgColor(percent: number): string {
   if (percent >= 100) return 'bg-green-500'
   if (percent >= 50) return 'bg-yellow-500'
   return 'bg-red-500'
@@ -140,7 +132,7 @@ export function MaterialAvailabilityCard({
             <div
               className={cn(
                 'w-3 h-3 rounded-full',
-                getIndicatorClass(overallPercent)
+                getIndicatorBgColor(overallPercent)
               )}
               aria-hidden="true"
             />
@@ -194,7 +186,7 @@ export function MaterialAvailabilityCard({
                           <div
                             className={cn(
                               'w-2.5 h-2.5 rounded-full flex-shrink-0',
-                              getIndicatorClass(material.availability_percent)
+                              getIndicatorBgColor(material.availability_percent)
                             )}
                             aria-label={`Status: ${material.availability_percent}% available`}
                           />

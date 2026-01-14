@@ -42,6 +42,7 @@ import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import { WOOperationsList } from '@/components/planning/WOOperationsList'
 import { WOMaterialsTable } from '@/components/planning/work-orders/WOMaterialsTable'
+import { WOAvailabilityPanel } from '@/components/planning/work-orders/availability'
 import { MaterialReservationsTable } from '@/components/production/MaterialReservationsTable'
 import { ConsumptionHistoryTable } from '@/components/production/ConsumptionHistoryTable'
 import WOStartModal from '@/components/production/WOStartModal'
@@ -545,6 +546,9 @@ export default function WorkOrderDetailsPage(
                 </div>
               </div>
             </div>
+
+            {/* Material Availability Panel - Story 03.13 */}
+            <WOAvailabilityPanel woId={wo.id} />
 
             {/* Notes & Audit Card */}
             <div className="border rounded-lg p-6">
