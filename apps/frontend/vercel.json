@@ -1,7 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "cd ../.. && pnpm install && cd apps/frontend && pnpm run build",
+  "installCommand": "cd ../.. && rm -rf node_modules apps/frontend/node_modules && corepack enable && corepack prepare pnpm@8.15.0 --activate && pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm run build",
   "crons": [{
     "path": "/api/cron/cleanup-invitations",
     "schedule": "0 2 * * 0"
