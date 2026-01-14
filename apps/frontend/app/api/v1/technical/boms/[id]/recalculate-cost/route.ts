@@ -124,7 +124,7 @@ export async function POST(
           quantity,
           scrap_percent,
           operation_seq,
-          component:products!component_id (
+          component:products!product_id (
             id,
             code,
             name,

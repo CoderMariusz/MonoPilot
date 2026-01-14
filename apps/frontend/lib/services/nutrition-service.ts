@@ -181,7 +181,7 @@ export default class NutritionService {
         quantity,
         uom,
         sequence,
-        products!component_id (
+        products!product_id (
           id,
           code,
           name

@@ -123,7 +123,7 @@ export async function calculateTotalBOMCost(
           id,
           quantity,
           scrap_percent,
-          product:products!component_id (
+          product:products!product_id (
             id,
             code,
             name,

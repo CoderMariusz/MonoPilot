@@ -50,7 +50,7 @@ export async function listBomItems(
     .from('bom_items')
     .select(`
       *,
-      component:products!component_id (
+      component:products!product_id (
         id,
         code,
         name,
@@ -203,7 +203,7 @@ export async function createBomItem(
     .from('bom_items')
     .insert({
       bom_id: bomId,
-      component_id: input.component_id,
+      product_id: input.component_id,
       operation_seq: input.operation_seq,
       is_output: input.is_output ?? false,
       quantity: input.quantity,
@@ -216,7 +216,7 @@ export async function createBomItem(
     })
     .select(`
       *,
-      component:products!component_id (
+      component:products!product_id (
         id,
         code,
         name,
@@ -280,7 +280,7 @@ export async function updateBomItem(
   // Verify item exists
   const { data: existingItem, error: itemError } = await supabase
     .from('bom_items')
-    .select('id, component_id, is_output')
+    .select('id, product_id, is_output')
     .eq('id', itemId)
     .eq('bom_id', bomId)
     .single()
@@ -326,7 +326,7 @@ export async function updateBomItem(
 
   // Build update object
   const updateData: Record<string, unknown> = {}
-  if (input.component_id !== undefined) updateData.component_id = input.component_id
+  if (input.component_id !== undefined) updateData.product_id = input.component_id
   if (input.operation_seq !== undefined) updateData.operation_seq = input.operation_seq
   if (input.is_output !== undefined) updateData.is_output = input.is_output
   if (input.quantity !== undefined) updateData.quantity = input.quantity
@@ -344,7 +344,7 @@ export async function updateBomItem(
     .eq('id', itemId)
     .select(`
       *,
-      component:products!component_id (
+      component:products!product_id (
         id,
         code,
         name,
@@ -411,7 +411,7 @@ export async function getInputsForOperation(
     .from('bom_items')
     .select(`
       *,
-      component:products!component_id (id, code, name, base_uom, product_type:product_types(code))
+      component:products!product_id (id, code, name, base_uom, product_type:product_types(code))
     `)
     .eq('bom_id', bomId)
     .eq('operation_seq', operationSeq)
@@ -439,7 +439,7 @@ export async function getOutputsForOperation(
     .from('bom_items')
     .select(`
       *,
-      component:products!component_id (id, code, name, base_uom, product_type:product_types(code))
+      component:products!product_id (id, code, name, base_uom, product_type:product_types(code))
     `)
     .eq('bom_id', bomId)
     .eq('operation_seq', operationSeq)
@@ -468,7 +468,7 @@ export async function getItemsForLine(
     .from('bom_items')
     .select(`
       *,
-      component:products!component_id (id, code, name, base_uom, product_type:product_types(code))
+      component:products!product_id (id, code, name, base_uom, product_type:product_types(code))
     `)
     .eq('bom_id', bomId)
     .or(`line_ids.is.null,line_ids.cs.{${lineId}}`)

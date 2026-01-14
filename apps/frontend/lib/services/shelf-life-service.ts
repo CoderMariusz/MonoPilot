@@ -164,7 +164,7 @@ export async function calculateProductShelfLife(
     .select(`
       id,
       quantity,
-      component:products!component_id (
+      component:products!product_id (
         id,
         code,
         name,
@@ -424,7 +424,7 @@ export async function getShelfLifeConfig(
     const { data: items } = await supabase
       .from('bom_items')
       .select(`
-        component:products!component_id (
+        component:products!product_id (
           id,
           code,
           name,
@@ -703,7 +703,7 @@ export async function calculateShelfLife(
     .select(`
       id,
       quantity,
-      component:products!component_id (
+      component:products!product_id (
         id,
         code,
         name,

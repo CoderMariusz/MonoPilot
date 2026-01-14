@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
           version,
           items:bom_items (
             *,
-            component:products!component_id (
+            component:products!product_id (
               id,
               code,
               name,
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
           version,
           items:bom_items (
             *,
-            component:products!component_id (
+            component:products!product_id (
               id,
               code,
               name,

@@ -303,7 +303,7 @@ async function getCostDriversFromDB(
         items:bom_items (
           id,
           quantity,
-          component:products!component_id (
+          component:products!product_id (
             id,
             code,
             name,

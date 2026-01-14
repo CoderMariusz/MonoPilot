@@ -179,7 +179,7 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
       ),
       items:bom_items (
         *,
-        component:products!component_id (
+        component:products!product_id (
           id,
           code,
           name,
@@ -823,7 +823,7 @@ export async function scaleBOM(
         id,
         quantity,
         uom,
-        product:products!component_id(id, code, name)
+        product:products!product_id(id, code, name)
       )
     `)
     .eq('id', bomId)
@@ -929,7 +929,7 @@ export async function compareBOMVersions(
           operation_seq,
           scrap_percent,
           is_output,
-          component:products!component_id (
+          component:products!product_id (
             id,
             code,
             name
@@ -960,7 +960,7 @@ export async function compareBOMVersions(
           operation_seq,
           scrap_percent,
           is_output,
-          component:products!component_id (
+          component:products!product_id (
             id,
             code,
             name
@@ -989,9 +989,10 @@ export async function compareBOMVersions(
   }
 
   // Map items to BomItemSummary format
+  // Note: Database column is product_id, but API uses component_id for consistency
   const mapToSummary = (item: any): BomItemSummary => ({
     id: item.id,
-    component_id: item.component_id,
+    component_id: item.product_id,
     component_code: item.component?.code || '',
     component_name: item.component?.name || '',
     quantity: item.quantity,
@@ -1162,7 +1163,7 @@ export async function explodeBOM(
       sequence,
       scrap_percent,
       is_output,
-      component:products!component_id (
+      component:products!product_id (
         id,
         code,
         name,
@@ -1225,9 +1226,9 @@ export async function explodeBOM(
       const componentType = component?.product_type?.code || 'raw'
 
       // Check for circular reference
-      const itemPath = [...path, item.component_id]
+      const itemPath = [...path, item.product_id]
       const pathKey = itemPath.join('->')
-      if (visitedPaths.has(pathKey) || path.includes(item.component_id)) {
+      if (visitedPaths.has(pathKey) || path.includes(item.product_id)) {
         throw new Error('CIRCULAR_REFERENCE')
       }
       visitedPaths.add(pathKey)
@@ -1243,7 +1244,7 @@ export async function explodeBOM(
       let subBomOutputQty = 1
 
       if (componentType === 'wip' || componentType === 'semi_finished') {
-        const subBom = await getSubBOM(item.component_id)
+        const subBom = await getSubBOM(item.product_id)
         if (subBom) {
           hasSubBom = true
           subBomOutputQty = subBom.output_qty
@@ -1259,7 +1260,7 @@ export async function explodeBOM(
               sequence,
               scrap_percent,
               is_output,
-              component:products!component_id (
+              component:products!product_id (
                 id,
                 code,
                 name,
@@ -1278,7 +1279,7 @@ export async function explodeBOM(
 
       const explosionItem: ExplosionItem = {
         item_id: item.id,
-        component_id: item.component_id,
+        component_id: item.product_id,
         component_code: component?.code || '',
         component_name: component?.name || '',
         component_type: componentType,
@@ -1295,12 +1296,12 @@ export async function explodeBOM(
 
       // Add raw materials to summary
       if (componentType === 'raw' || (!hasSubBom && componentType !== 'wip' && componentType !== 'semi_finished')) {
-        const existing = rawMaterialsMap.get(item.component_id)
+        const existing = rawMaterialsMap.get(item.product_id)
         if (existing) {
           existing.total_qty += cumulativeQty
         } else {
-          rawMaterialsMap.set(item.component_id, {
-            component_id: item.component_id,
+          rawMaterialsMap.set(item.product_id, {
+            component_id: item.product_id,
             component_code: component?.code || '',
             component_name: component?.name || '',
             total_qty: cumulativeQty,
@@ -1379,7 +1380,7 @@ export async function applyBOMScaling(
         quantity,
         uom,
         is_output,
-        component:products!component_id (
+        component:products!product_id (
           id,
           code,
           name

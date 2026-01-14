@@ -321,7 +321,7 @@ export async function getAllAlternativesForBom(
       ),
       bom_item:bom_items!bom_item_id (
         id,
-        component:products!component_id (
+        component:products!product_id (
           id,
           code,
           name

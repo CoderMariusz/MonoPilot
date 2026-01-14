@@ -156,7 +156,7 @@ export async function POST(
       .from('bom_items')
       .insert({
         bom_id: id,
-        component_id: validatedData.component_id,
+        product_id: validatedData.component_id,
         operation_seq: validatedData.operation_seq,
         is_output: validatedData.is_output ?? false,
         quantity: validatedData.quantity,
@@ -169,7 +169,7 @@ export async function POST(
       })
       .select(`
         *,
-        component:products!component_id (
+        component:products!product_id (
           id,
           code,
           name,
