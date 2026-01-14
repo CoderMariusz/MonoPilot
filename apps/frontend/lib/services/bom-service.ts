@@ -315,7 +315,7 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
       version: newVersion,
       effective_from,
       effective_to,
-      status: input.status || 'Draft',
+      status: input.status || 'draft',
       output_qty: input.output_qty || 1.0,
       output_uom: input.output_uom,
       notes: input.notes || null,
@@ -397,7 +397,7 @@ export async function deleteBOM(id: string): Promise<void> {
 /**
  * Get active BOM for a product on a specific date
  * AC-3.10.3: Select active BOM based on scheduled_date
- * Query: effective_from <= date AND (effective_to IS NULL OR >= date) AND status = 'Active'
+ * Query: effective_from <= date AND (effective_to IS NULL OR >= date) AND status = 'active'
  */
 export async function getActiveBOMForProduct(
   productId: string,
@@ -419,13 +419,13 @@ export async function getActiveBOMForProduct(
   // Find active BOM where:
   // - effective_from <= targetDate
   // - effective_to IS NULL OR effective_to >= targetDate
-  // - status = 'Active'
+  // - status = 'active'
   const { data, error } = await supabase
     .from('boms')
     .select('*')
     .eq('org_id', org_id)
     .eq('product_id', productId)
-    .eq('status', 'Active')
+    .eq('status', 'active')
     .lte('effective_from', dateStr)
     .or(`effective_to.gte.${dateStr},effective_to.is.null`)
     .order('version', { ascending: false })
@@ -1200,7 +1200,7 @@ export async function explodeBOM(
       `)
       .eq('product_id', componentId)
       .eq('org_id', orgId)
-      .eq('status', 'Active')
+      .eq('status', 'active')
       .lte('effective_from', new Date().toISOString().split('T')[0])
       .or(`effective_to.gte.${new Date().toISOString().split('T')[0]},effective_to.is.null`)
       .limit(1)
