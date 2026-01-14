@@ -42,7 +42,7 @@ export async function GET(
     // Fetch all BOM items (excluding outputs/by-products)
     const { data: items, error: itemsError } = await supabase
       .from('bom_items')
-      .select('component_id')
+      .select('product_id')
       .eq('bom_id', id)
       .eq('is_output', false); // Only input items
 
@@ -65,7 +65,7 @@ export async function GET(
     }
 
     // Extract component IDs
-    const productIds = items.map(item => item.component_id);
+    const productIds = items.map(item => item.product_id);
 
     // Fetch allergens for all component products
     const { data: productAllergens, error: allergensError } = await supabase

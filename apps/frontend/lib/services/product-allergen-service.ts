@@ -309,8 +309,8 @@ export class ProductAllergenService {
       .select(
         `
         id,
-        component_id,
-        product:products!bom_items_component_id_fkey (
+        product_id,
+        product:products!product_id (
           id,
           code,
           name
@@ -369,7 +369,7 @@ export class ProductAllergenService {
           )
         `
         )
-        .eq('product_id', item.component_id)
+        .eq('product_id', item.product_id)
         .eq('relation_type', 'contains') // Only inherit "contains" allergens
 
       if (ingredientAllergens && ingredientAllergens.length > 0) {

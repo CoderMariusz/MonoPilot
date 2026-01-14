@@ -79,9 +79,10 @@ export async function listBomItems(
     }
   }
 
-  // Add operation details to items
-  const enrichedItems = (items || []).map(item => ({
+  // Add operation details to items and transform product_id to component_id for API consistency
+  const enrichedItems = (items || []).map((item: any) => ({
     ...item,
+    component_id: item.product_id, // Map database column to API field name
     operation: operationsMap.get(item.operation_seq) || undefined
   })) as BOMItem[]
 
@@ -233,7 +234,11 @@ export async function createBomItem(
     throw new Error(`Failed to create BOM item: ${insertError.message}`)
   }
 
-  return newItem as BOMItem
+  // Transform product_id to component_id for API consistency
+  return {
+    ...newItem,
+    component_id: (newItem as any).product_id
+  } as BOMItem
 }
 
 /**
@@ -358,7 +363,11 @@ export async function updateBomItem(
     throw new Error(`Failed to update BOM item: ${updateError.message}`)
   }
 
-  return updatedItem as BOMItem
+  // Transform product_id to component_id for API consistency
+  return {
+    ...updatedItem,
+    component_id: (updatedItem as any).product_id
+  } as BOMItem
 }
 
 /**
@@ -422,7 +431,11 @@ export async function getInputsForOperation(
     throw new Error(`Failed to fetch inputs: ${error.message}`)
   }
 
-  return (data || []) as BOMItem[]
+  // Transform product_id to component_id for API consistency
+  return (data || []).map((item: any) => ({
+    ...item,
+    component_id: item.product_id
+  })) as BOMItem[]
 }
 
 /**
@@ -450,7 +463,11 @@ export async function getOutputsForOperation(
     throw new Error(`Failed to fetch outputs: ${error.message}`)
   }
 
-  return (data || []) as BOMItem[]
+  // Transform product_id to component_id for API consistency
+  return (data || []).map((item: any) => ({
+    ...item,
+    component_id: item.product_id
+  })) as BOMItem[]
 }
 
 /**
@@ -479,7 +496,11 @@ export async function getItemsForLine(
     throw new Error(`Failed to fetch items for line: ${error.message}`)
   }
 
-  return (data || []) as BOMItem[]
+  // Transform product_id to component_id for API consistency
+  return (data || []).map((item: any) => ({
+    ...item,
+    component_id: item.product_id
+  })) as BOMItem[]
 }
 
 /**

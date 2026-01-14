@@ -105,7 +105,7 @@ export async function createBomItemAlternative(
   // Verify BOM item exists
   const { data: item, error: itemError } = await supabaseAdmin
     .from('bom_items')
-    .select('id, component_id')
+    .select('id, product_id')
     .eq('id', itemId)
     .eq('bom_id', bomId)
     .single()
@@ -130,7 +130,7 @@ export async function createBomItemAlternative(
   }
 
   // Check self-reference: alternative cannot be same as primary component
-  if (input.alternative_component_id === item.component_id) {
+  if (input.alternative_component_id === item.product_id) {
     throw new Error('SELF_REFERENCE')
   }
 

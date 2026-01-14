@@ -141,12 +141,12 @@ export async function GET(request: NextRequest) {
     const items1 = (bom1.items || []) as unknown as BOMItem[]
     const items2 = (bom2.items || []) as unknown as BOMItem[]
 
-    // Create maps by component_id for efficient lookup
+    // Create maps by product_id for efficient lookup
     const items1Map = new Map<string, BOMItem>()
     const items2Map = new Map<string, BOMItem>()
 
-    items1.forEach(item => items1Map.set(item.component_id, item))
-    items2.forEach(item => items2Map.set(item.component_id, item))
+    items1.forEach(item => items1Map.set((item as any).product_id, item))
+    items2.forEach(item => items2Map.set((item as any).product_id, item))
 
     // Calculate differences
     const added: BOMItem[] = []
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
 
     // Find added and unchanged/changed items
     items2.forEach(item2 => {
-      const item1 = items1Map.get(item2.component_id)
+      const item1 = items1Map.get((item2 as any).product_id)
 
       if (!item1) {
         // Item exists in v2 but not in v1 → Added
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
 
     // Find removed items
     items1.forEach(item1 => {
-      const item2 = items2Map.get(item1.component_id)
+      const item2 = items2Map.get((item1 as any).product_id)
 
       if (!item2) {
         // Item exists in v1 but not in v2 → Removed
