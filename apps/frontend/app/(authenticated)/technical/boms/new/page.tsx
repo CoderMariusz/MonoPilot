@@ -412,11 +412,11 @@ export default function CreateBOMPage() {
     p.type && ['RM', 'ING', 'PKG', 'WIP'].includes(p.type)
   )
 
-  // Auto-fill UoM when component selected
+  // Auto-fill UoM when component selected (always for new items)
   useEffect(() => {
     if (itemForm.component_id && !editingItem) {
       const comp = allProducts.find(p => p.id === itemForm.component_id)
-      if (comp && !itemForm.uom) {
+      if (comp && comp.uom) {
         setItemForm(prev => ({ ...prev, uom: comp.uom }))
       }
     }

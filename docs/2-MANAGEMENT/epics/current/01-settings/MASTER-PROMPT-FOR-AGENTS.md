@@ -20,6 +20,7 @@ Epic: {{EPIC_ID}}        02-Technical
 
 **Agents append checkpoints. Orchestrator reads + routes.**
 **check what need to be fix/done**
+**STRICT follow wireframe**
 
 ## 🔄 CHECKPOINT SYSTEM
 
@@ -67,7 +68,7 @@ Exit: {condition}
 3. **Max 4 parallel agents**
 4. **Phase skip = orchestrator decision** (agents don't skip)
 5. **Micro-handoff ≤150 tokens** from agents
-6. **check UX in cataloge 3-Architecture/ux/wireframe do not relay on code! make sure you are doing how project show wireframe** 
+6. **check UX in cataloge 3-Architecture/ux/wireframe do not relay on code! make sure you are doing STRICT how project show wireframe** 
 7. **check context make sure you dont runout if there is posibility /compact context or close subagent and run next after short handover**
 8. **Aways one soties per Agent!**
 

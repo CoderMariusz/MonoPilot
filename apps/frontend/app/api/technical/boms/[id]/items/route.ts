@@ -174,7 +174,7 @@ export async function POST(
           code,
           name,
           uom,
-          type
+          product_type:product_types(code, name)
         )
       `)
       .single()

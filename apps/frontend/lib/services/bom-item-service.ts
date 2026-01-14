@@ -55,7 +55,7 @@ export async function listBomItems(
         code,
         name,
         uom,
-        type
+        product_type:product_types(code, name)
       )
     `)
     .eq('bom_id', bomId)
@@ -222,7 +222,7 @@ export async function createBomItem(
         code,
         name,
         uom,
-        type
+        product_type:product_types(code, name)
       )
     `)
     .single()
@@ -354,7 +354,7 @@ export async function updateBomItem(
         code,
         name,
         uom,
-        type
+        product_type:product_types(code, name)
       )
     `)
     .single()
