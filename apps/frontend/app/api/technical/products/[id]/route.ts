@@ -45,11 +45,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     const orgId = currentUser.org_id
 
-    // Fetch product with allergens
+    // Fetch product with allergens and product type
     const { data, error } = await supabase
       .from('products')
       .select(`
         *,
+        product_type:product_types (id, code, name),
         product_allergens (
           allergen_id,
           relation_type,

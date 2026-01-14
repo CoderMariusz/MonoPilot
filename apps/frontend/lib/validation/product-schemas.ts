@@ -16,32 +16,39 @@ const productBaseSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, 'Code must be alphanumeric with hyphens or underscores'),
   name: z.string()
     .min(1, 'Name is required')
-    .max(200, 'Name must be less than 200 characters'),
-  type: z.enum(['RM', 'WIP', 'FG', 'PKG', 'BP', 'CUSTOM'], {
-    errorMap: () => ({ message: 'Invalid product type' })
-  }),
+    .max(255, 'Name must be less than 255 characters'),
+  product_type_id: z.string().uuid('Invalid product type'),
   description: z.string().optional(),
-  category: z.string().optional(),
-  uom: z.string().min(1, 'Unit of Measure is required'),
+  base_uom: z.string().min(1, 'Unit of Measure is required').max(20),
+  barcode: z.string().max(100).optional(),
+  gtin: z.string().max(14).optional(),
+  // TODO: Enable when categories table is created
+  // category_id: z.string().uuid().optional().nullable(),
+  supplier_id: z.string().uuid().optional().nullable(),
+  lead_time_days: z.number().int().min(0).optional(),
+  moq: z.number().positive().optional(),
+  std_price: z.number().min(0).optional(),
+  cost_per_unit: z.number().min(0).optional(),
+  min_stock: z.number().min(0).optional(),
+  max_stock: z.number().min(0).optional(),
+  expiry_policy: z.enum(['fixed', 'rolling', 'none']).optional().default('none'),
   shelf_life_days: z.number().int().positive().optional(),
-  min_stock_qty: z.number().positive().optional(),
-  max_stock_qty: z.number().positive().optional(),
-  reorder_point: z.number().positive().optional(),
-  cost_per_unit: z.number().positive().optional(),
-  status: z.enum(['active', 'inactive', 'obsolete']).optional().default('active')
+  storage_conditions: z.string().max(500).optional(),
+  is_perishable: z.boolean().optional().default(false),
+  status: z.enum(['active', 'inactive', 'discontinued']).optional().default('active')
 })
 
 export const productCreateSchema = productBaseSchema.refine(
   (data) => {
-    // If max_stock_qty is provided, it must be greater than min_stock_qty
-    if (data.max_stock_qty && data.min_stock_qty) {
-      return data.max_stock_qty > data.min_stock_qty
+    // If max_stock is provided, it must be greater than min_stock
+    if (data.max_stock && data.min_stock) {
+      return data.max_stock > data.min_stock
     }
     return true
   },
   {
     message: 'Max stock quantity must be greater than min stock quantity',
-    path: ['max_stock_qty']
+    path: ['max_stock']
   }
 )
 
@@ -117,9 +124,10 @@ export type TechnicalSettingsInput = z.input<typeof technicalSettingsSchema>
 export const productListQuerySchema = z.object({
   search: z.string().optional(),
   code: z.string().optional(), // Exact match by product code
-  type: z.array(z.string()).or(z.string()).optional(),
+  product_type_id: z.array(z.string().uuid()).or(z.string().uuid()).optional(),
   status: z.array(z.string()).or(z.string()).optional(),
-  category: z.string().optional(),
+  // TODO: Enable when categories table is created
+  // category_id: z.string().uuid().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(1000).optional().default(50),
   sort: z.string().optional().default('code'),

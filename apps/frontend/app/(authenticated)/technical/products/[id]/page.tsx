@@ -38,20 +38,25 @@ import { useToast } from '@/hooks/use-toast'
 import { ProductFormModal } from '@/components/technical/ProductFormModal'
 import { ProductDeleteDialog } from '@/components/technical/ProductDeleteDialog'
 
+interface ProductType {
+  id: string
+  code: string
+  name: string
+}
+
 interface Product {
   id: string
   code: string
   name: string
-  type: 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP' | 'CUSTOM'
+  product_type_id: string
+  product_type?: ProductType
   description?: string
-  category?: string
-  uom: string
+  base_uom: string
   version: number
-  status: 'active' | 'inactive' | 'obsolete'
+  status: 'active' | 'inactive' | 'discontinued'
   shelf_life_days?: number
-  min_stock_qty?: number
-  max_stock_qty?: number
-  reorder_point?: number
+  min_stock?: number
+  max_stock?: number
   cost_per_unit?: number
   created_at: string
   updated_at: string
@@ -110,7 +115,7 @@ const PRODUCT_TYPES: Record<string, { label: string; color: string }> = {
 const STATUS_COLORS: Record<string, { variant: 'default' | 'secondary' | 'destructive'; className: string }> = {
   active: { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
   inactive: { variant: 'secondary', className: '' },
-  obsolete: { variant: 'destructive', className: '' },
+  discontinued: { variant: 'destructive', className: '' },
 }
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -270,8 +275,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   // Render helpers
-  const getTypeBadge = (type: string) => {
-    const config = PRODUCT_TYPES[type] || PRODUCT_TYPES.CUSTOM
+  const getTypeBadge = (typeCode?: string) => {
+    const code = typeCode || 'CUSTOM'
+    const config = PRODUCT_TYPES[code] || PRODUCT_TYPES.CUSTOM
     return (
       <Badge className={`${config.color} text-white`}>
         {config.label}
@@ -329,7 +335,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold font-mono">{product.code}</h1>
-                {getTypeBadge(product.type)}
+                {getTypeBadge(product.product_type?.code)}
                 {getStatusBadge(product.status)}
                 <Badge variant="outline">v{product.version.toFixed(1)}</Badge>
               </div>
@@ -463,15 +469,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">Type</p>
-                    <p className="font-medium">{PRODUCT_TYPES[product.type]?.label || product.type}</p>
+                    <p className="font-medium">{product.product_type?.name || PRODUCT_TYPES[product.product_type?.code || '']?.label || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Unit of Measure</p>
-                    <p className="font-medium">{product.uom}</p>
+                    <p className="font-medium">{product.base_uom}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Category</p>
-                    <p className="font-medium">{product.category || '-'}</p>
+                    <p className="text-sm text-gray-500">Cost per Unit</p>
+                    <p className="font-medium">{product.cost_per_unit ? `$${product.cost_per_unit.toFixed(2)}` : '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Shelf Life</p>
@@ -493,19 +499,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <div>
                     <p className="text-sm text-gray-500">Min Stock</p>
                     <p className="font-medium">
-                      {product.min_stock_qty ? `${product.min_stock_qty} ${product.uom}` : '-'}
+                      {product.min_stock ? `${product.min_stock} ${product.base_uom}` : '-'}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Max Stock</p>
                     <p className="font-medium">
-                      {product.max_stock_qty ? `${product.max_stock_qty} ${product.uom}` : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Reorder Point</p>
-                    <p className="font-medium">
-                      {product.reorder_point ? `${product.reorder_point} ${product.uom}` : '-'}
+                      {product.max_stock ? `${product.max_stock} ${product.base_uom}` : '-'}
                     </p>
                   </div>
                   <div>

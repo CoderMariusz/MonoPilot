@@ -23,20 +23,25 @@ import { useToast } from '@/hooks/use-toast'
 import { productCreateSchema, productUpdateSchema } from '@/lib/validation/product-schemas'
 import { ZodError } from 'zod'
 
+interface ProductType {
+  id: string
+  code: string
+  name: string
+  is_active: boolean
+}
+
 interface Product {
   id: string
   code: string
   name: string
-  type: 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP' | 'CUSTOM'
+  product_type_id: string
   description?: string
-  category?: string
-  uom: string
+  base_uom: string
   version: number
-  status: 'active' | 'inactive' | 'obsolete'
+  status: 'active' | 'inactive' | 'discontinued'
   shelf_life_days?: number
-  min_stock_qty?: number
-  max_stock_qty?: number
-  reorder_point?: number
+  min_stock?: number
+  max_stock?: number
   cost_per_unit?: number
 }
 
@@ -69,16 +74,6 @@ interface ProductFormModalProps {
   onSuccess: () => void
 }
 
-// Product type options
-const PRODUCT_TYPES = [
-  { value: 'RM', label: 'Raw Material (RM)' },
-  { value: 'WIP', label: 'Work In Progress (WIP)' },
-  { value: 'FG', label: 'Finished Good (FG)' },
-  { value: 'PKG', label: 'Packaging (PKG)' },
-  { value: 'BP', label: 'By-Product (BP)' },
-  { value: 'CUSTOM', label: 'Custom' },
-]
-
 // Common UoM options
 const UOM_OPTIONS = ['kg', 'g', 'L', 'mL', 'pcs', 'pack', 'box', 'pallet', 'unit']
 
@@ -87,21 +82,23 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
   const [formData, setFormData] = useState({
     code: product?.code || '',
     name: product?.name || '',
-    type: product?.type || 'RM',
+    product_type_id: product?.product_type_id || '',
     description: product?.description || '',
-    category: product?.category || '',
-    uom: product?.uom || '',
+    base_uom: product?.base_uom || '',
     status: product?.status || 'active',
     shelf_life_days: product?.shelf_life_days?.toString() || '',
-    min_stock_qty: product?.min_stock_qty?.toString() || '',
-    max_stock_qty: product?.max_stock_qty?.toString() || '',
-    reorder_point: product?.reorder_point?.toString() || '',
+    min_stock: product?.min_stock?.toString() || '',
+    max_stock: product?.max_stock?.toString() || '',
     cost_per_unit: product?.cost_per_unit?.toString() || '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [checkingCode, setCheckingCode] = useState(false)
   const [codeExists, setCodeExists] = useState(false)
+
+  // Product types state
+  const [productTypes, setProductTypes] = useState<ProductType[]>([])
+  const [loadingProductTypes, setLoadingProductTypes] = useState(true)
 
   // Allergen state
   const [allergens, setAllergens] = useState<Allergen[]>([])
@@ -117,6 +114,32 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
 
   const { toast } = useToast()
   const isEditMode = !!product
+
+  // Fetch product types on mount
+  useEffect(() => {
+    const fetchProductTypes = async () => {
+      try {
+        setLoadingProductTypes(true)
+        const response = await fetch('/api/technical/product-types')
+        if (response.ok) {
+          const data = await response.json()
+          setProductTypes(data.data || [])
+          // Set default product type if not in edit mode and no type selected
+          if (!product && data.data?.length > 0 && !formData.product_type_id) {
+            const rmType = data.data.find((t: ProductType) => t.code === 'RM')
+            if (rmType) {
+              setFormData(prev => ({ ...prev, product_type_id: rmType.id }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching product types:', error)
+      } finally {
+        setLoadingProductTypes(false)
+      }
+    }
+    fetchProductTypes()
+  }, [])
 
   // Fetch allergens on mount
   useEffect(() => {
@@ -243,8 +266,8 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
 
       const dataToValidate: Record<string, unknown> = {
         name: formData.name,
-        type: formData.type,
-        uom: formData.uom,
+        product_type_id: formData.product_type_id,
+        base_uom: formData.base_uom,
         status: formData.status,
       }
 
@@ -253,11 +276,9 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
       }
 
       if (formData.description) dataToValidate.description = formData.description
-      // Note: category field removed - table has category_id (UUID) but no categories table exists yet
       if (formData.shelf_life_days) dataToValidate.shelf_life_days = parseInt(formData.shelf_life_days)
-      if (formData.min_stock_qty) dataToValidate.min_stock_qty = parseFloat(formData.min_stock_qty)
-      if (formData.max_stock_qty) dataToValidate.max_stock_qty = parseFloat(formData.max_stock_qty)
-      if (formData.reorder_point) dataToValidate.reorder_point = parseFloat(formData.reorder_point)
+      if (formData.min_stock) dataToValidate.min_stock = parseFloat(formData.min_stock)
+      if (formData.max_stock) dataToValidate.max_stock = parseFloat(formData.max_stock)
       if (formData.cost_per_unit) dataToValidate.cost_per_unit = parseFloat(formData.cost_per_unit)
 
       schema.parse(dataToValidate)
@@ -301,11 +322,11 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
     setSubmitting(true)
 
     try {
-      // Build payload
+      // Build payload with correct database column names
       const payload: Record<string, unknown> = {
         name: formData.name,
-        type: formData.type,
-        uom: formData.uom,
+        product_type_id: formData.product_type_id,
+        base_uom: formData.base_uom,
         status: formData.status,
       }
 
@@ -314,11 +335,9 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
       }
 
       if (formData.description) payload.description = formData.description
-      // Note: category field removed - table has category_id (UUID) but no categories table exists yet
       if (formData.shelf_life_days) payload.shelf_life_days = parseInt(formData.shelf_life_days)
-      if (formData.min_stock_qty) payload.min_stock_qty = parseFloat(formData.min_stock_qty)
-      if (formData.max_stock_qty) payload.max_stock_qty = parseFloat(formData.max_stock_qty)
-      if (formData.reorder_point) payload.reorder_point = parseFloat(formData.reorder_point)
+      if (formData.min_stock) payload.min_stock = parseFloat(formData.min_stock)
+      if (formData.max_stock) payload.max_stock = parseFloat(formData.max_stock)
       if (formData.cost_per_unit) payload.cost_per_unit = parseFloat(formData.cost_per_unit)
 
       // API call for product
@@ -477,33 +496,37 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              {/* Type */}
+              {/* Product Type */}
               <div className="space-y-2">
-                <Label htmlFor="type">
+                <Label htmlFor="product_type_id">
                   Type <span className="text-red-500">*</span>
                 </Label>
-                <Select value={formData.type} onValueChange={(v) => handleChange('type', v)}>
-                  <SelectTrigger className={errors.type ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRODUCT_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.type && <p className="text-sm text-red-500">{errors.type}</p>}
+                {loadingProductTypes ? (
+                  <p className="text-sm text-gray-500 py-2">Loading types...</p>
+                ) : (
+                  <Select value={formData.product_type_id} onValueChange={(v) => handleChange('product_type_id', v)}>
+                    <SelectTrigger className={errors.product_type_id ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productTypes.filter(t => t.is_active).map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name} ({type.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {errors.product_type_id && <p className="text-sm text-red-500">{errors.product_type_id}</p>}
               </div>
 
               {/* UoM */}
               <div className="space-y-2">
-                <Label htmlFor="uom">
+                <Label htmlFor="base_uom">
                   Unit of Measure <span className="text-red-500">*</span>
                 </Label>
-                <Select value={formData.uom} onValueChange={(v) => handleChange('uom', v)}>
-                  <SelectTrigger className={errors.uom ? 'border-red-500' : ''}>
+                <Select value={formData.base_uom} onValueChange={(v) => handleChange('base_uom', v)}>
+                  <SelectTrigger className={errors.base_uom ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select UoM" />
                   </SelectTrigger>
                   <SelectContent>
@@ -514,7 +537,7 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.uom && <p className="text-sm text-red-500">{errors.uom}</p>}
+                {errors.base_uom && <p className="text-sm text-red-500">{errors.base_uom}</p>}
               </div>
 
               {/* Status */}
@@ -527,7 +550,7 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
                   <SelectContent>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="obsolete">Obsolete</SelectItem>
+                    <SelectItem value="discontinued">Discontinued</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -577,47 +600,34 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Inventory Settings</h3>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="min_stock_qty">Min Stock</Label>
+                <Label htmlFor="min_stock">Min Stock</Label>
                 <Input
-                  id="min_stock_qty"
+                  id="min_stock"
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.min_stock_qty}
-                  onChange={(e) => handleChange('min_stock_qty', e.target.value)}
+                  value={formData.min_stock}
+                  onChange={(e) => handleChange('min_stock', e.target.value)}
                   placeholder="0"
-                  className={errors.min_stock_qty ? 'border-red-500' : ''}
+                  className={errors.min_stock ? 'border-red-500' : ''}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max_stock_qty">Max Stock</Label>
+                <Label htmlFor="max_stock">Max Stock</Label>
                 <Input
-                  id="max_stock_qty"
+                  id="max_stock"
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.max_stock_qty}
-                  onChange={(e) => handleChange('max_stock_qty', e.target.value)}
+                  value={formData.max_stock}
+                  onChange={(e) => handleChange('max_stock', e.target.value)}
                   placeholder="0"
-                  className={errors.max_stock_qty ? 'border-red-500' : ''}
+                  className={errors.max_stock ? 'border-red-500' : ''}
                 />
-                {errors.max_stock_qty && <p className="text-sm text-red-500">{errors.max_stock_qty}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reorder_point">Reorder Point</Label>
-                <Input
-                  id="reorder_point"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.reorder_point}
-                  onChange={(e) => handleChange('reorder_point', e.target.value)}
-                  placeholder="0"
-                />
+                {errors.max_stock && <p className="text-sm text-red-500">{errors.max_stock}</p>}
               </div>
 
               <div className="space-y-2">

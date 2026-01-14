@@ -361,18 +361,10 @@ export default function TechnicalDashboardPage() {
       </div>
       </div>
 
-      {/* Product Form Modal */}
+      {/* Product Form Modal - for new products only from dashboard */}
       <ProductFormModal
         open={productModalOpen}
-        product={selectedProduct ? {
-          id: selectedProduct.id,
-          code: selectedProduct.code,
-          name: selectedProduct.name,
-          type: selectedProduct.type,
-          uom: selectedProduct.uom || 'pcs',
-          version: selectedProduct.version,
-          status: selectedProduct.status as 'active' | 'inactive' | 'obsolete'
-        } : null}
+        product={null}
         onClose={closeProductModal}
         onSuccess={() => {
           closeProductModal()

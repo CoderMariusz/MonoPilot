@@ -58,9 +58,9 @@ export async function GET(req: NextRequest) {
       query = query.or(`code.ilike.%${params.search}%,name.ilike.%${params.search}%`)
     }
 
-    if (params.type) {
-      const types = Array.isArray(params.type) ? params.type : [params.type]
-      query = query.in('type', types)
+    if (params.product_type_id) {
+      const types = Array.isArray(params.product_type_id) ? params.product_type_id : [params.product_type_id]
+      query = query.in('product_type_id', types)
     }
 
     if (params.status) {
@@ -68,9 +68,10 @@ export async function GET(req: NextRequest) {
       query = query.in('status', statuses)
     }
 
-    if (params.category) {
-      query = query.eq('category', params.category)
-    }
+    // TODO: Enable when categories table is created
+    // if (params.category_id) {
+    //   query = query.eq('category_id', params.category_id)
+    // }
 
     // Apply sorting
     query = query.order(params.sort, { ascending: params.order === 'asc' })
