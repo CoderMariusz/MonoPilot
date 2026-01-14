@@ -71,6 +71,7 @@ Exit: {condition}
 6. **check UX in cataloge 3-Architecture/ux/wireframe do not relay on code! make sure you are doing STRICT how project show wireframe** 
 7. **check context make sure you dont runout if there is posibility /compact context or close subagent and run next after short handover**
 8. **Aways one soties per Agent!**
+9. **update Roadmaps files**
 
 ---
 
@@ -79,5 +80,19 @@ Exit: {condition}
 `.claude/agents/ORCHESTRATOR.md`
 `.claude/ROADMAP-STORIES.MD`
 `.claude/IMPLEMENTATION-ROADMAP.yaml`
+
+## Confirmation Deployment in yaml file
+**Patern**
+```
+# ============================================================================
+# STORY COMPLETE
+# ============================================================================
+# ============================================================================
+# DEPLOYED TO PRODUCTION
+# ============================================================================
+P3-FIX: ✓ backend-dev 11:21 migration:122,123 blocker:fixed
+DEPLOY: ✓ 14-01-2026 11:38 status:DEPLOYED environment:production migrations:122,123
+```
+
 
 **START. NO QUESTIONS. DELEGATE IMMEDIATELY.**

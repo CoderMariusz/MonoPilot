@@ -30,9 +30,9 @@ summary:
 
     epic_02_technical:
       total: 17
-      complete: 9
-      partial: 8
-      percent: "88%"  # UPDATED from 60%
+      complete: 12  # UPDATED: +3 (02.5b, 02.6, 02.8 DEPLOYED)
+      partial: 5
+      percent: "92%"  # UPDATED 2026-01-14
 
     epic_03_planning:
       total: 20
@@ -202,34 +202,15 @@ epic_02_technical:
     - {id: "02.3", name: "Product Allergens", status: "PRODUCTION-READY", completion: "95%"}
     - {id: "02.4", name: "BOMs CRUD", status: DONE, completion: "98%"}
     - {id: "02.5a", name: "BOM Items Core", status: DONE, completion: "100%", tests: 227}
+    - {id: "02.5b", name: "BOM Items Advanced", status: DEPLOYED, completion: "100%", deployed: "2026-01-14"}
+    - {id: "02.6", name: "BOM Alternatives + Clone", status: DEPLOYED, completion: "100%", deployed: "2026-01-14"}
     - {id: "02.7", name: "Routings CRUD", status: COMPLETE, completion: "95%"}
+    - {id: "02.8", name: "Routing Operations", status: DEPLOYED, completion: "100%", deployed: "2026-01-14", migrations: ["122", "123"]}
     - {id: "02.10a", name: "Traceability Config", status: "PRODUCTION-READY", completion: "100%"}
     - {id: "02.10b", name: "Traceability Queries", status: "PRODUCTION-READY", completion: "100%"}
     - {id: "02.13", name: "Nutrition Calculation", status: "PRODUCTION-READY", completion: "100%"}
 
   partial_stories:
-    - id: "02.5b"
-      name: "BOM Items Advanced"
-      status: "PRODUCTION-READY"
-      completion: "68%"
-      needs: "Frontend integration"
-      priority: MEDIUM
-
-    - id: "02.6"
-      name: "BOM Alternatives + Clone"
-      status: PARTIAL
-      completion: "85%"
-      needs: "UI verification"
-      priority: LOW
-
-    - id: "02.8"
-      name: "Routing Operations"
-      status: PARTIAL
-      completion: "87%"
-      blocker: "Missing operation_attachments migration"
-      priority: HIGH
-      effort_days: 1
-
     - id: "02.9"
       name: "BOM-Routing Costs"
       status: PARTIAL
@@ -269,12 +250,12 @@ epic_02_technical:
 
   next_steps:
     priority_high:
-      - "02.8 - Create operation_attachments migration (1 day)"
-    priority_medium:
       - "02.12 - Add dashboard tests (2 days)"
+    priority_medium:
       - "02.9, 02.15 - Complete API gaps (3-4 days)"
+      - "02.14 - Export features (2 days)"
     priority_low:
-      - "02.6, 02.14 - UI polish (defer)"
+      - "02.11 - Shelf life polish (defer)"
 
 # =============================================================================
 # EPIC 03 - PLANNING (95% Complete) - UPDATED
@@ -653,6 +634,13 @@ next_actions:
 # =============================================================================
 
 changelog:
+  - date: "2026-01-14 11:40"
+    changes:
+      - "✅ DEPLOYED: 02.5b, 02.6, 02.8 to production"
+      - "Epic 02 updated: 88% → 92% (12 done, 5 partial)"
+      - "Created migrations 122, 123 for operation_attachments"
+      - "Resolved 02.8 blocker - routing_operations table dependency"
+
   - date: "2026-01-14"
     changes:
       - "Full checkpoint analysis completed"

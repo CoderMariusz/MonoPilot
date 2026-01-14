@@ -11,7 +11,7 @@
 | Epic | Moduł | Stories | Zaimplementowane | Status | % |
 |------|-------|---------|------------------|--------|---|
 | 01 | Settings | 16 | 16 | ✅ **COMPLETE** | 100% |
-| 02 | Technical | 17 | 9 done + 8 partial | ⚠️ PARTIAL | 88% |
+| 02 | Technical | 17 | 12 done + 5 partial | ⚠️ NEAR COMPLETE | 92% |
 | 03 | Planning | 20 | 18 done + 1 partial | ⚠️ NEAR COMPLETE | 95% |
 | 04 Phase 0 | Production MVP | 7 | 7 | ✅ **COMPLETE** | 100% |
 | 04 Phase 1 | Production Full | 10 | 0 | ❌ READY (unblocked) | 0% |
@@ -55,9 +55,9 @@
 
 ---
 
-## EPIC 02 - TECHNICAL ⚠️ 88% COMPLETE
+## EPIC 02 - TECHNICAL ⚠️ 92% COMPLETE
 
-**Status:** 9 stories DONE, 8 stories PARTIAL
+**Status:** 12 stories DONE/DEPLOYED, 5 stories PARTIAL
 
 | Story | Nazwa | Status | Testy | AC | Uwagi |
 |-------|-------|--------|-------|-----|-------|
@@ -66,10 +66,10 @@
 | 02.3 | Product Allergens | ✅ PRODUCTION-READY | 1,964 LOC | ✓ | 95% complete |
 | 02.4 | BOMs CRUD + Validity | ✅ DONE | 1,691 LOC | 8/8 | 98% complete |
 | 02.5a | BOM Items Core | ✅ DONE | 227+ | 13/13 | 100% complete |
-| 02.5b | BOM Items Advanced | ⚠️ PRODUCTION-READY | 253 | ✓ | 68% - frontend gaps |
-| 02.6 | BOM Alternatives + Clone | ⚠️ PARTIAL | 132 | ✓ | 85% - UI gaps |
+| 02.5b | BOM Items Advanced | ✅ DEPLOYED | 253 | ✓ | 100% - deployed 2026-01-14 |
+| 02.6 | BOM Alternatives + Clone | ✅ DEPLOYED | 132 | ✓ | 100% - deployed 2026-01-14 |
 | 02.7 | Routings CRUD | ✅ COMPLETE | 15 | ✓ | 95% complete |
-| 02.8 | Routing Operations | ⚠️ PARTIAL | - | ✓ | 87% - attachments missing |
+| 02.8 | Routing Operations | ✅ DEPLOYED | 30+ | ✓ | 100% - deployed 2026-01-14 |
 | 02.9 | BOM-Routing Costs | ⚠️ PARTIAL | 37 | ✓ | 85% - API gaps |
 | 02.10a | Traceability Config | ✅ PRODUCTION-READY | 169 | ✓ | 100% backend |
 | 02.10b | Traceability Queries | ✅ PRODUCTION-READY | 42+ | ✓ | 100% complete |
@@ -80,9 +80,8 @@
 | 02.15 | Cost History + Variance | ⚠️ PARTIAL | 50 | ✓ | 85% - migration done |
 
 **Do zrobienia:**
-1. ⚡ 02.8 - Dodać `operation_attachments` migration
-2. ⚡ 02.12 - Dodać testy
-3. 02.6, 02.14 - Dokończyć UI gaps
+1. ⚡ 02.12 - Dodać testy
+2. 02.9, 02.14, 02.15 - Dokończyć API/UI gaps
 
 ---
 
