@@ -1,10 +1,11 @@
 # Epic 04 - Production Module - Implementation Plan
 
-**Date:** 2026-01-04
+**Date:** 2026-01-04 (Updated: 2026-01-14)
 **Epic:** 04-production (WO Execution, Consumption, Outputs, OEE)
-**Status:** Ready for Implementation
-**Total Stories:** 28 (7 Phase 0 + 10 Phase 1 + 11 Phase 2)
+**Status:** Phase 0 COMPLETE | Phase 1-2 Stories Defined
+**Total Stories:** 18 (7 Phase 0 + 10 Phase 1 + 11 Phase 2)
 **Max Parallel Tracks:** 3
+**Story Definition:** 100% complete (all Phase 1-2 markdown + context created 2026-01-14)
 
 ---
 
@@ -572,6 +573,81 @@ special_notes:
 
 ---
 
-**Generated:** 2026-01-04
-**Author:** Claude Code (AI Agent)
+## Phase 2: OEE & Analytics (NEW - 2026-01-14)
+
+**Status:** Stories Defined | Implementation Pending
+**Stories:** 11 (4 OEE Core + 7 Analytics Reports)
+**Estimated Effort:** 33 days
+
+### Phase 2 Dependency Graph
+
+```
+LEVEL 1: Foundation (no dependencies)
+└── 04.9d - Shift Management [M, 3d]
+
+LEVEL 2: Data Collection (parallel possible)
+├── 04.9b - Downtime Tracking [L, 4d] ← 01.10 (Machines)
+└── Continue Phase 1 stories if needed
+
+LEVEL 3: OEE Calculation
+└── 04.9a - OEE Calculation [L, 5d] ← 04.9d (Shifts), 04.9b (Downtime), 04.4 (Yield)
+
+LEVEL 4: Advanced Integration (optional)
+└── 04.9c - Machine Integration [L, 5d] ← 01.10 (Machines), 04.9b (Downtime)
+
+LEVEL 5: Analytics Reports (parallel - can run all 7 simultaneously)
+├── 04.10a - OEE Summary Report [M, 3d] ← 04.9a
+├── 04.10b - Downtime Analysis Report [M, 3d] ← 04.9b
+├── 04.10c - Yield Analysis Report [M, 2d] ← 04.4
+├── 04.10d - Production Output Report [M, 2d] ← 04.7a
+├── 04.10e - Material Consumption Report [M, 2d] ← 04.6a
+├── 04.10f - Quality Rate Report [M, 2d] ← 04.7a, Epic 06 (soft)
+└── 04.10g - WO Completion Report [S, 2d] ← 04.2c
+```
+
+### Phase 2 Stories Quick Reference
+
+**OEE Core:**
+
+| ID | Name | Size | Days | Key Dependencies |
+|----|------|------|------|------------------|
+| 04.9a | OEE Calculation | L | 5 | 04.9d, 04.9b, 04.4 |
+| 04.9b | Downtime Tracking | L | 4 | 01.10 |
+| 04.9c | Machine Integration | L | 5 | 01.10, 04.9b |
+| 04.9d | Shift Management | M | 3 | 01.1 |
+
+**Analytics Reports:**
+
+| ID | Name | Size | Days | Key Dependencies |
+|----|------|------|------|------------------|
+| 04.10a | OEE Summary Report | M | 3 | 04.9a |
+| 04.10b | Downtime Analysis Report | M | 3 | 04.9b |
+| 04.10c | Yield Analysis Report | M | 2 | 04.4 |
+| 04.10d | Production Output Report | M | 2 | 04.7a |
+| 04.10e | Material Consumption Report | M | 2 | 04.6a |
+| 04.10f | Quality Rate Report | M | 2 | 04.7a |
+| 04.10g | WO Completion Report | S | 2 | 04.2c |
+
+**Critical Path (Phase 2):** 04.9d [3d] → 04.9b [4d] → 04.9a [5d] → 04.10a [3d] = ~15 days sequential
+
+**With Parallel Execution:** Reports (04.10a-g) can all run simultaneously → **~25 days total**
+
+---
+
+## Updated Timeline Estimate
+
+| Phase | Stories | Sequential Days | Parallel Days | Status |
+|-------|---------|----------------|---------------|--------|
+| Phase 0 (MVP Core) | 7 | - | - | 100% DONE ✅ |
+| Phase 1 (Full Production) | 10 | 27-31 | 27-31 | 0% (stories ready) |
+| Phase 2 (OEE & Analytics) | 11 | 33 | 25 | 0% (stories ready) |
+| **TOTAL** | **18** | **60-64** | **52-56** | **39% complete** |
+
+**Note:** Phase 2 should start after Phase 1 completes to ensure production data availability.
+
+---
+
+**Generated:** 2026-01-04 (Updated: 2026-01-14)
+**Author:** Claude Code (AI Agent) + ORCHESTRATOR
 **Epic Owner:** Production Module
+**Last Update:** Added Phase 1-2 markdown stories (21 files, ~440KB documentation)

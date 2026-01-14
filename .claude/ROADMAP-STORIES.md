@@ -13,18 +13,18 @@
 | 01 | Settings | 26 (16+10) | 16 MVP done | MVP COMPLETE + Phase 1B-3 defined | 62% impl / 100% def |
 | 02 | Technical | 23 (17+6) | 17 MVP done | MVP COMPLETE + Phase 2 defined | 74% impl / 100% def |
 | 03 | Planning | 30 (20+10) | 19 MVP done | MVP COMPLETE + Phase 2-3 defined | 63% impl / 100% def |
-| 04 Phase 0 | Production MVP | 7 | 7 | COMPLETE | 100% |
-| 04 Phase 1 | Production Full | 10 | 0 | READY (unblocked) | 0% |
+| 04 | Production | 18 (7+11) | 7 Phase 0 done | Phase 0 COMPLETE + Phase 1-2 defined | 39% impl / 100% def |
 | 05 | Warehouse | 20 | 20 | COMPLETE | 100% |
 | 06 | Quality | 41 | 0 | NOT STARTED | 0% |
 | 07 | Shipping | 16 | 0 | NOT STARTED | 0% |
 | 08-11 | Premium | 78-97 | 0 | NO STORIES | 0% |
 
-**TOTAL:** 88/106 stories zaimplementowanych w Epic 01-05 (~83%)
+**TOTAL:** 88/127 stories zaimplementowanych w Epic 01-05 (~69%)
 **Note:**
 - Epic 01 has 10 Phase 1B-3 stories defined (01.17-01.26) for security, integrations, enterprise
 - Epic 02 has 6 Phase 2 stories defined (02.16-02.21) covering remaining P2 FR
 - Epic 03 has 10 Phase 2-3 stories defined (03.18-03.27) for forecasting, MRP, supplier quality, EDI
+- Epic 04 has 11 Phase 1-2 stories defined (04.6a-e, 04.7a-d, 04.8, 04.9a-d, 04.10a-g) for full production + OEE
 
 ---
 
@@ -217,9 +217,11 @@
 
 ---
 
-## EPIC 04 - PRODUCTION
+## EPIC 04 - PRODUCTION 100% STORY DEFINITION | 39% IMPLEMENTED
 
-### Phase 0 - MVP Core COMPLETE 100%
+**Status:** Phase 0 COMPLETE (7/7) + Phase 1-2 stories defined (21 stories)
+
+### Phase 0 - MVP Core (COMPLETE)
 
 | Story | Nazwa | Status | Testy | AC | Uwagi |
 |-------|-------|--------|-------|-----|-------|
@@ -236,28 +238,70 @@
 - AC pass rate: 97.8% (44/45)
 - Wszystkie P6 (QA) passed
 
-### Phase 1 - Full Production READY TO START
+### Phase 1 - Full Production (STORIES DEFINED)
 
-**Status:** UNBLOCKED (Epic 05 complete!)
+**Status:** UNBLOCKED (Epic 05 complete!) | Stories ready for implementation
 
-| Story | Nazwa | Status | Wymaga |
-|-------|-------|--------|--------|
-| 04.6a | Material Consumption Desktop | NOT STARTED | LP table pass |
-| 04.6b | Material Consumption Scanner | NOT STARTED | LP table pass |
-| 04.6c | 1:1 Consumption | NOT STARTED | LP table pass |
-| 04.6d | Consumption Correction | NOT STARTED | LP table pass |
-| 04.6e | Over-Consumption Control | NOT STARTED | LP table pass |
-| 04.7a | Output Registration Desktop | NOT STARTED | LP + Genealogy pass |
-| 04.7b | Output Registration Scanner | NOT STARTED | LP + Genealogy pass |
-| 04.7c | By-Product Registration | NOT STARTED | LP + Genealogy pass |
-| 04.7d | Multiple Outputs per WO | NOT STARTED | LP + Genealogy pass |
-| 04.8 | Material Reservations | NOT STARTED | LP Reservations pass |
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 04.6a | Material Consumption Desktop | NOT STARTED | 1 FR | L (4d) | LP selection, quantity validation, progress |
+| 04.6b | Material Consumption Scanner | NOT STARTED | 1 FR | M (3d) | Barcode scan, quick consumption workflow |
+| 04.6c | 1:1 Consumption Enforcement | NOT STARTED | 1 FR | S (2d) | consume_whole_lp validation |
+| 04.6d | Consumption Correction | NOT STARTED | 1 FR | S (2d) | Reversal workflow with audit trail |
+| 04.6e | Over-Consumption Control | NOT STARTED | 1 FR | S (2d) | Setting-based block/warn logic |
+| 04.7a | Output Registration Desktop | NOT STARTED | 1 FR | M (3d) | LP creation, genealogy, yield capture |
+| 04.7b | Output Registration Scanner | NOT STARTED | 1 FR | M (3d) | Mobile output registration workflow |
+| 04.7c | By-Product Registration | NOT STARTED | 1 FR | S (2d) | Secondary output with yield % |
+| 04.7d | Multiple Outputs per WO | NOT STARTED | 1 FR | S (2d) | Multi-output batch support |
+| 04.8 | Material Reservations | NOT STARTED | 1 FR | M (4d) | Prevent allocation conflicts |
 
-**Szacowany effort:** 18-24 dni
+**Metryki Phase 1:**
+- Stories created: 2026-01-14
+- Total documentation: ~190KB (10 markdown files)
+- Context YAML: Complete (database, API, frontend, tests)
+- Estimated effort: 27-31 days
+- Dependencies: Epic 05 COMPLETE ✅
 
-### Phase 2 - OEE & Analytics NOT STARTED
+### Phase 2 - OEE & Analytics (STORIES DEFINED)
 
-11 stories do stworzenia (04.9a-d, 04.10a-g)
+**OEE Core (4 stories):**
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 04.9a | OEE Calculation | NOT STARTED | 1 FR | L (5d) | Availability × Performance × Quality |
+| 04.9b | Downtime Tracking | NOT STARTED | 1 FR | L (4d) | Planned/unplanned, reason categorization |
+| 04.9c | Machine Integration | NOT STARTED | 1 FR | L (5d) | Machine status, counters, alarms (OPC UA) |
+| 04.9d | Shift Management | NOT STARTED | 1 FR | M (3d) | Shift definition, break times, calendar |
+
+**Analytics Reports (7 stories):**
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 04.10a | OEE Summary Report | NOT STARTED | 1 FR | M (3d) | OEE by machine/line/shift, trends |
+| 04.10b | Downtime Analysis Report | NOT STARTED | 1 FR | M (3d) | Pareto analysis, planned vs unplanned |
+| 04.10c | Yield Analysis Report | NOT STARTED | 1 FR | M (2d) | Yield trends, operator performance |
+| 04.10d | Production Output Report | NOT STARTED | 1 FR | M (2d) | Units produced, plan vs actual |
+| 04.10e | Material Consumption Report | NOT STARTED | 1 FR | M (2d) | Consumption variance analysis |
+| 04.10f | Quality Rate Report | NOT STARTED | 1 FR | M (2d) | QA status, rejection rate, defects |
+| 04.10g | WO Completion Report | NOT STARTED | 1 FR | S (2d) | On-time vs delayed, delay reasons |
+
+**Metryki Phase 2:**
+- Stories created: 2026-01-14
+- Total documentation: ~250KB (11 files)
+- OEE Core effort: 17 days
+- Analytics Reports effort: 16 days
+- Total Phase 2 effort: 33 days
+
+**Status:**
+- Phase 0 (MVP Core): 100% COMPLETE ✅ (7/7 stories, 1,600+ tests)
+- Phase 1 (Full Production): 100% STORIES DEFINED ✅ Implementation pending (27-31 days)
+- Phase 2 (OEE & Analytics): 100% STORIES DEFINED ✅ Implementation pending (33 days)
+- Epic 04: 100% story definition complete | 39% implemented (7/18 stories)
+
+**Dependencies satisfied:**
+- ✅ Epic 05 (Warehouse) - LP table, genealogy, reservations COMPLETE
+- ✅ Epic 03 (Planning) - WO CRUD COMPLETE
+- ✅ Epic 02 (Technical) - BOMs, routings COMPLETE
 
 ---
 
@@ -402,19 +446,22 @@ Potem: Implementacja
 ## CHECKSUM
 
 ```
-Wygenerowano: 2026-01-14 21:45 UTC
-Zrodlo: .claude/checkpoints/*.yaml + Epic 01-03 gap analysis
-Stories zaimplementowane: 88/106 (Epic 01-05)
-Stories do implementacji: 8 (Epic 04 Phase 1) + 10 (Epic 01 Phase 1B-3) + 6 (Epic 02 Phase 2) + 10 (Epic 03 Phase 2-3)
+Wygenerowano: 2026-01-14 22:10 UTC
+Zrodlo: .claude/checkpoints/*.yaml + Epic 01-04 gap analysis
+Stories zaimplementowane: 88/127 (Epic 01-05)
+Stories do implementacji: 21 (Epic 04 Phase 1-2) + 10 (Epic 01 Phase 1B-3) + 6 (Epic 02 Phase 2) + 10 (Epic 03 Phase 2-3)
 Stories do napisania: 78-97 (Epic 08-11)
-Epic 01 story definition: 100% complete (26 stories total: 16 MVP + 10 Phase 1B-3)
+Epic 01 story definition: 100% complete (26 stories: 16 MVP + 10 Phase 1B-3)
 Epic 01 implementation: 62% (16/26 MVP done, 10 Phase 1B-3 pending)
-Epic 02 story definition: 100% complete (23 stories total: 17 MVP + 6 Phase 2)
+Epic 02 story definition: 100% complete (23 stories: 17 MVP + 6 Phase 2)
 Epic 02 implementation: 74% (17/23 MVP done, 6 Phase 2 pending)
-Epic 03 story definition: 100% complete (30 stories total: 20 MVP + 10 Phase 2-3)
+Epic 03 story definition: 100% complete (30 stories: 20 MVP + 10 Phase 2-3)
 Epic 03 implementation: 63% (19/30 MVP ~done, 10 Phase 2-3 pending, 1 in progress, 1 blocked)
+Epic 04 story definition: 100% complete (18 stories: 7 Phase 0 + 10 Phase 1 + 11 Phase 2)
+Epic 04 implementation: 39% (7/18 Phase 0 done, 11 Phase 1-2 pending)
 Epic 05 completion date: 2026-01-09
 Epic 01 Phase 1B-3 stories: 01.17-01.26 (security, integrations, enterprise)
 Epic 02 Phase 2 stories: 02.16-02.21 (created 2026-01-14, 184KB)
 Epic 03 Phase 2-3 stories: 03.18-03.27 (created 2026-01-14, 376KB)
+Epic 04 Phase 1-2 stories: 04.6a-e, 04.7a-d, 04.8, 04.9a-d, 04.10a-g (created 2026-01-14, ~440KB)
 ```

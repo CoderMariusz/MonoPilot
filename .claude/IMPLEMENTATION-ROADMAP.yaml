@@ -414,10 +414,11 @@ epic_04_production:
     summary: "Phase 0 MVP Core 100% done. 1,600+ tests. Can track WO lifecycle."
 
   phase_1_full_production:
-    status: "READY_TO_START"  # UPDATED - no longer BLOCKED!
+    status: "STORIES_DEFINED"  # UPDATED - markdown + context complete!
     total_stories: 10
     ready: 10
     completion_percentage: 0
+    documentation: "~190KB (created 2026-01-14)"
 
     unblock_status: "✅ ALL DEPENDENCIES SATISFIED"
     unblock_details:
@@ -427,42 +428,59 @@ epic_04_production:
       - "✅ Epic 05.4 - FIFO/FEFO COMPLETE"
 
     stories:
-      - {id: "04.6a", name: "Material Consumption Desktop", ready: true}
-      - {id: "04.6b", name: "Material Consumption Scanner", ready: true}
-      - {id: "04.6c", name: "1:1 Consumption", ready: true}
-      - {id: "04.6d", name: "Consumption Correction", ready: true}
-      - {id: "04.6e", name: "Over-Consumption Control", ready: true}
-      - {id: "04.7a", name: "Output Registration Desktop", ready: true}
-      - {id: "04.7b", name: "Output Registration Scanner", ready: true}
-      - {id: "04.7c", name: "By-Product Registration", ready: true}
-      - {id: "04.7d", name: "Multiple Outputs per WO", ready: true}
-      - {id: "04.8", name: "Material Reservations", ready: true}
+      - {id: "04.6a", name: "Material Consumption Desktop", complexity: L, days: 4, fr: "FR-PROD-006"}
+      - {id: "04.6b", name: "Material Consumption Scanner", complexity: M, days: 3, fr: "FR-PROD-007"}
+      - {id: "04.6c", name: "1:1 Consumption", complexity: S, days: 2, fr: "FR-PROD-008"}
+      - {id: "04.6d", name: "Consumption Correction", complexity: S, days: 2, fr: "FR-PROD-009"}
+      - {id: "04.6e", name: "Over-Consumption Control", complexity: S, days: 2, fr: "FR-PROD-010"}
+      - {id: "04.7a", name: "Output Registration Desktop", complexity: M, days: 3, fr: "FR-PROD-011"}
+      - {id: "04.7b", name: "Output Registration Scanner", complexity: M, days: 3, fr: "FR-PROD-012"}
+      - {id: "04.7c", name: "By-Product Registration", complexity: S, days: 2, fr: "FR-PROD-013"}
+      - {id: "04.7d", name: "Multiple Outputs per WO", complexity: S, days: 2, fr: "FR-PROD-015"}
+      - {id: "04.8", name: "Material Reservations", complexity: M, days: 4, fr: "FR-PROD-016"}
 
-    effort_estimate: "18-24 days"
+    effort_estimate: "27-31 days"  # UPDATED from 18-24
 
     implementation_order:
       - task: "Material Consumption"
         stories: ["04.6a", "04.6b", "04.6c", "04.6d", "04.6e"]
-        duration: "12-15 days"
+        duration: "13-15 days"
       - task: "Output Registration"
         stories: ["04.7a", "04.7b", "04.7c", "04.7d"]
-        duration: "8-10 days"
+        duration: "10-12 days"
       - task: "Material Reservations"
         stories: ["04.8"]
-        duration: "2-3 days"
+        duration: "4 days"
 
   phase_2_oee_analytics:
-    status: "NOT_STARTED"
+    status: "STORIES_DEFINED"  # UPDATED!
     total_stories: 11
-    stories_documented: false
-    description: "OEE calculation, downtime tracking, analytics reports"
+    ready: 11
+    completion_percentage: 0
+    documentation: "~250KB (created 2026-01-14)"
+
+    oee_core:
+      stories:
+        - {id: "04.9a", name: "OEE Calculation", complexity: L, days: 5, fr: "FR-PROD-018"}
+        - {id: "04.9b", name: "Downtime Tracking", complexity: L, days: 4, fr: "FR-PROD-019"}
+        - {id: "04.9c", name: "Machine Integration", complexity: L, days: 5, fr: "FR-PROD-020"}
+        - {id: "04.9d", name: "Shift Management", complexity: M, days: 3, fr: "FR-PROD-021"}
+      effort: "17 days"
+
+    analytics_reports:
+      stories:
+        - {id: "04.10a", name: "OEE Summary Report", complexity: M, days: 3, fr: "FR-PROD-022a"}
+        - {id: "04.10b", name: "Downtime Analysis Report", complexity: M, days: 3, fr: "FR-PROD-022b"}
+        - {id: "04.10c", name: "Yield Analysis Report", complexity: M, days: 2, fr: "FR-PROD-022c"}
+        - {id: "04.10d", name: "Production Output Report", complexity: M, days: 2, fr: "FR-PROD-022d"}
+        - {id: "04.10e", name: "Material Consumption Report", complexity: M, days: 2, fr: "FR-PROD-022e"}
+        - {id: "04.10f", name: "Quality Rate Report", complexity: M, days: 2, fr: "FR-PROD-022f"}
+        - {id: "04.10g", name: "WO Completion Report", complexity: S, days: 2, fr: "FR-PROD-022g"}
+      effort: "16 days"
+
+    effort_estimate: "33 days total"
+    critical_path: "04.9d → 04.9b → 04.9a → 04.10a-g = ~25 days sequential"
     defer: "After Phase 1 complete"
-    stories:
-      - "04.9a - OEE Calculation (L)"
-      - "04.9b - Downtime Tracking (M)"
-      - "04.9c - Machine Integration (M)"
-      - "04.9d - Shift Management (M)"
-      - "04.10a-04.10g - 7 Analytics Reports (S each)"
 
 # =============================================================================
 # EPIC 05 - WAREHOUSE (100% COMPLETE!)
