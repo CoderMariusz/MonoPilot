@@ -11,6 +11,13 @@ import type { BOM, BOMWithProduct, BOMStatus, CreateBOMInput, UpdateBOMInput } f
  * - RLS org_id isolation (AC-2.6.1)
  * - Cascade delete to bom_items (AC-2.6.6)
  * - Cache invalidation events
+ *
+ * BUSINESS RULE: BOMs can only be created for:
+ * - FG (Finished Goods) - final products
+ * - WIP (Work in Progress) - intermediate/sub-assembly products
+ *
+ * NOT allowed for: RM (Raw Materials), PKG (Packaging), BP (Byproducts)
+ * These are purchased/outputs, not manufactured.
  */
 
 /**
@@ -264,6 +271,25 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
 
   const supabase = await createServerSupabase()
   const org_id = userInfo.orgId
+
+  // Validate product type - BOMs can only be created for FG and WIP products
+  const { data: product, error: productError } = await supabase
+    .from('products')
+    .select('id, code, product_type:product_types(id, code, name)')
+    .eq('id', input.product_id)
+    .eq('org_id', org_id)
+    .single()
+
+  if (productError || !product) {
+    throw new Error('Product not found')
+  }
+
+  const productType = product.product_type as { id: string; code: string; name: string } | null
+  const allowedTypes = ['FG', 'WIP']
+
+  if (!productType || !allowedTypes.includes(productType.code)) {
+    throw new Error(`BOMs can only be created for Finished Goods (FG) or Work in Progress (WIP) products. Product "${product.code}" is type "${productType?.name || 'Unknown'}".`)
+  }
 
   // Get max version for this product
   const maxVersion = await getMaxVersion(input.product_id, org_id)
