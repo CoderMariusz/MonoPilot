@@ -53,6 +53,7 @@ import {
 import { cn } from '@/lib/utils'
 import { BOMStatusBadge } from './BOMStatusBadge'
 import { BOMTimelineModal } from './BOMTimelineModal'
+import { BOMCreateModal } from './BOMCreateModal'
 import type { BOMWithProduct, BOMFilters, BOMStatus } from '@/lib/types/bom'
 
 // Debounce hook
@@ -113,6 +114,7 @@ export function BOMsDataTable({
     productCode?: string
     productName?: string
   }>({ open: false, productId: null })
+  const [createModalOpen, setCreateModalOpen] = useState(false)
 
   const debouncedSearch = useDebounce(searchInput, 300)
 
@@ -137,9 +139,14 @@ export function BOMsDataTable({
     }
   }
 
-  // Handle create click
+  // Handle create click - open modal instead of navigating
   const handleCreateClick = () => {
-    router.push('/technical/boms/new')
+    setCreateModalOpen(true)
+  }
+
+  // Handle successful BOM creation
+  const handleCreateSuccess = () => {
+    onRefresh()
   }
 
   // Handle timeline button click
@@ -490,6 +497,13 @@ export function BOMsDataTable({
         productId={timelineModal.productId}
         productCode={timelineModal.productCode}
         productName={timelineModal.productName}
+      />
+
+      {/* Create BOM Modal */}
+      <BOMCreateModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSuccess={handleCreateSuccess}
       />
     </div>
   )
