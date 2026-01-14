@@ -17,6 +17,12 @@ export interface ProductType {
   updated_at: string
 }
 
+export interface ProductTypeRef {
+  id: string
+  code: 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP'
+  name: string
+}
+
 export interface Product {
   id: string
   org_id: string
@@ -24,6 +30,7 @@ export interface Product {
   name: string
   description?: string | null
   product_type_id: string
+  product_type?: ProductTypeRef | null  // Joined from product_types table
   base_uom: string
   status: 'active' | 'inactive' | 'discontinued'
   version: number

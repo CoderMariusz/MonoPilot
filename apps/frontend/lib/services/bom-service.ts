@@ -112,8 +112,8 @@ export async function getBOMs(filters: BOMFilters = {}): Promise<BOMWithProduct[
         id,
         code,
         name,
-        type,
-        uom
+        base_uom,
+        product_type:product_types(id, code, name)
       ),
       created_by_user:users!created_by (
         id,

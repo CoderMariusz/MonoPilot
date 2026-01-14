@@ -72,13 +72,13 @@ export async function GET(req: NextRequest, context: RouteContext) {
     const from = (params.page - 1) * params.limit
     const to = from + params.limit - 1
 
+    // Note: product_version_history doesn't have org_id - RLS uses product lookup
     const { data, error, count } = await supabase
       .from('product_version_history')
       .select(`
         id,
         version,
         changed_fields,
-        change_summary,
         changed_at,
         changed_by_user:users!product_version_history_changed_by_fkey (
           id,
@@ -88,7 +88,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
         )
       `, { count: 'exact' })
       .eq('product_id', id)
-      .eq('org_id', orgId)
       .order('changed_at', { ascending: false })
       .range(from, to)
 
@@ -105,7 +104,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
       id: item.id,
       version: item.version,
       changed_fields: item.changed_fields,
-      change_summary: item.change_summary,
       changed_at: item.changed_at,
       changed_by: item.changed_by_user
     }))

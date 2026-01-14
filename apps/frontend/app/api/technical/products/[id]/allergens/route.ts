@@ -66,7 +66,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       .select(`
         allergen_id,
         relation_type,
-        allergens (id, code, name)
+        allergens (id, code, name_en)
       `)
       .eq('product_id', id)
       .eq('org_id', orgId)
@@ -222,7 +222,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       .select(`
         allergen_id,
         relation_type,
-        allergens (id, code, name)
+        allergens (id, code, name_en)
       `)
       .eq('product_id', id)
       .eq('org_id', orgId)

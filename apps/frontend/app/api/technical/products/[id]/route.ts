@@ -54,7 +54,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
         product_allergens (
           allergen_id,
           relation_type,
-          allergens (id, code, name)
+          allergens (id, code, name_en)
         ),
         created_by_user:users!products_created_by_fkey (id, first_name, last_name, email),
         updated_by_user:users!products_updated_by_fkey (id, first_name, last_name, email)

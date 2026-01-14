@@ -43,10 +43,10 @@ export async function GET(req: NextRequest) {
     const searchParams = Object.fromEntries(req.nextUrl.searchParams.entries())
     const params = productListQuerySchema.parse(searchParams)
 
-    // Build query
+    // Build query - join with product_types to get type code/name
     let query = supabase
       .from('products')
-      .select('*', { count: 'exact' })
+      .select('*, product_type:product_types(id, code, name)', { count: 'exact' })
       .eq('org_id', orgId)
       .is('deleted_at', null)
 

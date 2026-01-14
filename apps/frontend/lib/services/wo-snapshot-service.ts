@@ -133,7 +133,7 @@ export async function getWOMaterials(
     .from('wo_materials')
     .select(`
       *,
-      product:products(id, code, name, product_type)
+      product:products(id, code, name, product_type:product_types(id, code, name))
     `)
     .eq('wo_id', woId)
     .order('sequence', { ascending: true })
@@ -182,7 +182,7 @@ export async function createBOMSnapshot(
         yield_percent,
         condition_flags,
         notes,
-        product:products(id, name, code, product_type)
+        product:products(id, name, code, product_type:product_types(id, code, name))
       )
     `)
     .eq('id', bomId)
@@ -228,7 +228,7 @@ export async function createBOMSnapshot(
     .insert(woMaterials)
     .select(`
       *,
-      product:products(id, code, name, product_type)
+      product:products(id, code, name, product_type:product_types(id, code, name))
     `)
 
   if (error) {

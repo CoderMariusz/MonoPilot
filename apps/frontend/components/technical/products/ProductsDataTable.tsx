@@ -297,7 +297,7 @@ export function ProductsDataTable({
                 <TableCell>{product.name}</TableCell>
                 <TableCell>
                   <ProductTypeBadge
-                    type={getProductTypeCode(product.product_type_id)}
+                    type={product.product_type?.code || 'RM'}
                   />
                 </TableCell>
                 <TableCell>{product.base_uom}</TableCell>
@@ -361,16 +361,3 @@ export function ProductsDataTable({
   )
 }
 
-// Helper function to get product type code
-// In real implementation, this would come from product_types lookup
-function getProductTypeCode(typeId: string): 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP' {
-  // Mock mapping - in production this would be a lookup from product_types table
-  const typeMap: Record<string, 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP'> = {
-    'type-rm': 'RM',
-    'type-wip': 'WIP',
-    'type-fg': 'FG',
-    'type-pkg': 'PKG',
-    'type-bp': 'BP',
-  }
-  return typeMap[typeId] || 'RM'
-}
