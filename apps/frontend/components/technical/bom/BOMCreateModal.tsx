@@ -789,12 +789,15 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Routing</Label>
-                  <Select value={routingId} onValueChange={setRoutingId}>
+                  <Select
+                    value={routingId || 'none'}
+                    onValueChange={(v) => setRoutingId(v === 'none' ? '' : v)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select routing..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No routing</SelectItem>
+                      <SelectItem value="none">No routing</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
