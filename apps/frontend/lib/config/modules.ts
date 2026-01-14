@@ -103,6 +103,17 @@ export const MODULES: Module[] = [
     dependencies: ['planning'],
   },
   {
+    code: 'warehouse',
+    name: 'Warehouse',
+    description: 'Inventory, LP, ASN, GRN',
+    defaultEnabled: true,
+    epic: 5,
+    group: 'core',
+    pricing: 'Free',
+    dependencies: ['technical'],
+    required_for: ['shipping'],
+  },
+  {
     code: 'quality',
     name: 'Quality',
     description: 'QA Workflows',
@@ -120,7 +131,7 @@ export const MODULES: Module[] = [
     epic: 7,
     group: 'core',
     pricing: 'Free',
-    dependencies: ['settings'],
+    dependencies: ['warehouse'],
   },
   // PREMIUM MODULES
   {

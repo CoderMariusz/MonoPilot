@@ -8,6 +8,7 @@ import {
   Wrench,
   Calendar,
   Factory,
+  Warehouse,
   ShieldCheck,
   Truck,
   Lightbulb,
@@ -55,6 +56,13 @@ const allModules: SidebarModule[] = [
     icon: Factory,
     href: '/production/dashboard',
     color: 'text-green-600',
+  },
+  {
+    key: 'warehouse',
+    name: 'Warehouse',
+    icon: Warehouse,
+    href: '/warehouse',
+    color: 'text-amber-600',
   },
   {
     key: 'quality',
