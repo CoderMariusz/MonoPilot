@@ -9,8 +9,9 @@ import type { GenealogyNode } from '@/lib/types/genealogy'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { lpId: string } | Promise<{ lpId: string }> }
+  props: { params: Promise<{ lpId: string } | Promise<{ lpId: string }>> }
 ) {
+  const params = await props.params;
   try {
     // Handle both Promise and object params (Next.js 15 compatibility)
     const resolvedParams = 'then' in params ? await params : params

@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -41,16 +41,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { POLine, CreatePOLineInput, POStatus } from '@/lib/types/purchase-order'
 import { canEditPOLines, calculatePOTotals } from '@/lib/types/purchase-order'
 
-export default function PurchaseOrderDetailsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export default function PurchaseOrderDetailsPage(
+  props: {
+    params: Promise<{ id: string }>
+  }
+) {
+  const params = use(props.params);
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
-  const [paramsId, setParamsId] = useState<string>('')
   const [activeTab, setActiveTab] = useState('lines')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -66,10 +66,8 @@ export default function PurchaseOrderDetailsPage({
     line: null,
   })
 
-  // Unwrap params
-  useEffect(() => {
-    params.then((p) => setParamsId(p.id))
-  }, [params])
+  // Get id from params (already unwrapped by use() hook)
+  const paramsId = params.id
 
   // Fetch data
   const { data: po, isLoading, error, refetch } = usePurchaseOrder(paramsId)

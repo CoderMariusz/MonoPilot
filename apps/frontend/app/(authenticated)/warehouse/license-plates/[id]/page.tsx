@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, use } from 'react';
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, RefreshCw, Scissors, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -27,12 +27,13 @@ import { SplitLPModal } from '@/components/warehouse/license-plates/SplitLPModal
 import { PrintLabelButton } from '@/components/warehouse/license-plates/PrintLabelButton'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
-export default function LicensePlateDetailPage({ params }: PageProps) {
+export default function LicensePlateDetailPage(props: PageProps) {
+  const params = use(props.params);
   const router = useRouter()
   const { data: lp, isLoading, error, refetch } = useLicensePlate(params.id)
   const [activeTab, setActiveTab] = useState('overview')

@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -130,14 +130,14 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
   cancelled: [],
 }
 
-export default function WorkOrderDetailsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export default function WorkOrderDetailsPage(
+  props: {
+    params: Promise<{ id: string }>
+  }
+) {
+  const params = use(props.params);
   const [wo, setWO] = useState<WorkOrder | null>(null)
   const [loading, setLoading] = useState(true)
-  const [paramsId, setParamsId] = useState<string>('')
   const [statusChanging, setStatusChanging] = useState(false)
   const [startModalOpen, setStartModalOpen] = useState(false)
   const [pauseModalOpen, setPauseModalOpen] = useState(false)
@@ -147,10 +147,8 @@ export default function WorkOrderDetailsPage({
   const router = useRouter()
   const { toast } = useToast()
 
-  // Unwrap params
-  useEffect(() => {
-    params.then((p) => setParamsId(p.id))
-  }, [params])
+  // Get id from params (already unwrapped by use() hook)
+  const paramsId = params.id
 
   // Fetch WO details
   const fetchWO = useCallback(async () => {

@@ -16,10 +16,8 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { LabelPrintService } from '@/lib/services/label-print-service'
 import { printLabelQuerySchema } from '@/lib/validation/label-print-schemas'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const supabase = await createServerSupabase()
 

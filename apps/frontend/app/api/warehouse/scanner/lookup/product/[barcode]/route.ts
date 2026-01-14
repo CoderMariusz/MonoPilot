@@ -7,10 +7,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ScannerReceiveService } from '@/lib/services/scanner-receive-service'
 
-export async function GET(
-  request: Request,
-  { params }: { params: { barcode: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ barcode: string }> }) {
+  const params = await props.params;
   try {
     const supabase = await createClient()
 

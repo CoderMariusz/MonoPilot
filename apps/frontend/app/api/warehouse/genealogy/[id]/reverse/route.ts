@@ -7,8 +7,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } | Promise<{ id: string }> }
+  props: { params: Promise<{ id: string } | Promise<{ id: string }>> }
 ) {
+  const params = await props.params;
   try {
     // Handle both Promise and object params (Next.js 15 compatibility)
     const resolvedParams = 'then' in params ? await params : params

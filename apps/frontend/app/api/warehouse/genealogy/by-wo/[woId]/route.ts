@@ -7,8 +7,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { woId: string } | Promise<{ woId: string }> }
+  props: { params: Promise<{ woId: string } | Promise<{ woId: string }>> }
 ) {
+  const params = await props.params;
   try {
     // Handle both Promise and object params (Next.js 15 compatibility)
     const resolvedParams = 'then' in params ? await params : params
