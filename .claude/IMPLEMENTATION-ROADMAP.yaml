@@ -563,33 +563,110 @@ epic_05_warehouse:
 # =============================================================================
 
 epic_06_quality:
-  status: "NOT_STARTED"
-  total_stories: 41
-  stories_documented: 12
-  stories_to_write: 29
+  status: "PHASE_1_2A_COMPLETE_PHASE_2B_4_DEFINED"
+  total_stories: 41  # 12 Phase 1-2A + 29 Phase 2B-4
+  complete: 12
+  not_started: 29
+  completion_percentage_implementation: 29
+  completion_percentage_definition: 100
   prd_complete: true
   architecture_complete: true
-  effort_estimate: "52-68 days"
-  phases:
-    phase_1a: {stories: 5, status: "documented"}
-    phase_1b: {stories: 5, status: "documented"}
-    phase_2: {stories: 11, status: "partial"}
-    phase_3: {stories: 10, status: "to_write"}
-    phase_4: {stories: 10, status: "to_write"}
+  documentation: "~40K lines markdown + ~10K lines YAML context"
+  last_verified: "2026-01-15"
+
+  phase_1_2a_core:
+    status: "IMPLEMENTATION_READY"
+    stories: 12
+    stories_list:
+      - {id: "06.0", name: "Quality Settings"}
+      - {id: "06.1", name: "Quality Status Types"}
+      - {id: "06.2", name: "Quality Holds CRUD"}
+      - {id: "06.3", name: "Product Specifications"}
+      - {id: "06.4", name: "Test Parameters"}
+      - {id: "06.5", name: "Incoming Inspection"}
+      - {id: "06.6", name: "Test Results Recording"}
+      - {id: "06.7", name: "Sampling Plans (AQL)"}
+      - {id: "06.8", name: "Scanner QA Pass/Fail"}
+      - {id: "06.9", name: "Basic NCR Creation"}
+      - {id: "06.10", name: "In-Process Inspection"}
+      - {id: "06.11", name: "Final Inspection + Batch Release"}
+
+  phase_2b_3_4_advanced:
+    status: "STORIES_DEFINED"
+    total_stories: 29
+    ready: 29
+    completion_percentage: 0
+    documentation: "~40K lines (created in 2nd terminal 2026-01-15)"
+
+    stories:
+      - {id: "06.12", name: "Batch Release Approval"}
+      - {id: "06.13", name: "NCR Workflow State Machine"}
+      - {id: "06.14-16", name: "NCR Root Cause/Actions/Verification"}
+      - {id: "06.17-18", name: "Quality Alerts & Trending"}
+      - {id: "06.19-20", name: "Operation Quality Checkpoints"}
+      - {id: "06.21-30", name: "HACCP/CCP/CoA (10 stories)"}
+      - {id: "06.31-40", name: "CAPA/Supplier Quality/Analytics (10 stories)"}
+
+    effort_estimate: "78-98 days"
 
 epic_07_shipping:
-  status: "NOT_STARTED"
-  total_stories: 16
-  stories_documented: 16
+  status: "STORIES_DEFINED"
+  total_stories: 24  # 16 Phase 1 + 8 Phase 2-3
+  complete: 0
+  not_started: 24
+  completion_percentage_implementation: 0
+  completion_percentage_definition: 100
   prd_complete: true
   architecture_complete: true
-  effort_estimate: "50-60 days"
+  documentation: "~850KB (created 2026-01-15)"
+  last_verified: "2026-01-15"
   blocker_resolved: true  # Epic 05 complete!
-  phases:
-    phase_1a: {stories: 6, status: "ready"}
-    phase_1b: {stories: 4, status: "ready", note: "07.7 unblocked!"}
-    phase_1c: {stories: 5, status: "ready"}
-    phase_2: {stories: 1, status: "ready"}
+
+  phase_1_mvp:
+    status: "STORIES_DEFINED"
+    total_stories: 16
+    ready: 16
+    completion_percentage: 0
+    documentation: "~540KB (pre-existing)"
+
+    stories:
+      - {id: "07.1", name: "Customers CRUD", complexity: M, days: "3-4"}
+      - {id: "07.2", name: "Sales Orders Core", complexity: L, days: "5-7"}
+      - {id: "07.3", name: "SO Status Workflow", complexity: M, days: 3}
+      - {id: "07.4", name: "SO Line Pricing", complexity: M, days: 3}
+      - {id: "07.5", name: "SO Clone/Import", complexity: M, days: "3-4"}
+      - {id: "07.6", name: "SO Allergen Validation", complexity: M, days: "2-3"}
+      - {id: "07.7", name: "Inventory Allocation", complexity: L, days: "5-7"}
+      - {id: "07.8", name: "Pick List Generation", complexity: L, days: "4-5"}
+      - {id: "07.9", name: "Pick Confirmation Desktop", complexity: M, days: "3-4"}
+      - {id: "07.10", name: "Pick Scanner", complexity: M, days: "3-4"}
+      - {id: "07.11", name: "Packing Shipment Creation", complexity: L, days: "4-5"}
+      - {id: "07.12", name: "Packing Scanner", complexity: M, days: "3-4"}
+      - {id: "07.13", name: "SSCC & BOL Labels", complexity: M, days: "3-4"}
+      - {id: "07.14", name: "Shipment Manifest & Ship", complexity: M, days: "2-3"}
+      - {id: "07.15", name: "Shipping Dashboard", complexity: M, days: "3-4"}
+      - {id: "07.16", name: "RMA Core CRUD", complexity: L, days: "5-7"}
+
+    effort_estimate: "60-79 days sequential | 40-50 days parallel"
+
+  phase_2_3_advanced:
+    status: "STORIES_DEFINED"
+    total_stories: 8
+    ready: 8
+    completion_percentage: 0
+    documentation: "~310KB (created 2026-01-15)"
+
+    stories:
+      - {id: "07.17", name: "Customer Advanced Features", complexity: M, days: "3-4", fr: "3 FR"}
+      - {id: "07.18", name: "SO Advanced Features", complexity: M, days: "4-5", fr: "2 FR"}
+      - {id: "07.19", name: "Pick Optimization & Batch", complexity: L, days: "5-7", fr: "3 FR"}
+      - {id: "07.20", name: "Carrier Integration", complexity: XL, days: "10-14", fr: "7 FR"}
+      - {id: "07.21", name: "Dock & Loading Management", complexity: L, days: "7-10", fr: "7 FR"}
+      - {id: "07.22", name: "Packing Advanced Features", complexity: M, days: "3-4", fr: "2 FR"}
+      - {id: "07.23", name: "Customer Pricing Agreements", complexity: M, days: "4-5", fr: "1 FR"}
+      - {id: "07.24", name: "Shipping Reports & Analytics", complexity: L, days: "7-10", fr: "7 FR"}
+
+    effort_estimate: "48-64 days total"
 
 epic_08_11_premium:
   status: "NO_STORIES"
