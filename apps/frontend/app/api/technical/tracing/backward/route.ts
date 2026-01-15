@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const input = traceInputSchema.parse(body)
 
-    let lpId = input.lp_id
+    const lpId = input.lp_id
     if (!lpId && input.batch_number) {
       // TODO: Query LP by batch_number
       throw new Error('Batch number lookup not implemented yet')

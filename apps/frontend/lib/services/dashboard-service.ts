@@ -634,7 +634,7 @@ export async function fetchAllergenMatrix(
     .order('name')
 
   // Get products with allergen relations
-  let productsQuery = supabase
+  const productsQuery = supabase
     .from('products')
     .select(`
       id, code, name,
@@ -957,7 +957,7 @@ export async function exportAllergenMatrixPdf(
 
   // Legend
   doc.setFontSize(8)
-  let legendY = 30
+  const legendY = 30
   doc.setFillColor(239, 68, 68) // Red
   doc.rect(14, legendY, 5, 5, 'F')
   doc.text('Contains', 21, legendY + 4)

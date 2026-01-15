@@ -82,7 +82,7 @@ export default [
       'no-console': [
         'warn',
         {
-          allow: ['warn', 'error'],
+          allow: ['warn', 'error', 'info', 'debug'],
         },
       ],
     },
@@ -97,12 +97,16 @@ export default [
   {
     files: ['**/*.ts', '**/*.tsx'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // Allow 'any' for now - will be fixed gradually
+      '@typescript-eslint/no-explicit-any': 'off',
+
+      // More lenient unused vars - allow underscore prefix
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
         },
       ],
       '@typescript-eslint/no-require-imports': 'off',

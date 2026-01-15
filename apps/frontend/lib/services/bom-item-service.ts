@@ -67,7 +67,7 @@ export async function listBomItems(
   }
 
   // Get routing operations if routing exists
-  let operationsMap: Map<number, { sequence: number; name: string }> = new Map()
+  const operationsMap: Map<number, { sequence: number; name: string }> = new Map()
   if (bom.routing_id) {
     const { data: ops } = await supabase
       .from('routing_operations')
