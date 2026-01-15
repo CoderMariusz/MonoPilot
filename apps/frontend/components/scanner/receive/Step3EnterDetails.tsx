@@ -103,12 +103,11 @@ export function Step3EnterDetails({
         </div>
 
         {/* Batch number */}
-        {(requireBatch || true) && (
-          <div>
-            <Label htmlFor="batch" className="text-sm font-medium text-gray-700">
-              Batch Number
-              {requireBatch && <span className="text-red-500 ml-1">Required</span>}
-            </Label>
+        <div>
+          <Label htmlFor="batch" className="text-sm font-medium text-gray-700">
+            Batch Number
+            {requireBatch && <span className="text-red-500 ml-1">Required</span>}
+          </Label>
             <Input
               id="batch"
               value={formData.batchNumber}
@@ -117,12 +116,10 @@ export function Step3EnterDetails({
               className="mt-1 h-12 min-h-[48px] text-lg"
               onFocus={() => setShowNumberPad(false)}
             />
-          </div>
-        )}
+        </div>
 
         {/* Expiry date */}
-        {(requireExpiry || true) && (
-          <div>
+        <div>
             <Label htmlFor="expiry" className="text-sm font-medium text-gray-700">
               Expiry Date
               {requireExpiry && <span className="text-red-500 ml-1">Required</span>}
@@ -138,8 +135,7 @@ export function Step3EnterDetails({
               />
               <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
             </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Number pad */}

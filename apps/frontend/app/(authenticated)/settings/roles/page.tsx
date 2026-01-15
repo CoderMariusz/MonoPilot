@@ -178,7 +178,7 @@ export default function RolesPage() {
           /* Hide non-essential elements */
           header,
           nav,
-          .print\:hidden {
+          .print:hidden {
             display: none !important;
           }
 

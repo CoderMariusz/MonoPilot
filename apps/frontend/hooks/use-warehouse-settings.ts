@@ -34,37 +34,29 @@ export function useWarehouseSettings() {
   };
 
   const updateSettings = async (updates: Partial<WarehouseSettings>) => {
-    try {
-      const response = await fetch('/api/warehouse/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update settings');
-      }
-      const data = await response.json();
-      setSettings(data);
-      return data;
-    } catch (err) {
-      throw err;
+    const response = await fetch('/api/warehouse/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update settings');
     }
+    const data = await response.json();
+    setSettings(data);
+    return data;
   };
 
   const resetSettings = async () => {
-    try {
-      const response = await fetch('/api/warehouse/settings/reset', {
-        method: 'POST',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to reset settings');
-      }
-      const data = await response.json();
-      setSettings(data);
-      return data;
-    } catch (err) {
-      throw err;
+    const response = await fetch('/api/warehouse/settings/reset', {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to reset settings');
     }
+    const data = await response.json();
+    setSettings(data);
+    return data;
   };
 
   useEffect(() => {

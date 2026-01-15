@@ -261,12 +261,13 @@ export function getWOLabel(workOrder: GanttWorkOrder, zoomLevel: ZoomLevel): str
     case 'day':
       // Full: WO-00156: Chocolate Bar (1000pc)
       return `${workOrder.wo_number}: ${workOrder.product.name} (${workOrder.quantity}${workOrder.uom})`;
-    case 'week':
+    case 'week': {
       // Truncated: WO-00156: Choc...
       const truncatedName = workOrder.product.name.length > 8
         ? workOrder.product.name.substring(0, 8) + '...'
         : workOrder.product.name;
       return `${workOrder.wo_number}: ${truncatedName}`;
+    }
     case 'month':
       // Minimal: WO-156
       return workOrder.wo_number.replace('WO-00', 'WO-');
@@ -289,13 +290,14 @@ export function getDefaultDateRange(zoomLevel: ZoomLevel): GanttDateRange {
       from.setDate(today.getDate() - 1);
       to.setDate(today.getDate() + 1);
       break;
-    case 'week':
+    case 'week': {
       // Show current week (Monday to Sunday)
       const dayOfWeek = today.getDay();
       const monday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
       from.setDate(today.getDate() + monday);
       to.setDate(from.getDate() + 6);
       break;
+    }
     case 'month':
       // Show current month
       from.setDate(1);

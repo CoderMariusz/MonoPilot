@@ -116,14 +116,15 @@ export function GanttFilters({
       case 'today':
         fromDate = toDate = today;
         break;
-      case 'this_week':
+      case 'this_week': {
         const dayOfWeek = today.getDay();
         fromDate = new Date(today);
         fromDate.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
         toDate = new Date(fromDate);
         toDate.setDate(fromDate.getDate() + 6);
         break;
-      case 'next_week':
+      }
+      case 'next_week': {
         const nextMonday = new Date(today);
         const currentDayOfWeek = today.getDay();
         const daysUntilNextMonday = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
@@ -132,6 +133,7 @@ export function GanttFilters({
         toDate = new Date(nextMonday);
         toDate.setDate(nextMonday.getDate() + 6);
         break;
+      }
       case 'this_month':
         fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
         toDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);

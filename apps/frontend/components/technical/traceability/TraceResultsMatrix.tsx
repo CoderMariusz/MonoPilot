@@ -436,11 +436,12 @@ export function TraceResultsMatrix({
         case 'status':
           comparison = a.lp.status.localeCompare(b.lp.status)
           break
-        case 'expiry_date':
+        case 'expiry_date': {
           const dateA = a.lp.expiry_date ? new Date(a.lp.expiry_date).getTime() : 0
           const dateB = b.lp.expiry_date ? new Date(b.lp.expiry_date).getTime() : 0
           comparison = dateA - dateB
           break
+        }
       }
 
       return sortDirection === 'asc' ? comparison : -comparison

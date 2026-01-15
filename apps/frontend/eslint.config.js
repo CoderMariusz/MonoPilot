@@ -29,6 +29,14 @@ export default [
       '**/*.test.tsx',
       '**/*.spec.ts',
       '**/*.spec.tsx',
+      // Node.js utility scripts
+      'check-schema.js',
+      'fix-db-schema.js',
+      'fix-schema.js',
+      'check_bom_items.sql',
+      'temp_schema.sql',
+      'scripts/**/*.mjs',
+      'scripts/**/*.js',
     ],
   },
 

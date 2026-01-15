@@ -114,7 +114,7 @@ function formatCurrency(value: number | null | undefined): string {
  */
 function parseCurrencyInput(value: string): string {
   // Remove commas and other non-numeric characters except decimal point and negative sign
-  return value.replace(/[^0-9.\-]/g, '');
+  return value.replace(/[^0-9.-]/g, '');
 }
 
 export function POApprovalSettings({

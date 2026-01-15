@@ -333,30 +333,34 @@ export function canPerformBulkAction(
   statuses: POStatus[]
 ): { allowed: boolean; reason?: string } {
   switch (action) {
-    case 'approve':
+    case 'approve': {
       const canApprove = statuses.every(s => s === 'pending_approval' || s === 'submitted')
       return {
         allowed: canApprove,
         reason: canApprove ? undefined : 'Can only approve POs in Pending Approval or Submitted status',
       }
-    case 'reject':
+    }
+    case 'reject': {
       const canReject = statuses.every(s => s === 'pending_approval' || s === 'submitted')
       return {
         allowed: canReject,
         reason: canReject ? undefined : 'Can only reject POs in Pending Approval or Submitted status',
       }
-    case 'cancel':
+    }
+    case 'cancel': {
       const canCancel = statuses.every(s => !['closed', 'cancelled', 'receiving'].includes(s))
       return {
         allowed: canCancel,
         reason: canCancel ? undefined : 'Cannot cancel POs that are Closed, Cancelled, or Receiving',
       }
-    case 'confirm':
+    }
+    case 'confirm': {
       const canConfirm = statuses.every(s => s === 'approved')
       return {
         allowed: canConfirm,
         reason: canConfirm ? undefined : 'Can only confirm Approved POs',
       }
+    }
     default:
       return { allowed: false, reason: 'Unknown action' }
   }

@@ -117,20 +117,17 @@ export function TOLinesDataTable({
   const handleAssignLPs = async (selections: LPSelection[]) => {
     if (!lpPickerLine) return
 
-    try {
-      await assignLPsMutation.mutateAsync({
-        toId,
-        lineId: lpPickerLine.id,
-        lps: selections.map((sel) => ({
-          lp_id: sel.lp_id,
-          quantity: sel.quantity,
-        })),
-      })
-      setLPPickerLine(null)
-      onRefresh?.()
-    } catch (error) {
-      throw error // Let modal handle the error display
-    }
+    // Let modal handle any errors
+    await assignLPsMutation.mutateAsync({
+      toId,
+      lineId: lpPickerLine.id,
+      lps: selections.map((sel) => ({
+        lp_id: sel.lp_id,
+        quantity: sel.quantity,
+      })),
+    })
+    setLPPickerLine(null)
+    onRefresh?.()
   }
 
   // Handle LP removal
