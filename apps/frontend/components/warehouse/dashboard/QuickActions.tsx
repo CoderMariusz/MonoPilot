@@ -5,25 +5,44 @@
 
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
 import Link from 'next/link';
+import { CreateLPModal } from '@/components/warehouse/CreateLPModal';
 
-export function QuickActions() {
+interface QuickActionsProps {
+  onLPCreated?: () => void;
+}
+
+export function QuickActions({ onLPCreated }: QuickActionsProps) {
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  const handleLPCreated = () => {
+    setCreateModalOpen(false);
+    onLPCreated?.();
+  };
+
   return (
-    <div className="flex gap-3">
-      <Button asChild>
-        <Link href="/warehouse/license-plates/new">
+    <>
+      <div className="flex gap-3">
+        <Button onClick={() => setCreateModalOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Create LP
-        </Link>
-      </Button>
-      <Button variant="outline" asChild>
-        <Link href="/warehouse/inventory">
-          <Search className="h-4 w-4 mr-2" />
-          View Inventory
-        </Link>
-      </Button>
-    </div>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/warehouse/inventory">
+            <Search className="h-4 w-4 mr-2" />
+            View Inventory
+          </Link>
+        </Button>
+      </div>
+
+      <CreateLPModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSuccess={handleLPCreated}
+      />
+    </>
   );
 }

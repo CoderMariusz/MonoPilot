@@ -1,0 +1,263 @@
+# Story 06.13 - Index File (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.13"
+  name: "NCR Workflow State Machine"
+  slug: "ncr-workflow"
+  epic: "06-quality"
+  phase: "2B"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+  food_safety_critical: true
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data, migrations
+  - api.yaml         # Endpoints, auth, request/response schemas
+  - frontend.yaml    # Components, pages, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table"]
+    - story: "01.6"
+      name: "Role Permissions"
+      provides: ["role-based access control", "permission checks"]
+    - story: "06.9"
+      name: "Basic NCR Creation"
+      provides: ["ncr_reports table", "basic status field", "NCR CRUD"]
+  soft_dependencies: []
+  blocked_by: []
+  blocks:
+    - story: "06.14"
+      name: "NCR Root Cause Analysis"
+      reason: "Requires investigation -> root_cause workflow state"
+    - story: "06.15"
+      name: "NCR Corrective Action"
+      reason: "Requires corrective_action workflow state"
+    - story: "06.16"
+      name: "NCR Verification & Close"
+      reason: "Requires verification workflow state"
+    - story: "06.17"
+      name: "Quality Alerts"
+      reason: "Receives notification trigger events from transitions"
+    - story: "06.31"
+      name: "CAPA Creation"
+      reason: "Can auto-create CAPA at corrective_action state"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-009", "Section 8 NCR Lifecycle", "8.1 NCR States", "8.2 NCR Workflow"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["NCR Workflow", "State Machine", "ncr_state_history"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.13.ncr-workflow.md"
+  prerequisite_story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.9.basic-ncr-creation.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-013-ncr-workflow-timeline.md"
+      name: "NCR Workflow Timeline"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-013-ncr-transition-modal.md"
+      name: "NCR Transition Modal"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-013-ncr-workflow-config.md"
+      name: "NCR Workflow Config"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for workflow tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "Extend ncr_reports + ncr_state_transitions + ncr_state_history tables"
+  - type: "service"
+    count: 1
+    description: "ncr-workflow-service.ts with state machine logic"
+  - type: "api"
+    count: 3
+    description: "Transition, available-transitions, workflow-history endpoints"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for transition operations"
+  - type: "pages"
+    count: 1
+    description: "Workflow history page (optional, integrate into detail)"
+  - type: "components"
+    count: 8
+    description: "Timeline stepper, transition modal, transition buttons, history table"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Workflow States
+workflow_states:
+  - code: "draft"
+    description: "Initial creation, not yet submitted"
+    sla_hours: null
+    default_owner: "creator"
+  - code: "open"
+    description: "Submitted, awaiting investigation start"
+    sla_hours: 24
+    default_owner: "QA_MANAGER"
+  - code: "investigation"
+    description: "Gathering data, analyzing issue"
+    sla_hours: 48
+    default_owner: "assigned_inspector"
+  - code: "root_cause"
+    description: "Determining root cause (5-Why, Fishbone)"
+    sla_hours: 72
+    default_owner: "qa_team"
+  - code: "corrective_action"
+    description: "Implementing fix/prevention"
+    sla_hours: 168
+    default_owner: "PROCESS_OWNER"
+  - code: "verification"
+    description: "Verifying effectiveness of action"
+    sla_hours: 336
+    default_owner: "QA_MANAGER"
+  - code: "closed"
+    description: "Issue resolved, NCR complete"
+    sla_hours: null
+    default_owner: null
+  - code: "reopened"
+    description: "Reopened for further investigation"
+    sla_hours: 48
+    default_owner: "QA_MANAGER"
+
+# Workflow Transitions
+workflow_transitions:
+  - code: "submit"
+    from: "draft"
+    to: "open"
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "ADMIN"]
+    requires_notes: false
+  - code: "start_investigation"
+    from: "open"
+    to: "investigation"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    requires_notes: true
+  - code: "start_investigation_reopen"
+    from: "reopened"
+    to: "investigation"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    requires_notes: true
+  - code: "complete_investigation"
+    from: "investigation"
+    to: "root_cause"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    requires_notes: true
+    min_notes: 50
+  - code: "identify_cause"
+    from: "root_cause"
+    to: "corrective_action"
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    requires_notes: true
+    min_notes: 50
+  - code: "implement_action"
+    from: "corrective_action"
+    to: "verification"
+    roles: ["PROCESS_OWNER", "QA_MANAGER", "ADMIN"]
+    requires_notes: true
+    min_notes: 50
+  - code: "verify_effective"
+    from: "verification"
+    to: "closed"
+    roles: ["QA_MANAGER"]
+    requires_notes: true
+    min_notes: 50
+    confirmation_required: true
+  - code: "verify_ineffective"
+    from: "verification"
+    to: "corrective_action"
+    roles: ["QA_MANAGER"]
+    requires_notes: true
+    min_notes: 50
+    confirmation_required: true
+  - code: "reopen"
+    from: "closed"
+    to: "reopened"
+    roles: ["QA_MANAGER"]
+    requires_notes: true
+    min_notes: 50
+    confirmation_required: true
+
+# Technical notes
+technical_notes:
+  - "Extends story 06.9 (Basic NCR Creation) with full workflow state machine"
+  - "8 workflow states: draft, open, investigation, root_cause, corrective_action, verification, closed, reopened"
+  - "Immutable ncr_state_history table for FDA 21 CFR Part 11 compliance"
+  - "Permission-based transitions: QA Inspector vs QA Manager authorization"
+  - "SLA tracking with due dates calculated per state entry"
+  - "Auto-assignment routing based on state and org configuration"
+  - "Reopen logic with count tracking and justification requirement"
+  - "Notification trigger points queued (actual sending in story 06.17)"
+  - "RLS enforced on all tables for multi-tenancy"
+
+# Acceptance Criteria Summary (high-level)
+acceptance_summary:
+  - "ncr_reports.status expanded to all 8 workflow states"
+  - "ncr_state_transitions table with configurable transition rules per org"
+  - "ncr_state_history table with immutable audit trail"
+  - "POST /api/quality/ncrs/:id/transition validates and executes state changes"
+  - "GET /api/quality/ncrs/:id/available-transitions returns valid next steps"
+  - "GET /api/quality/ncrs/:id/workflow returns complete history"
+  - "Cannot skip states (must follow valid transitions)"
+  - "Role-based authorization per transition"
+  - "Notes required for most transitions (configurable min length)"
+  - "Due dates calculated from SLA configuration"
+  - "Auto-assignment on state entry"
+  - "Reopen increments reopen_count and requires justification"
+  - "Timeline component shows workflow progress"
+  - "Transition modal validates and submits state changes"
+
+# UI Components Summary
+ui_components:
+  - "NCRWorkflowTimeline: Vertical stepper showing all states with completion status"
+  - "NCRWorkflowProgress: Compact horizontal progress bar"
+  - "NCRTransitionModal: Modal for executing transition with notes input"
+  - "NCRTransitionButton: Button that opens transition modal"
+  - "NCRAvailableTransitions: List of available transition buttons"
+  - "NCRWorkflowHistory: Table of history entries"
+  - "NCRStateHistoryCard: Card for single history entry"
+  - "NCROverdueIndicator: Badge/indicator for overdue state"
+  - "NCRStateBadge: Badge with state-specific colors (8 states)"
+
+# Database Tables Summary
+database_summary:
+  ncr_reports_extended:
+    - "status CHECK expanded to 8 states"
+    - "current_state_owner UUID (user responsible for current state)"
+    - "state_entered_at TIMESTAMPTZ"
+    - "state_due_at TIMESTAMPTZ (SLA deadline)"
+    - "escalation_level INTEGER (0-3)"
+    - "reopen_count INTEGER"
+    - "last_reopened_at, last_reopened_by, reopen_reason"
+  ncr_state_transitions:
+    - "org_id, transition_code, from_state, to_state"
+    - "allowed_roles TEXT[], requires_notes, min_notes_length"
+    - "sla_hours, auto_assign_role, auto_assign_user_id"
+    - "notify_roles, notify_users"
+    - "button_label, button_variant, confirmation_required"
+  ncr_state_history:
+    - "IMMUTABLE audit trail (no UPDATE/DELETE)"
+    - "ncr_id, transition_code, from_state, to_state"
+    - "transitioned_by, transitioned_at, transition_notes"
+    - "was_overdue, previous_owner, new_owner"
+
+# API Endpoints Summary
+api_summary:
+  - "POST /api/quality/ncrs/:id/transition - Execute state transition"
+  - "GET /api/quality/ncrs/:id/workflow - Get workflow history"
+  - "GET /api/quality/ncrs/:id/available-transitions - Get valid transitions for current state"

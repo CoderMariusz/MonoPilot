@@ -1,0 +1,107 @@
+# Story 10.12 - Test Specification
+# Purpose: Dashboard acceptance criteria and tests
+# Agent: QA-AGENT / TEST-WRITER
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/dashboard-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/components/oee/dashboard/__tests__/KPICard.test.tsx"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/dashboard/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-dashboard.spec.ts"
+    type: "e2e"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "user navigates to /oee/dashboard"
+    when: "page loads"
+    then: "displays 10 KPI cards in grid layout"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "dashboard loaded"
+    when: "inspecting charts section"
+    then: "6 chart widgets displayed: OEE trend, Pareto, status grid, heatmap, energy, quality"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "dashboard open"
+    when: "30 seconds pass"
+    then: "all metrics refresh without full page reload"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "dashboard loaded"
+    when: "initial data load"
+    then: "all data loads within 2 seconds"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "OEE trend chart"
+    when: "user clicks a data point (Jan 10)"
+    then: "navigates to detailed view for that day"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "dashboard displayed"
+    when: "new data highlighted after refresh"
+    then: "visual indicator shows changed values"
+    test_type: "e2e"
+    priority: "P1"
+
+unit_tests:
+  dashboard_service:
+    - name: "getDashboardData() aggregates all sources"
+    - name: "getKPIs() calculates correctly"
+    - name: "parallel queries complete efficiently"
+
+  kpi_card:
+    - name: "renders percentage format correctly"
+    - name: "shows trend indicator"
+    - name: "applies status color coding"
+
+integration_tests:
+  - name: "GET /api/oee/dashboard returns all data"
+    expected: "200 OK with kpis, oee_trend, machine_status"
+
+  - name: "Dashboard API performance < 2000ms"
+    expected: "Response time under 2 seconds"
+
+e2e_tests:
+  - name: "Full dashboard load"
+    steps:
+      - "Login as executive"
+      - "Navigate to /oee/dashboard"
+    expected:
+      - "10 KPI cards visible"
+      - "6 charts rendered"
+      - "Data displayed within 2 seconds"
+
+  - name: "Auto-refresh test"
+    steps:
+      - "View dashboard"
+      - "Wait 30 seconds"
+    expected:
+      - "Metrics refresh"
+      - "No page reload"
+
+definition_of_done:
+  - "Dashboard page loads with 10 KPI cards"
+  - "6 chart widgets display correctly"
+  - "Auto-refresh works every 30 seconds"
+  - "All data loads within 2 seconds"
+  - "Drill-down navigation works"
+  - "Export to PDF functional"
+  - "Responsive on tablet/desktop"
+
+coverage:
+  unit:
+    target: 75
+  integration:
+    target: 80

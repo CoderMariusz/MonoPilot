@@ -1,0 +1,205 @@
+# Story 06.37 - Quality Dashboard Frontend Context
+# Components, charts, UX patterns
+
+pages:
+  - path: /quality/dashboard
+    description: "Main quality dashboard page"
+    layout: "Responsive grid with KPI cards at top, charts below"
+    components:
+      - QualityDashboard (container)
+      - KPISummaryCards
+      - NCRTrendChart
+      - DefectParetoChart
+      - InspectionStatusPieChart
+      - SupplierQualityHeatmap
+      - DashboardDateFilter
+      - DashboardExportPDFButton
+      - DashboardRefreshButton
+
+components:
+  - name: QualityDashboard
+    path: components/quality/dashboard/QualityDashboard.tsx
+    description: "Dashboard container with layout and data fetching"
+    props:
+      - dateFrom: Date
+      - dateTo: Date
+    state:
+      - kpis: DashboardKPIs
+      - ncrTrend: NCRTrendData[]
+      - defectPareto: DefectParetoData[]
+      - inspectionStatus: InspectionStatusData
+      - supplierHeatmap: SupplierHeatmapData[]
+      - loading: boolean
+    hooks:
+      - useDashboardData (custom hook)
+      - useWebSocket (for real-time updates)
+
+  - name: KPISummaryCards
+    path: components/quality/dashboard/KPISummaryCards.tsx
+    description: "Grid of 5 KPI cards"
+    layout: "Grid: 5 columns on desktop, 1 column on mobile"
+    children:
+      - KPICard (x5: First Pass Yield, NCR Rate, CCP Compliance, Inspection Backlog, CAPA Closure)
+
+  - name: KPICard
+    path: components/quality/dashboard/KPICard.tsx
+    description: "Individual KPI card with value, target, trend"
+    props:
+      - title: string
+      - current: number
+      - target: number
+      - trend: 'up' | 'down' | 'stable'
+      - unit: string (e.g., '%', 'per 1000')
+      - drillDownLink: string
+    design:
+      - Header: KPI title
+      - Body: Current value (large font), target (small font)
+      - Footer: Trend indicator (arrow + percentage change)
+      - Color: Green if target met, red if not met
+
+  - name: NCRTrendChart
+    path: components/quality/dashboard/NCRTrendChart.tsx
+    description: "Line chart for NCR trend over time"
+    library: Recharts
+    chart_type: LineChart
+    axes:
+      - x: Date (daily/weekly buckets)
+      - y: NCR count
+    lines:
+      - Primary: Daily NCR count (blue)
+      - Secondary: 7-day moving average (orange, dashed)
+    tooltip:
+      - Date
+      - Total NCRs
+      - Breakdown by severity (critical, major, minor)
+    interactions:
+      - Click data point → navigate to /quality/ncr?date={date}
+
+  - name: DefectParetoChart
+    path: components/quality/dashboard/DefectParetoChart.tsx
+    description: "Pareto bar + line chart for defect types"
+    library: Recharts
+    chart_type: ComposedChart (Bar + Line)
+    axes:
+      - x: Defect type (top 10)
+      - y_left: Defect count (bars)
+      - y_right: Cumulative percentage (line)
+    bars:
+      - Color-coded by severity (critical=red, major=orange, minor=yellow)
+    line:
+      - Cumulative percentage (blue)
+      - 80% rule line (gray dashed, horizontal at 80%)
+    tooltip:
+      - Defect type
+      - Count
+      - Percentage
+      - Cumulative percentage
+    interactions:
+      - Click bar → navigate to /quality/test-results?defect_type={type}
+
+  - name: InspectionStatusPieChart
+    path: components/quality/dashboard/InspectionStatusPieChart.tsx
+    description: "Pie chart for inspection status breakdown"
+    library: Recharts
+    chart_type: PieChart
+    slices:
+      - Scheduled (yellow)
+      - In Progress (blue)
+      - Completed (green)
+    legend: true
+    tooltip:
+      - Status
+      - Count
+      - Percentage
+    interactions:
+      - Click slice → navigate to /quality/inspections?status={status}
+
+  - name: SupplierQualityHeatmap
+    path: components/quality/dashboard/SupplierQualityHeatmap.tsx
+    description: "Heatmap table for supplier quality scorecard"
+    type: Custom table with color-coded cells
+    rows: Suppliers (top 10 by volume)
+    columns:
+      - Supplier Name
+      - Defect Rate (0-100)
+      - On-Time Delivery (0-100)
+      - CoA Compliance (0-100)
+      - Overall Score (average)
+    cell_colors:
+      - Green: >90
+      - Yellow: 70-90
+      - Red: <70
+    tooltip:
+      - Supplier name
+      - Metric name
+      - Score value
+      - Trend (vs previous period)
+    interactions:
+      - Click row → navigate to /settings/suppliers/{id}/quality
+
+  - name: DashboardDateFilter
+    path: components/quality/dashboard/DashboardDateFilter.tsx
+    description: "Date range filter dropdown"
+    options:
+      - Last 7 Days
+      - Last 30 Days
+      - Last 90 Days (default)
+      - YTD
+      - Custom (date picker modal)
+    state:
+      - dateFrom: Date
+      - dateTo: Date
+    onChange: Update all dashboard widgets
+
+  - name: DashboardExportPDFButton
+    path: components/quality/dashboard/DashboardExportPDFButton.tsx
+    description: "Export dashboard as PDF"
+    permissions: [QA_MANAGER, QUALITY_DIRECTOR]
+    onClick:
+      - Call POST /api/quality/dashboard/export-pdf
+      - Show loading spinner
+      - Download PDF on success
+
+  - name: DashboardWebSocketProvider
+    path: components/quality/dashboard/DashboardWebSocketProvider.tsx
+    description: "WebSocket connection for real-time KPI updates"
+    library: Supabase Realtime or native WebSocket
+    events:
+      - inspection_completed → refresh First Pass Yield
+      - ccp_deviation → refresh CCP Compliance
+      - ncr_created → refresh NCR Rate
+    reconnection_logic: Auto-reconnect with exponential backoff
+
+chart_library:
+  name: Recharts
+  version: "^2.5.0"
+  reason: "Already in use, great for responsive charts, good TypeScript support"
+  charts_used:
+    - LineChart (NCR Trend)
+    - ComposedChart (Defect Pareto)
+    - PieChart (Inspection Status)
+
+ux_patterns:
+  - pattern: "Drill-down navigation"
+    description: "All widgets link to underlying data"
+    example: "Click NCR trend data point → navigate to /quality/ncr?date={date}"
+  - pattern: "Loading skeletons"
+    description: "Show skeleton UI while data loading"
+  - pattern: "Empty states"
+    description: "Show helpful message when no data"
+  - pattern: "Mobile responsive"
+    description: "Stack widgets vertically on mobile, resize charts"
+  - pattern: "Real-time updates"
+    description: "WebSocket updates critical KPIs, show badge with update count"
+
+responsive_design:
+  desktop:
+    - KPI cards: 5 columns
+    - Charts: 2 columns
+  tablet:
+    - KPI cards: 2 columns
+    - Charts: 1 column
+  mobile:
+    - KPI cards: 1 column
+    - Charts: 1 column (full width)
+    - Heatmap: Scrollable table

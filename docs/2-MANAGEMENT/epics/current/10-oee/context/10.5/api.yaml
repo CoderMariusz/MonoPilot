@@ -1,0 +1,76 @@
+# Story 10.5 - API Specification
+# Real-Time Machine Dashboard
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/realtime/:machineId"
+    description: "Get real-time OEE data for machine"
+    auth: "required"
+    query_params:
+      include_target: "boolean (default: true)"
+      include_downtime: "boolean (default: true)"
+    response:
+      status: 200
+      schema:
+        machine:
+          id: "UUID"
+          name: "string"
+          status: "running | down | idle"
+        oee:
+          oee_pct: "number"
+          availability_pct: "number"
+          performance_pct: "number"
+          quality_pct: "number"
+          snapshot_time: "ISO 8601"
+        work_order:
+          id: "UUID | null"
+          wo_number: "string | null"
+          product_name: "string | null"
+          planned_quantity: "number | null"
+          completed_quantity: "number | null"
+        active_downtime:
+          id: "UUID | null"
+          reason: "string | null"
+          duration_minutes: "number | null"
+          severity: "minor | moderate | major | null"
+        target:
+          oee_target: "number"
+          warning_threshold: "number"
+          critical_threshold: "number"
+          source: "machine | line | organization | default"
+
+  - method: "GET"
+    path: "/api/oee/dashboard"
+    description: "Get dashboard data for all machines"
+    auth: "required"
+    query_params:
+      line_id: "UUID (optional) - filter by line"
+    response:
+      status: 200
+      schema:
+        machines:
+          - id: "UUID"
+            name: "string"
+            status: "running | down | idle"
+            oee_pct: "number"
+            target_oee: "number"
+            alert_level: "normal | warning | critical"
+        summary:
+          avg_oee: "number"
+          machines_running: "number"
+          machines_down: "number"
+          total_downtime_minutes: "number"
+
+services:
+  - path: "apps/frontend/lib/services/oee-dashboard-service.ts"
+    description: "Real-time dashboard data service"
+    methods:
+      - { name: "getMachineRealtime", params: ["machineId"], returns: "Promise<MachineRealtimeData>" }
+      - { name: "getDashboardData", params: ["lineId?"], returns: "Promise<DashboardData>" }
+      - { name: "getLineOEE", params: ["lineId"], returns: "Promise<LineOEE>" }
+
+types:
+  - "MachineRealtimeData"
+  - "DashboardData"
+  - "MachineStatus"
+  - "AlertLevel"

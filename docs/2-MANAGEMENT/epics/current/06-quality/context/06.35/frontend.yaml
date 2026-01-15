@@ -1,0 +1,8 @@
+# Story 06.35 - Frontend Schema
+
+components:
+  - SupplierAuditList.tsx
+  - ScheduleAuditForm.tsx
+  - AuditChecklist.tsx (GMP, HACCP, QS)
+  - CompleteAuditModal.tsx
+  - SupplierAuditHistory.tsx

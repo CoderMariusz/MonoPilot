@@ -1,0 +1,144 @@
+# Story 08.13 - Handoff: Pilot WO Creation Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (Handoff Integration)
+
+story:
+  id: "08.13"
+  name: "Handoff: Pilot WO Creation"
+  slug: "handoff-pilot-wo-creation"
+  epic: "08-npd"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Schema changes for pilot WO type and NPD linkage
+  - api.yaml         # Endpoints for pilot WO creation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["organizations, users tables"]
+    - story: "03.2"
+      name: "Work Orders CRUD"
+      provides: ["work_orders table", "WO service"]
+    - story: "08.2"
+      name: "NPD Projects CRUD"
+      provides: ["npd_projects table"]
+    - story: "08.12"
+      name: "Handoff: Formulation → BOM"
+      provides: ["BOM for pilot WO reference"]
+
+  soft:
+    - story: "04.1"
+      name: "Routings CRUD"
+      provides: ["routings table for pilot routing"]
+      impact: "Routing selection unavailable (manual entry later)"
+    - story: "08.7"
+      name: "Formulation Costing"
+      provides: ["Actual cost feedback from pilot WO"]
+      impact: "Cost linkage not automated (manual entry)"
+
+  blocked_by: []
+
+  blocks:
+    - story: "08.11"
+      name: "Handoff Wizard"
+      reason: "Wizard creates pilot WO as part of handoff flow"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["FR-NPD-42", "FR-NPD-57", "FR-NPD-60", "Section 8.2 - Handoff Workflow"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.13.handoff-pilot-wo-creation.md"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add type, npd_project_id to work_orders table"
+  - type: "service"
+    count: 1
+    description: "NPDHandoffService.createPilotWO()"
+  - type: "api"
+    count: 1
+    description: "POST /api/npd/projects/:id/handoff/create-pilot-wo"
+  - type: "validation"
+    count: 1
+    description: "createPilotWOSchema (Zod)"
+  - type: "test"
+    count: 3
+    description: "Unit, Integration, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Pilot WO type = 'pilot' (vs 'production')"
+  - "WO number format: WO-PILOT-{PROJECT_NUMBER}-{SEQ} (e.g., WO-PILOT-NPD-001-001)"
+  - "Default quantity from formulation.total_qty"
+  - "Default scheduled_date = +7 days from handoff"
+  - "Default routing from npd_settings.default_pilot_routing"
+  - "Auto-assign to NPD project owner (can override)"
+  - "Traceability: WO.npd_project_id for lineage"
+  - "Actual cost from completed pilot WO feeds to npd_costing.actual_cost"
+  - "Transactional execution with rollback on failure"
+
+# Business Rules
+business_rules:
+  - rule: "Pilot WO Type Required"
+    description: "Pilot Work Orders must have type = 'pilot'"
+    enforcement: "Set type field in work_orders table on creation"
+  - rule: "BOM-Product Linkage"
+    description: "BOM must belong to specified product"
+    enforcement: "Validation query checks bom.product_id = product_id"
+  - rule: "Quantity Must Be Positive"
+    description: "Pilot WO quantity must be > 0"
+    enforcement: "Zod validation schema z.number().positive()"
+  - rule: "NPD Project Linkage"
+    description: "Pilot WOs must link back to originating NPD project"
+    enforcement: "npd_project_id field populated on creation"
+  - rule: "Auto-Assign to NPD Lead"
+    description: "Pilot WO defaults to NPD project owner unless overridden"
+    enforcement: "Service layer sets assigned_to from project.owner_id"
+  - rule: "Default Routing Optional"
+    description: "Routing can be null (assigned later)"
+    enforcement: "routing_id nullable in database schema"
+
+# Context Summary
+summary: |
+  Story 08.13 enables pilot Work Order creation during NPD handoff to facilitate
+  small-batch trial production and actual cost tracking.
+
+  MVP SCOPE (This Story):
+  - Create pilot WO (type = 'pilot') linked to NPD project
+  - Auto-generate pilot WO number: WO-PILOT-{PROJECT}-{SEQ}
+  - Use BOM created in 08.12 as WO BOM reference
+  - Default quantity from formulation.total_qty (editable)
+  - Default routing from npd_settings.default_pilot_routing (optional)
+  - Default scheduled_date = +7 days (editable)
+  - Auto-assign to NPD Lead (overrideable)
+  - Traceability: WO.npd_project_id for audit trail
+  - Actual cost feedback to npd_costing (08.7 integration)
+
+  DEFERRED (Phase 2/3):
+  - Multi-pilot WO creation (batch trials)
+  - Pilot WO approval workflow before execution
+  - Automated scheduling based on resource availability
+  - Trial output tracking (yield variance)
+
+  KEY INTEGRATION POINTS:
+  - Uses BOM from 08.12 (formulation → BOM conversion)
+  - Feeds actual cost to 08.7 (costing module)
+  - Used by 08.11 (handoff wizard) as optional step
+  - Executes in Production module (Epic 04) for trial runs
+  - Links to routing module (Epic 04) for process definition

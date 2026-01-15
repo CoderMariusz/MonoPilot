@@ -1,0 +1,39 @@
+# Story 10.19 - Test Specification
+# Purpose: Benchmarking tests
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "org OEE = 72%, industry typical = 75%, world-class = 85%"
+    when: "viewing benchmark report"
+    then: "shows gap to typical = -3%, gap to world-class = -13%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "3 lines: Line 1 (85%), Line 2 (72%), Line 3 (68%)"
+    when: "viewing internal benchmark"
+    then: "Line 1 = best-in-class, Line 2/3 gaps calculated"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "baseline Jan 2025 = 68%, current Dec 2025 = 78%"
+    when: "viewing improvement report"
+    then: "improvement = +10 percentage points, trend chart shows progression"
+    test_type: "e2e"
+    priority: "P0"
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/benchmark-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/benchmarks/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-benchmarking.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "Industry benchmarks loaded"
+  - "Comparison table displays"
+  - "Internal best-in-class calculated"
+  - "Improvement tracking works"

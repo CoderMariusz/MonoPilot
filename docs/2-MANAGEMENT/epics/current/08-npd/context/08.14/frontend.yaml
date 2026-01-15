@@ -1,0 +1,48 @@
+# Story 08.14 - Frontend Specification
+# Purpose: Export buttons and NPD-only mode UI
+# Agent: FRONTEND-DEV
+# SEE: markdown lines 277-295
+
+# NPD-Only Mode Toggle
+settings_page:
+  path: "apps/frontend/app/(authenticated)/settings/npd/page.tsx"
+  modification: "Add npd_only_mode toggle"
+  toggle:
+    label: "NPD-Only Mode"
+    description: "Enable standalone NPD without production integration (R&D consultancy mode)"
+    default: false
+
+# Export Buttons
+export_buttons:
+  location: "Formulation detail page"
+  visibility: "Shown when npd_settings.npd_only_mode = true"
+  buttons:
+    - label: "Export PDF"
+      icon: "FileText"
+      action: "GET /api/npd/formulations/:id/export/pdf"
+      disabled_when: "formulation status != 'locked'"
+      tooltip: "Export as PDF recipe card"
+    - label: "Export Excel"
+      icon: "FileSpreadsheet"
+      action: "GET /api/npd/formulations/:id/export/excel"
+      disabled_when: "formulation status != 'locked'"
+      tooltip: "Export as Excel ingredient list"
+
+# Handoff Wizard Hiding
+handoff_wizard:
+  visibility: "Hidden when npd_settings.npd_only_mode = true"
+  replacement: "Export buttons shown instead"
+
+# Download Handling
+download:
+  method: "Browser native download via Content-Disposition header"
+  loading_state: "Show spinner during export generation"
+  error_handling: "Toast error if export fails"
+
+components:
+  - path: "components/npd/formulation/ExportButtons.tsx"
+    description: "Export PDF and Excel buttons"
+    props:
+      - { name: "formulationId", type: "number" }
+      - { name: "isLocked", type: "boolean" }
+      - { name: "npdOnlyMode", type: "boolean" }

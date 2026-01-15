@@ -1,0 +1,220 @@
+# Story 04.6b - Test Specifications
+
+test_files:
+  unit:
+    - path: "apps/frontend/lib/services/__tests__/scanner-service.test.ts"
+    - path: "apps/frontend/lib/hooks/__tests__/use-scanner-flow.test.ts"
+  integration:
+    - path: "apps/frontend/app/api/production/work-orders/barcode/[barcode]/__tests__/route.test.ts"
+    - path: "apps/frontend/app/api/warehouse/license-plates/barcode/[barcode]/__tests__/route.test.ts"
+  e2e:
+    - path: "e2e/scanner/consume-material.spec.ts"
+
+unit_tests:
+  scanner_service:
+    - test: "playSuccessSound plays 500ms beep"
+      given: "success feedback triggered"
+      when: "playSuccessSound is called"
+      then: "audio plays 500ms tone at 440Hz"
+
+    - test: "playErrorSound plays 2 short beeps"
+      given: "error feedback triggered"
+      when: "playErrorSound is called"
+      then: "audio plays 2x 200ms tones with 100ms gap"
+
+    - test: "triggerVibration calls navigator.vibrate"
+      given: "device supports vibration"
+      when: "triggerVibration(200) is called"
+      then: "navigator.vibrate(200) is called"
+
+    - test: "showSuccessFeedback combines all feedback types"
+      given: "success event"
+      when: "showSuccessFeedback is called"
+      then: "sound, vibration, and visual feedback all triggered"
+
+  scanner_flow:
+    - test: "initial state is scan_wo"
+      given: "new scanner flow instance"
+      when: "created"
+      then: "state is 'scan_wo'"
+
+    - test: "valid WO scan transitions to scan_lp"
+      given: "state is scan_wo"
+      when: "valid WO scanned"
+      then: "state becomes 'scan_lp', WO data stored"
+
+    - test: "valid LP scan transitions to enter_qty"
+      given: "state is scan_lp"
+      when: "valid LP scanned"
+      then: "state becomes 'enter_qty', LP data stored"
+
+    - test: "Full Consumption button skips to review"
+      given: "state is enter_qty"
+      when: "Full Consumption button tapped"
+      then: "state becomes 'review', qty set to LP.qty"
+
+    - test: "confirm success transitions to next"
+      given: "state is confirm"
+      when: "API returns success"
+      then: "state becomes 'next', success feedback shown"
+
+    - test: "Next Material returns to scan_lp"
+      given: "state is next"
+      when: "Next Material button tapped"
+      then: "state becomes 'scan_lp', LP data cleared"
+
+integration_tests:
+  wo_barcode_api:
+    - test: "GET /barcode/:barcode returns WO with materials"
+      given: "valid WO barcode 'WO-2025-0156'"
+      when: "GET request sent"
+      then: "status 200, returns WO info and materials array"
+
+    - test: "GET /barcode/:barcode returns 404 for invalid barcode"
+      given: "barcode 'WO-99999' does not exist"
+      when: "GET request sent"
+      then: "status 404, error = 'WO_NOT_FOUND'"
+
+    - test: "GET /barcode/:barcode returns 400 for inactive WO"
+      given: "WO with status = 'completed'"
+      when: "GET request sent"
+      then: "status 400, error = 'WO_NOT_ACTIVE'"
+
+    - test: "GET /barcode/:barcode response time under 500ms"
+      given: "valid WO barcode"
+      when: "GET request sent"
+      then: "response received within 500ms"
+
+  lp_barcode_api:
+    - test: "GET /barcode/:barcode returns LP with validation"
+      given: "valid LP barcode 'LP-2025-01234' and material_id"
+      when: "GET request sent"
+      then: "status 200, returns LP info and validation result"
+
+    - test: "GET /barcode/:barcode validates product match"
+      given: "LP with product_id != material.product_id"
+      when: "GET request with material_id"
+      then: "validation.product_match = false, error_code = 'PRODUCT_MISMATCH'"
+
+    - test: "GET /barcode/:barcode validates availability"
+      given: "LP with status = 'consumed'"
+      when: "GET request sent"
+      then: "validation.is_available = false, error_code = 'LP_NOT_AVAILABLE'"
+
+    - test: "GET /barcode/:barcode response time under 300ms"
+      given: "valid LP barcode"
+      when: "GET request sent"
+      then: "response received within 300ms"
+
+e2e_tests:
+  - scenario: "Complete scanner consumption flow (6 steps)"
+    device: "mobile viewport 375px"
+    steps:
+      - "Navigate to /scanner/consume"
+      - "Verify Step 1 displays, scan input focused"
+      - "Enter WO barcode 'WO-2025-0156'"
+      - "Press Enter"
+      - "Verify green check animation displays"
+      - "Verify WO info card displays within 500ms"
+      - "Verify materials list shows 3 materials"
+      - "Click [Next: Scan Material LP]"
+      - "Verify Step 2 displays"
+      - "Enter LP barcode 'LP-2025-01234'"
+      - "Verify green check with success beep"
+      - "Verify LP info card displays"
+      - "Click [Next: Enter Quantity]"
+      - "Verify Step 3 displays with number pad"
+      - "Tap [2] [5] [0] on number pad"
+      - "Verify qty input shows '250'"
+      - "Click [Next: Review]"
+      - "Verify Step 4 displays review summary"
+      - "Click [Confirm]"
+      - "Verify Step 5 shows spinner"
+      - "Verify green check animation (2 seconds)"
+      - "Verify success beep plays"
+      - "Verify Step 6 displays with progress update"
+      - "Verify 'Next Material' and 'Done' buttons display"
+
+  - scenario: "Full Consumption button skips number pad"
+    steps:
+      - "Navigate to /scanner/consume"
+      - "Scan valid WO barcode"
+      - "Scan valid LP with qty = 500"
+      - "Verify Step 3 shows number pad and Full Consumption button"
+      - "Click [Full Consumption (500 kg)]"
+      - "Verify skips directly to Step 4 Review"
+      - "Verify qty shows 500 kg"
+
+  - scenario: "Error handling - invalid WO barcode"
+    steps:
+      - "Navigate to /scanner/consume"
+      - "Enter invalid barcode 'WO-99999'"
+      - "Press Enter"
+      - "Verify red X animation with shake"
+      - "Verify 2 short error beeps play"
+      - "Verify error message 'Invalid WO barcode' displays"
+      - "Verify [Scan Again] and [Manual Entry] buttons display"
+
+  - scenario: "Error handling - product mismatch"
+    steps:
+      - "Scan valid WO barcode"
+      - "Navigate to Step 2 (Scan LP)"
+      - "Scan LP with wrong product"
+      - "Verify red X animation"
+      - "Verify error 'Product mismatch' displays"
+
+  - scenario: "Number pad decimal input"
+    steps:
+      - "Navigate to Step 3 (Enter Quantity)"
+      - "Tap [5] [0] [.] [5]"
+      - "Verify qty input shows '50.5'"
+      - "Verify decimal is accepted"
+
+  - scenario: "Touch targets meet 48dp minimum"
+    steps:
+      - "Navigate to /scanner/consume"
+      - "Measure [Scan] button height"
+      - "Verify height >= 48px"
+      - "Navigate to Step 3"
+      - "Measure number pad key size"
+      - "Verify keys are 64x64px"
+
+performance:
+  - metric: "WO barcode scan to info display"
+    target: "< 500ms"
+    test: "Measure time from Enter key to WO card render"
+
+  - metric: "LP barcode scan to validation result"
+    target: "< 300ms"
+    test: "Measure time from Enter key to validation badges"
+
+  - metric: "Consumption confirm to success feedback"
+    target: "< 2s"
+    test: "Measure time from Confirm tap to green check"
+
+  - metric: "Auto-advance delay"
+    target: "2s exactly"
+    test: "Measure delay between success and auto-advance"
+
+accessibility_tests:
+  - test: "All touch targets >= 48dp"
+    elements:
+      - "Primary buttons (48dp)"
+      - "Number pad keys (64dp)"
+      - "List items (64dp)"
+
+  - test: "Font sizes >= 18px"
+    elements:
+      - "Body text (18px)"
+      - "Headings (24px)"
+      - "Input text (24px)"
+
+  - test: "Contrast ratio >= 4.5:1"
+    pairs:
+      - "White text on Slate-700"
+      - "Green-400 text on Slate-900"
+
+  - test: "Audio feedback functions"
+    verify:
+      - "Success beep plays on valid scan"
+      - "Error beeps play on invalid scan"

@@ -1,0 +1,46 @@
+# Story 10.17 - API Specification
+# Purpose: Bottleneck analysis endpoints
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/analytics/bottlenecks"
+    description: "Get bottleneck analysis for production lines"
+    auth: "required"
+    query_params:
+      line_id: "string (optional)"
+    response:
+      lines:
+        - line_id: "string"
+          line_name: "string"
+          bottleneck_operation: "string"
+          bottleneck_cycle_time: "number (seconds)"
+          line_capacity: "number (units/hour)"
+          operations:
+            - operation_name: "string"
+              cycle_time: "number"
+              capacity: "number"
+              is_bottleneck: "boolean"
+          potential_improvement: "string (description)"
+
+  - method: "GET"
+    path: "/api/oee/analytics/bottlenecks/:lineId/impact"
+    description: "Calculate impact of resolving bottleneck"
+    auth: "required"
+
+services:
+  - path: "apps/frontend/lib/services/bottleneck-service.ts"
+    exports:
+      - name: "BottleneckService"
+        methods:
+          - "getBottleneckAnalysis"
+          - "identifyBottleneck"
+          - "calculateLineBalance"
+          - "calculateImpact"
+
+types:
+  - path: "apps/frontend/lib/types/bottleneck.ts"
+    exports:
+      - "BottleneckAnalysis"
+      - "OperationCapacity"
+      - "LineBalanceData"

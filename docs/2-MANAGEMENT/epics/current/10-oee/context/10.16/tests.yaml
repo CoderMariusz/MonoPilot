@@ -1,0 +1,39 @@
+# Story 10.16 - Test Specification
+# Purpose: MTBF/MTTR tests
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "machine ran 480 hours with 6 failures"
+    when: "calculating MTBF"
+    then: "MTBF = 480 / 6 = 80 hours"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "6 failures with repair times: 15, 20, 30, 10, 25, 20 min"
+    when: "calculating MTTR"
+    then: "MTTR = 120 / 6 = 20 minutes"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "5 machines with varying MTBF"
+    when: "viewing reliability ranking"
+    then: "machines sorted by MTBF descending, least reliable flagged"
+    test_type: "e2e"
+    priority: "P0"
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/reliability-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/analytics/mtbf/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-reliability.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "MTBF calculation correct"
+  - "MTTR calculation correct"
+  - "Reliability ranking works"
+  - "Trend tracking functional"

@@ -1,0 +1,200 @@
+# Story 08.7 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "08.7"
+  name: "Formulation Costing"
+  slug: "formulation-costing"
+  epic: "08-npd"
+  phase: "1"  # MVP Phase 1
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # npd_costing table, triggers, functions
+  - api.yaml         # Endpoints, formulation-costing-service.ts
+  - frontend.yaml    # Components, wireframe integration (NPD-007, NPD-008)
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id filter", "RLS pattern", "auth context"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "cost_per_unit field", "product_id FK"]
+    - story: "08.2"
+      name: "NPD Projects CRUD"
+      provides: ["npd_projects table", "npd_project_id FK"]
+    - story: "08.4"
+      name: "Formulations CRUD & Versioning"
+      provides: ["npd_formulations table", "npd_formulation_items table", "formulation_id FK"]
+    - story: "04.x"
+      name: "Work Orders CRUD (for pilot WO cost capture)"
+      provides: ["work_orders table", "work_order_costs table", "pilot WO type"]
+  blocked_by: []
+  blocks:
+    - story: "08.9"
+      name: "Handoff Wizard (requires costing approval validation)"
+    - story: "08.10"
+      name: "NPD Dashboard (shows cost variance metrics)"
+
+# External Dependencies
+external_dependencies:
+  migrations:
+    - migration: "TBD"
+      description: "npd_costing table with RLS policies"
+      status: "pending"
+    - migration: "TBD"
+      description: "calculate_formulation_cost() function"
+      status: "pending"
+    - migration: "TBD"
+      description: "Auto-update estimated_cost trigger"
+      status: "pending"
+    - migration: "TBD"
+      description: "Auto-calculate variance_pct trigger"
+      status: "pending"
+  services:
+    - service: "formulation-costing-service.ts"
+      path: "apps/frontend/lib/services/formulation-costing-service.ts"
+      status: "to_create"
+      provides:
+        - "getFormulationCosting()"
+        - "setTargetCost()"
+        - "recalculateEstimatedCost()"
+        - "submitCosting()"
+        - "approveCosting()"
+        - "rejectCosting()"
+        - "getCostingHistory()"
+        - "calculateFormulationCost()"
+        - "getVarianceAlert()"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections:
+      - "FR-NPD-23"  # Target cost entry
+      - "FR-NPD-24"  # Estimated cost calculation
+      - "FR-NPD-25"  # Actual cost recording from pilot WO
+      - "FR-NPD-26"  # Cost variance calculation
+      - "FR-NPD-27"  # Variance alerts (warning/blocker)
+      - "FR-NPD-28"  # Cost history tracking
+      - "FR-NPD-29"  # Finance approval workflow
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/npd.md"
+    sections: ["Costing Logic", "npd_costing table", "Finance Approval Workflow"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.7.formulation-costing.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-NPD-002-costing-workflow.md"
+      relevance: "REFERENCE - Costing approval workflow and variance thresholds"
+      status: "may_not_exist"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-007-formulation-costing.md"
+      relevance: "Formulation Costing View with target/estimated/actual costs"
+      status: "to_create"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-008-cost-variance-alerts.md"
+      relevance: "Cost variance alert components (warning/blocker)"
+      status: "to_create"
+  patterns:
+    - path: "apps/frontend/lib/services/costing-service.ts"
+      relevance: "REFERENCE - Existing costing service for BOM costs (similar pattern)"
+    - path: "apps/frontend/lib/services/formulation-service.ts"
+      relevance: "Formulation service pattern (from 08.4)"
+    - path: "apps/frontend/components/technical/bom/CostSummary.tsx"
+      relevance: "REFERENCE - Similar cost summary component for BOMs"
+    - path: "docs/2-MANAGEMENT/epics/current/02-technical/02.9.bom-routing-costs.md"
+      relevance: "PATTERN - Similar costing story for BOM/routing costs"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "npd_costing table + triggers + functions + RLS"
+  - type: "api"
+    count: 7
+    description: "PUT target, GET costing, POST recalculate/submit/approve/reject, GET history"
+  - type: "component"
+    count: 9
+    description: "CostingCard, BreakdownTable, Modals, Indicators, Alerts"
+  - type: "service"
+    count: 1
+    description: "formulation-costing-service.ts"
+  - type: "validation"
+    count: 4
+    description: "Zod schemas for target/submit/approve/reject"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + API tests"
+
+# Scope Boundaries
+scope:
+  in_scope:
+    - "PUT /api/npd/formulations/:id/costing/target (set/update target cost)"
+    - "GET /api/npd/formulations/:id/costing (get costing with breakdown)"
+    - "POST /api/npd/formulations/:id/costing/recalculate (recalculate estimated)"
+    - "POST /api/npd/formulations/:id/costing/submit (submit for approval)"
+    - "POST /api/npd/formulations/:id/costing/approve (Finance approves)"
+    - "POST /api/npd/formulations/:id/costing/reject (Finance rejects)"
+    - "GET /api/npd/formulations/:id/costing/history (cost history)"
+    - "Target cost entry (manual input at G2)"
+    - "Estimated cost calculation (sum of formulation item costs)"
+    - "Actual cost recording (from pilot WO material consumption)"
+    - "Cost variance calculation: ((actual - target) / target) * 100"
+    - "Variance alerts: warning > 20%, blocker > 50%"
+    - "Cost history tracking per formulation version"
+    - "Display: target vs estimated vs actual with variance %"
+    - "Finance approval workflow (draft/submitted/approved/rejected)"
+    - "Costing section on formulation detail page"
+    - "Cost breakdown table (per ingredient)"
+    - "Auto-recalculate on formulation items change"
+    - "Permission enforcement (Finance role for approval)"
+  out_of_scope:
+    - "Multi-currency support (Phase 1)"
+    - "Cost versioning with effective dates (Phase 1)"
+    - "Batch cost locking (Phase 1)"
+    - "Cost variance analysis across versions (Phase 2)"
+    - "Historical cost trend charts (Phase 2)"
+    - "Cost scenario modeling (Phase 2)"
+    - "Cost optimization suggestions (Phase 2)"
+
+# Technical notes
+technical_notes:
+  - "npd_costing table - one record per formulation version"
+  - "calculate_formulation_cost() function - sum of item.quantity * product.cost_per_unit"
+  - "Auto-update trigger - recalculates estimated_cost on formulation_items change"
+  - "Auto-calculate trigger - calculates variance_pct on target/actual update"
+  - "Variance formula: ((actual - target) / target) * 100"
+  - "Variance thresholds from npd_settings: cost_variance_warning_pct (20%), cost_variance_blocker_pct (50%)"
+  - "Finance approval required before handoff if require_costing_approval = true (default)"
+  - "Approved costing immutable - must reject and resubmit to edit"
+  - "Actual cost from pilot WO work_order_costs table (material consumption)"
+  - "Currency: single currency per org (default PLN)"
+  - "Performance target: <500ms for cost calculation with up to 50 items"
+  - "Auto-recalc on formulation items change (if auto_recalc setting enabled)"
+  - "Cost breakdown shows per-ingredient costs with percentage of total"
+  - "Handoff validation: check costing approved + variance < blocker threshold"
+  - "RLS policies: org_id isolation on npd_costing table"
+
+# PRD Requirements Coverage
+prd_coverage:
+  - { fr_id: "NPD-FR-23", description: "Target cost entry (manual)", priority: "P0", status: "covered" }
+  - { fr_id: "NPD-FR-24", description: "Estimated cost calculation (sum of items)", priority: "P0", status: "covered" }
+  - { fr_id: "NPD-FR-25", description: "Actual cost recording (from pilot WO)", priority: "P0", status: "covered" }
+  - { fr_id: "NPD-FR-26", description: "Cost variance calculation", priority: "P0", status: "covered" }
+  - { fr_id: "NPD-FR-27", description: "Variance alerts (warning/blocker)", priority: "P0", status: "covered" }
+  - { fr_id: "NPD-FR-28", description: "Cost history tracking", priority: "P1", status: "covered" }
+  - { fr_id: "NPD-FR-29", description: "Finance approval workflow", priority: "P0", status: "covered" }
+  # Deferred to Phase 1+
+  - { fr_id: "NPD-FR-30", description: "Multi-currency support", priority: "P1", status: "deferred_phase1" }
+  - { fr_id: "NPD-FR-31", description: "Cost versioning with effective dates", priority: "P1", status: "deferred_phase1" }
+  - { fr_id: "NPD-FR-32", description: "Cost variance analysis across versions", priority: "P2", status: "deferred_phase2" }
+  - { fr_id: "NPD-FR-33", description: "Historical cost trend charts", priority: "P2", status: "deferred_phase2" }

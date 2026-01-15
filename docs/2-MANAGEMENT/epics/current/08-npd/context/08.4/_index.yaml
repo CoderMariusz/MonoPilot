@@ -1,0 +1,149 @@
+# Story 08.4 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "08.4"
+  name: "Formulations CRUD & Versioning"
+  slug: "formulations-crud-versioning"
+  epic: "08-npd"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 5-6
+  type: "full-stack"
+  state: "ready"
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, triggers, indexes
+  - api.yaml         # Endpoints, auth, errors, schemas
+  - frontend.yaml    # Pages, components, services, validation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "08.1"
+      name: "NPD Projects CRUD"
+      provides: ["npd_projects table", "project-service.ts", "project types"]
+      rationale: "Formulation.npd_project_id references npd_projects table; project selector depends on project-service"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product-service.ts", "product types"]
+      rationale: "FormulationItem.product_id references products table; product selector for formulation items"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations table", "users table", "RLS pattern", "org-context-service.ts"]
+      rationale: "Formulation table requires org_id for multi-tenancy; RLS policies follow ADR-013 pattern"
+  blocked_by: []
+  blocks:
+    - story: "08.5"
+      name: "Formulation Allergen Aggregation"
+    - story: "08.6"
+      name: "Formulation Clone/Copy"
+    - story: "08.7"
+      name: "Formulation Comparison/Diff View"
+    - story: "08.8"
+      name: "Formulation Costing"
+    - story: "08.9"
+      name: "Handoff Wizard"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["Section 3 - Formulations", "FR-NPD-08", "FR-NPD-09", "FR-NPD-11", "FR-NPD-12", "FR-NPD-13", "FR-NPD-14"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/npd.md"
+    sections: ["Database Schema - npd_formulations", "API Design - Formulations Endpoints", "Business Rules - Formulations"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.4.formulations-crud-versioning.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for npd_formulations table"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/02-technical/02.4.boms-crud-validity.md"
+      relevance: "PATTERN - Similar versioning, date validity, timeline visualization logic"
+    - path: "apps/frontend/lib/services/bom-service.ts"
+      relevance: "PATTERN - Service structure for versioned entities"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-004-formulation-list.md"
+      relevance: "Formulation list page with search, filters, pagination, CRUD actions"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-005-formulation-editor.md"
+      relevance: "Formulation create/edit page with header fields, items table, date validation"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-006-formulation-timeline.md"
+      relevance: "Formulation timeline visualization for version tracking"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Database tables + triggers for date overlap, percentage calc, lock prevention"
+  - type: "api"
+    count: 7
+    description: "CRUD endpoints + lock + lineage + timeline: GET/POST/PUT/DELETE /api/npd/formulations"
+  - type: "service"
+    count: 1
+    description: "formulation-service.ts with CRUD, version numbering, date overlap validation, lineage"
+  - type: "validation"
+    count: 2
+    description: "Zod schemas for formulation header (create/update) + lock confirmation"
+  - type: "page"
+    count: 4
+    description: "List page, create page, detail page, edit page"
+  - type: "component"
+    count: 10
+    description: "DataTable, HeaderForm, ItemsTable, ProjectSelector, StatusBadge, DeleteDialog, LockDialog, TimelineModal, TimelineBar, LineageTree"
+  - type: "test"
+    count: 3
+    description: "Unit tests + integration tests + date overlap tests + percentage calc tests"
+
+# Technical notes
+technical_notes:
+  - "Date overlap prevention via database trigger (PostgreSQL daterange)"
+  - "Version numbering: v1.0 (major.minor) - auto-suggest next version"
+  - "Lineage tracking via parent_formulation_id (tree structure)"
+  - "Lock on approval: status = 'locked' makes formulation immutable"
+  - "Project field is LOCKED after formulation creation (immutable)"
+  - "effective_from/effective_to both OPTIONAL (NULL = no date constraint)"
+  - "Auto-calculate percentages: item_qty / total_qty * 100 (database trigger)"
+  - "Formulation timeline visualization shows all versions for a project"
+  - "Delete blocked if formulation is locked OR used in BOM handoff"
+  - "Pattern follows BOM CRUD (02.4) - similar versioning, date validity, timeline"
+
+# PRD Requirements Mapping
+prd_mapping:
+  - fr_id: "NPD-FR-08"
+    description: "Create formulations with versioning"
+    covered_by: ["API endpoints", "Service layer", "Version numbering logic"]
+  - fr_id: "NPD-FR-09"
+    description: "Add formulation items with product search"
+    covered_by: ["FormulationItemsTable component", "Product selector", "API endpoints"]
+  - fr_id: "NPD-FR-11"
+    description: "Support effective dates"
+    covered_by: ["Database schema", "Date validation", "Timeline visualization"]
+  - fr_id: "NPD-FR-12"
+    description: "Prevent overlapping versions"
+    covered_by: ["Database trigger", "Zod validation", "Error handling"]
+  - fr_id: "NPD-FR-13"
+    description: "Lock formulation on approval"
+    covered_by: ["Lock endpoint", "Database trigger", "UI lock button"]
+  - fr_id: "NPD-FR-14"
+    description: "Track formulation lineage"
+    covered_by: ["parent_formulation_id field", "Lineage tree component", "Lineage endpoint"]
+
+# Handoff to DEV Agents
+handoff:
+  story: "08.4.formulations-crud-versioning"
+  story_file: "docs/2-MANAGEMENT/epics/current/08-npd/08.4.formulations-crud-versioning.md"
+  epic_folder: "docs/2-MANAGEMENT/epics/current/08-npd/"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  pattern_reference: "02.4 BOMs CRUD - Similar versioning, date validity, timeline visualization"
+  technical_notes: "Follow BOM pattern (02.4) for versioning logic; ADR-013 for RLS pattern"
+  dependencies:
+    - "08.1 NPD Projects CRUD must be complete"
+    - "02.1 Products CRUD must be complete"
+    - "01.1 Org Context + RLS must be complete"

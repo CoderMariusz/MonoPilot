@@ -1,0 +1,24 @@
+# Story 06.40 - Document Control Frontend
+
+pages:
+  - /quality/documents (list with filters)
+  - /quality/documents/[id] (detail with version history)
+  - /quality/documents/new (upload form)
+
+components:
+  - DocumentDataTable (list with filters)
+  - DocumentFilters (type, status, owner)
+  - DocumentDetailView (metadata + version history)
+  - DocumentUploadForm (drag-and-drop file upload)
+  - DocumentApprovalActions (approve/reject buttons)
+  - DocumentStatusBadge, DocumentTypeBadge
+  - DocumentVersionHistory (table of versions)
+  - DocumentFilePreview (PDF iframe viewer)
+  - NewVersionModal (create new version form)
+  - DocumentExpiryAlert (banner for expiring docs)
+
+file_upload:
+  library: Supabase Storage SDK
+  file_types: PDF, DOCX, XLSX, PNG, JPG
+  max_size: 50 MB
+  features: Drag-and-drop, progress bar

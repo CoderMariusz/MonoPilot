@@ -1,0 +1,196 @@
+story:
+  id: "09.6"
+  name: "WO Cost Summary"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "02.1"
+      provides: ["products"]
+    - story: "04.1"
+      provides: ["work_orders"]
+    - story: "04.4"
+      provides: ["material_consumption"]
+    - story: "04.5"
+      provides: ["operation_labor"]
+    - story: "09.8"
+      provides: ["currencies"]
+  optional:
+    - story: "09.9"
+      provides: ["tax_codes"]
+    - story: "09.10"
+      provides: ["cost_centers"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.3.4", "FR-9.3.6"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.6.wo-cost-summary.md"
+  reference_story: "docs/2-MANAGEMENT/epics/current/06-quality/06.5.incoming-inspection.md"
+  patterns:
+    - "apps/frontend/lib/services/bom-service.ts"
+    - "apps/frontend/app/api/technical/boms/[id]/cost/route.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_work_order_costs.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/material/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/labor/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/recalculate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/export/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/work-order-cost-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+  components:
+    - path: "apps/frontend/components/finance/WOCostSummaryCard.tsx"
+    - path: "apps/frontend/components/finance/WOCostBreakdownChart.tsx"
+    - path: "apps/frontend/components/finance/WOCostStatusBadge.tsx"
+    - path: "apps/frontend/components/finance/MaterialCostsTable.tsx"
+    - path: "apps/frontend/components/finance/LaborCostsTable.tsx"
+
+database:
+  tables:
+    - name: "work_order_costs"
+      columns:
+        - "id"
+        - "org_id"
+        - "work_order_id"
+        - "material_cost_actual"
+        - "labor_cost_actual"
+        - "overhead_cost_actual"
+        - "total_cost_actual"
+        - "quantity_produced"
+        - "unit_cost_actual"
+        - "currency_id"
+        - "status"
+      rls: true
+      indexes:
+        - "org_id, work_order_id"
+        - "org_id, status"
+        - "cost_center_id"
+    - name: "material_consumption_costs"
+      columns:
+        - "id"
+        - "org_id"
+        - "consumption_id"
+        - "work_order_id"
+        - "product_id"
+        - "quantity"
+        - "unit_cost"
+        - "total_cost"
+      rls: true
+      indexes:
+        - "org_id, work_order_id"
+        - "consumption_id"
+    - name: "labor_costs"
+      columns:
+        - "id"
+        - "org_id"
+        - "work_order_id"
+        - "operation_id"
+        - "user_id"
+        - "hours_actual"
+        - "hourly_rate"
+        - "total_cost"
+      rls: true
+      indexes:
+        - "org_id, work_order_id"
+        - "operation_id"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id"
+    auth: true
+    roles: ["viewer", "production_manager", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/material"
+    auth: true
+    roles: ["viewer", "production_manager", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/labor"
+    auth: true
+    roles: ["viewer", "production_manager", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/work-order-costs/:id/recalculate"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/export"
+    auth: true
+    roles: ["viewer", "production_manager", "finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-001"
+      description: "WO Cost Summary Card on WO Detail Page"
+      components:
+        - "Card with cost metrics"
+        - "Progress bar (cost breakdown)"
+        - "Status badge"
+        - "Export button"
+  patterns:
+    card: "ShadCN Card pattern"
+    chart: "Recharts pie chart"
+    badge: "ShadCN Badge with color variants"
+  states:
+    - "loading"
+    - "pending (no costs)"
+    - "calculated"
+    - "error"
+
+validation_rules:
+  quantity: "Must be positive"
+  unit_cost: "Must be >= 0"
+  total_cost: "Must be >= 0"
+  currency_id: "Must match work order currency"
+  hours_actual: "Must be >= 0"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  triggers: "Auto-calculate on insert/update"
+
+acceptance_checklist:
+  - "work_order_costs table created with RLS"
+  - "material_consumption_costs table created"
+  - "labor_costs table created"
+  - "calculate_work_order_costs() function works"
+  - "Auto-recalculation triggers fire on consumption/labor"
+  - "GET cost summary API returns correct data"
+  - "Unit cost calculation handles zero quantity"
+  - "Cost summary card displays on WO detail page"
+  - "Cost breakdown chart renders correctly"
+  - "Status badge shows correct status"
+  - "CSV export generates valid file"
+  - "Real-time updates work within 5 seconds"
+  - "Permission enforcement for recalculate"
+  - "RLS enforces org isolation"
+  - "All tests pass (unit, integration, E2E)"
+
+output_artifacts:
+  - "Migration: work_order_costs table"
+  - "Migration: material_consumption_costs table"
+  - "Migration: labor_costs table"
+  - "Function: calculate_work_order_costs()"
+  - "API: 5 cost endpoints"
+  - "Service: WorkOrderCostService with 9 methods"
+  - "Component: WOCostSummaryCard"
+  - "Component: WOCostBreakdownChart"
+  - "Component: WOCostStatusBadge"
+  - "Tests: Unit, integration, E2E"

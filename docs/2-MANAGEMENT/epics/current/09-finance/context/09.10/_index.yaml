@@ -1,0 +1,58 @@
+# Story 09.10 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "09.10"
+  name: "Cost Center CRUD"
+  epic: "09-finance"
+  phase: "TBD"
+  complexity: "M"
+  estimate_days: 3
+  type: "fullstack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required: []
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/MODULE.md"
+    sections: ["FR-XXX"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/09-finance/09.10.*.md"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Database schema changes"
+  - type: "service"
+    count: 1
+    description: "Service layer methods"
+  - type: "api"
+    count: 3
+    description: "API endpoints"
+  - type: "component"
+    count: 5
+    description: "UI components"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + e2e tests"
+
+# Technical notes
+technical_notes:
+  - "Auto-generated context file - customize as needed"
+  - "Read story markdown for complete requirements"

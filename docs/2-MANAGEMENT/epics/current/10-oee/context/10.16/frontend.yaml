@@ -1,0 +1,33 @@
+# Story 10.16 - Frontend Specification
+# Purpose: Reliability metrics visualization
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/oee/analytics/ReliabilityRankingTable.tsx"
+    description: "Table ranking machines by reliability (MTBF)"
+    columns:
+      - { id: "rank", header: "#" }
+      - { id: "machine_name", header: "Machine" }
+      - { id: "mtbf_hours", header: "MTBF (hours)" }
+      - { id: "mttr_minutes", header: "MTTR (min)" }
+      - { id: "failure_count", header: "Failures" }
+    features:
+      - "Sorted by MTBF descending (most reliable first)"
+      - "Highlight least reliable in red"
+
+  - path: "apps/frontend/components/oee/analytics/ReliabilityTrendChart.tsx"
+    description: "MTBF/MTTR trend over time"
+
+  - path: "apps/frontend/components/oee/dashboard/ReliabilityWidget.tsx"
+    description: "Dashboard summary widget"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/analytics/reliability/page.tsx"
+    route: "/oee/analytics/reliability"
+    title: "Machine Reliability Analysis"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-reliability.ts"
+    exports:
+      - "useReliabilityMetrics"
+      - "useReliabilityTrend"

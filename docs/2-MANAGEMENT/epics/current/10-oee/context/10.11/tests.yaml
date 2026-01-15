@@ -1,0 +1,221 @@
+# Story 10.11 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/downtime-analysis-service.test.ts"
+    type: "unit"
+    description: "Unit tests for DowntimeAnalysisService methods"
+  - path: "apps/frontend/components/oee/analytics/__tests__/ParetoChart.test.tsx"
+    type: "unit"
+    description: "Unit tests for Pareto chart rendering"
+  - path: "apps/frontend/app/api/oee/downtime/analysis/__tests__/api.test.ts"
+    type: "integration"
+    description: "Integration tests for Pareto API endpoint"
+  - path: "tests/e2e/oee-pareto-analysis.spec.ts"
+    type: "e2e"
+    description: "E2E test for Pareto chart interaction"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Pareto Chart Display
+  - id: "AC-01"
+    given: "downtime events last week with reasons: Machine Jams (180 min, 37%), Setup (145 min, 30%), Cleaning (85 min, 18%), Other (75 min, 15%)"
+    when: "viewing Pareto chart"
+    then: "bars show duration descending: Jams, Setup, Cleaning, Other"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "Pareto chart displayed"
+    when: "cumulative line inspected"
+    then: "shows cumulative %: 37%, 67%, 85%, 100%"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "Pareto chart displayed"
+    when: "80% reference line"
+    then: "horizontal dashed line at 80% level"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Drill-down Navigation
+  - id: "AC-04"
+    given: "Pareto chart displayed"
+    when: "user clicks 'Machine Jams' bar"
+    then: "navigates to downtime events filtered by reason='Machine Jams'"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Summary Cards
+  - id: "AC-05"
+    given: "total downtime = 485 min"
+    when: "viewing summary cards"
+    then: "Total Downtime card shows '8h 05min'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "top 2 reasons account for 67%"
+    when: "viewing summary"
+    then: "Reasons for 80% card shows '3' (Jams + Setup + Cleaning)"
+    test_type: "unit"
+    priority: "P0"
+
+  # API Endpoint
+  - id: "AC-07"
+    given: "authenticated user"
+    when: "GET /api/oee/downtime/analysis?date_from=2025-01-01&date_to=2025-01-07"
+    then: "returns reasons array with cumulative_percentage"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "API request with limit=5"
+    when: "org has 10 distinct reasons"
+    then: "returns only top 5 reasons"
+    test_type: "integration"
+    priority: "P0"
+
+  # Performance
+  - id: "AC-09"
+    given: "500 downtime events across 20 reasons"
+    when: "loading Pareto analysis"
+    then: "response time < 500ms"
+    test_type: "integration"
+    priority: "P1"
+
+  # RLS
+  - id: "AC-10"
+    given: "User A (Org A) and User B (Org B)"
+    when: "both request Pareto data"
+    then: "each sees only their org's downtime"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  downtime_analysis_service:
+    - name: "calculateCumulativePercentage() computes correctly"
+      setup: "Reasons: 37%, 30%, 18%, 15%"
+      expected: "Cumulative: 37%, 67%, 85%, 100%"
+
+    - name: "getReasonsFor80Percent() returns correct count"
+      setup: "Cumulative: 37%, 67%, 85%, 100%"
+      expected: "3 (first 3 reasons reach 85% > 80%)"
+
+    - name: "getSummaryStats() calculates top reason"
+      setup: "Reasons with durations"
+      expected: "Returns reason with highest duration as top_reason"
+
+  pareto_chart:
+    - name: "renders bars in descending order"
+      setup: "Unordered reasons array"
+      expected: "Bars ordered by duration DESC"
+
+    - name: "shows 80% line when enabled"
+      setup: "showEightyLine=true"
+      expected: "Dashed horizontal line at 80%"
+
+    - name: "calls onBarClick with reason code"
+      setup: "onClick handler"
+      expected: "Handler called with correct reason_code"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/oee/downtime/analysis returns Pareto data"
+      setup: "Downtime events for 5 reasons"
+      action: "GET /api/oee/downtime/analysis?date_from=2025-01-01&date_to=2025-01-07"
+      expected: "200 OK with reasons[], summary, period"
+
+    - name: "API calculates cumulative correctly"
+      setup: "Known durations"
+      action: "GET API"
+      expected: "cumulative_percentage values are correct"
+
+    - name: "API respects limit parameter"
+      setup: "15 different reasons"
+      action: "GET with limit=5"
+      expected: "Only 5 reasons returned"
+
+    - name: "API filters by machine_id"
+      setup: "Events on Machine A and Machine B"
+      action: "GET with machine_id=A"
+      expected: "Only Machine A downtime in analysis"
+
+  rls_policies:
+    - name: "RLS isolates Pareto data by org"
+      setup: "Org A events, Org B events"
+      action: "User A queries Pareto"
+      expected: "Only Org A downtime in results"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "View Pareto chart for last week"
+    steps:
+      - "Login as production manager"
+      - "Navigate to /oee/analytics/downtime"
+      - "Select date range: Last 7 Days"
+    expected:
+      - "Pareto chart displays with bars"
+      - "Cumulative line overlaid"
+      - "80% line visible"
+      - "Summary cards show totals"
+
+  - name: "Drill down to specific reason"
+    steps:
+      - "View Pareto chart"
+      - "Click on 'Machine Jams' bar"
+    expected:
+      - "Navigates to /oee/downtime?reason=MACHINE_JAM"
+      - "Events list filtered by reason"
+
+  - name: "Filter by category"
+    steps:
+      - "View Pareto chart"
+      - "Select category filter: Mechanical"
+    expected:
+      - "Chart updates to show only mechanical reasons"
+      - "Percentages recalculated"
+
+# Definition of Done
+definition_of_done:
+  - "GET /api/oee/downtime/analysis returns Pareto data"
+  - "Pareto chart renders bars descending by duration"
+  - "Cumulative line shows percentage progression"
+  - "80% reference line displayed"
+  - "Click bar navigates to filtered events"
+  - "Summary cards show key metrics"
+  - "Performance < 500ms for 30-day range"
+  - "RLS enforces org isolation"
+  - "Unit tests achieve >80% coverage"
+  - "E2E test covers drill-down workflow"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Cumulative calculation must be correct"
+  integration:
+    target: 80
+    reason: "API aggregation accuracy is critical"
+  files:
+    - "lib/services/downtime-analysis-service.ts: 80%"
+    - "components/oee/analytics/ParetoChart.tsx: 75%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Many small reasons could make chart unreadable"
+    mitigation: "Limit to top 10, group others as 'Other'"
+    severity: "low"
+    test_coverage: "unit_tests"
+
+  - id: "RISK-02"
+    description: "Cumulative percentage calculation errors"
+    mitigation: "Thorough unit tests for calculation logic"
+    severity: "medium"
+    test_coverage: "unit_tests.downtime_analysis_service"

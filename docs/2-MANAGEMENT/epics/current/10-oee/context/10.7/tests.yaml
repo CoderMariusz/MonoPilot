@@ -1,0 +1,47 @@
+# Story 10.7 - Test Specification
+# Shift Report Generation
+
+test_files:
+  - path: "tests/e2e/shift-reports.spec.ts"
+    type: "e2e"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "shift ends at 14:00"
+    when: "14:15 (15min after shift end)"
+    then: "shift report auto-generated via cron job"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "shift report generated"
+    when: "supervisor views report"
+    then: "report displays OEE avg, downtime, output, WOs completed"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "supervisor on shift report page"
+    when: "clicks [Approve]"
+    then: "status=approved, approved_by and approved_at set"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "approved report"
+    when: "clicks [Export PDF]"
+    then: "PDF generated and downloaded"
+    test_type: "e2e"
+    priority: "P0"
+
+definition_of_done:
+  - "shift_reports and shift_handover_notes tables created"
+  - "generate_shift_report() function works"
+  - "Cron job auto-generates reports 15min after shift end"
+  - "GET /api/oee/shift-reports lists reports"
+  - "Approve workflow functional"
+  - "PDF export works"
+
+coverage:
+  unit: 80
+  integration: 80

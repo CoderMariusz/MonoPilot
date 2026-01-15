@@ -1,0 +1,46 @@
+# Story 06.25 - CCP Deviation Handling Context
+# Generated: 2025-01-15
+
+story:
+  id: "06.25"
+  name: "CCP Deviation Handling"
+  slug: "ccp-deviation-handling"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+
+dependencies:
+  required:
+    - story: "06.22"
+      provides: ["haccp_ccp table"]
+    - story: "06.23"
+      provides: ["haccp_ccp_monitoring table, monitoring fail hook"]
+    - story: "06.9"
+      provides: ["ncr_reports table for critical deviations"]
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "haccp_ccp_deviations table + RLS"
+  - type: "service"
+    count: 1
+    description: "ccp-deviation-service.ts"
+  - type: "api"
+    count: 6
+    description: "GET/POST deviations, investigate, resolve, verify"
+
+technical_notes:
+  - "Auto-create deviation on monitoring result='fail'"
+  - "Severity: critical (>100% over), major (>50%), minor (<50%)"
+  - "Auto-create NCR if severity='critical'"
+  - "Workflow: open -> investigating -> resolved -> verified"
+  - "Link to monitoring record, WO, batch, LP"
+  - "Audit trail for all actions"
+
+summary: |
+  Auto-create deviation records on CCP monitoring failures,
+  classify severity, link to NCR if critical, track resolution workflow.

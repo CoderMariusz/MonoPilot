@@ -1,0 +1,186 @@
+# Story 04.6a - Frontend Components
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/consumption/[woId]/page.tsx"
+    route: "/production/consumption/:woId"
+    description: "Material consumption page for work order"
+    layout: "authenticated"
+
+components:
+  - name: "MaterialsTable"
+    path: "apps/frontend/components/production/consumption/MaterialsTable.tsx"
+    description: "Required materials table with progress bars"
+    props:
+      woId: "string"
+      materials: "WOMaterial[]"
+      onConsume: "(materialId: string) => void"
+    state:
+      filter: "all | partial | completed | over-consumed"
+      sort: "sequence | name | progress"
+    features:
+      - "Progress bar per material (consumed/required)"
+      - "Variance percentage display with color coding"
+      - "'Full LP Required' badge for consume_whole_lp=true"
+      - "Over-consumed warning indicator"
+      - "[+] button to open AddConsumptionModal"
+    columns:
+      - "Sequence (#)"
+      - "Component (name, SKU, type)"
+      - "Required (qty + uom)"
+      - "Consumed (qty)"
+      - "Remaining (qty)"
+      - "Progress (bar + %)"
+      - "Variance (% with color)"
+      - "Actions ([+] consume)"
+
+  - name: "ConsumptionHistoryTable"
+    path: "apps/frontend/components/production/consumption/ConsumptionHistoryTable.tsx"
+    description: "Consumption history with reversal capability"
+    props:
+      woId: "string"
+      consumptions: "Consumption[]"
+      canReverse: "boolean"
+      onReverse: "(consumptionId: string) => void"
+    features:
+      - "LP number, material, qty, timestamp, user"
+      - "Batch and expiry info"
+      - "Status badge (Active/Reversed)"
+      - "'Full LP' indicator"
+      - "[Rev] button for managers only"
+      - "Pagination"
+    columns:
+      - "LP Number"
+      - "Material"
+      - "Qty"
+      - "Consumed At"
+      - "Consumed By"
+      - "Status"
+      - "Actions ([Rev] if manager)"
+
+  - name: "AddConsumptionModal"
+    path: "apps/frontend/components/production/consumption/AddConsumptionModal.tsx"
+    description: "Two-step modal for LP selection and qty entry"
+    props:
+      woId: "string"
+      material: "WOMaterial"
+      open: "boolean"
+      onClose: "() => void"
+      onSuccess: "(consumption: Consumption) => void"
+    state:
+      step: "1 | 2"
+      selectedLP: "LP | null"
+      consumeQty: "number"
+      validationError: "string | null"
+      isSubmitting: "boolean"
+    steps:
+      step1:
+        title: "Select License Plate"
+        content:
+          - "WO context card (WO number, material, required/consumed/remaining)"
+          - "LP barcode search input with scan button"
+          - "Available LPs table (filtered by product, status=available)"
+          - "FIFO order by expiry date"
+      step2:
+        title: "Confirm Quantity"
+        content:
+          - "LP validated card (number, product, batch, expiry, location, qty)"
+          - "Qty input field with UoM"
+          - "'Use All Available' button"
+          - "Consumption summary card"
+          - "LP status after preview"
+    validation:
+      - "LP exists"
+      - "LP available"
+      - "Product match"
+      - "UoM match"
+      - "Qty <= LP.qty"
+      - "Qty > 0"
+
+  - name: "ReverseConsumptionModal"
+    path: "apps/frontend/components/production/consumption/ReverseConsumptionModal.tsx"
+    description: "Confirmation modal for reversing consumption"
+    props:
+      consumption: "Consumption"
+      open: "boolean"
+      onClose: "() => void"
+      onConfirm: "(reason: string, notes: string) => void"
+    state:
+      reason: "string"
+      notes: "string"
+      isSubmitting: "boolean"
+    content:
+      - "Consumption details (read-only)"
+      - "Warning box explaining reversal effects"
+      - "Reason dropdown (predefined options)"
+      - "Additional notes textarea"
+      - "Cancel and Confirm buttons"
+
+  - name: "LPSearchInput"
+    path: "apps/frontend/components/production/consumption/LPSearchInput.tsx"
+    description: "LP barcode search/scan input component"
+    props:
+      onSelect: "(lp: LP) => void"
+      productId: "string"
+      placeholder: "string"
+    features:
+      - "Search as you type"
+      - "Barcode scan button"
+      - "Auto-complete dropdown"
+      - "Validation on selection"
+
+  - name: "WOSummaryCard"
+    path: "apps/frontend/components/production/consumption/WOSummaryCard.tsx"
+    description: "Work order summary header card"
+    props:
+      wo: "WorkOrder"
+      materialsProgress: "{ consumed: number; total: number }"
+    content:
+      - "WO number, product name, SKU"
+      - "Batch, status, line"
+      - "Planned vs actual qty"
+      - "Materials progress (X of Y consumed)"
+      - "Overall progress bar"
+
+wireframe_refs:
+  - id: "PROD-003"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-003-material-consumption.md"
+    sections:
+      - "Success State (Desktop)"
+      - "Add Consumption Modal (Step 1)"
+      - "Add Consumption Modal (Step 2)"
+      - "Validation Error States"
+      - "Reverse Consumption Modal"
+
+states:
+  loading:
+    description: "Skeleton loaders for tables and cards"
+    components:
+      - "MaterialsTable skeleton"
+      - "ConsumptionHistoryTable skeleton"
+  empty:
+    description: "No materials or no consumption history"
+    messages:
+      no_materials: "No materials defined for this work order"
+      no_consumptions: "No consumptions recorded yet"
+  error:
+    description: "API errors and validation errors"
+    display: "Toast notification + inline error messages"
+  success:
+    description: "Successful consumption or reversal"
+    display: "Toast notification + table refresh"
+  over_consumed_warning:
+    description: "Material consumed more than required"
+    display: "Yellow warning badge + variance %"
+
+hooks:
+  - name: "useWOMaterials"
+    path: "apps/frontend/lib/hooks/use-wo-materials.ts"
+    description: "Fetch and manage WO materials state"
+
+  - name: "useConsumptionHistory"
+    path: "apps/frontend/lib/hooks/use-consumption-history.ts"
+    description: "Fetch paginated consumption history"
+
+  - name: "useConsumption"
+    path: "apps/frontend/lib/hooks/use-consumption.ts"
+    description: "Mutation hook for recording/reversing consumption"

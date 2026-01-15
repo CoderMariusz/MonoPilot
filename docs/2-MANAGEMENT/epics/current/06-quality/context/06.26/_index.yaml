@@ -1,0 +1,45 @@
+# Story 06.26 - CCP Deviation Alerts Context
+# Generated: 2025-01-15
+
+story:
+  id: "06.26"
+  name: "CCP Deviation Alerts"
+  slug: "ccp-deviation-alerts"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+
+dependencies:
+  required:
+    - story: "06.25"
+      provides: ["haccp_ccp_deviations table, deviation events"]
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "ccp_deviation_alerts table + RLS"
+  - type: "service"
+    count: 1
+    description: "ccp-alert-service.ts"
+  - type: "integration"
+    count: 3
+    description: "Twilio (SMS), SendGrid (Email), WebSocket (real-time)"
+  - type: "background_job"
+    count: 1
+    description: "Escalation job (5min timer)"
+
+technical_notes:
+  - "Alert latency target: <30s"
+  - "Multi-channel: SMS + Email + WebSocket"
+  - "Recipients by severity: Critical=QA+Prod+Dir, Major=QA+Prod, Minor=QA"
+  - "Acknowledgment tracking (who, when)"
+  - "Escalation if not acknowledged within 5min"
+  - "Escalation job runs every 1min"
+
+summary: |
+  Real-time alert notifications for CCP deviations via SMS, Email, WebSocket.
+  Escalate to Director if not acknowledged within 5min.

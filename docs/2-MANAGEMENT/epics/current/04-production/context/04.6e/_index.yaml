@@ -1,0 +1,136 @@
+# Story 04.6e - Index File (Entry Point)
+# Generated: 2025-01-14
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.6e"
+  name: "Over-Consumption Control"
+  slug: "over-consumption-control"
+  epic: "04-production"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # over_consumption_approvals table, RLS
+  - api.yaml         # Endpoints for approval workflow
+  - frontend.yaml    # Components, modals, UI patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "04.6a"
+      name: "Material Consumption Desktop"
+      provides: ["material_consumptions table", "consumption-service", "wo_materials table"]
+    - story: "04.5"
+      name: "Production Settings"
+      provides: ["allow_over_consumption setting"]
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "permission-service"]
+  soft:
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["LP quantity tracking for variance calculation"]
+  blocked_by:
+    - story: "04.6a"
+      reason: "Over-consumption detection requires consumption tracking"
+  blocks:
+    - story: "04.1"
+      name: "Production Dashboard"
+      reason: "Dashboard shows high variance alerts"
+    - story: "04.10e"
+      name: "Material Consumption Report"
+      reason: "Reports need variance data"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-010"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/production.md"
+    sections: ["Over-Consumption Control"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.0.epic-overview.md"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-003-material-consumption.md"
+    sections: ["Over-Consumption Approval Modal", "Over-Consumption Approval - Manager Approves", "Over-Consumption Approval - Manager Rejects"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for approval records"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "over_consumption_approvals table + RLS + indexes"
+  - type: "api"
+    count: 3
+    description: "POST request, POST approve, POST reject endpoints"
+  - type: "service"
+    count: 1
+    description: "over-consumption-service.ts with approval workflow"
+  - type: "validation"
+    count: 2
+    description: "overConsumptionRequestSchema, overConsumptionApprovalSchema"
+  - type: "component"
+    count: 3
+    description: "OverConsumptionModal, ApprovalControls, VarianceIndicator"
+  - type: "page"
+    count: 0
+    description: "Uses existing consumption page - modal only"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Controlled by production_settings.allow_over_consumption"
+  - "When OFF: Over-consumption requires Manager approval"
+  - "When ON: Over-consumption proceeds with variance tracking"
+  - "Variance calculated: ((consumed - required) / required) * 100"
+  - "High variance (>10%) triggers dashboard alert"
+  - "Approval can be approved or rejected with reason"
+  - "Pending approvals block the specific consumption attempt"
+  - "Operator sees 'Awaiting approval' status until decision"
+
+# MVP Scope Clarification
+mvp_scope:
+  in_scope:
+    - "Detection of over-consumption (consumed + attempting > required)"
+    - "Approval request modal for Operator"
+    - "Approval/Reject controls for Manager"
+    - "Pending approval status display"
+    - "Variance indicator on materials table"
+    - "Variance color coding (green/yellow/red)"
+    - "Dashboard high variance alert flag"
+    - "Audit trail for approvals/rejections"
+    - "Production settings integration"
+  out_of_scope:
+    - "Email/push notifications for approval requests"
+    - "Approval request expiration"
+    - "Bulk approval of multiple requests"
+    - "Variance tolerance configuration per material"
+    - "Automatic approval rules"
+
+# FR-PROD-010 Mapping
+prd_mapping:
+  fr: "FR-PROD-010"
+  title: "Over-Consumption Control"
+  ac_count: 8
+  covered:
+    - "AC #1: GIVEN allow_over_consumption = false AND required = 100 AND consumed = 100, WHEN user attempts to consume additional 10, THEN approval request modal displays"
+    - "AC #2: GIVEN allow_over_consumption = true AND required = 100 AND consumed = 100, WHEN user consumes additional 10, THEN consumption proceeds with variance = +10%"
+    - "AC #3: GIVEN material has variance > 0%, WHEN displayed in materials table, THEN variance indicator shows in red with percentage (e.g., '+10%')"
+    - "AC #4: GIVEN material has variance = 0%, WHEN displayed in materials table, THEN variance indicator shows in green with '0%'"
+    - "AC #5: GIVEN over-consumption approval requested, WHEN manager approves, THEN consumption proceeds and audit trail records approval"
+    - "AC #6: GIVEN over-consumption approval requested, WHEN manager rejects with reason, THEN consumption is blocked and rejection reason is recorded"
+    - "AC #7: GIVEN WO has any material with variance > 10%, WHEN dashboard loads, THEN WO is flagged in 'High Variance' alert section"
+    - "AC #8: GIVEN allow_over_consumption = false, WHEN approval is pending, THEN operator sees 'Awaiting manager approval' status"

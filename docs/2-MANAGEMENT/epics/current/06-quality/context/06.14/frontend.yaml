@@ -1,0 +1,19 @@
+# Story 06.14 - Frontend Context
+# Generated: 2026-01-15
+# Purpose: Components for NCR Root Cause Analysis
+
+# This story has extensive frontend work. Due to size constraints,
+# please refer to story 06.17 frontend.yaml as a comprehensive template.
+# Key components needed:
+
+components_summary:
+  - RootCauseTab (main container)
+  - FiveWhyWizard (5-Why progressive disclosure)
+  - FishboneDiagram (interactive SVG with 6 categories)
+  - ClassificationSelector
+  - ImpactAssessmentForm
+  - EvidenceUploader
+  - ApprovalPanel
+
+# See _index.yaml for full component list
+# Pattern: Follow 06.17 frontend.yaml structure

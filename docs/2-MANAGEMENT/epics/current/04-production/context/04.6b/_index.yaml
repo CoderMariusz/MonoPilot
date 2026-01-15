@@ -1,0 +1,121 @@
+# Story 04.6b - Material Consumption Scanner (Mobile)
+# Generated: 2026-01-14
+# Format: Multi-file context (5 files)
+
+story:
+  id: "04.6b"
+  name: "Material Consumption Scanner"
+  slug: "material-consumption-scanner"
+  epic: "04-production"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+dependencies:
+  required:
+    - story: "04.6a"
+      name: "Material Consumption Desktop"
+      provides:
+        - "wo_material_consumptions table"
+        - "consumption-service"
+        - "consume API endpoint"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "org_id context"
+        - "RLS patterns"
+    - story: "04.5"
+      name: "Production Settings"
+      provides:
+        - "production_settings"
+    - story: "05.1"
+      name: "License Plates Table"
+      provides:
+        - "license_plates table"
+        - "LP status management"
+  soft:
+    - story: "05.6"
+      name: "LP Transactions"
+      provides:
+        - "lp_transactions table"
+  blocked_by:
+    - story: "04.6a"
+      reason: "Reuses service layer and database schema"
+  blocks:
+    - story: "04.6c"
+      reason: "Scanner uses 1:1 mode with Full Consumption button"
+
+references:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections:
+      - "FR-PROD-007"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-005-scanner-consume-material.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+
+functional_requirements:
+  - id: "FR-04.6b-001"
+    name: "WO Barcode Scan"
+    description: "Scan WO barcode and display WO info with materials list within 500ms"
+
+  - id: "FR-04.6b-002"
+    name: "LP Barcode Scan with Validation"
+    description: "Scan LP barcode, validate product/UoM match, show green check or error"
+
+  - id: "FR-04.6b-003"
+    name: "Number Pad Qty Entry"
+    description: "Enter quantity using large touch target number pad with decimal support"
+
+  - id: "FR-04.6b-004"
+    name: "Full Consumption Quick Action"
+    description: "Full Consumption button auto-fills LP.qty and skips to Review step"
+
+  - id: "FR-04.6b-005"
+    name: "Consumption Confirmation with Feedback"
+    description: "Review and confirm consumption with visual/audio/vibration feedback"
+
+acceptance_criteria:
+  - id: "AC-04.6b-001"
+    given: "valid WO barcode scanned"
+    when: "processed"
+    then: "WO info displays within 500ms with materials list and progress"
+
+  - id: "AC-04.6b-002"
+    given: "invalid WO barcode scanned"
+    when: "processed"
+    then: "red X displays with 2 short error beeps, message 'Invalid WO barcode'"
+
+  - id: "AC-04.6b-003"
+    given: "valid LP barcode scanned"
+    when: "processed"
+    then: "green check displays with 1 long success beep (500ms), 200ms vibration"
+
+  - id: "AC-04.6b-004"
+    given: "LP scanned with wrong product"
+    when: "validated"
+    then: "error 'Product mismatch: LP contains X, material requires Y' displays"
+
+  - id: "AC-04.6b-005"
+    given: "number pad displayed"
+    when: "user enters '50.5'"
+    then: "decimal input accepted, qty shows 50.5"
+
+  - id: "AC-04.6b-006"
+    given: "Full Consumption button tapped"
+    when: "processed"
+    then: "qty auto-fills with LP.qty, flow skips to Step 4 Review"
+
+  - id: "AC-04.6b-007"
+    given: "consumption confirmed and successful"
+    when: "complete"
+    then: "green check animation displays for 1-2 seconds, success beep plays"
+
+  - id: "AC-04.6b-008"
+    given: "consumption complete"
+    when: "Step 6 displayed"
+    then: "'Next Material' and 'Done' buttons display, materials progress updated"

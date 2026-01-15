@@ -1,0 +1,383 @@
+# Story 06.25 - CCP Deviation Handling - Frontend Context
+# Generated: 2025-01-15
+
+pages:
+  - path: "app/(authenticated)/quality/haccp/ccp-deviations/page.tsx"
+    name: "CCP Deviations List Page"
+    components: ["DeviationDataTable", "DeviationFilters", "DeviationSummaryCards"]
+    layout: "Authenticated Layout"
+    features:
+      - "DataTable with pagination"
+      - "Filter by severity, status, CCP, date range"
+      - "Search by batch number"
+      - "Summary cards (critical/major/minor counts)"
+      - "Severity badges (color-coded)"
+      - "Resolution time indicators"
+
+  - path: "app/(authenticated)/quality/haccp/ccp-deviations/[id]/page.tsx"
+    name: "CCP Deviation Detail Page"
+    components: ["DeviationDetail", "DeviationHeader", "DeviationTimeline", "LinkedRecords"]
+    features:
+      - "Deviation information display"
+      - "Severity badge (large)"
+      - "Deviation details (value, limits, % over)"
+      - "Corrective action display"
+      - "Resolution workflow buttons (Investigate/Resolve/Verify)"
+      - "Timeline of status changes"
+      - "Linked monitoring record"
+      - "Linked NCR (if critical)"
+      - "Audit trail"
+
+components:
+  # Data Display
+  - name: "DeviationDataTable.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "DataTable"
+    pattern: "ShadCN DataTable"
+    props:
+      - name: "data"
+        type: "CCPDeviation[]"
+      - name: "onRowClick"
+        type: "(id: string) => void"
+    features:
+      - "Columns: CCP #, Severity, Value, Limits, Deviation, Status, WO/Batch, Created, Actions"
+      - "Row click navigates to detail"
+      - "Inline actions: View, Investigate, Resolve, Verify (based on status and permissions)"
+      - "Sortable columns"
+      - "Pagination"
+      - "Color-coded severity rows (red bg for critical, orange for major, yellow for minor)"
+
+  - name: "DeviationFilters.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Filter Panel"
+    props:
+      - name: "filters"
+        type: "DeviationFilterState"
+      - name: "onChange"
+        type: "(filters: DeviationFilterState) => void"
+    features:
+      - "Severity filter (multi-select: critical/major/minor)"
+      - "Status filter (multi-select: open/investigating/resolved/verified)"
+      - "CCP filter (dropdown)"
+      - "Date range picker (from/to)"
+      - "Batch number search"
+      - "Clear filters button"
+
+  - name: "DeviationSummaryCards.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Metrics Cards"
+    props:
+      - name: "summary"
+        type: "DeviationSummary"
+    features:
+      - "Total deviations count"
+      - "Critical count (red card)"
+      - "Major count (orange card)"
+      - "Minor count (yellow card)"
+      - "Open deviations count (urgent)"
+      - "Avg resolution time (hours)"
+      - "Click to filter by severity/status"
+
+  - name: "DeviationDetail.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Detail Container"
+    props:
+      - name: "deviation"
+        type: "CCPDeviation"
+      - name: "monitoring"
+        type: "CCPMonitoring"
+      - name: "ncr"
+        type: "NCRReport | null"
+    features:
+      - "Two-column layout (desktop)"
+      - "Header with severity badge and status"
+      - "Deviation details panel"
+      - "Corrective action panel"
+      - "Resolution workflow panel"
+      - "Linked records panel (monitoring, NCR)"
+      - "Timeline panel"
+      - "Audit trail panel"
+
+  - name: "DeviationHeader.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Header"
+    props:
+      - name: "deviation"
+        type: "CCPDeviation"
+      - name: "onInvestigate"
+        type: "() => void"
+      - name: "onResolve"
+        type: "() => void"
+      - name: "onVerify"
+        type: "() => void"
+    features:
+      - "CCP number and name"
+      - "Severity badge (large, color-coded)"
+      - "Status badge"
+      - "Action buttons (based on status and permissions)"
+      - "Timestamp (created at)"
+
+  # Badges
+  - name: "DeviationSeverityBadge.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Badge"
+    props:
+      - name: "severity"
+        type: "'critical' | 'major' | 'minor'"
+    colors:
+      critical: "red (#EF4444)"
+      major: "orange (#F97316)"
+      minor: "yellow (#F59E0B)"
+    features:
+      - "Large text (18px)"
+      - "Icon: AlertTriangle"
+      - "Uppercase text"
+
+  - name: "DeviationStatusBadge.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Badge"
+    props:
+      - name: "status"
+        type: "'open' | 'investigating' | 'resolved' | 'verified' | 'closed'"
+    colors:
+      open: "red"
+      investigating: "yellow"
+      resolved: "blue"
+      verified: "green"
+      closed: "gray"
+
+  # Deviation Details Display
+  - name: "DeviationDetailsPanel.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Display Panel"
+    props:
+      - name: "deviation"
+        type: "CCPDeviation"
+    features:
+      - "Monitored value (large, bold)"
+      - "Critical limits (min/max)"
+      - "Deviation amount (+X over limit)"
+      - "Deviation percentage (X% over)"
+      - "Visual gauge (value vs limits)"
+      - "Unit of measure"
+      - "WO number (link)"
+      - "Batch number (link)"
+      - "LP ID (link, if available)"
+
+  - name: "CorrectiveActionPanel.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Display Panel"
+    props:
+      - name: "correctiveAction"
+        type: "string"
+      - name: "correctiveActionBy"
+        type: "User"
+      - name: "correctiveActionAt"
+        type: "string (ISO 8601)"
+    features:
+      - "Corrective action text (formatted)"
+      - "Taken by (user name)"
+      - "Taken at (timestamp)"
+      - "Expandable if long"
+
+  # Resolution Workflow
+  - name: "InvestigateDeviationDialog.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Dialog"
+    pattern: "ShadCN Dialog"
+    props:
+      - name: "deviation"
+        type: "CCPDeviation"
+      - name: "open"
+        type: "boolean"
+      - name: "onClose"
+        type: "() => void"
+      - name: "onConfirm"
+        type: "(notes: string) => void"
+    features:
+      - "Notes textarea (optional)"
+      - "Status will change to 'investigating'"
+      - "Assign to user (optional)"
+      - "Confirm button"
+
+  - name: "ResolveDeviationDialog.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Dialog"
+    pattern: "ShadCN Dialog"
+    props:
+      - name: "deviation"
+        type: "CCPDeviation"
+      - name: "open"
+        type: "boolean"
+      - name: "onClose"
+        type: "() => void"
+      - name: "onConfirm"
+        type: "(resolutionNotes: string) => void"
+    features:
+      - "Resolution notes textarea (required, min 10 chars)"
+      - "Root cause field (optional)"
+      - "Resolved date picker (default: today)"
+      - "Status will change to 'resolved'"
+      - "Confirm button (QA Manager only)"
+
+  - name: "VerifyDeviationDialog.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Dialog"
+    pattern: "ShadCN AlertDialog"
+    props:
+      - name: "deviation"
+        type: "CCPDeviation"
+      - name: "open"
+        type: "boolean"
+      - name: "onClose"
+        type: "() => void"
+      - name: "onConfirm"
+        type: "() => void"
+    features:
+      - "Verification confirmation"
+      - "Review resolution notes"
+      - "Verified date picker (default: today)"
+      - "Status will change to 'verified'"
+      - "Confirm button (QA Manager/Director only)"
+
+  # Timeline
+  - name: "DeviationTimeline.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Timeline"
+    props:
+      - name: "deviation"
+        type: "CCPDeviation"
+    features:
+      - "Timeline of status changes"
+      - "Icons for each status"
+      - "Timestamps"
+      - "User who performed action"
+      - "Notes (if any)"
+    events:
+      - event: "Created (open)"
+        icon: "AlertCircle"
+        color: "red"
+      - event: "Investigating"
+        icon: "Search"
+        color: "yellow"
+      - event: "Resolved"
+        icon: "CheckCircle"
+        color: "blue"
+      - event: "Verified"
+        icon: "Shield"
+        color: "green"
+
+  # Linked Records
+  - name: "LinkedRecordsPanel.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Display Panel"
+    props:
+      - name: "monitoring"
+        type: "CCPMonitoring"
+      - name: "ncr"
+        type: "NCRReport | null"
+    features:
+      - "Monitoring record link (CCP Monitoring)"
+      - "NCR link (if critical)"
+      - "WO link"
+      - "Batch link"
+      - "LP link"
+      - "Click to navigate to linked record"
+
+  # Deviation Gauge
+  - name: "DeviationGauge.tsx"
+    path: "components/quality/haccp/deviations/"
+    type: "Visual Gauge"
+    props:
+      - name: "value"
+        type: "number"
+      - name: "min"
+        type: "number | null"
+      - name: "max"
+        type: "number | null"
+      - name: "unit"
+        type: "string"
+    features:
+      - "Visual range indicator (min-max bar)"
+      - "Value marker (red if outside limits)"
+      - "Color zones: green (pass), yellow (marginal), red (fail)"
+      - "Annotations for limits"
+
+# Hooks
+hooks:
+  - name: "useDeviationList"
+    file: "lib/hooks/use-deviation-list.ts"
+    params: ["filters: DeviationFilterState"]
+    returns: "{ deviations: CCPDeviation[]; loading: boolean; error: Error | null }"
+
+  - name: "useDeviationDetail"
+    file: "lib/hooks/use-deviation-detail.ts"
+    params: ["id: string"]
+    returns: "{ deviation: CCPDeviation | null; monitoring: CCPMonitoring | null; ncr: NCRReport | null; loading: boolean }"
+
+  - name: "useInvestigateDeviation"
+    file: "lib/hooks/use-investigate-deviation.ts"
+    returns: "{ investigate: (id: string, notes: string) => Promise<void>; loading: boolean }"
+
+  - name: "useResolveDeviation"
+    file: "lib/hooks/use-resolve-deviation.ts"
+    returns: "{ resolve: (id: string, resolutionNotes: string) => Promise<void>; loading: boolean }"
+
+  - name: "useVerifyDeviation"
+    file: "lib/hooks/use-verify-deviation.ts"
+    returns: "{ verify: (id: string) => Promise<void>; loading: boolean }"
+
+  - name: "useDeviationSummary"
+    file: "lib/hooks/use-deviation-summary.ts"
+    params: ["dateFrom: string", "dateTo: string"]
+    returns: "{ summary: DeviationSummary | null; loading: boolean }"
+
+# Types
+types:
+  file: "lib/types/ccp-deviation.ts"
+  interfaces:
+    - name: "CCPDeviation"
+      extends: "Database['public']['Tables']['haccp_ccp_deviations']['Row']"
+    - name: "CreateDeviationInput"
+      fields: ["All createDeviationSchema fields"]
+    - name: "DeviationFilterState"
+      fields: ["severity?", "status?", "ccp_id?", "wo_id?", "batch_number?", "date_from?", "date_to?"]
+    - name: "DeviationSummary"
+      fields:
+        - total_deviations: "number"
+        - by_severity: "{ critical: number; major: number; minor: number }"
+        - by_status: "{ open: number; investigating: number; resolved: number; verified: number }"
+        - by_ccp: "{ ccp_number: string; count: number }[]"
+        - avg_resolution_time_hours: "number"
+
+# UX Patterns
+ux_patterns:
+  - pattern: "DataTable"
+    library: "ShadCN"
+    customization: "Color-coded severity rows"
+  - pattern: "Dialog/Modal"
+    library: "ShadCN"
+    customization: "Workflow confirmation dialogs"
+  - pattern: "Timeline"
+    library: "Custom"
+    customization: "Status change timeline"
+  - pattern: "Badge"
+    library: "ShadCN"
+    customization: "Severity and status badges"
+
+# Responsive Design
+responsive:
+  - breakpoint: "mobile"
+    layout: "Stacked columns, simplified table (cards instead of table)"
+  - breakpoint: "tablet"
+    layout: "Two-column detail view"
+  - breakpoint: "desktop"
+    layout: "Two-column detail view, full table"
+
+# Accessibility
+accessibility:
+  - "Color-coded severity with text labels (not just color)"
+  - "Keyboard navigation (table, dialogs)"
+  - "Screen reader labels (badges, status)"
+  - "Focus indicators"
+  - "High contrast mode support"

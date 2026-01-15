@@ -75,7 +75,7 @@ export async function GET(
         relation_type,
         allergen:allergens!allergen_id (
           id,
-          name,
+          name_en,
           code
         )
       `)
@@ -96,7 +96,7 @@ export async function GET(
 
       const allergenData = {
         id: allergen.id,
-        name: allergen.name,
+        name: allergen.name_en,
         code: allergen.code,
       };
 

@@ -1,0 +1,148 @@
+# Story 11.4 - Database Context
+# Tables for Webhook Configuration & Events
+
+tables:
+  integration_webhooks:
+    purpose: "Store webhook endpoint configurations"
+    columns:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+      - name: "org_id"
+        type: "UUID NOT NULL REFERENCES organizations(id)"
+      - name: "name"
+        type: "VARCHAR(255) NOT NULL"
+      - name: "url"
+        type: "VARCHAR(500) NOT NULL"
+        constraint: "CHECK (url ~* '^https://.*')"
+        description: "HTTPS only"
+      - name: "events"
+        type: "JSONB NOT NULL DEFAULT '[]'"
+        description: "Subscribed events ['order.created', 'shipment.dispatched']"
+      - name: "status"
+        type: "VARCHAR(20) NOT NULL DEFAULT 'active'"
+        constraint: "CHECK (status IN ('active', 'paused'))"
+      - name: "secret"
+        type: "VARCHAR(255) NOT NULL"
+        description: "HMAC signature secret (generated)"
+      - name: "retry_policy"
+        type: "VARCHAR(20) NOT NULL DEFAULT 'exponential'"
+        constraint: "CHECK (retry_policy IN ('immediate', 'exponential', 'manual'))"
+      - name: "max_retries"
+        type: "INTEGER NOT NULL DEFAULT 3"
+        constraint: "CHECK (max_retries >= 0 AND max_retries <= 10)"
+      - name: "custom_headers"
+        type: "JSONB DEFAULT '{}'"
+      - name: "last_triggered_at"
+        type: "TIMESTAMPTZ"
+      - name: "total_deliveries"
+        type: "INTEGER DEFAULT 0"
+      - name: "failed_deliveries"
+        type: "INTEGER DEFAULT 0"
+      - name: "created_by"
+        type: "UUID REFERENCES users(id)"
+      - name: "created_at"
+        type: "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ NOT NULL DEFAULT now()"
+
+    indexes:
+      - name: "idx_webhooks_org"
+        columns: ["org_id"]
+      - name: "idx_webhooks_active"
+        columns: ["org_id", "status"]
+        where: "status = 'active'"
+      - name: "idx_webhooks_events"
+        type: "GIN"
+        columns: ["events"]
+
+    constraints:
+      - type: "UNIQUE"
+        columns: ["org_id", "name"]
+
+    rls_policies:
+      - name: "webhooks_select"
+        operation: "SELECT"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN', 'IT_MANAGER')"
+      - name: "webhooks_insert"
+        operation: "INSERT"
+        check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')"
+      - name: "webhooks_update"
+        operation: "UPDATE"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')"
+      - name: "webhooks_delete"
+        operation: "DELETE"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')"
+
+  webhook_deliveries:
+    purpose: "Track webhook delivery attempts"
+    columns:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+      - name: "webhook_id"
+        type: "UUID NOT NULL REFERENCES integration_webhooks(id) ON DELETE CASCADE"
+      - name: "org_id"
+        type: "UUID NOT NULL REFERENCES organizations(id)"
+      - name: "event_type"
+        type: "VARCHAR(100) NOT NULL"
+      - name: "payload"
+        type: "JSONB NOT NULL"
+      - name: "status"
+        type: "VARCHAR(20) NOT NULL DEFAULT 'pending'"
+        constraint: "CHECK (status IN ('pending', 'delivered', 'failed'))"
+      - name: "http_status"
+        type: "INTEGER"
+      - name: "response_body"
+        type: "TEXT"
+      - name: "error_message"
+        type: "TEXT"
+      - name: "attempt_count"
+        type: "INTEGER DEFAULT 0"
+      - name: "next_retry_at"
+        type: "TIMESTAMPTZ"
+      - name: "last_attempt_at"
+        type: "TIMESTAMPTZ"
+      - name: "duration_ms"
+        type: "INTEGER"
+      - name: "created_at"
+        type: "TIMESTAMPTZ NOT NULL DEFAULT now()"
+      - name: "delivered_at"
+        type: "TIMESTAMPTZ"
+
+    indexes:
+      - name: "idx_webhook_deliveries_webhook"
+        columns: ["webhook_id", "created_at DESC"]
+      - name: "idx_webhook_deliveries_org"
+        columns: ["org_id", "created_at DESC"]
+      - name: "idx_webhook_deliveries_status"
+        columns: ["status", "next_retry_at"]
+        where: "status = 'pending'"
+
+    rls_policies:
+      - name: "webhook_deliveries_select"
+        operation: "SELECT"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      - name: "webhook_deliveries_insert"
+        operation: "INSERT"
+        check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+functions:
+  trigger_webhook_event:
+    purpose: "Create webhook delivery entries for subscribed webhooks"
+    parameters:
+      - name: "p_org_id"
+        type: "UUID"
+      - name: "p_event_type"
+        type: "VARCHAR"
+      - name: "p_payload"
+        type: "JSONB"
+    returns: "INTEGER (count of webhooks triggered)"
+    logic: |
+      Find active webhooks subscribed to event
+      Create delivery entry for each
+      Return count
+    security: "SECURITY DEFINER"
+
+migration_file:
+  name: "YYYYMMDDHHMMSS_create_integration_webhooks.sql"
+  order: 4
+  dependencies: ["integration_health"]

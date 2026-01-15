@@ -1,0 +1,85 @@
+# Story 10.2 - API Specification
+# Downtime Reason Codes & Categories
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/downtime/reasons"
+    description: "List downtime reason codes with filtering by category/planned status"
+    auth: "required"
+    roles: ["*"]
+    query_params:
+      category: "string (optional) - mechanical|electrical|material|changeover|break|quality|operator|utility|other"
+      is_planned: "boolean (optional)"
+      is_active: "boolean (optional)"
+      sort_by: "string (optional) - sort_order|code|category"
+    response:
+      status: 200
+      schema:
+        reasons:
+          - id: "UUID"
+            code: "string"
+            description: "string"
+            category: "string"
+            is_planned: "boolean"
+            color_code: "string"
+            icon_name: "string | null"
+            sort_order: "number"
+            is_active: "boolean"
+
+  - method: "POST"
+    path: "/api/oee/downtime/reasons"
+    description: "Create new downtime reason code"
+    auth: "required"
+    roles: ["admin", "production_manager"]
+    request:
+      body:
+        code: "string (required) - unique within org"
+        description: "string (required)"
+        category: "string (required)"
+        is_planned: "boolean (required)"
+        color_code: "string (optional) - hex color"
+        icon_name: "string (optional)"
+        sort_order: "number (optional)"
+    response:
+      status: 201
+
+  - method: "PATCH"
+    path: "/api/oee/downtime/reasons/:id"
+    description: "Update reason code"
+    auth: "required"
+    roles: ["admin", "production_manager"]
+    response:
+      status: 200
+
+  - method: "DELETE"
+    path: "/api/oee/downtime/reasons/:id"
+    description: "Delete/deactivate reason code"
+    auth: "required"
+    roles: ["admin", "production_manager"]
+    response:
+      status: 204
+
+services:
+  - path: "apps/frontend/lib/services/downtime-reason-service.ts"
+    description: "Downtime reason code management"
+    methods:
+      - { name: "list", returns: "Promise<DowntimeReason[]>" }
+      - { name: "create", params: ["input: CreateReasonInput"], returns: "Promise<DowntimeReason>" }
+      - { name: "update", params: ["id: string", "input: UpdateReasonInput"], returns: "Promise<DowntimeReason>" }
+      - { name: "delete", params: ["id: string"], returns: "Promise<void>" }
+      - { name: "seedDefaults", params: ["orgId: string"], returns: "Promise<void>", description: "Call seed_default_downtime_reasons function" }
+
+validation:
+  - name: "createReasonSchema"
+    rules:
+      - "code: string().min(2).max(50).regex(/^[A-Z0-9-]+$/)"
+      - "description: string().min(3).max(200)"
+      - "category: enum(['mechanical', ...])"
+      - "is_planned: boolean()"
+      - "color_code: string().regex(/^#[0-9A-F]{6}$/i).optional()"
+
+types:
+  - "DowntimeReason"
+  - "DowntimeCategory"
+  - "CreateReasonInput"
+  - "UpdateReasonInput"

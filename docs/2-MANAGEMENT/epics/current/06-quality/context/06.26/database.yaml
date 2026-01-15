@@ -1,0 +1,316 @@
+# Story 06.26 - CCP Deviation Alerts - Database Context
+# Generated: 2025-01-15
+
+tables:
+  ccp_deviation_alerts:
+    description: "Alert notifications for CCP deviations (SMS, Email, WebSocket)"
+    columns:
+      # Identity
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+      - name: "org_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES organizations(id)"
+
+      # Deviation Reference
+      - name: "deviation_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES haccp_ccp_deviations(id)"
+      - name: "ccp_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES haccp_ccp(id)"
+      - name: "ccp_number"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Denormalized for performance"
+
+      # Alert Details
+      - name: "severity"
+        type: "TEXT"
+        constraints: "NOT NULL CHECK (severity IN ('critical', 'major', 'minor'))"
+        description: "From deviation record"
+      - name: "alert_message"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Alert text content for SMS/Email/WebSocket"
+
+      # Recipients (JSONB for flexibility)
+      - name: "recipients"
+        type: "JSONB"
+        constraints: "NOT NULL"
+        description: "Array of recipient objects: [{user_id, name, role, channels: [sms, email, websocket]}]"
+        example: |
+          [
+            {
+              "user_id": "uuid",
+              "name": "John Doe",
+              "role": "QA_MANAGER",
+              "channels": ["sms", "email", "websocket"],
+              "phone": "+1234567890",
+              "email": "john@example.com"
+            }
+          ]
+
+      # SMS Delivery
+      - name: "sms_sent"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+      - name: "sms_sent_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+      - name: "sms_error"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "Twilio error message if send failed"
+
+      # Email Delivery
+      - name: "email_sent"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+      - name: "email_sent_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+      - name: "email_error"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "SendGrid error message if send failed"
+
+      # WebSocket Delivery
+      - name: "websocket_sent"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+      - name: "websocket_sent_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+      - name: "websocket_error"
+        type: "TEXT"
+        constraints: "NULL"
+
+      # Acknowledgment
+      - name: "acknowledged"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+      - name: "acknowledged_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+      - name: "acknowledged_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+
+      # Escalation
+      - name: "escalated"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+      - name: "escalated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+      - name: "escalation_recipients"
+        type: "JSONB"
+        constraints: "NULL"
+        description: "Additional recipients on escalation (e.g., Director)"
+
+      # Audit
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+
+    indexes:
+      - name: "idx_ccp_alerts_org"
+        columns: ["org_id"]
+        type: "BTREE"
+      - name: "idx_ccp_alerts_deviation"
+        columns: ["deviation_id"]
+        type: "BTREE"
+      - name: "idx_ccp_alerts_unack"
+        columns: ["org_id", "acknowledged"]
+        type: "BTREE"
+        where: "acknowledged = false"
+        description: "Fast query for unacknowledged alerts"
+      - name: "idx_ccp_alerts_severity"
+        columns: ["org_id", "severity"]
+        type: "BTREE"
+      - name: "idx_ccp_alerts_escalation"
+        columns: ["created_at"]
+        type: "BTREE"
+        where: "acknowledged = false AND escalated = false"
+        description: "Escalation job queries alerts >5min old and not acknowledged"
+
+    rls:
+      enabled: true
+      policies:
+        - name: "ccp_alerts_select"
+          command: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_alerts_insert"
+          command: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_alerts_update"
+          command: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_alerts_delete"
+          command: "DELETE"
+          using: "false"
+          description: "No deletes allowed (audit trail)"
+
+triggers:
+  - name: "trigger_alert_on_deviation_creation"
+    table: "haccp_ccp_deviations"
+    timing: "AFTER INSERT"
+    for_each: "ROW"
+    function: "create_ccp_deviation_alert()"
+    description: "Auto-create alert when deviation is created"
+
+functions:
+  - name: "create_ccp_deviation_alert"
+    returns: "TRIGGER"
+    language: "plpgsql"
+    description: "Auto-create alert on deviation creation (trigger function)"
+    logic: |
+      DECLARE
+        v_recipients JSONB;
+      BEGIN
+        -- Determine recipients based on severity
+        v_recipients := get_alert_recipients_by_severity(NEW.org_id, NEW.severity);
+
+        -- Insert alert record
+        INSERT INTO ccp_deviation_alerts (
+          org_id,
+          deviation_id,
+          ccp_id,
+          ccp_number,
+          severity,
+          alert_message,
+          recipients
+        ) VALUES (
+          NEW.org_id,
+          NEW.id,
+          NEW.ccp_id,
+          NEW.ccp_number,
+          NEW.severity,
+          format_alert_message(NEW),
+          v_recipients
+        );
+
+        -- Trigger async alert delivery (via pg_notify or job queue)
+        PERFORM pg_notify('ccp_deviation_alert', NEW.id::text);
+
+        RETURN NEW;
+      END;
+
+  - name: "get_alert_recipients_by_severity"
+    returns: "JSONB"
+    language: "plpgsql"
+    description: "Get recipients based on deviation severity"
+    params:
+      - name: "p_org_id"
+        type: "UUID"
+      - name: "p_severity"
+        type: "TEXT"
+    logic: |
+      DECLARE
+        v_recipients JSONB := '[]'::JSONB;
+      BEGIN
+        -- Critical: QA Manager + Production Lead + Director
+        IF p_severity = 'critical' THEN
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'user_id', u.id,
+              'name', u.full_name,
+              'role', u.role,
+              'channels', ARRAY['sms', 'email', 'websocket'],
+              'phone', u.phone,
+              'email', u.email
+            )
+          ) INTO v_recipients
+          FROM users u
+          WHERE u.org_id = p_org_id
+          AND u.role IN ('QA_MANAGER', 'PRODUCTION_LEAD', 'DIRECTOR')
+          AND u.active = true;
+
+        -- Major: QA Manager + Production Lead
+        ELSIF p_severity = 'major' THEN
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'user_id', u.id,
+              'name', u.full_name,
+              'role', u.role,
+              'channels', ARRAY['sms', 'email', 'websocket'],
+              'phone', u.phone,
+              'email', u.email
+            )
+          ) INTO v_recipients
+          FROM users u
+          WHERE u.org_id = p_org_id
+          AND u.role IN ('QA_MANAGER', 'PRODUCTION_LEAD')
+          AND u.active = true;
+
+        -- Minor: QA Manager only
+        ELSE
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'user_id', u.id,
+              'name', u.full_name,
+              'role', u.role,
+              'channels', ARRAY['email', 'websocket'],
+              'phone', u.phone,
+              'email', u.email
+            )
+          ) INTO v_recipients
+          FROM users u
+          WHERE u.org_id = p_org_id
+          AND u.role = 'QA_MANAGER'
+          AND u.active = true;
+        END IF;
+
+        RETURN v_recipients;
+      END;
+
+  - name: "format_alert_message"
+    returns: "TEXT"
+    language: "plpgsql"
+    description: "Format alert message for SMS/Email/WebSocket"
+    params:
+      - name: "p_deviation"
+        type: "haccp_ccp_deviations"
+    logic: |
+      BEGIN
+        RETURN format(
+          '[%s] CCP DEVIATION: %s - Value: %s (Limit: %s-%s). Immediate action required. ACK: /quality/haccp/ccp-deviations/%s',
+          upper(p_deviation.severity),
+          p_deviation.ccp_number,
+          p_deviation.monitored_value,
+          coalesce(p_deviation.critical_limit_min::text, 'N/A'),
+          coalesce(p_deviation.critical_limit_max::text, 'N/A'),
+          p_deviation.id
+        );
+      END;
+
+migration_file: "YYYYMMDDHHMMSS_create_ccp_deviation_alerts.sql"
+migration_order: "After haccp_ccp_deviations table (story 06.25)"
+
+# Sample Data
+sample_data:
+  - severity: "critical"
+    ccp_number: "CCP-1"
+    alert_message: "[CRITICAL] CCP DEVIATION: CCP-1 - Value: 10°C (Limit: 0-4°C). Immediate action required. ACK: /quality/haccp/ccp-deviations/uuid"
+    recipients: |
+      [
+        {"user_id": "qa-mgr-uuid", "name": "Jane Smith", "role": "QA_MANAGER", "channels": ["sms", "email", "websocket"]},
+        {"user_id": "prod-lead-uuid", "name": "Bob Johnson", "role": "PRODUCTION_LEAD", "channels": ["sms", "email", "websocket"]},
+        {"user_id": "director-uuid", "name": "Alice Chen", "role": "DIRECTOR", "channels": ["sms", "email", "websocket"]}
+      ]
+    sms_sent: true
+    email_sent: true
+    websocket_sent: true
+    acknowledged: false
+
+# Performance Notes
+performance:
+  - "Index on (org_id, acknowledged) for fast unacknowledged alert queries"
+  - "Partial index on unacknowledged alerts for dashboard"
+  - "Index on created_at for escalation job (queries alerts >5min old)"
+  - "JSONB indexes on recipients if frequent filtering needed"
+  - "Alert delivery async (pg_notify + background job)"
+  - "Expected query patterns: list unacknowledged, list by severity, escalation check"
+  - "Typical org has 5-20 alerts per week"

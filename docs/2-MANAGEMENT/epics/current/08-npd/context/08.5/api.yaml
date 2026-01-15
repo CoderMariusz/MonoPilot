@@ -1,0 +1,264 @@
+api:
+  endpoints:
+    - method: "GET"
+      path: "/api/npd/formulations/:id/allergens"
+      file: "apps/frontend/app/api/npd/formulations/[id]/allergens/route.ts"
+
+      description: "Get aggregated allergens for a formulation"
+
+      authentication:
+        required: true
+        mechanism: "Supabase Auth (cookie-based)"
+
+      authorization:
+        rls: true
+        enforcement: "Formulation org_id must match user org_id"
+
+      parameters:
+        path:
+          - name: "id"
+            type: "UUID"
+            description: "Formulation ID"
+            required: true
+
+        query:
+          - name: "lang"
+            type: "enum"
+            values: ["en", "pl", "de", "fr"]
+            required: false
+            default: "en"
+            description: "Language preference for primary allergen name sorting"
+
+      request:
+        headers:
+          - "Cookie: supabase-auth-token"
+
+        example: "GET /api/npd/formulations/550e8400-e29b-41d4-a716-446655440000/allergens?lang=pl"
+
+      response:
+        success:
+          status: 200
+          content_type: "application/json"
+
+          schema: |
+            {
+              "allergens": Allergen[],
+              "total": number
+            }
+
+            interface Allergen {
+              id: string;
+              code: string;
+              name_en: string;
+              name_pl: string;
+              name_de: string | null;
+              name_fr: string | null;
+              icon_url: string | null;
+            }
+
+          example: |
+            {
+              "allergens": [
+                {
+                  "id": "a1111111-1111-1111-1111-111111111111",
+                  "code": "A01",
+                  "name_en": "Gluten",
+                  "name_pl": "Gluten",
+                  "name_de": "Gluten",
+                  "name_fr": "Gluten",
+                  "icon_url": "/icons/allergens/gluten.svg"
+                },
+                {
+                  "id": "a3333333-3333-3333-3333-333333333333",
+                  "code": "A03",
+                  "name_en": "Eggs",
+                  "name_pl": "Jaja",
+                  "name_de": "Eier",
+                  "name_fr": "Oeufs",
+                  "icon_url": "/icons/allergens/eggs.svg"
+                }
+              ],
+              "total": 2
+            }
+
+        errors:
+          - status: 401
+            description: "Unauthorized - missing or invalid auth token"
+            example: |
+              {
+                "error": "Unauthorized",
+                "message": "Authentication required"
+              }
+
+          - status: 403
+            description: "Forbidden - formulation belongs to different org"
+            example: |
+              {
+                "error": "Forbidden",
+                "message": "You do not have access to this formulation"
+              }
+
+          - status: 404
+            description: "Not Found - formulation ID does not exist"
+            example: |
+              {
+                "error": "Not Found",
+                "message": "Formulation not found"
+              }
+
+          - status: 500
+            description: "Internal Server Error - database error"
+            example: |
+              {
+                "error": "Internal Server Error",
+                "message": "Failed to fetch allergens"
+              }
+
+      implementation:
+        service_call: "NPDFormulationService.getFormulationAllergens(formulationId, orgId)"
+
+        flow: |
+          1. Extract formulation ID from params
+          2. Get authenticated user (Supabase Auth)
+          3. Get user's org_id
+          4. Validate formulation ID format (UUID)
+          5. Call database function via Supabase client
+          6. RLS automatically enforces org_id match on formulation lookup
+          7. If formulation not found or different org → 403/404
+          8. Return allergens array with total count
+
+        error_handling:
+          - "Invalid UUID → 400 Bad Request"
+          - "Auth missing → 401 Unauthorized"
+          - "Different org → 403 Forbidden"
+          - "Formulation not found → 404 Not Found"
+          - "Database error → 500 Internal Server Error"
+
+      validation:
+        zod_schema: "formulationAllergensResponseSchema"
+
+        rules:
+          - "allergens: array of Allergen objects"
+          - "total: integer >= 0, <= 14 (max EU allergens)"
+          - "Each allergen.code: matches regex ^A[0-9]{2}$"
+
+      performance:
+        target: "200ms p95"
+        optimization_notes:
+          - "Database function uses indexed JOINs"
+          - "DISTINCT on allergen_id deduplicates efficiently"
+          - "Max 14 allergens returned (EU standard)"
+
+      caching:
+        strategy: "None (Phase 1)"
+        future: "Redis cache keyed by formulation_id (Phase 2)"
+
+      testing:
+        unit_tests:
+          - "Valid formulation ID returns allergens"
+          - "Invalid UUID returns 400"
+          - "Unauthenticated returns 401"
+          - "Different org returns 403"
+          - "Non-existent formulation returns 404"
+
+        integration_tests:
+          - "End-to-end: formulation with 3 items → 3 allergens"
+          - "Deduplication: 2 items with A07 → 1 A07"
+          - "Sorting: A07, A01, A03 → returns A01, A03, A07"
+          - "Empty formulation → empty array"
+
+service:
+  file: "apps/frontend/lib/services/npd-formulation-service.ts"
+
+  class: "NPDFormulationService"
+
+  methods:
+    - name: "getFormulationAllergens"
+      description: "Get aggregated allergens for a formulation"
+
+      signature: |
+        async getFormulationAllergens(
+          formulationId: string,
+          orgId: string
+        ): Promise<Allergen[]>
+
+      implementation: |
+        const { data, error } = await supabase
+          .rpc('aggregate_formulation_allergens', {
+            p_formulation_id: formulationId
+          });
+
+        if (error) throw new Error(`Failed to fetch allergens: ${error.message}`);
+        return data || [];
+
+      error_handling:
+        - "RPC error → throw Error with message"
+        - "Null data → return empty array"
+
+    - name: "getAllergenCount"
+      description: "Get allergen count for badge display"
+
+      signature: |
+        async getAllergenCount(
+          formulationId: string,
+          orgId: string
+        ): Promise<number>
+
+      implementation: |
+        const allergens = await this.getFormulationAllergens(formulationId, orgId);
+        return allergens.length;
+
+    - name: "getAllergenName"
+      description: "Get localized allergen name based on language preference"
+
+      signature: |
+        getAllergenName(allergen: Allergen, lang: string): string
+
+      implementation: |
+        switch (lang) {
+          case 'pl': return allergen.name_pl;
+          case 'de': return allergen.name_de || allergen.name_en;
+          case 'fr': return allergen.name_fr || allergen.name_en;
+          default: return allergen.name_en;
+        }
+
+      notes: "Falls back to English if localized name is null"
+
+validation:
+  file: "apps/frontend/lib/validation/npd-allergen-schema.ts"
+
+  schemas:
+    - name: "allergenSchema"
+      reuse: "From lib/validation/allergen-schema.ts (Epic 01)"
+      source: "Epic 01 - Allergens Management"
+
+    - name: "formulationAllergensResponseSchema"
+      definition: |
+        import { z } from 'zod';
+        import { allergenSchema } from './allergen-schema';
+
+        export const formulationAllergensResponseSchema = z.object({
+          allergens: z.array(allergenSchema),
+          total: z.number().int().min(0).max(14),
+        });
+
+        export type FormulationAllergensResponse = z.infer<
+          typeof formulationAllergensResponseSchema
+        >;
+
+reuse_patterns:
+  - component: "AllergenIcon"
+    from: "Epic 01 - components/settings/allergens/AllergenIcon.tsx"
+    usage: "Display allergen icons in FormulationAllergenPanel"
+
+  - schema: "allergenSchema"
+    from: "Epic 01 - lib/validation/allergen-schema.ts"
+    usage: "Validate allergen objects in API response"
+
+  - table: "allergens"
+    from: "Epic 01 - Settings module"
+    usage: "Reference data for allergen names and icons"
+
+  - table: "product_allergens"
+    from: "Epic 01 - Settings module"
+    usage: "Junction table linking products to allergens"

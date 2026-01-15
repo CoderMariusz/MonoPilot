@@ -1,0 +1,68 @@
+# Story 06.30 - HACCP Verification Records Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 3 (CoA & HACCP)
+
+story:
+  id: "06.30"
+  name: "HACCP Verification Records"
+  slug: "haccp-verification-records"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "06.21"
+      provides: ["haccp_plans"]
+    - story: "06.22"
+      provides: ["haccp_ccps"]
+    - story: "06.23"
+      provides: ["haccp_monitoring_records"]
+    - story: "06.25"
+      provides: ["haccp_deviations"]
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "haccp_verification_records + sequences"
+  - type: "api"
+    count: 5
+    description: "List, create, approve-qa, approve-director, get-overdue"
+  - type: "service"
+    count: 1
+    description: "HACCPVerificationService with dual approval"
+  - type: "components"
+    count: 8
+    description: "List, form, approval modals, dashboard widget"
+
+technical_notes:
+  - "Verification number format: HACCP-VER-YYYY-NNNNN"
+  - "Dual approval workflow: QA Manager → Quality Director"
+  - "JSONB checklist_items for flexible checklists"
+  - "Auto-calculate next_verification_date based on frequency"
+  - "Trigger: calculate_next_verification_date() on approval"
+  - "Immutability after final approval (is_locked = true)"
+  - "Verification types: calibration, record_review, plan_review, audit"
+
+business_rules:
+  - rule: "Dual Approval Required"
+    enforcement: "QA Manager approves first, then Quality Director"
+  - rule: "Next Verification Date Auto-Calculated"
+    enforcement: "Database trigger calculates based on frequency"
+  - rule: "Failed Verification Triggers Corrective Action"
+    enforcement: "corrective_actions_required flag alerts Production Lead"
+  - rule: "Overdue Alerts"
+    enforcement: "Dashboard shows overdue verifications (next_date < today)"

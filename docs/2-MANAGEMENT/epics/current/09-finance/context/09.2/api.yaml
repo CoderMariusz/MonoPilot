@@ -1,0 +1,37 @@
+endpoints:
+  create_standard_cost:
+    method: POST
+    path: "/api/finance/standard-costs"
+    roles: ["admin", "finance_manager", "cost_accountant"]
+    request:
+      item_id: "uuid"
+      effective_from: "date"
+      material_cost: "number"
+      labor_cost: "number"
+      overhead_cost: "number"
+      currency_id: "uuid"
+    response:
+      status: 201
+      body: "StandardCost with status='draft', total_cost calculated"
+
+  approve_standard_cost:
+    method: POST
+    path: "/api/finance/standard-costs/:id/approve"
+    roles: ["admin", "finance_manager"]
+    response:
+      status: 200
+      body: "StandardCost with status='approved', approved_by set"
+
+  get_by_product:
+    method: GET
+    path: "/api/finance/standard-costs/by-product/:productId"
+    response:
+      status: 200
+      body: "Active StandardCost for product"
+
+  get_history:
+    method: GET
+    path: "/api/finance/standard-costs/:id/history"
+    response:
+      status: 200
+      body: "Array of StandardCost versions"

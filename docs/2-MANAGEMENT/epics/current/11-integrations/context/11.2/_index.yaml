@@ -1,0 +1,102 @@
+story:
+  id: "11.2"
+  name: "API Keys Management & Scopes"
+  epic: "11-integrations"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 4-5
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "11.1"
+      provides: ["integration_health", "dashboard nav"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/integrations.md"
+  prd_sections: ["FR-INT-002", "FR-INT-003", "FR-INT-004"]
+  story: "docs/2-MANAGEMENT/epics/current/11-integrations/11.2.api-keys-management-scopes.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_integration_api_keys.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/integrations/api-keys/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/integrations/api-keys/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+    - path: "apps/frontend/app/api/integrations/api-keys/[id]/regenerate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/integrations/api-keys/[id]/suspend/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/integrations/api-keys/[id]/activate/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/api-key-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/api-key.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/integrations/api-keys/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/integrations/api-keys/[id]/page.tsx"
+  components:
+    - path: "apps/frontend/components/integrations/api-keys/ApiKeysTable.tsx"
+    - path: "apps/frontend/components/integrations/api-keys/CreateApiKeyModal.tsx"
+    - path: "apps/frontend/components/integrations/api-keys/EditApiKeyModal.tsx"
+    - path: "apps/frontend/components/integrations/api-keys/ScopeSelector.tsx"
+    - path: "apps/frontend/components/integrations/api-keys/RateLimitTierSelector.tsx"
+    - path: "apps/frontend/components/integrations/api-keys/RegenerateKeyDialog.tsx"
+    - path: "apps/frontend/components/integrations/api-keys/RevokeKeyDialog.tsx"
+
+database:
+  tables:
+    - name: "integration_api_keys"
+      columns: ["id", "org_id", "name", "key_value_hash", "key_prefix", "scopes", "rate_limit_tier", "status", "expires_at", "last_used_at", "request_count"]
+      rls: true
+      indexes: ["org_id", "status", "key_value_hash"]
+    - name: "rate_limit_tiers"
+      columns: ["tier", "requests_per_minute", "requests_per_hour", "burst_limit"]
+      rls: false
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/integrations/api-keys"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+  - method: "GET"
+    path: "/api/integrations/api-keys"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "IT_MANAGER"]
+  - method: "PUT"
+    path: "/api/integrations/api-keys/:id"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+  - method: "POST"
+    path: "/api/integrations/api-keys/:id/regenerate"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  security: "bcrypt cost 12, HMAC signatures"
+
+acceptance_checklist:
+  - "API keys created with crypto-random 32-byte values"
+  - "Keys displayed ONCE at creation, never retrievable"
+  - "Scopes validated, write includes read"
+  - "Rate limiting enforced (429 responses)"
+  - "Revoked keys cannot be reactivated"
+  - "Admin-only CRUD, IT_MANAGER read-only"
+  - "RLS enforces org isolation"
+  - "Unit tests >80% coverage"
+
+output_artifacts:
+  - "integration_api_keys table with RLS"
+  - "API endpoints for CRUD + regenerate/suspend/activate"
+  - "ApiKeyService with auth, rate limit, scope checks"
+  - "Frontend components for key management"
+  - "Unit + integration + E2E tests"

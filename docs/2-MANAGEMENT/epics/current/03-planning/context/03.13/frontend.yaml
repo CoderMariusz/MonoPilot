@@ -1,321 +1,70 @@
 # Story 03.13 - Frontend Specification
-# Purpose: Components, hooks, UX patterns
-# Agent: FRONTEND-DEV
+# Purpose: Components, hooks, UI patterns
+# Status: COMPLETE
 
-# Components to Create
 components:
-  - path: "components/planning/work-orders/WOAvailabilityPanel.tsx"
-    description: "Main availability panel displayed on WO detail page"
-    props:
-      woId: "string"
-      enabled: "boolean"
-      onProceedWithShortages: "() => void"
-    features:
-      - "Fetches availability data on mount"
-      - "Shows loading skeleton while fetching"
-      - "Displays AvailabilitySummaryCard header"
-      - "Lists AvailabilityMaterialRow for each material"
-      - "Shows AvailabilityWarningModal when user proceeds with shortages"
-      - "Hidden when wo_material_check = false"
-    states:
-      - loading: "Skeleton placeholders"
-      - success: "Material list with indicators"
-      - error: "Error message with retry button"
-      - empty: "Message for WO with no materials"
-    pattern: |
-      <Card>
-        <CardHeader>
-          <AvailabilitySummaryCard summary={data.summary} overallStatus={data.overall_status} />
-        </CardHeader>
-        <CardContent>
-          <Table>
-            {data.materials.map(m => (
-              <AvailabilityMaterialRow key={m.wo_material_id} material={m} />
-            ))}
-          </Table>
-        </CardContent>
-      </Card>
+  - path: "apps/frontend/components/planning/work-orders/availability/WOAvailabilityPanel.tsx"
+    status: "complete"
+    props: ["woId: string"]
+    states: ["loading", "empty", "error", "success", "disabled"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilityMaterialRow.tsx"
+    status: "complete"
+    props: ["material: MaterialAvailability"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilityTrafficLight.tsx"
+    status: "complete"
+    props: ["status: AvailabilityStatus", "size: 'sm' | 'md' | 'lg'"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilitySummaryCard.tsx"
+    status: "complete"
+    props: ["summary: AvailabilitySummary", "overallStatus: AvailabilityStatus"]
+  - path: "apps/frontend/components/planning/work-orders/availability/AvailabilityWarningModal.tsx"
+    status: "complete"
+    props: ["open: boolean", "materials: MaterialAvailability[]", "onClose", "onProceed"]
 
-  - path: "components/planning/work-orders/AvailabilityMaterialRow.tsx"
-    description: "Single material row showing availability details"
-    props:
-      material: "MaterialAvailability"
-    displays:
-      - product_code: "Material code (e.g., RM-FLOUR-001)"
-      - product_name: "Material name"
-      - required_qty: "Required quantity with UOM"
-      - available_qty: "Available quantity with UOM"
-      - shortage_qty: "Shortage (red) or surplus (green)"
-      - coverage_percent: "Coverage percentage"
-      - status_indicator: "AvailabilityTrafficLight component"
-    styling:
-      shortage_positive: "text-red-600 font-medium"
-      surplus_negative: "text-green-600 font-medium"
-
-  - path: "components/planning/work-orders/AvailabilityTrafficLight.tsx"
-    description: "Traffic light indicator (colored circle with tooltip)"
-    props:
-      status: "'sufficient' | 'low_stock' | 'shortage' | 'no_stock'"
-      showLabel: "boolean (default: false)"
-    colors:
-      sufficient: "bg-green-500"
-      low_stock: "bg-yellow-500"
-      shortage: "bg-red-500"
-      no_stock: "bg-red-500 with strikethrough"
-    tooltips:
-      sufficient: "Sufficient stock available"
-      low_stock: "Low stock - may not be enough"
-      shortage: "Shortage - need more inventory"
-      no_stock: "No stock available"
-    sizes:
-      sm: "w-3 h-3"
-      md: "w-4 h-4"
-      lg: "w-5 h-5"
-
-  - path: "components/planning/work-orders/AvailabilitySummaryCard.tsx"
-    description: "Header summary showing overall availability"
-    props:
-      summary: "AvailabilitySummary"
-      overallStatus: "AvailabilityStatus"
-      cachedAt: "string | undefined"
-    displays:
-      - total_materials: "Total materials count"
-      - sufficient_count: "Materials with sufficient stock"
-      - low_stock_count: "Materials with low stock"
-      - shortage_count: "Materials with shortage"
-      - overall_indicator: "Large AvailabilityTrafficLight"
-      - cached_indicator: "Small badge showing if cached"
-    layout: |
-      +-------------------------------------------------------+
-      | [Overall Traffic Light]  Material Availability Check  |
-      |                                                       |
-      | Total: 5  |  [Green]3 Sufficient  |  [Yellow]1 Low   |
-      |           |  [Red]1 Shortage      |  Cached: 25s ago  |
-      +-------------------------------------------------------+
-
-  - path: "components/planning/work-orders/AvailabilityWarningModal.tsx"
-    description: "Warning modal when proceeding with material shortages"
-    props:
-      open: "boolean"
-      onClose: "() => void"
-      onProceed: "() => void"
-      shortageCount: "number"
-      materials: "MaterialAvailability[]"
-    content:
-      title: "Material Shortages Detected"
-      body: "Some materials have shortages. Proceeding may delay production."
-      shortage_list: "Scrollable list of shortage materials"
-      actions:
-        cancel: "Go Back (secondary)"
-        proceed: "Proceed Anyway (primary/warning)"
-
-# Hooks
 hooks:
   - path: "apps/frontend/lib/hooks/use-wo-availability.ts"
-    description: "React Query hook for fetching WO availability"
-    exports:
-      - name: "useWOAvailability"
-        params:
-          - "woId: string"
-          - "enabled: boolean = true"
-        returns: "UseQueryResult<AvailabilityResponse>"
-    pattern: |
-      import { useQuery } from '@tanstack/react-query';
+    status: "complete"
+    exports: ["useWOAvailability(woId, enabled)"]
+  - path: "apps/frontend/lib/hooks/use-check-availability.ts"
+    status: "complete"
+    exports: ["useCheckAvailability()"]
 
-      export function useWOAvailability(woId: string, enabled = true) {
-        return useQuery({
-          queryKey: ['wo-availability', woId],
-          queryFn: () => fetch(`/api/planning/work-orders/${woId}/availability`).then(r => r.json()),
-          enabled: enabled && !!woId,
-          staleTime: 30 * 1000, // 30 seconds (matches server cache)
-          refetchInterval: 30 * 1000, // Auto-refresh every 30s
-          refetchOnWindowFocus: true,
-        });
-      }
-
-# Types
 types:
-  - path: "apps/frontend/lib/types/material-availability.ts"
-    content: |
-      export type AvailabilityStatus = 'sufficient' | 'low_stock' | 'shortage' | 'no_stock';
+  path: "apps/frontend/lib/types/wo-availability.ts"
+  exports:
+    - "AvailabilityStatus: 'sufficient' | 'low_stock' | 'shortage' | 'no_stock'"
+    - "MaterialAvailability"
+    - "AvailabilitySummary"
+    - "WOAvailabilityResponse"
 
-      export interface MaterialAvailability {
-        wo_material_id: string;
-        product_id: string;
-        product_code: string;
-        product_name: string;
-        required_qty: number;
-        available_qty: number;
-        reserved_qty: number;
-        shortage_qty: number;
-        coverage_percent: number;
-        status: AvailabilityStatus;
-        uom: string;
-        expired_excluded_qty: number;
-      }
+wireframe:
+  id: "PLAN-027"
+  path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-027-wo-availability-panel.md"
 
-      export interface AvailabilitySummary {
-        total_materials: number;
-        sufficient_count: number;
-        low_stock_count: number;
-        shortage_count: number;
-      }
+traffic_light_colors:
+  sufficient: "#22c55e (green-500)"
+  low_stock: "#eab308 (yellow-500)"
+  shortage: "#ef4444 (red-500)"
+  no_stock: "#ef4444 (red-500) outline"
 
-      export interface AvailabilityResponse {
-        wo_id: string;
-        checked_at: string;
-        overall_status: AvailabilityStatus;
-        materials: MaterialAvailability[];
-        summary: AvailabilitySummary;
-        enabled: boolean;
-        cached: boolean;
-        cache_expires_at?: string;
-      }
-
-      export interface AvailabilityDisabledResponse {
-        enabled: false;
-        message: string;
-      }
-
-# UX Specification
-ux:
-  wireframes:
-    - id: "PLAN-015"
-      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
-      section: "Materials Tab"
-      relevance: "Availability indicators shown in Materials table"
-
-  placement:
-    page: "/planning/work-orders/[id]"
-    location: "Materials tab, above materials table"
-    visibility: "Only when wo_material_check = true in settings"
-
-  loading_state:
-    skeleton: true
-    min_height: "200px"
-    description: "Show skeleton for summary card + 5 placeholder rows"
-
-  error_state:
-    show_retry: true
-    message: "Failed to load availability. Click to retry."
-
-  empty_state:
-    condition: "WO has no materials (empty BOM snapshot)"
-    message: "No materials in this Work Order"
-    icon: "Package (outline)"
-
-  performance:
-    render_target: "<500ms"
-    virtualize_threshold: 50  # Virtualize table if > 50 materials
-    debounce_refresh: 1000  # Debounce manual refresh clicks
-
-  accessibility:
-    traffic_light:
-      aria_label: "Availability status: {status}"
-      keyboard: "Focusable with tooltip on focus"
-    material_row:
-      aria_label: "Material {name}, {coverage}% available, status {status}"
-    summary:
-      aria_live: "polite"
-      announce_on_change: true
-
-# States
 states:
-  - name: "loading"
-    description: "Initial load or refresh in progress"
-    ui: "Skeleton placeholders"
+  loading: "Skeleton placeholders"
+  empty: "No materials to check"
+  error: "Failed to check + Retry button"
+  success: "Full panel with data"
+  disabled: "Info message + link to settings"
 
-  - name: "success_all_sufficient"
-    description: "All materials have >= 100% coverage"
-    ui: "Green summary header, green indicators on rows"
+breakpoints:
+  desktop: ">1024px - Full table"
+  tablet: "768-1024px - Condensed table"
+  mobile: "<768px - Card layout"
 
-  - name: "success_mixed"
-    description: "Some materials have shortages"
-    ui: "Yellow/red summary header, mixed indicators"
+accessibility:
+  touch_targets: "48dp minimum"
+  contrast: "4.5:1 minimum"
+  aria_roles: ["region", "alertdialog", "img"]
+  keyboard: ["Tab", "Enter", "Escape"]
 
-  - name: "success_all_shortage"
-    description: "All materials have shortage"
-    ui: "Red summary header, all red indicators"
-
-  - name: "disabled"
-    description: "Feature disabled in settings"
-    ui: "Panel not rendered"
-
-  - name: "error"
-    description: "API error"
-    ui: "Error message with retry button"
-
-# Badge Colors (TailwindCSS)
-colors:
-  status_badges:
-    sufficient:
-      bg: "bg-green-100"
-      text: "text-green-800"
-      border: "border-green-200"
-    low_stock:
-      bg: "bg-yellow-100"
-      text: "text-yellow-800"
-      border: "border-yellow-200"
-    shortage:
-      bg: "bg-red-100"
-      text: "text-red-800"
-      border: "border-red-200"
-    no_stock:
-      bg: "bg-red-100"
-      text: "text-red-800"
-      border: "border-red-200"
-      style: "line-through opacity-75"
-
-  traffic_lights:
-    sufficient: "bg-green-500"
-    low_stock: "bg-yellow-500"
-    shortage: "bg-red-500"
-    no_stock: "bg-red-500 ring-2 ring-red-300"
-
-  quantities:
-    surplus: "text-green-600"
-    shortage: "text-red-600"
-    neutral: "text-gray-700"
-
-# Responsive Design
-responsive:
-  desktop:
-    layout: "Full table with all columns"
-    columns: ["Material", "Required", "Available", "Shortage", "Coverage", "Status"]
-  tablet:
-    layout: "Condensed table"
-    columns: ["Material", "Required", "Available", "Status"]
-    hide: ["Shortage", "Coverage"]
-  mobile:
-    layout: "Card-based list"
-    card_content: |
-      +---------------------------+
-      | [Status] Material Name    |
-      | Required: 100 kg          |
-      | Available: 75 kg          |
-      | Shortage: 25 kg           |
-      +---------------------------+
-
-# Integration Points
-integration:
-  wo_detail_page:
-    file: "app/(authenticated)/planning/work-orders/[id]/page.tsx"
-    changes:
-      - "Import WOAvailabilityPanel"
-      - "Fetch planning_settings to get wo_material_check"
-      - "Render panel conditionally based on setting"
-      - "Pass woId to panel"
-
-  wo_release_action:
-    description: "Show warning before releasing WO with shortages"
-    trigger: "User clicks Release button on WO with status='planned'"
-    flow:
-      - "Check if any material has status='shortage' or 'no_stock'"
-      - "If yes, show AvailabilityWarningModal"
-      - "If user clicks 'Proceed Anyway', continue with release"
-      - "If user clicks 'Go Back', cancel release action"
-
-  wo_save_action:
-    description: "Show warning before saving WO with shortages"
-    trigger: "User clicks Save on WO create/edit form"
-    flow: "Same as wo_release_action"
+performance:
+  initial_load: "<500ms"
+  cached_response: "<100ms"
+  auto_refresh: "30 seconds"

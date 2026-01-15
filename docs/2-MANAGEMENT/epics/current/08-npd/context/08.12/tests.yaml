@@ -1,0 +1,42 @@
+# Story 08.12 - Test Specifications
+# Purpose: Formulation → BOM conversion tests
+# Agent: TEST-WRITER, QA-AGENT
+# SEE: markdown lines 800-835
+
+test_files:
+  unit:
+    - "lib/services/npd-handoff-service.test.ts"
+  integration:
+    - "app/api/npd/projects/[id]/handoff/create-bom/route.test.ts"
+  e2e:
+    - "e2e/npd-formulation-to-bom.spec.ts"
+
+key_tests:
+  conversion:
+    - "Convert locked formulation to BOM (new product)"
+    - "Update existing product with new BOM version"
+    - "BOM number auto-generates: BOM-{CODE}-v{N}"
+    - "Formulation items copied 1:1 to bom_items"
+    - "Notes transferred from formulation to BOM"
+
+  validation:
+    - "Cannot convert draft formulation"
+    - "Cannot convert approved (not locked) formulation"
+    - "Duplicate product code → error + rollback"
+    - "Effective_to >= effective_from validation"
+
+  traceability:
+    - "BOM.npd_formulation_id set correctly"
+    - "Product.npd_project_id set correctly"
+    - "BOM.source = 'npd'"
+    - "Product.source = 'npd'"
+
+  transaction:
+    - "Rollback on product creation failure"
+    - "Rollback on BOM creation failure"
+    - "Rollback on bom_items copy failure"
+
+  performance:
+    - "Convert 50-item formulation < 3 seconds"
+
+coverage_target: ">= 80%"

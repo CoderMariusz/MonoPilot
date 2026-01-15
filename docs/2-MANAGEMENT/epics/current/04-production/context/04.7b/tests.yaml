@@ -1,0 +1,225 @@
+# Story 04.7b: Output Registration Scanner - Test Specifications
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/scanner-output-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/services/__tests__/label-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/services/__tests__/offline-queue-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/hooks/__tests__/use-audio-feedback.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/production/output/__tests__/validate-wo.test.ts"
+    type: "integration"
+  - path: "apps/frontend/app/api/production/output/__tests__/print-label.test.ts"
+    type: "integration"
+  - path: "apps/frontend/e2e/scanner/output-registration.spec.ts"
+    type: "e2e"
+
+unit_tests:
+  - fr_id: "FR-012"
+    service: "ScannerOutputService"
+    tests:
+      - name: "validateWO returns WO data for valid barcode"
+        input:
+          barcode: "WO-2025-0156"
+        expected: "WOValidationResult with product_name, planned_qty, registered_qty"
+      - name: "validateWO rejects invalid WO status"
+        input:
+          barcode: "WO-COMPLETED"
+          wo_status: "completed"
+        expected: "Error: Work order is not in progress or paused"
+      - name: "registerOutput creates LP with scanner metadata"
+        input:
+          wo_id: "uuid"
+          quantity: 250
+          qa_status: "approved"
+          operator_badge: "JD-001"
+        expected: "LP created with operator_badge in metadata"
+
+  - fr_id: "FR-012"
+    service: "LabelService"
+    tests:
+      - name: "generateZPL creates valid ZPL with all fields"
+        input:
+          lp_id: "uuid-lp-123"
+        expected: "ZPL string containing lp_number barcode, product_name, qty, batch, expiry, qa_status"
+      - name: "sendToPrinter returns success within 2s"
+        input:
+          zpl: "^XA...^XZ"
+          printer_id: "uuid-printer"
+        expected: "PrintResult with success=true, sent_at timestamp"
+      - name: "getPrinterStatus returns configured=false when no printer"
+        input:
+          location_id: "uuid-no-printer"
+        expected: "PrinterStatus with configured=false"
+
+  - fr_id: "FR-012"
+    service: "OfflineQueueService"
+    tests:
+      - name: "queueOperation stores operation locally"
+        input:
+          operation_type: "register_output"
+          payload: { wo_id: "uuid", quantity: 250 }
+        expected: "Operation stored in IndexedDB/localStorage"
+      - name: "syncQueue processes all pending operations"
+        input:
+          pending_count: 3
+        expected: "SyncResult with synced_count=3, failed_count=0"
+      - name: "getPendingCount returns correct count"
+        input:
+          stored_operations: 5
+        expected: 5
+
+  - fr_id: "FR-012"
+    service: "AudioFeedback"
+    tests:
+      - name: "playSuccess triggers 500ms beep"
+        expected: "Audio plays for 500ms"
+      - name: "playError triggers 2 short beeps"
+        expected: "Two 200ms beeps with 100ms gap"
+      - name: "speak uses Web Speech API"
+        input:
+          text: "LP created"
+        expected: "SpeechSynthesis.speak called with text"
+      - name: "vibrate triggers device vibration"
+        input:
+          pattern: [200]
+        expected: "navigator.vibrate called with pattern"
+
+integration_tests:
+  - ac_id: "AC-012-01"
+    scenario: "WO validation returns data within 500ms"
+    steps:
+      - "Start timer"
+      - "POST /api/production/output/validate-wo with valid barcode"
+      - "Assert response received"
+      - "Assert elapsed time < 500ms"
+    expected_status: 200
+    expected_response:
+      valid: true
+      wo:
+        product_name: "defined"
+        planned_qty: "number"
+        registered_qty: "number"
+
+  - ac_id: "AC-012-04"
+    scenario: "Print label sends ZPL within 2s"
+    steps:
+      - "Setup: Printer configured"
+      - "POST /api/production/output/generate-label"
+      - "POST /api/production/output/print-label with ZPL"
+      - "Assert print completed within 2s"
+    expected_status: 200
+    expected_response:
+      success: true
+      sent_at: "timestamp"
+
+  - ac_id: "AC-012-06"
+    scenario: "Print endpoint returns 404 when no printer"
+    steps:
+      - "Setup: No printer configured for location"
+      - "POST /api/production/output/print-label"
+    expected_status: 404
+    expected_error: "No printer configured"
+
+  - ac_id: "AC-013-01"
+    scenario: "By-products endpoint returns expected qty"
+    steps:
+      - "Setup: WO with planned_qty=1000, by-product yield=5%"
+      - "GET /api/production/output/by-products/:woId"
+    expected_response:
+      by_products:
+        - expected_qty: 50
+
+  - ac_id: "AC-013-07"
+    scenario: "By-product registration with qty=0 requires confirmation"
+    steps:
+      - "POST /api/production/output/register-by-product with quantity=0"
+    expected_status: 400
+    expected_error: "Quantity is 0 and not confirmed"
+
+e2e_tests:
+  - name: "Full 7-step scanner flow"
+    description: "Complete flow from scan to print"
+    steps:
+      - "Navigate to /scanner/output"
+      - "Step 1: Enter WO barcode WO-2025-0156"
+      - "Verify WO info displays within 500ms"
+      - "Step 2: Enter quantity 250 using number pad"
+      - "Tap [Next: QA Status]"
+      - "Step 3: Tap Approved button (verify 64dp height)"
+      - "Step 4: Verify review summary correct"
+      - "Tap [Confirm]"
+      - "Step 5: Verify success animation and 'LP created' voice"
+      - "Step 6: Verify label preview"
+      - "Tap [Print] (if printer configured)"
+      - "Verify print completes within 2s"
+      - "Step 7: Handle by-product prompt if applicable"
+
+  - name: "By-product registration loop"
+    description: "Register multiple by-products after main output"
+    steps:
+      - "Complete main output registration"
+      - "Step 7: Verify by-products list displays"
+      - "Tap [Yes] to register first by-product"
+      - "Enter quantity using number pad"
+      - "Complete by-product registration"
+      - "Verify loop continues to next by-product"
+      - "Register all by-products"
+      - "Verify completion message"
+
+  - name: "Zero quantity by-product warning"
+    description: "Test zero qty confirmation flow"
+    steps:
+      - "Navigate to by-product registration"
+      - "Enter quantity 0"
+      - "Tap confirm"
+      - "Verify warning displays: 'By-product quantity is 0. Continue?'"
+      - "Tap [Confirm Anyway]"
+      - "Verify LP created with qty=0"
+
+  - name: "Network error handling"
+    description: "Test offline mode and retry"
+    steps:
+      - "Disable network during Step 5"
+      - "Verify network error displays"
+      - "Verify 'Retry' and 'Save Offline' buttons appear"
+      - "Tap [Save Offline]"
+      - "Verify operation queued"
+      - "Re-enable network"
+      - "Verify sync completes"
+
+  - name: "Printer not configured flow"
+    description: "Test disabled print button"
+    steps:
+      - "Setup: Remove all printers for location"
+      - "Complete Steps 1-5"
+      - "Step 6: Verify Print button is disabled"
+      - "Verify tooltip shows 'No printer configured'"
+      - "Tap [Skip]"
+      - "Verify proceeds to Step 7"
+
+  - name: "Mobile touch targets"
+    description: "Verify accessibility requirements"
+    steps:
+      - "Set viewport to 375px width"
+      - "Verify number pad keys are 64x64dp"
+      - "Verify QA buttons are >= 64dp height"
+      - "Verify all touch targets >= 48dp"
+      - "Verify contrast ratios >= 4.5:1"
+
+performance_tests:
+  - name: "WO validation response time"
+    target: "< 500ms p95"
+    scenario: "POST /api/production/output/validate-wo"
+    iterations: 100
+
+  - name: "Label print response time"
+    target: "< 2000ms p95"
+    scenario: "POST /api/production/output/print-label"
+    iterations: 50
+
+  - name: "Step transition time"
+    target: "< 300ms"
+    scenario: "Each wizard step transition"

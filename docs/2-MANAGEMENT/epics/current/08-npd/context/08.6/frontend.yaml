@@ -1,0 +1,386 @@
+# Story 08.6 - Frontend Context
+# NPD Gate Approvals & History - Components, Services, Types
+
+ux:
+  wireframes:
+    - id: "NPD-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-005-advance-gate-modal.md"
+      relevance: "Base modal for gate advancement - extended for approval workflow"
+      components: ["GateApprovalButton"]
+    - id: "NPD-010"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-010-gate-approval-modal.md"
+      relevance: "Modal for approving or rejecting gate transitions with checklist validation"
+      components: ["GateApprovalModal", "ESignatureModal"]
+    - id: "NPD-011"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-011-approval-history-timeline.md"
+      relevance: "Chronological timeline of gate approvals/rejections"
+      components: ["ApprovalHistoryTimeline"]
+  patterns:
+    modal: "ShadCN Dialog with form validation"
+    timeline: "Vertical timeline with approval cards"
+    button: "Split button for approve/reject actions"
+  states:
+    - "loading: Fetching checklist status and approval history"
+    - "empty: No approvals yet"
+    - "ready: Form ready for input"
+    - "submitting: Approval/rejection in progress"
+    - "success: Action completed"
+    - "error: Action failed"
+
+components:
+  # Main approval modal
+  GateApprovalModal:
+    path: "components/npd/GateApprovalModal.tsx"
+    purpose: "Modal for approving or rejecting gate transitions"
+    props:
+      - name: "project"
+        type: "NPDProject"
+        required: true
+      - name: "mode"
+        type: "'approve' | 'reject'"
+        required: true
+      - name: "isOpen"
+        type: "boolean"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+      - name: "onSuccess"
+        type: "(approval: NPDApproval) => void"
+        required: true
+
+    states:
+      - "loading: Fetching checklist status"
+      - "ready: Form ready for input"
+      - "submitting: Approval/rejection in progress"
+      - "success: Action completed"
+      - "error: Action failed"
+
+    sections:
+      - "Header: Project number, name, gate transition"
+      - "Checklist Summary: X/Y items complete, validation warnings"
+      - "Notes/Reason Input: Textarea (optional for approve, required for reject)"
+      - "E-signature Prompt: Password input if enabled"
+      - "Actions: Cancel, Approve/Reject buttons"
+
+    validation:
+      - "Approve: notes max 1000 chars"
+      - "Reject: reason required, min 10 chars, max 1000 chars"
+      - "E-signature: password required if setting enabled"
+
+    ux_notes:
+      - "Similar to PLAN-008 PO approval modal"
+      - "Show checklist completion status prominently"
+      - "Disable submit if checklist incomplete"
+      - "Confirmation dialog before final submit"
+      - "Success state shows next actions (view project, close)"
+
+  # Approval history timeline
+  ApprovalHistoryTimeline:
+    path: "components/npd/ApprovalHistoryTimeline.tsx"
+    purpose: "Display chronological approval/rejection history"
+    props:
+      - name: "projectId"
+        type: "number"
+        required: true
+      - name: "maxItems"
+        type: "number"
+        required: false
+        default: 10
+
+    states:
+      - "loading: Fetching approval history"
+      - "empty: No approvals yet"
+      - "loaded: Approvals displayed"
+      - "error: Fetch failed"
+
+    display:
+      - "Timeline with date markers"
+      - "Each approval shows: gate transition, result, approver, timestamp, notes"
+      - "Visual indicators: green checkmark (approved), red X (rejected)"
+      - "E-signature badge if applicable"
+      - "Sorted DESC (newest first)"
+
+    interactions:
+      - "Click to expand/collapse notes"
+      - "Hover to show full timestamp"
+      - "Link to approver profile (optional)"
+
+  # E-signature password modal
+  ESignatureModal:
+    path: "components/npd/ESignatureModal.tsx"
+    purpose: "Password confirmation for e-signature"
+    props:
+      - name: "isOpen"
+        type: "boolean"
+        required: true
+      - name: "onConfirm"
+        type: "(password: string) => Promise<void>"
+        required: true
+      - name: "onCancel"
+        type: "() => void"
+        required: true
+
+    states:
+      - "ready: Waiting for password input"
+      - "verifying: Password verification in progress"
+      - "error: Invalid password"
+
+    validation:
+      - "Password required"
+      - "Min 8 characters (user account password policy)"
+
+    ux_notes:
+      - "Mask password input"
+      - "Show verification spinner"
+      - "Error state with retry option"
+      - "Keyboard: Enter to submit, Escape to cancel"
+
+  # Gate approval action button
+  GateApprovalButton:
+    path: "components/npd/GateApprovalButton.tsx"
+    purpose: "Action button with role permission check"
+    props:
+      - name: "project"
+        type: "NPDProject"
+        required: true
+      - name: "currentUser"
+        type: "User"
+        required: true
+      - name: "onApprovalRequest"
+        type: "() => void"
+        required: true
+
+    logic:
+      - "Check if user has permission for current gate"
+      - "Check if checklist is complete"
+      - "Show appropriate button state and tooltip"
+
+    button_states:
+      - "Visible + Enabled: User has permission, checklist complete"
+      - "Visible + Disabled: User has permission, checklist incomplete (tooltip: 'Complete checklist first')"
+      - "Hidden: User does not have permission for this gate"
+
+    variations:
+      - "Primary action: 'Request Approval'"
+      - "Split button: 'Request Approval' dropdown with 'Approve' | 'Reject' for approvers"
+
+# Services
+services:
+  npd_approval_service:
+    path: "lib/services/npd-approval-service.ts"
+    purpose: "Business logic for gate approvals"
+
+    methods:
+      getApprovalHistory:
+        signature: "(projectId: number) => Promise<NPDApproval[]>"
+        description: "Fetch all approvals for project"
+        logic:
+          - "Call GET /api/npd/projects/:id/approvals"
+          - "Sort by approved_at DESC"
+          - "Return approval array"
+
+      approveGate:
+        signature: "(projectId: number, gate: string, data: GateApprovalInput) => Promise<ApprovalResult>"
+        description: "Approve gate transition"
+        logic:
+          - "Validate user permission (canApproveGate)"
+          - "Validate checklist completion"
+          - "Call POST /api/npd/projects/:id/gates/:gate/approve"
+          - "Return updated project + approval"
+
+      rejectGate:
+        signature: "(projectId: number, gate: string, reason: string) => Promise<ApprovalResult>"
+        description: "Reject gate transition"
+        logic:
+          - "Validate user permission"
+          - "Validate reason (min 10 chars)"
+          - "Call POST /api/npd/projects/:id/gates/:gate/reject"
+          - "Return unchanged project + rejection record"
+
+      canApproveGate:
+        signature: "(userRole: string, gate: string) => boolean"
+        description: "Check if user role can approve this gate"
+        logic:
+          - "Approval matrix:"
+          - "  G0-G2: NPD_LEAD"
+          - "  G3: QA_MANAGER"
+          - "  G4: DIRECTOR"
+          - "Return true if role matches"
+
+      validateChecklistCompletion:
+        signature: "(projectId: number, gate: string) => Promise<ChecklistValidation>"
+        description: "Check if all required checklist items are complete"
+        logic:
+          - "Fetch checklist for gate"
+          - "Count required items"
+          - "Count completed items"
+          - "Return validation result with incomplete items"
+
+# Types
+types:
+  NPDApproval:
+    definition: |
+      interface NPDApproval {
+        id: number;
+        org_id: string;
+        project_id: number;
+        gate: 'G0' | 'G1' | 'G2' | 'G3' | 'G4';
+        target_gate: 'G1' | 'G2' | 'G3' | 'G4' | 'Launched';
+        result: 'approved' | 'rejected';
+        approved_by: {
+          id: string;
+          name: string;
+          email: string;
+          role: string;
+        };
+        approved_at: string;
+        notes?: string;
+        e_signature: boolean;
+        created_at: string;
+        updated_at: string;
+      }
+
+  GateApprovalInput:
+    definition: |
+      interface GateApprovalInput {
+        notes?: string;
+        password?: string;  // for e-signature
+      }
+
+  GateRejectionInput:
+    definition: |
+      interface GateRejectionInput {
+        reason: string;  // required
+      }
+
+  ApprovalResult:
+    definition: |
+      interface ApprovalResult {
+        project: NPDProject;
+        approval: NPDApproval;
+      }
+
+  ChecklistValidation:
+    definition: |
+      interface ChecklistValidation {
+        isValid: boolean;
+        totalRequired: number;
+        totalCompleted: number;
+        incompleteItems: {
+          id: number;
+          description: string;
+        }[];
+      }
+
+# Validation schemas (Zod)
+validation:
+  path: "lib/validation/npd-approval-schema.ts"
+
+  schemas:
+    gateApprovalSchema:
+      definition: |
+        z.object({
+          notes: z.string().max(1000, 'Notes cannot exceed 1000 characters').optional(),
+          password: z.string().optional()
+        })
+
+    gateRejectionSchema:
+      definition: |
+        z.object({
+          reason: z.string()
+            .min(10, 'Please provide a more detailed reason (min 10 characters)')
+            .max(1000, 'Reason cannot exceed 1000 characters')
+        })
+
+# State management (if needed)
+state:
+  approach: "React Query for server state, local state for UI"
+
+  queries:
+    - key: "['npd-approvals', projectId]"
+      fetcher: "getApprovalHistory(projectId)"
+      staleTime: "5 minutes"
+      cacheTime: "10 minutes"
+
+  mutations:
+    - key: "approveGate"
+      mutationFn: "approveGate(projectId, gate, data)"
+      invalidates: "['npd-approvals', projectId], ['npd-project', projectId]"
+
+    - key: "rejectGate"
+      mutationFn: "rejectGate(projectId, gate, reason)"
+      invalidates: "['npd-approvals', projectId], ['npd-project', projectId]"
+
+# UI/UX patterns
+ui_patterns:
+  approval_modal:
+    base: "ShadCN Dialog"
+    size: "max-w-2xl"
+    responsive: "Full-screen on mobile (<768px)"
+    sections:
+      - "Header with project info"
+      - "Checklist summary card"
+      - "Notes/Reason textarea"
+      - "E-signature input (conditional)"
+      - "Action buttons (Cancel, Approve/Reject)"
+
+  timeline:
+    base: "Vertical timeline component"
+    item_height: "min 80px"
+    icon_size: "32px"
+    date_format: "MMM DD, YYYY HH:mm"
+    max_visible: "10 items, expand for more"
+
+  button_states:
+    enabled: "Primary color, no tooltip"
+    disabled_checklist: "Disabled with tooltip: 'Complete X checklist items first'"
+    disabled_permission: "Hidden or disabled with tooltip: 'Only [role] can approve this gate'"
+
+# Accessibility
+a11y:
+  modal:
+    - "role='dialog'"
+    - "aria-modal='true'"
+    - "aria-labelledby='modal-title'"
+    - "Focus trap when open"
+    - "Escape to close (with confirmation if form dirty)"
+
+  timeline:
+    - "Semantic HTML: <time> for timestamps"
+    - "ARIA labels for status icons"
+    - "Keyboard navigable list"
+
+  buttons:
+    - "Touch targets >=48dp"
+    - "Clear visual disabled state"
+    - "Tooltips on hover and focus"
+
+# Performance targets
+performance:
+  approval_history_load: "<300ms for 20 approvals"
+  approval_submit: "<500ms (excluding email send)"
+  modal_open: "<200ms"
+  timeline_render: "<100ms for 10 items"
+
+# Error handling
+error_handling:
+  network_error:
+    display: "Toast notification: 'Network error. Please try again.'"
+    action: "Retry button"
+
+  permission_denied:
+    display: "Toast notification: 'You do not have permission to approve this gate'"
+    action: "Close modal"
+
+  checklist_incomplete:
+    display: "Inline warning in modal with list of incomplete items"
+    action: "Disable submit button, link to checklist"
+
+  concurrent_approval:
+    display: "Toast notification: 'This gate has already been approved by [user]'"
+    action: "Refresh project, close modal"
+
+  invalid_password:
+    display: "Inline error in e-signature modal"
+    action: "Clear password field, allow retry"

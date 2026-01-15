@@ -1,0 +1,453 @@
+# Story 06.24 - CCP Monitoring Scanner - Frontend Context
+# Generated: 2025-01-15
+
+pages:
+  - path: "app/(authenticated)/quality/haccp/ccp-monitoring/mobile/page.tsx"
+    name: "Mobile CCP Monitoring Page"
+    components: ["MobileMonitoringForm", "BarcodeScannerButton", "OfflineIndicator", "AudioFeedback"]
+    layout: "Mobile-optimized (portrait orientation)"
+    features:
+      - "Large touch targets (48px+)"
+      - "WO barcode scanner"
+      - "CCP dropdown (large options)"
+      - "Numeric keypad for value entry"
+      - "Real-time validation indicator"
+      - "Audio feedback (pass/fail)"
+      - "Vibration feedback"
+      - "Offline mode (50 records)"
+      - "Sync button"
+
+  - path: "app/(authenticated)/quality/haccp/ccp-monitoring/mobile/history/page.tsx"
+    name: "Mobile Monitoring History"
+    components: ["MobileHistoryList", "SyncStatus"]
+    features:
+      - "Today's monitoring records"
+      - "Offline queue status"
+      - "Sync status (pending/synced/failed)"
+      - "Pull-to-refresh"
+
+components:
+  # Main Monitoring Form
+  - name: "MobileMonitoringForm.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Form"
+    props:
+      - name: "onSubmit"
+        type: "(record: OfflineMonitoringRecord) => void"
+    features:
+      - "Large touch targets (48px+ buttons, inputs)"
+      - "Portrait orientation optimized"
+      - "One-handed use friendly"
+      - "Auto-focus on value input after CCP selection"
+      - "Real-time validation"
+      - "Audio feedback on validation change"
+      - "Vibration on fail"
+      - "Offline indicator"
+      - "Corrective action templates (if fail)"
+    layout: |
+      [WO Barcode Scan Button] (64px height)
+      [WO Number Display] (if scanned)
+      [CCP Dropdown] (56px height, large text)
+      [Monitoring Value Input] (64px height, numeric keypad)
+      [Unit Display] (read-only, 32px)
+      [Validation Indicator] (large icon + text)
+      [Corrective Action] (if fail, large textarea)
+      [Submit Button] (64px height, full width)
+
+  # Barcode Scanner
+  - name: "BarcodeScannerButton.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Button + Camera Modal"
+    props:
+      - name: "onScan"
+        type: "(barcode: string) => void"
+      - name: "type"
+        type: "'wo' | 'ccp' | 'lp'"
+    features:
+      - "Large scan button (64px height)"
+      - "Camera access (navigator.mediaDevices.getUserMedia)"
+      - "Barcode detection (BarcodeDetector API or ZXing fallback)"
+      - "Visual guidance (camera overlay)"
+      - "Scan success feedback (beep + vibration)"
+      - "Manual entry fallback (if camera fails)"
+    libraries:
+      - "BarcodeDetector API (Chrome/Edge)"
+      - "@zxing/browser (fallback for Firefox/Safari)"
+      - "react-qr-barcode-scanner (optional)"
+
+  # CCP Dropdown (Mobile)
+  - name: "MobileCCPDropdown.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Select"
+    props:
+      - name: "ccps"
+        type: "MobileCCP[]"
+      - name: "value"
+        type: "string | null"
+      - name: "onChange"
+        type: "(ccpId: string) => void"
+    features:
+      - "Large touch targets (56px per option)"
+      - "Large text (18px font)"
+      - "Filtered by WO routing (if WO scanned)"
+      - "Displays: CCP-N - Name (Limits)"
+      - "Auto-select if only one CCP available"
+      - "Auto-select if QR scanned"
+
+  # Monitoring Value Input
+  - name: "MonitoringValueInput.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Input (Numeric)"
+    props:
+      - name: "value"
+        type: "number | null"
+      - name: "onChange"
+        type: "(value: number) => void"
+      - name: "unit"
+        type: "string"
+      - name: "criticalLimitMin"
+        type: "number | null"
+      - name: "criticalLimitMax"
+        type: "number | null"
+    features:
+      - "Large input (64px height, 24px font)"
+      - "Numeric keyboard (mobile)"
+      - "Decimal support (2 decimal places)"
+      - "Real-time validation as typed"
+      - "Auto-submit on Enter (optional)"
+      - "Clear button"
+
+  # Real-Time Validation Indicator
+  - name: "ValidationIndicator.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Visual Feedback"
+    props:
+      - name: "result"
+        type: "'pass' | 'fail' | 'marginal' | null"
+      - name: "value"
+        type: "number | null"
+      - name: "criticalLimitMin"
+        type: "number | null"
+      - name: "criticalLimitMax"
+        type: "number | null"
+    features:
+      - "Large icon (64px)"
+      - "Color-coded: Green (pass), Red (fail), Yellow (marginal)"
+      - "Text: 'PASS', 'FAIL - Above max', 'MARGINAL - Close to limit'"
+      - "Animates on change"
+      - "Fullscreen red overlay on fail (optional)"
+    states:
+      pass:
+        icon: "CheckCircle (green)"
+        text: "PASS - Within limits"
+        color: "#10B981"
+      fail:
+        icon: "XCircle (red)"
+        text: "FAIL - Outside limits"
+        color: "#EF4444"
+        background: "rgba(239, 68, 68, 0.1) fullscreen"
+      marginal:
+        icon: "AlertTriangle (yellow)"
+        text: "MARGINAL - Approaching limit"
+        color: "#F59E0B"
+
+  # Audio Feedback Service
+  - name: "AudioFeedbackService.ts"
+    path: "lib/services/"
+    type: "Service"
+    methods:
+      - name: "playPass()"
+        description: "Beep sound (500Hz, 1s)"
+      - name: "playFail()"
+        description: "Alarm sound (1kHz, 3 beeps, urgent)"
+      - name: "playMarginal()"
+        description: "Caution sound (750Hz, 1 beep)"
+    features:
+      - "Web Audio API"
+      - "User gesture required before first play (browser policy)"
+      - "Volume control"
+      - "Mute toggle (optional, but not recommended)"
+    implementation: |
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      oscillator.frequency.value = 500; // Hz
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 1);
+
+  # Vibration Feedback
+  - name: "VibrationService.ts"
+    path: "lib/services/"
+    type: "Service"
+    methods:
+      - name: "vibratePass()"
+        description: "Single short vibration (100ms)"
+      - name: "vibrateFail()"
+        description: "Three short bursts (100ms each, 100ms gap)"
+      - name: "vibrateMarginal()"
+        description: "Two short vibrations"
+    features:
+      - "Vibration API (navigator.vibrate)"
+      - "Fallback if not supported (no error)"
+      - "Pattern support for fail/marginal"
+    implementation: |
+      // Pass: [100]
+      // Fail: [100, 100, 100, 100, 100]
+      // Marginal: [100, 100, 100]
+      navigator.vibrate(pattern);
+
+  # Offline Storage Service
+  - name: "OfflineMonitoringService.ts"
+    path: "lib/services/"
+    type: "Service"
+    methods:
+      - name: "saveOffline(record: OfflineMonitoringRecord)"
+        returns: "Promise<void>"
+        description: "Save monitoring record to IndexedDB"
+
+      - name: "getOfflineQueue()"
+        returns: "Promise<OfflineMonitoringRecord[]>"
+        description: "Get all pending offline records"
+
+      - name: "syncOfflineRecords()"
+        returns: "Promise<{ synced: number; failed: number }>"
+        description: "Sync all offline records to server"
+
+      - name: "clearOfflineQueue()"
+        returns: "Promise<void>"
+        description: "Clear all synced records from IndexedDB"
+
+      - name: "getQueueCount()"
+        returns: "Promise<number>"
+        description: "Get count of pending offline records"
+
+      - name: "isQueueFull()"
+        returns: "Promise<boolean>"
+        description: "Check if queue has 50 records (limit)"
+    features:
+      - "IndexedDB via Dexie.js"
+      - "Max 50 records limit"
+      - "Auto-sync on WiFi reconnect"
+      - "Manual sync button"
+      - "Background sync (Service Worker, optional)"
+      - "Sync status tracking"
+
+  # Offline Indicator
+  - name: "OfflineIndicator.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Status Badge"
+    props:
+      - name: "isOnline"
+        type: "boolean"
+      - name: "queueCount"
+        type: "number"
+    features:
+      - "Online: Green dot + 'Online'"
+      - "Offline: Red dot + 'Offline (X/50 pending)'"
+      - "Sticky position (top-right)"
+      - "Pulse animation when offline"
+      - "Click to open sync modal"
+
+  # Sync Status Modal
+  - name: "SyncStatusModal.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Modal"
+    props:
+      - name: "open"
+        type: "boolean"
+      - name: "onClose"
+        type: "() => void"
+    features:
+      - "Queue count (X/50)"
+      - "List of pending records (CCP, value, timestamp)"
+      - "Sync button (manual trigger)"
+      - "Sync progress (X of Y synced)"
+      - "Sync errors (if any)"
+      - "Clear queue button (confirm dialog)"
+
+  # Corrective Action Templates
+  - name: "CorrectiveActionTemplates.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "Quick Select + Textarea"
+    props:
+      - name: "value"
+        type: "string"
+      - name: "onChange"
+        type: "(action: string) => void"
+    features:
+      - "Quick-select buttons (large, 48px height)"
+      - "Templates: 'Adjusted temperature', 'Rejected batch', 'Recalibrated equipment', 'Notified QA', 'Custom'"
+      - "If 'Custom', show textarea"
+      - "Template + additional notes (append)"
+    templates:
+      - "Adjusted temperature to bring within limits"
+      - "Rejected batch and quarantined"
+      - "Recalibrated equipment and re-tested"
+      - "Notified QA Manager immediately"
+      - "Custom (enter below)"
+
+  # QR Code Generator
+  - name: "CCPQRCodeGenerator.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "QR Code Display + Download"
+    props:
+      - name: "ccpId"
+        type: "string"
+      - name: "ccpNumber"
+        type: "string"
+    features:
+      - "Generate QR code (react-qr-code library)"
+      - "QR data: /quality/haccp/ccp-monitoring/mobile?ccp=CCP-1"
+      - "Download QR code as PNG"
+      - "Print QR code"
+      - "Display CCP number below QR"
+    libraries:
+      - "react-qr-code"
+      - "qrcode (Node.js, for server-side generation)"
+
+  # Mobile History List
+  - name: "MobileHistoryList.tsx"
+    path: "components/quality/haccp/mobile/"
+    type: "List"
+    props:
+      - name: "records"
+        type: "OfflineMonitoringRecord[]"
+    features:
+      - "Simple list (not table, mobile-friendly)"
+      - "Each item: CCP-N - Value - Result badge - Timestamp"
+      - "Sync status indicator (pending/synced/failed)"
+      - "Tap to view detail"
+      - "Pull-to-refresh"
+      - "Infinite scroll (or pagination)"
+
+# Hooks
+hooks:
+  - name: "useBarcodeScan"
+    file: "lib/hooks/use-barcode-scan.ts"
+    params: ["type: 'wo' | 'ccp'"]
+    returns: "{ scan: () => void; scanning: boolean; result: string | null; error: Error | null }"
+    features:
+      - "Camera access"
+      - "Barcode detection"
+      - "Error handling"
+
+  - name: "useOfflineSync"
+    file: "lib/hooks/use-offline-sync.ts"
+    returns: "{ sync: () => Promise<void>; syncing: boolean; queueCount: number; isOnline: boolean }"
+    features:
+      - "Auto-sync on reconnect"
+      - "Manual sync trigger"
+      - "Queue count"
+      - "Online/offline status"
+
+  - name: "useAudioFeedback"
+    file: "lib/hooks/use-audio-feedback.ts"
+    returns: "{ playPass: () => void; playFail: () => void; playMarginal: () => void }"
+    features:
+      - "Audio context initialization"
+      - "Play sounds based on result"
+
+  - name: "useVibration"
+    file: "lib/hooks/use-vibration.ts"
+    returns: "{ vibratePass: () => void; vibrateFail: () => void; vibrateMarginal: () => void }"
+    features:
+      - "Vibration API wrapper"
+      - "Fallback if not supported"
+
+# Types
+types:
+  file: "lib/types/mobile-ccp-monitoring.ts"
+  interfaces:
+    - name: "MobileCCP"
+      fields:
+        - id: "string"
+        - ccp_number: "string"
+        - ccp_name: "string"
+        - critical_limit_min: "number | null"
+        - critical_limit_max: "number | null"
+        - unit_of_measure: "string"
+        - target_value: "number | null"
+        - monitoring_method: "string"
+        - corrective_action_std: "string"
+
+    - name: "OfflineMonitoringRecord"
+      fields:
+        - id: "string (UUID v4 generated offline)"
+        - org_id: "string"
+        - ccp_id: "string"
+        - ccp_number: "string"
+        - ccp_name: "string"
+        - wo_id: "string | null"
+        - wo_number: "string | null"
+        - monitored_value: "number"
+        - unit_of_measure: "string"
+        - critical_limit_min: "number | null"
+        - critical_limit_max: "number | null"
+        - result: "'pass' | 'fail' | 'marginal'"
+        - deviation_detected: "boolean"
+        - corrective_action_taken: "string | null"
+        - monitoring_method: "string"
+        - equipment_used: "string | null"
+        - monitored_by: "string"
+        - monitored_at: "string (ISO 8601)"
+        - synced: "boolean"
+        - sync_error: "string | null"
+        - created_offline_at: "string (ISO 8601)"
+
+    - name: "WOBarcodeData"
+      fields:
+        - wo_id: "string"
+        - wo_number: "string"
+        - product_id: "string"
+        - product_name: "string"
+        - batch_number: "string | null"
+        - routing_id: "string"
+        - ccp_ids: "string[]"
+
+# UX Patterns (Mobile-Specific)
+ux_patterns:
+  - pattern: "Large Touch Targets"
+    description: "All interactive elements >= 48px (WCAG AAA)"
+    implementation: "min-height: 48px, min-width: 48px, padding: 12px 24px"
+
+  - pattern: "Portrait Orientation"
+    description: "Mobile UI optimized for one-handed portrait use"
+    implementation: "max-width: 480px, vertical layout, large buttons at bottom"
+
+  - pattern: "Offline-First"
+    description: "Works offline, syncs when online"
+    implementation: "IndexedDB + Service Worker + Auto-sync on reconnect"
+
+  - pattern: "Audio + Vibration Feedback"
+    description: "Immediate tactile and audio alerts on deviation"
+    implementation: "Web Audio API + Vibration API"
+
+  - pattern: "Barcode Scanner"
+    description: "Camera-based barcode scanning"
+    implementation: "BarcodeDetector API + ZXing fallback"
+
+# Responsive Design (Mobile)
+responsive:
+  - breakpoint: "mobile (portrait)"
+    layout: "Single column, large buttons, vertical stacking"
+  - breakpoint: "mobile (landscape)"
+    layout: "Not recommended, show rotation prompt"
+  - breakpoint: "tablet"
+    layout: "Larger elements, same mobile patterns"
+
+# Accessibility (Mobile)
+accessibility:
+  - "Touch targets min 48px (WCAG AAA)"
+  - "High contrast mode support"
+  - "Large font sizes (18px+ for body, 24px+ for inputs)"
+  - "Screen reader support (aria-labels)"
+  - "Keyboard navigation (Bluetooth keyboard support)"
+  - "Voice control support (experimental)"
+
+# Performance (Mobile)
+performance:
+  - "Page load: <2s on 3G"
+  - "Offline storage: <100ms read/write"
+  - "Sync: <2s for 50 records"
+  - "Camera access: <1s"
+  - "Barcode detection: <500ms"
+  - "Audio feedback: <100ms latency"

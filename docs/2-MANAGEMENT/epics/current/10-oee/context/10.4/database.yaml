@@ -1,0 +1,112 @@
+# Story 10.4 - Database Schema
+# OEE Calculation Engine
+
+migrations:
+  - path: "supabase/migrations/XXX_create_oee_snapshots.sql"
+    type: "migration"
+    description: "Create oee_snapshots, oee_daily_summary, oee_hourly_summary tables"
+
+tables:
+  - name: "oee_snapshots"
+    description: "Point-in-time OEE calculations for machines/lines"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "shift_id", type: "UUID", constraints: "REFERENCES shifts(id)" }
+      - { name: "work_order_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "snapshot_time", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "availability_pct", type: "DECIMAL(5,2)", constraints: "NOT NULL CHECK (availability_pct >= 0 AND availability_pct <= 100)" }
+      - { name: "performance_pct", type: "DECIMAL(5,2)", constraints: "NOT NULL CHECK (performance_pct >= 0 AND performance_pct <= 100)" }
+      - { name: "quality_pct", type: "DECIMAL(5,2)", constraints: "NOT NULL CHECK (quality_pct >= 0 AND quality_pct <= 100)" }
+      - { name: "oee_pct", type: "DECIMAL(5,2)", constraints: "GENERATED ALWAYS AS ((availability_pct * performance_pct * quality_pct) / 10000) STORED" }
+      - { name: "planned_production_time", type: "INTEGER", constraints: "NOT NULL (minutes)" }
+      - { name: "actual_production_time", type: "INTEGER", constraints: "NOT NULL (minutes)" }
+      - { name: "total_downtime", type: "INTEGER", constraints: "DEFAULT 0 (minutes)" }
+      - { name: "ideal_cycle_time", type: "DECIMAL(10,4)", constraints: "NULLABLE (units per minute)" }
+      - { name: "total_pieces", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "good_pieces", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "rejected_pieces", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "calculation_method", type: "TEXT", constraints: "DEFAULT 'auto' CHECK (calculation_method IN ('auto', 'manual', 'scheduled'))" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_snapshots_org ON oee_snapshots(org_id)"
+      - "idx_snapshots_machine ON oee_snapshots(machine_id) WHERE machine_id IS NOT NULL"
+      - "idx_snapshots_time ON oee_snapshots(org_id, snapshot_time DESC)"
+      - "idx_snapshots_machine_time ON oee_snapshots(machine_id, snapshot_time DESC) WHERE machine_id IS NOT NULL"
+
+  - name: "oee_daily_summary"
+    description: "Aggregated daily OEE metrics"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "summary_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "machine_id", type: "UUID", constraints: "NULLABLE" }
+      - { name: "line_id", type: "UUID", constraints: "NULLABLE" }
+      - { name: "shift_id", type: "UUID", constraints: "NULLABLE" }
+      - { name: "total_planned_time", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "total_downtime", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "total_production_time", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "oee_avg", type: "DECIMAL(5,2)", constraints: "" }
+      - { name: "availability_avg", type: "DECIMAL(5,2)", constraints: "" }
+      - { name: "performance_avg", type: "DECIMAL(5,2)", constraints: "" }
+      - { name: "quality_avg", type: "DECIMAL(5,2)", constraints: "" }
+      - { name: "total_output", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "good_output", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "scrap_output", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_daily_org_date ON oee_daily_summary(org_id, summary_date DESC)"
+    constraints:
+      - "uq_daily_summary UNIQUE (org_id, summary_date, machine_id, line_id, shift_id)"
+
+  - name: "oee_hourly_summary"
+    description: "Aggregated hourly OEE metrics for intraday trends"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "hour_start", type: "TIMESTAMPTZ", constraints: "NOT NULL" }
+      - { name: "machine_id", type: "UUID", constraints: "NULLABLE" }
+      - { name: "line_id", type: "UUID", constraints: "NULLABLE" }
+      - { name: "oee_avg", type: "DECIMAL(5,2)", constraints: "" }
+      - { name: "units_produced", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "good_units", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "downtime_minutes", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_hourly_org_hour ON oee_hourly_summary(org_id, hour_start DESC)"
+    constraints:
+      - "uq_hourly_summary UNIQUE (org_id, hour_start, machine_id)"
+
+rls_policies:
+  pattern: "ADR-013 Users Table Lookup"
+  policies:
+    - { table: "oee_snapshots", name: "snapshots_select", operation: "SELECT" }
+    - { table: "oee_snapshots", name: "snapshots_insert", operation: "INSERT" }
+    - { table: "oee_daily_summary", name: "daily_summary_select", operation: "SELECT" }
+    - { table: "oee_daily_summary", name: "daily_summary_insert", operation: "INSERT" }
+    - { table: "oee_hourly_summary", name: "hourly_summary_select", operation: "SELECT" }
+    - { table: "oee_hourly_summary", name: "hourly_summary_insert", operation: "INSERT" }
+
+triggers:
+  - { name: "update_oee_daily_summary_updated_at", table: "oee_daily_summary", event: "BEFORE UPDATE", function: "update_updated_at_column()" }
+
+business_rules:
+  - rule: "OEE Formula"
+    description: "OEE = (Availability × Performance × Quality) / 10000"
+    enforcement: "Generated column oee_pct"
+
+  - rule: "Availability = (Actual Production Time / Planned Production Time) × 100"
+    enforcement: "Service layer calculation"
+
+  - rule: "Performance = (Total Pieces / (Actual Production Time × Ideal Cycle Time)) × 100"
+    enforcement: "Service layer calculation"
+
+  - rule: "Quality = (Good Pieces / Total Pieces) × 100"
+    enforcement: "Service layer calculation"

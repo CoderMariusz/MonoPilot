@@ -1,0 +1,33 @@
+# Story 09.15 - Tests Context
+# Generated: 2026-01-15
+
+unit_tests:
+  - file: "lib/services/__tests__/resource-service.test.ts"
+    coverage_target: 80
+    test_count: 10
+    description: "Service layer tests"
+
+integration_tests:
+  - file: "app/api/MODULE/resource/route.test.ts"
+    test_count: 5
+    description: "API endpoint tests"
+
+e2e_tests:
+  - file: "tests/e2e/MODULE/resource.spec.ts"
+    test_count: 3
+    description: "Full workflow tests"
+
+rls_tests:
+  - description: "Org isolation verification"
+  - description: "Cross-tenant access prevention"
+
+acceptance_criteria_mapping:
+  - ac: "AC-1: Basic CRUD"
+    tests: ["unit: create", "integration: POST /api", "e2e: create flow"]
+  - ac: "AC-2: Permissions"
+    tests: ["integration: 403 forbidden", "rls: org isolation"]
+
+coverage_targets:
+  unit: 80
+  integration: 90
+  e2e: 100

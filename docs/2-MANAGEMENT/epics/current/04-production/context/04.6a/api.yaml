@@ -1,0 +1,222 @@
+# Story 04.6a - API Endpoints
+
+endpoints:
+  - method: "GET"
+    path: "/api/production/work-orders/:woId/materials"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/materials/route.ts"
+    description: "List WO materials with consumption progress"
+    auth: true
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+      - "production_operator"
+      - "planner"
+    request:
+      params:
+        woId: "UUID - Work order ID"
+      query:
+        filter: "all | partial | completed | over-consumed"
+        sort: "sequence | name | progress"
+    response:
+      success:
+        status: 200
+        body:
+          materials:
+            type: "array"
+            items:
+              id: "UUID"
+              product_id: "UUID"
+              material_name: "string"
+              material_sku: "string"
+              required_qty: "number"
+              consumed_qty: "number"
+              remaining_qty: "number"
+              uom: "string"
+              sequence: "number"
+              consume_whole_lp: "boolean"
+              is_by_product: "boolean"
+              progress_percent: "number"
+              variance_percent: "number"
+    errors:
+      - code: 404
+        message: "Work order not found"
+      - code: 403
+        message: "Not authorized to view this work order"
+
+  - method: "POST"
+    path: "/api/production/work-orders/:woId/consume"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/consume/route.ts"
+    description: "Record material consumption from LP"
+    auth: true
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+      - "production_operator"
+    request:
+      params:
+        woId: "UUID - Work order ID"
+      body:
+        wo_material_id: "UUID - Required"
+        lp_id: "UUID - Required"
+        consume_qty: "number - Required, must be > 0"
+    response:
+      success:
+        status: 201
+        body:
+          consumption:
+            id: "UUID"
+            consumed_qty: "number"
+            consumed_at: "ISO timestamp"
+          lp_updated:
+            id: "UUID"
+            new_qty: "number"
+            new_status: "available | consumed"
+          material_progress:
+            consumed: "number"
+            required: "number"
+            percentage: "number"
+    errors:
+      - code: 400
+        error: "LP_NOT_FOUND"
+        message: "License plate not found"
+      - code: 400
+        error: "LP_NOT_AVAILABLE"
+        message: "LP is not available (status: consumed)"
+      - code: 400
+        error: "PRODUCT_MISMATCH"
+        message: "Product mismatch: LP contains X, material requires Y"
+      - code: 400
+        error: "UOM_MISMATCH"
+        message: "UoM mismatch: LP is X, material requires Y"
+      - code: 400
+        error: "INSUFFICIENT_QUANTITY"
+        message: "Insufficient quantity: LP has X, requested Y"
+      - code: 400
+        error: "FULL_LP_REQUIRED"
+        message: "Full LP consumption required. LP quantity is X"
+
+  - method: "GET"
+    path: "/api/production/work-orders/:woId/consumptions"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/consumptions/route.ts"
+    description: "List consumption history for WO"
+    auth: true
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+      - "production_operator"
+      - "planner"
+    request:
+      params:
+        woId: "UUID - Work order ID"
+      query:
+        page: "number - default 1"
+        limit: "number - default 20"
+        status: "all | active | reversed"
+    response:
+      success:
+        status: 200
+        body:
+          consumptions:
+            type: "array"
+            items:
+              id: "UUID"
+              lp_number: "string"
+              material_name: "string"
+              consumed_qty: "number"
+              uom: "string"
+              consumed_at: "ISO timestamp"
+              consumed_by_name: "string"
+              batch_number: "string"
+              expiry_date: "date"
+              status: "active | reversed"
+              is_full_lp: "boolean"
+          pagination:
+            page: "number"
+            limit: "number"
+            total: "number"
+            pages: "number"
+
+  - method: "POST"
+    path: "/api/production/work-orders/:woId/consumptions/:id/reverse"
+    file: "apps/frontend/app/api/production/work-orders/[woId]/consumptions/[id]/reverse/route.ts"
+    description: "Reverse a consumption (Manager only)"
+    auth: true
+    roles:
+      - "owner"
+      - "admin"
+      - "production_manager"
+    request:
+      params:
+        woId: "UUID - Work order ID"
+        id: "UUID - Consumption ID"
+      body:
+        reason: "string - Required, reversal reason"
+        notes: "string - Optional, additional notes"
+    response:
+      success:
+        status: 200
+        body:
+          success: true
+          lp_restored:
+            id: "UUID"
+            new_qty: "number"
+            new_status: "available"
+          consumption:
+            id: "UUID"
+            status: "reversed"
+            reversed_at: "ISO timestamp"
+            reversed_by: "UUID"
+    errors:
+      - code: 403
+        message: "Only managers can reverse consumptions"
+      - code: 404
+        message: "Consumption not found"
+      - code: 400
+        error: "ALREADY_REVERSED"
+        message: "Consumption already reversed"
+
+services:
+  - path: "apps/frontend/lib/services/consumption-service.ts"
+    class: "ConsumptionService"
+    methods:
+      - name: "validateLP"
+        params: ["lpId", "materialId"]
+        returns: "LPValidationResult"
+        description: "Validate LP for consumption (exists, available, product match, UoM match)"
+
+      - name: "recordConsumption"
+        params: ["woId", "woMaterialId", "lpId", "consumeQty"]
+        returns: "ConsumptionResult"
+        description: "Record consumption with transaction (LP update + consumption record)"
+
+      - name: "reverseConsumption"
+        params: ["consumptionId", "reason", "notes"]
+        returns: "ReversalResult"
+        description: "Reverse consumption (Manager only)"
+
+      - name: "getWOMaterials"
+        params: ["woId", "filter", "sort"]
+        returns: "WOMaterial[]"
+        description: "Get WO materials with progress"
+
+      - name: "getConsumptionHistory"
+        params: ["woId", "page", "limit", "status"]
+        returns: "ConsumptionHistoryPage"
+        description: "Get paginated consumption history"
+
+validation:
+  path: "apps/frontend/lib/validation/consumption-schema.ts"
+  schemas:
+    - name: "consumeRequestSchema"
+      fields:
+        wo_material_id: "z.string().uuid()"
+        lp_id: "z.string().uuid()"
+        consume_qty: "z.number().positive()"
+
+    - name: "reverseRequestSchema"
+      fields:
+        reason: "z.string().min(1).max(500)"
+        notes: "z.string().max(1000).optional()"

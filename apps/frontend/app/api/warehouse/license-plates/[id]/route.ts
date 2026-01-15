@@ -16,6 +16,15 @@ export async function GET(
 ) {
   try {
     const { id, action } = await params
+
+    // Skip "new" - it's not a valid LP ID (handled by create page/modal)
+    if (id === 'new') {
+      return NextResponse.json(
+        { error: 'Invalid LP ID' },
+        { status: 400 }
+      )
+    }
+
     const supabase = await createServerSupabase()
 
     // Check authentication

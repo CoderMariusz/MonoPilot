@@ -1,0 +1,69 @@
+# Story 10.20 - API Specification
+# Purpose: Data export endpoints for BI tools
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/export/snapshots"
+    description: "Export OEE snapshots"
+    auth: "required"
+    query_params:
+      format: "string (required) - 'csv' | 'json' | 'xlsx'"
+      date_from: "string (required) - YYYY-MM-DD"
+      date_to: "string (required) - YYYY-MM-DD"
+      machine_id: "string (optional)"
+      line_id: "string (optional)"
+      shift_id: "string (optional)"
+      include_headers: "boolean (optional) - default: true"
+    response:
+      content_type: "text/csv | application/json | application/vnd.openxmlformats"
+      max_rows: 100000
+
+  - method: "GET"
+    path: "/api/oee/export/downtime"
+    description: "Export downtime events"
+    auth: "required"
+    query_params:
+      format: "string - 'csv' | 'json' | 'xlsx'"
+      date_from: "string"
+      date_to: "string"
+      include_resolved: "boolean"
+
+  - method: "GET"
+    path: "/api/oee/export/shift-reports"
+    description: "Export shift reports"
+    auth: "required"
+    query_params:
+      format: "string"
+      date_from: "string"
+      date_to: "string"
+      status: "string (optional)"
+
+  - method: "GET"
+    path: "/api/oee/export/data-mart"
+    description: "Full data mart export for BI tools"
+    auth: "required"
+    query_params:
+      format: "string - 'csv' | 'json'"
+      date_from: "string"
+      date_to: "string"
+      limit: "number (optional) - max 100000"
+
+services:
+  - path: "apps/frontend/lib/services/export-service.ts"
+    exports:
+      - name: "ExportService"
+        methods:
+          - "exportSnapshots"
+          - "exportDowntime"
+          - "exportShiftReports"
+          - "exportDataMart"
+          - "convertToCSV"
+          - "convertToXLSX"
+
+types:
+  - path: "apps/frontend/lib/types/export.ts"
+    exports:
+      - "ExportFormat"
+      - "ExportParams"
+      - "ExportResponse"

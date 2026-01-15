@@ -1,0 +1,32 @@
+# Story 06.36 - Supplier Audit Findings Context
+# Phase: 4 (Advanced Quality)
+
+story:
+  id: "06.36"
+  name: "Supplier Audit Findings"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "full-stack"
+  state: "ready"
+  priority: "P1"
+
+dependencies:
+  required:
+    - story: "06.35"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "supplier_audit_findings table"
+  - type: "api"
+    count: 7
+  - type: "components"
+    count: 6
+
+summary: |
+  Audit findings with category/severity (critical/major/minor/observation).
+  Supplier corrective action response workflow.
+  Auditor verification and closure.
+  Auto-due dates by severity.

@@ -1,0 +1,20 @@
+# Story 06.40 - Document Control API
+
+endpoints:
+  - GET /api/quality/documents (list with filters)
+  - GET /api/quality/documents/:id (detail with version history)
+  - POST /api/quality/documents (upload with metadata)
+  - PUT /api/quality/documents/:id (update, creates new version if file changed)
+  - DELETE /api/quality/documents/:id (draft only)
+  - POST /api/quality/documents/:id/submit-review
+  - POST /api/quality/documents/:id/approve
+  - POST /api/quality/documents/:id/reject
+  - POST /api/quality/documents/:id/new-version
+  - POST /api/quality/documents/:id/archive
+  - GET /api/quality/documents/:id/download (signed URL)
+
+service_methods:
+  - uploadFile(file, orgId, documentNumber, version)
+  - downloadFile(id, version) - returns signed URL
+  - calculateFileHash(file) - SHA-256
+  - createNewVersion(id, file, changeReason, revisionNotes)

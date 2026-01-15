@@ -1,0 +1,31 @@
+pages:
+  - path: "/technical/boms/:id"
+    sections:
+      - name: "BOM Costing"
+        component: "BOMCostBreakdown"
+        sections:
+          - "Ingredient Costs (table)"
+          - "Packaging Costs (table)"
+          - "Labor Cost (from routing)"
+          - "Overhead Cost"
+          - "Total Cost per Unit"
+        actions:
+          - "Recalculate Cost button"
+
+components:
+  - "BOMCostBreakdown.tsx - Cost breakdown view"
+  - "IngredientCostTable.tsx - Ingredient cost detail"
+  - "PackagingCostTable.tsx - Packaging cost detail"
+  - "BOMCostSummary.tsx - Summary card with total"
+
+ui_patterns:
+  - "Cost breakdown collapsible sections"
+  - "Recalculate button triggers POST /calculate"
+  - "Auto-refresh on BOM changes (if auto_calculate=true)"
+  - "Cost per unit prominently displayed"
+
+ux:
+  wireframes:
+    - id: "FIN-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-004-bom-costing-page.md"
+      relevance: "Complete BOM costing page with ingredient, packaging, labor, and overhead cost breakdown"

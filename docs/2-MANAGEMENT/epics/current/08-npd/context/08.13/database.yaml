@@ -1,0 +1,29 @@
+# Story 08.13 - Database Schema
+# Purpose: Pilot WO type and NPD linkage in work_orders
+# Agent: BACKEND-DEV
+# SEE: _index.yaml and markdown lines 672-690
+
+migrations:
+  - path: "supabase/migrations/XXX_add_pilot_wo_to_work_orders.sql"
+    type: "migration"
+    description: "Add type and npd_project_id to work_orders table"
+
+extensions:
+  - table: "work_orders"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "type", type: "VARCHAR(20)", constraints: "DEFAULT 'production'" }
+      - { name: "npd_project_id", type: "INTEGER", constraints: "REFERENCES npd_projects(id)" }
+    indexes:
+      - "idx_work_orders_type ON work_orders(type)"
+      - "idx_work_orders_npd_project ON work_orders(npd_project_id) WHERE npd_project_id IS NOT NULL"
+    comments:
+      - "COMMENT ON COLUMN work_orders.type IS 'Work order type: production, pilot, trial, rework, etc.'"
+      - "COMMENT ON COLUMN work_orders.npd_project_id IS 'NPD project that created this pilot WO (handoff traceability)'"
+
+dependencies:
+  required_tables:
+    - "npd_projects (08.2)"
+    - "work_orders (03.2)"
+    - "boms (02.2)"
+    - "routings (04.1 - soft dependency)"

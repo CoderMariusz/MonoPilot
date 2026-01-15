@@ -1,0 +1,18 @@
+# Story 06.39 - Quality Analytics API
+
+endpoints:
+  - GET /api/quality/analytics/defect-pareto
+  - GET /api/quality/analytics/ncr-trend
+  - GET /api/quality/analytics/test-result-trend
+  - GET /api/quality/analytics/ccp-deviation-trend
+  - GET /api/quality/analytics/spc-chart (X-bar, R-chart)
+  - GET /api/quality/analytics/root-cause-frequency
+  - GET /api/quality/analytics/supplier-quality-trend
+  - GET /api/quality/analytics/capa-effectiveness
+  - POST /api/quality/analytics/export (CSV, Excel, PDF)
+  - POST /api/quality/analytics/schedule-report
+
+service_methods:
+  - calculateControlLimits(data, chartType, subgroupSize)
+  - calculateCpk(mean, stdDev, specMin, specMax)
+  - getSPCChart(parameterId, chartType, subgroupSize, dateFrom, dateTo)

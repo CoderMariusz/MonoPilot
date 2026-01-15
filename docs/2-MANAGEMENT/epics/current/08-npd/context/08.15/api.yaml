@@ -1,0 +1,72 @@
+# Story 08.15 - API Specification
+# Purpose: Event log and notification endpoints
+# Agent: BACKEND-DEV
+# SEE: markdown lines 500-775
+
+endpoints:
+  - method: "GET"
+    path: "/api/npd/events"
+    description: "List events (admin only)"
+    auth: "required"
+    roles: ["ADMIN"]
+    query_params:
+      - { name: "status", type: "enum", optional: true }
+      - { name: "event_type", type: "string", optional: true }
+      - { name: "page", type: "number", default: 1 }
+      - { name: "limit", type: "number", default: 20 }
+    response: "PaginatedResult<NPDEvent>"
+
+  - method: "POST"
+    path: "/api/npd/events/:id/retry"
+    description: "Retry failed event (admin only)"
+    auth: "required"
+    roles: ["ADMIN"]
+    request: "{ force?: boolean }"
+    response: "RetryEventResponse"
+
+  - method: "GET"
+    path: "/api/notifications"
+    description: "List user notifications"
+    auth: "required"
+    response: "NotificationListResponse"
+
+  - method: "PUT"
+    path: "/api/notifications/:id/read"
+    description: "Mark notification as read"
+    auth: "required"
+    response: "MarkReadResponse"
+
+  - method: "GET"
+    path: "/api/notifications/unread-count"
+    description: "Get unread notification count"
+    auth: "required"
+    response: "{ count: number }"
+
+services:
+  - name: "NPDEventService"
+    path: "lib/services/npd-event-service.ts"
+    methods:
+      - "logEvent(orgId, eventType, entityType, entityId, payload): void"
+      - "listEvents(params): PaginatedResult<NPDEvent>"
+      - "retryEvent(eventId, force): void"
+      - "processEvent(event): void (private)"
+
+  - name: "NPDNotificationService"
+    path: "lib/services/npd-notification-service.ts"
+    methods:
+      - "sendNotification(userId, type, title, body, link, priority): void"
+      - "sendEmail(userId, subject, body, link): void (private)"
+      - "getUserPreferences(userId): NotificationPreferences (private)"
+      - "markAsRead(notificationId, userId): void"
+      - "getUnreadCount(userId): number"
+
+edge_function:
+  name: "send-email"
+  path: "supabase/functions/send-email/index.ts"
+  description: "Supabase Edge Function for email delivery"
+  payload: "{ to: string, subject: string, body: string, link: string }"
+
+retry_mechanism:
+  max_retries: 3
+  backoff: "Exponential (1min, 2min, 4min)"
+  worker: "Cron job or background worker (every 1 minute)"

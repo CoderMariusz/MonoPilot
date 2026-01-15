@@ -1,0 +1,416 @@
+# Story 05.28 - Test Specification
+# Purpose: Acceptance criteria verification, test cases
+
+# Acceptance Criteria Summary
+acceptance_criteria:
+  - id: AC-1
+    name: "Expiring Soon Dashboard Widget"
+    requirement: "LPs within warning period appear in widget sorted by expiry date"
+    tests: [unit, integration, e2e]
+
+  - id: AC-2
+    name: "Multi-Tier Color Coding"
+    requirement: "Red (<=7d), Orange (8-14d), Yellow (15-30d) indicators"
+    tests: [unit, component]
+
+  - id: AC-3
+    name: "Days Until Expiry Calculation"
+    requirement: "Accurate calculation with proper labels (X days, today, expired)"
+    tests: [unit]
+
+  - id: AC-4
+    name: "Expired LPs Alert Panel"
+    requirement: "Past-expiry LPs shown with days expired and value"
+    tests: [unit, integration, e2e]
+
+  - id: AC-5
+    name: "Expired LP Summary"
+    requirement: "Count, quantity, value at risk totals"
+    tests: [unit, integration]
+
+  - id: AC-6
+    name: "Daily Expiry Check Job"
+    requirement: "Scheduled job at 06:00 UTC detects expiring inventory"
+    tests: [unit, integration]
+
+  - id: AC-7
+    name: "Email Notification"
+    requirement: "Email sent to warehouse managers when threshold met"
+    tests: [unit, integration]
+
+  - id: AC-8
+    name: "Notification Settings Integration"
+    requirement: "Respect enabled flag and threshold settings"
+    tests: [unit, integration]
+
+  - id: AC-9
+    name: "Expiry Warning Days Setting"
+    requirement: "Configurable 1-365 days, queries use setting"
+    tests: [unit, integration]
+
+  - id: AC-10
+    name: "Multi-Tier Threshold Configuration"
+    requirement: "Configurable critical/orange day thresholds"
+    tests: [unit, integration]
+
+  - id: AC-11
+    name: "Expiring Inventory API"
+    requirement: "Returns expiring LPs with tier filtering, <300ms"
+    tests: [integration]
+
+  - id: AC-12
+    name: "Expiry Summary API"
+    requirement: "Returns aggregated data with caching"
+    tests: [integration]
+
+  - id: AC-13
+    name: "Performance Requirements"
+    requirement: "<500ms for 100K+ LPs, 5min cache TTL"
+    tests: [performance]
+
+  - id: AC-14
+    name: "Export Expiring Items"
+    requirement: "CSV export with streaming for large datasets"
+    tests: [integration]
+
+# Unit Tests
+unit_tests:
+  expiry_alert_service:
+    file: "lib/services/__tests__/expiry-alert-service.test.ts"
+    coverage_target: "80%"
+    test_cases:
+      calculateDaysUntilExpiry:
+        - name: "returns positive days for future expiry"
+          input: { expiry_date: "2025-01-22" }  # 7 days from now
+          expected: 7
+
+        - name: "returns 0 for today expiry"
+          input: { expiry_date: "2025-01-15" }  # today
+          expected: 0
+
+        - name: "returns negative days for past expiry"
+          input: { expiry_date: "2025-01-10" }  # 5 days ago
+          expected: -5
+
+      getExpiryTier:
+        - name: "returns critical for days <= critical_days"
+          input: { days: 5, critical_days: 7, orange_days: 14 }
+          expected: "critical"
+
+        - name: "returns warning for days <= orange_days"
+          input: { days: 10, critical_days: 7, orange_days: 14 }
+          expected: "warning"
+
+        - name: "returns caution for days <= warning_days"
+          input: { days: 20, critical_days: 7, orange_days: 14, warning_days: 30 }
+          expected: "caution"
+
+        - name: "returns normal for days > warning_days"
+          input: { days: 45, critical_days: 7, orange_days: 14, warning_days: 30 }
+          expected: "normal"
+
+        - name: "returns expired for negative days"
+          input: { days: -3 }
+          expected: "expired"
+
+      getExpiringLPs:
+        - name: "returns only available LPs with expiry_date"
+          mock_data: "LPs with mixed status and expiry_date values"
+          expected: "Only status=available AND expiry_date IS NOT NULL"
+
+        - name: "filters by tier when specified"
+          input: { tier: "critical" }
+          expected: "Only LPs with days <= critical_days"
+
+        - name: "filters by warehouse_id when specified"
+          input: { warehouse_id: "uuid" }
+          expected: "Only LPs in specified warehouse"
+
+        - name: "respects limit and offset"
+          input: { limit: 10, offset: 20 }
+          expected: "Returns items 21-30"
+
+        - name: "sorts by expiry_date ASC"
+          expected: "Soonest expiry first"
+
+      getExpirySummary:
+        - name: "calculates correct counts per tier"
+          mock_data: "10 critical, 15 warning, 5 caution"
+          expected: { critical: 10, warning: 15, caution: 5 }
+
+        - name: "calculates value at risk correctly"
+          mock_data: "LPs with qty and unit_cost"
+          expected: "SUM(qty * unit_cost)"
+
+        - name: "groups by warehouse correctly"
+          mock_data: "LPs in 3 warehouses"
+          expected: "3 warehouse entries with counts"
+
+      calculateValueAtRisk:
+        - name: "sums quantity * unit_cost for all LPs"
+          input: [{ qty: 10, unit_cost: 5 }, { qty: 20, unit_cost: 3 }]
+          expected: 110
+
+        - name: "handles missing unit_cost as 0"
+          input: [{ qty: 10, unit_cost: null }]
+          expected: 0
+
+  expiry_badge_component:
+    file: "components/warehouse/expiry/__tests__/ExpiryBadge.test.tsx"
+    test_cases:
+      - name: "renders red badge for critical tier"
+        input: { daysRemaining: 5 }
+        expected: "bg-red-100 visible"
+
+      - name: "renders orange badge for warning tier"
+        input: { daysRemaining: 10 }
+        expected: "bg-orange-100 visible"
+
+      - name: "renders yellow badge for caution tier"
+        input: { daysRemaining: 20 }
+        expected: "bg-yellow-100 visible"
+
+      - name: "renders no badge for normal tier"
+        input: { daysRemaining: 45 }
+        expected: "no badge rendered"
+
+      - name: "renders expired badge for negative days"
+        input: { daysRemaining: -3 }
+        expected: "bg-red-500 text-white 'Expired'"
+
+      - name: "shows days text when showDays=true"
+        input: { daysRemaining: 5, showDays: true }
+        expected: "text contains '5'"
+
+  expiry_widget_component:
+    file: "components/warehouse/expiry/__tests__/ExpiryAlertWidget.test.tsx"
+    test_cases:
+      - name: "displays correct count in header"
+        input: { expiringItems: [10 items] }
+        expected: "header shows '10'"
+
+      - name: "limits display to 10 items"
+        input: { expiringItems: [25 items] }
+        expected: "only 10 items rendered"
+
+      - name: "shows View All link with count"
+        input: { expiringItems: [25 items] }
+        expected: "View All (25) link visible"
+
+      - name: "calls onItemClick when item clicked"
+        action: "click on item"
+        expected: "onItemClick called with lpId"
+
+      - name: "shows loading state"
+        input: { isLoading: true }
+        expected: "loading skeleton visible"
+
+# Integration Tests
+integration_tests:
+  expiry_api:
+    file: "app/api/warehouse/inventory/expiring/__tests__/route.test.ts"
+    test_cases:
+      get_expiring:
+        - name: "returns expiring LPs within warning period"
+          setup: "Create LPs with various expiry dates"
+          expected: "Only LPs within warning_days returned"
+
+        - name: "filters by tier correctly"
+          input: { tier: "critical" }
+          expected: "Only critical tier items"
+
+        - name: "filters by warehouse_id correctly"
+          input: { warehouse_id: "specific-uuid" }
+          expected: "Only items from that warehouse"
+
+        - name: "respects pagination (limit, offset)"
+          input: { limit: 10, offset: 5 }
+          expected: "Items 6-15 returned"
+
+        - name: "returns 401 for unauthenticated"
+          setup: "No auth token"
+          expected: 401
+
+        - name: "enforces org isolation (RLS)"
+          setup: "User from Org A, LPs in Org B"
+          expected: "No Org B LPs returned"
+
+      get_summary:
+        - name: "returns correct summary counts"
+          setup: "Create known distribution of LPs"
+          expected: "Counts match setup data"
+
+        - name: "returns correct value calculations"
+          setup: "LPs with known qty and unit_cost"
+          expected: "Values match qty * unit_cost sums"
+
+        - name: "uses cache on second request"
+          action: "Call twice within 5 min"
+          expected: "Second call faster (cache hit)"
+
+        - name: "returns fresh data after cache invalidation"
+          action: "Update LP, then call"
+          expected: "Updated data returned"
+
+      export:
+        - name: "returns CSV file with correct headers"
+          expected: "Content-Type: text/csv, correct columns"
+
+        - name: "includes all expiring items"
+          setup: "50 expiring items"
+          expected: "50 rows in CSV"
+
+        - name: "handles large datasets without timeout"
+          setup: "5000 expiring items"
+          expected: "Completes within 30s"
+
+  expiry_settings_api:
+    file: "app/api/warehouse/settings/expiry/__tests__/route.test.ts"
+    test_cases:
+      - name: "returns current settings"
+        expected: "Settings object with all fields"
+
+      - name: "updates settings with valid data"
+        input: { expiry_warning_days: 14 }
+        expected: "Setting updated, 200 response"
+
+      - name: "rejects invalid warning_days"
+        input: { expiry_warning_days: 500 }
+        expected: "400 with validation error"
+
+      - name: "only admins can update settings"
+        user_role: "WAREHOUSE_OPERATOR"
+        expected: 403
+
+# E2E Tests
+e2e_tests:
+  file: "e2e/warehouse/expiry-alerts.spec.ts"
+  test_cases:
+    - name: "displays expiring soon widget with items"
+      steps:
+        - "Navigate to /warehouse"
+        - "Wait for dashboard load"
+      expected: "Expiring Soon widget visible with items"
+
+    - name: "shows correct color coding for tiers"
+      steps:
+        - "Navigate to /warehouse"
+        - "View expiring items"
+      expected: "Red, orange, yellow badges visible"
+
+    - name: "navigates to LP detail on item click"
+      steps:
+        - "Navigate to /warehouse"
+        - "Click on expiring item"
+      expected: "LP detail page opens"
+
+    - name: "expands to full list on View All click"
+      steps:
+        - "Navigate to /warehouse"
+        - "Click View All on expiry widget"
+      expected: "Full expiring list page opens"
+
+    - name: "displays expired inventory panel"
+      steps:
+        - "Navigate to /warehouse"
+        - "View expired section"
+      expected: "Expired items visible with value"
+
+    - name: "exports CSV on export button click"
+      steps:
+        - "Navigate to /warehouse/expiring"
+        - "Click Export CSV"
+      expected: "CSV file downloaded"
+
+    - name: "updates when threshold settings changed"
+      steps:
+        - "Navigate to /warehouse/settings/expiry"
+        - "Change warning_days from 30 to 14"
+        - "Save and navigate to dashboard"
+      expected: "Widget reflects new threshold"
+
+# Performance Tests
+performance_tests:
+  file: "tests/performance/expiry-alerts.perf.ts"
+  scenarios:
+    - name: "API response time with 10K LPs"
+      setup: "10,000 LPs with expiry dates"
+      endpoint: "/api/warehouse/inventory/expiring"
+      target: "<300ms"
+
+    - name: "API response time with 100K LPs"
+      setup: "100,000 LPs with expiry dates"
+      endpoint: "/api/warehouse/inventory/expiring"
+      target: "<500ms"
+
+    - name: "Summary aggregation with 100K LPs"
+      setup: "100,000 LPs"
+      endpoint: "/api/warehouse/inventory/expiring/summary"
+      target: "<500ms"
+
+    - name: "Cache hit performance"
+      setup: "Warm cache"
+      endpoint: "/api/warehouse/inventory/expiring"
+      target: "<50ms"
+
+    - name: "CSV export with 5K items"
+      setup: "5,000 expiring items"
+      endpoint: "/api/warehouse/inventory/expiring/export"
+      target: "<10s"
+
+# Test Data Fixtures
+fixtures:
+  expiring_lps:
+    description: "Sample expiring LPs for testing"
+    data:
+      - lp_number: "LP-EXPIRE-001"
+        expiry_date: "+3 days"  # Critical
+        quantity: 100
+        product_name: "Fresh Milk"
+
+      - lp_number: "LP-EXPIRE-002"
+        expiry_date: "+10 days"  # Warning
+        quantity: 50
+        product_name: "Yogurt"
+
+      - lp_number: "LP-EXPIRE-003"
+        expiry_date: "+25 days"  # Caution
+        quantity: 200
+        product_name: "Cheese"
+
+      - lp_number: "LP-EXPIRE-004"
+        expiry_date: "-2 days"  # Expired
+        quantity: 30
+        product_name: "Cream"
+
+  expiry_settings:
+    description: "Sample settings for testing"
+    data:
+      expiry_warning_days: 30
+      expiry_critical_days: 7
+      expiry_warning_days_orange: 14
+      expiry_alert_enabled: true
+      expiry_alert_email_threshold: 1
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: "80%"
+    critical_paths:
+      - calculateDaysUntilExpiry
+      - getExpiryTier
+      - getExpiringLPs
+      - getExpirySummary
+
+  integration:
+    target: "70%"
+    critical_endpoints:
+      - GET /api/warehouse/inventory/expiring
+      - GET /api/warehouse/inventory/expiring/summary
+      - PUT /api/warehouse/settings/expiry
+
+  e2e:
+    critical_flows:
+      - Dashboard widget display
+      - Navigation to LP detail
+      - Export functionality

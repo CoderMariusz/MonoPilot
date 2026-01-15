@@ -1,0 +1,149 @@
+story:
+  id: "09.17"
+  name: "Variance Drill-Down"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 4
+
+dependencies:
+  required:
+    - story: "09.1"
+      provides: ["finance_settings"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+    - story: "09.3"
+      provides: ["material_consumption_costs"]
+    - story: "09.4"
+      provides: ["labor_costs"]
+    - story: "09.6"
+      provides: ["work_order_costs"]
+    - story: "09.12"
+      provides: ["overhead_allocations"]
+    - story: "09.16"
+      provides: ["variance_alerts", "base variance data"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-FIN-054", "FR-FIN-056", "Variance Drill-Down by Product/Line/Shift"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.17.variance-drill-down.md"
+  patterns:
+    - "apps/frontend/components/shared/DataTable.tsx"
+    - "apps/frontend/lib/utils/export-to-csv.ts"
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/finance/reports/variance-by-product/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/variance-by-product/[id]/details/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/variance-by-line/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/variance-by-shift/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/overhead-variance/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/variance-export/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/variance-drill-down-service.ts"
+    - path: "apps/frontend/lib/services/variance-export-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/variance-drill-down-schema.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/reports/variance-drill-down/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/reports/variance-drill-down/product/[id]/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/variance/VarianceDrillDownPage.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceByProductTable.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceByLineTable.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceByShiftTable.tsx"
+    - path: "apps/frontend/components/finance/variance/ProductVarianceDetailModal.tsx"
+    - path: "apps/frontend/components/finance/variance/OverheadVarianceBreakdownCard.tsx"
+    - path: "apps/frontend/components/finance/variance/VarianceByLineChart.tsx"
+    - path: "apps/frontend/components/finance/variance/WorkOrderVarianceTable.tsx"
+    - path: "apps/frontend/components/finance/variance/BOMComponentVarianceTable.tsx"
+    - path: "apps/frontend/components/finance/variance/DimensionSelector.tsx"
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-variance-by-product.ts"
+    - path: "apps/frontend/lib/hooks/use-variance-by-line.ts"
+    - path: "apps/frontend/lib/hooks/use-variance-by-shift.ts"
+    - path: "apps/frontend/lib/hooks/use-overhead-variance.ts"
+    - path: "apps/frontend/lib/hooks/use-product-variance-details.ts"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/reports/variance-by-product"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/reports/variance-by-product/:id/details"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/reports/variance-by-line"
+    auth: true
+    roles: ["admin", "finance_manager", "production_supervisor", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/reports/variance-by-shift"
+    auth: true
+    roles: ["admin", "finance_manager", "production_supervisor"]
+  - method: "GET"
+    path: "/api/finance/reports/overhead-variance"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "POST"
+    path: "/api/finance/reports/variance-export"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+
+ux:
+  wireframes:
+    - id: "FIN-VARIANCE-DRILLDOWN-001"
+      path: "docs/2-MANAGEMENT/epics/current/09-finance/09.17.variance-drill-down.md"
+      components: ["VarianceByProductTable", "VarianceByLineTable", "VarianceByShiftTable", "ProductVarianceDetailModal", "OverheadVarianceBreakdownCard"]
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering"
+    drill_down: "Click row to navigate or open modal"
+    export: "CSV/Excel export with filters applied"
+  states: ["loading", "empty", "data_loaded", "export_generating"]
+
+validation_rules:
+  dimension: "enum: product, line, shift"
+  dateFrom: "ISO date, < dateTo"
+  dateTo: "ISO date, > dateFrom"
+  productIds: "array of valid product UUIDs"
+  lineIds: "array of valid production_line UUIDs"
+  shiftType: "enum: day, night, weekend"
+  minVariancePercent: "number 0-100"
+  exportFormat: "enum: csv, excel"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  export: "Server-side generation with streaming"
+
+acceptance_checklist:
+  - "Variance by product query returns ranked list"
+  - "Product drill-down modal shows trend, WOs, BOM components"
+  - "Variance by line includes shift breakdown"
+  - "Shift variance highlights overtime impact"
+  - "Overhead variance shows spending + volume variance"
+  - "Export to CSV includes filters and timestamp"
+  - "Contribution % sums to 100% across products"
+  - "Performance: queries <1s, export <5s"
+  - "RLS policies enforce org isolation"
+  - "Navigation from drill-down table to detail pages works"
+
+output_artifacts:
+  - "Variance drill-down API endpoints (by product, line, shift, overhead)"
+  - "VarianceDrillDownService with aggregation logic"
+  - "VarianceExportService for CSV/Excel generation"
+  - "Variance drill-down page with dimension selector"
+  - "Variance by product/line/shift tables"
+  - "Product variance detail modal with tabs"
+  - "Overhead variance breakdown card"
+  - "Export functionality with format selection"
+  - "Validation schemas for drill-down queries"

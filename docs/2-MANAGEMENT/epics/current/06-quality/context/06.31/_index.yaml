@@ -1,0 +1,165 @@
+# Story 06.31 - CAPA Creation Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 4 (Advanced Quality)
+
+story:
+  id: "06.31"
+  name: "CAPA Creation"
+  slug: "capa-creation"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, triggers, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications, E2E scenarios
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table"]
+    - story: "06.13"
+      name: "NCR Creation"
+      provides: ["ncr_reports table", "NCR reference for source linkage"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "06.32"
+      name: "CAPA Action Items"
+      reason: "Action items require capa_id reference"
+    - story: "06.33"
+      name: "CAPA Effectiveness Check"
+      reason: "Effectiveness checks require CAPA record"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-016", "Section 4.2 NCR & CAPA", "Section 10 Phase Roadmap"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["capa_records", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.31.capa-creation.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for capa_records table"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/06-quality/06.13.ncr-creation.md"
+      relevance: "NCR-CAPA integration pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "capa_records + capa_number_sequences + triggers + RLS"
+  - type: "function"
+    count: 2
+    description: "generate_capa_number() + calculate_capa_target_date()"
+  - type: "service"
+    count: 1
+    description: "capa-service.ts with list, create, update, close, delete"
+  - type: "validation"
+    count: 4
+    description: "createCapaSchema, updateCapaSchema, closeCapaSchema, capaListQuerySchema"
+  - type: "api"
+    count: 7
+    description: "GET/POST capa, GET detail, PUT update, DELETE, POST close, POST create-from-ncr"
+  - type: "components"
+    count: 14
+    description: "DataTable, Filters, Modals, Badges, Forms"
+  - type: "page"
+    count: 3
+    description: "/quality/capa (list), /quality/capa/[id] (detail), /quality/capa/new (create)"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Technical notes
+technical_notes:
+  - "CAPA types: corrective (fix existing) vs preventive (prevent future)"
+  - "CAPA priority: low (90d), medium (60d), high (30d), critical (7d) - auto-calculates target_close_date"
+  - "CAPA status workflow: open → in_progress → closed (or cancelled)"
+  - "CAPA number format: CAPA-{YYYY}-{NNNNN} (e.g., CAPA-2025-00001)"
+  - "Source polymorphism: NCR, Audit, Complaint, Management Review, Manual"
+  - "Create from NCR: inherits title, description, priority from NCR severity"
+  - "Cannot edit or delete closed CAPAs (immutable)"
+  - "Closure requires: actual_close_date, closure_notes, all actions complete (06.32), effectiveness passed (06.33)"
+  - "Overdue indicator: target_close_date < today AND status != 'closed'"
+  - "Audit trail required for all state changes (quality_audit_log)"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+
+# Business Rules
+business_rules:
+  - rule: "CAPA Number Uniqueness"
+    description: "CAPA numbers unique per org per year (CAPA-YYYY-NNNNN)"
+    enforcement: "Database UNIQUE constraint on (org_id, capa_number)"
+  - rule: "Target Date Auto-Calculation"
+    description: "Priority determines default target close date (Critical=7d, High=30d, Medium=60d, Low=90d)"
+    enforcement: "calculate_capa_target_date() function in database"
+  - rule: "Manual Target Date Override"
+    description: "Users can override auto-calculated target date"
+    enforcement: "UI allows manual target_close_date input"
+  - rule: "Source Polymorphism"
+    description: "CAPA can be linked to NCR, Audit, Complaint, Management Review, or Manual"
+    enforcement: "source_type + source_id columns with CHECK constraint"
+  - rule: "Owner Assignment Required"
+    description: "CAPA should have owner before moving to in_progress"
+    enforcement: "UI validation before status change"
+  - rule: "Cannot Edit Closed CAPA"
+    description: "Closed CAPAs are immutable (read-only)"
+    enforcement: "UI hides edit buttons, API returns 403 for update"
+  - rule: "Delete Only Open"
+    description: "Only open CAPAs without action items can be deleted"
+    enforcement: "RLS policy + API validation checks status='open'"
+  - rule: "Closure Requirements"
+    description: "CAPA can only close when all action items complete and effectiveness checks pass"
+    enforcement: "canClose() service method validation (enforced in 06.32, 06.33)"
+  - rule: "Overdue Calculation"
+    description: "CAPA overdue if target_close_date < today AND status != 'closed'"
+    enforcement: "Calculated field in query, indexed for performance"
+  - rule: "Audit Trail Required"
+    description: "All CAPA state changes, assignments, closures logged"
+    enforcement: "Application layer creates audit_log entries on every state change"
+
+# Context Summary
+summary: |
+  Story 06.31 implements CAPA (Corrective and Preventive Action) creation and management.
+
+  MVP SCOPE (This Story):
+  - capa_records table with source type polymorphism
+  - CAPA number auto-generation (CAPA-YYYY-NNNNN)
+  - CAPA types: Corrective vs Preventive
+  - CAPA priority levels: Low/Medium/High/Critical
+  - Source integration: NCR, Audit, Complaint, Management Review
+  - Owner assignment
+  - Target close date auto-calculation based on priority
+  - Integration with 06.13 NCR (create CAPA from NCR)
+  - CAPA list with filters and search
+  - CAPA detail page
+  - Create/Edit CAPA forms
+
+  DEFERRED (Stories 06.32, 06.33):
+  - CAPA action items checklist (06.32)
+  - CAPA effectiveness checks (06.33)
+  - CAPA analytics/dashboard (future)
+  - CAPA templates (future)
+  - CAPA attachments (future)
+
+  KEY INTEGRATION POINTS:
+  - Created from NCR detail page (06.13)
+  - Blocks action items (06.32) and effectiveness checks (06.33)
+  - Links to quality_audit_log for traceability
+  - Part of Quality Phase 4 (Advanced Quality)

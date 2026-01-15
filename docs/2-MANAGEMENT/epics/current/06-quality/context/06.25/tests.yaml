@@ -1,0 +1,510 @@
+# Story 06.25 - CCP Deviation Handling - Tests Context
+# Generated: 2025-01-15
+
+test_coverage:
+  target: ">80%"
+  focus_areas:
+    - "Auto-deviation creation on monitoring fail"
+    - "Severity classification logic"
+    - "NCR auto-creation for critical deviations"
+    - "Resolution workflow state transitions"
+    - "Deviation calculation accuracy"
+
+unit_tests:
+  file: "lib/services/ccp-deviation-service.test.ts"
+  framework: "Vitest"
+  coverage_target: ">80%"
+  test_suites:
+    - suite: "determineSeverity"
+      tests:
+        - name: "classifies critical deviation (>100% over limit)"
+          input:
+            value: 10
+            min: null
+            max: 4
+          assertions:
+            - "Deviation: 6 / 4 = 150% over"
+            - "Severity = 'critical'"
+
+        - name: "classifies major deviation (50-99% over limit)"
+          input:
+            value: 6.5
+            min: null
+            max: 4
+          assertions:
+            - "Deviation: 2.5 / 4 = 62.5% over"
+            - "Severity = 'major'"
+
+        - name: "classifies minor deviation (<50% over limit)"
+          input:
+            value: 5
+            min: null
+            max: 4
+          assertions:
+            - "Deviation: 1 / 4 = 25% over"
+            - "Severity = 'minor'"
+
+        - name: "handles min limit violation"
+          input:
+            value: -2
+            min: 0
+            max: null
+          assertions:
+            - "Deviation: 2 / 0 = undefined (handle division by zero)"
+            - "Severity = 'critical' (absolute deviation used)"
+
+        - name: "returns null if value within limits"
+          input:
+            value: 2.5
+            min: 0
+            max: 4
+          assertions:
+            - "Severity = null (no deviation)"
+
+    - suite: "calculateDeviationAmount"
+      tests:
+        - name: "calculates positive deviation (over max)"
+          input:
+            value: 10
+            max: 4
+          assertions:
+            - "Deviation amount = 6 (10 - 4)"
+
+        - name: "calculates negative deviation (under min)"
+          input:
+            value: -1.5
+            min: 0
+          assertions:
+            - "Deviation amount = 1.5 (0 - (-1.5))"
+
+        - name: "returns null if no deviation"
+          input:
+            value: 2.5
+            min: 0
+            max: 4
+          assertions:
+            - "Deviation amount = null"
+
+    - suite: "create"
+      tests:
+        - name: "creates deviation record from monitoring fail"
+          input:
+            ccp_monitoring_id: "monitoring-uuid"
+            ccp_id: "ccp-uuid"
+            monitored_value: 10
+            critical_limit_max: 4
+            corrective_action: "Rejected shipment"
+          assertions:
+            - "Deviation created with severity='critical'"
+            - "deviation_amount = 6"
+            - "deviation_percentage = 150"
+            - "status = 'open'"
+            - "created_at = now"
+
+        - name: "auto-creates NCR if severity='critical'"
+          input:
+            severity: "critical"
+          assertions:
+            - "NCR created with source='ccp_deviation'"
+            - "ncr_id linked to deviation"
+
+        - name: "does not create NCR if severity='major' or 'minor'"
+          input:
+            severity: "major"
+          assertions:
+            - "ncr_id = null"
+
+    - suite: "investigate"
+      tests:
+        - name: "marks deviation as investigating"
+          setup: "Deviation with status='open'"
+          assertions:
+            - "status = 'investigating'"
+            - "Audit log entry created"
+
+        - name: "cannot investigate deviation not in 'open' status"
+          setup: "Deviation with status='resolved'"
+          assertions:
+            - "Throws error: 'Deviation must be in open status'"
+
+    - suite: "resolve"
+      tests:
+        - name: "resolves deviation with notes"
+          setup: "Deviation with status='investigating'"
+          input:
+            resolutionNotes: "Root cause: Faulty thermometer. Replaced and recalibrated."
+          assertions:
+            - "status = 'resolved'"
+            - "resolution_notes = input"
+            - "resolved_by = current user"
+            - "resolved_at = now"
+
+        - name: "requires resolution notes (min 10 chars)"
+          input:
+            resolutionNotes: "Short"
+          assertions:
+            - "Throws validation error: 'Resolution notes must be at least 10 characters'"
+
+        - name: "cannot resolve deviation not in 'investigating' status"
+          setup: "Deviation with status='open'"
+          assertions:
+            - "Throws error: 'Deviation must be in investigating status'"
+
+    - suite: "verify"
+      tests:
+        - name: "verifies deviation resolution"
+          setup: "Deviation with status='resolved'"
+          assertions:
+            - "status = 'verified'"
+            - "verified_by = current user"
+            - "verified_at = now"
+
+        - name: "cannot verify deviation not in 'resolved' status"
+          setup: "Deviation with status='investigating'"
+          assertions:
+            - "Throws error: 'Deviation must be in resolved status'"
+
+integration_tests:
+  file: "app/api/quality/haccp/ccp-deviations/route.test.ts"
+  framework: "Vitest + Supertest"
+  test_suites:
+    - suite: "POST /api/quality/haccp/ccp-deviations"
+      tests:
+        - name: "creates deviation with severity calculation"
+          request:
+            method: "POST"
+            body: |
+              {
+                "ccp_monitoring_id": "uuid",
+                "ccp_id": "uuid",
+                "ccp_number": "CCP-1",
+                "monitored_value": 10,
+                "critical_limit_max": 4,
+                "corrective_action": "Rejected shipment"
+              }
+          assertions:
+            - "Returns 201 Created"
+            - "Response: { severity: 'critical', deviation_amount: 6, deviation_percentage: 150, ... }"
+            - "NCR created and linked (ncr_id populated)"
+
+        - name: "auto-creates NCR for critical deviation"
+          request:
+            body: "{ severity: critical, ... }"
+          assertions:
+            - "NCR created with source='ccp_deviation'"
+            - "ncr_id in response"
+
+        - name: "does not create NCR for major/minor deviation"
+          request:
+            body: "{ severity: major, ... }"
+          assertions:
+            - "ncr_id = null"
+
+    - suite: "POST /api/quality/haccp/ccp-deviations/:id/investigate"
+      tests:
+        - name: "marks deviation as investigating"
+          setup: "Deviation with status='open'"
+          request:
+            method: "POST"
+            body: "{ notes: 'Investigating root cause' }"
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { status: 'investigating', ... }"
+
+        - name: "returns 400 if deviation not in 'open' status"
+          setup: "Deviation with status='resolved'"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error: 'Deviation must be in open status'"
+
+    - suite: "POST /api/quality/haccp/ccp-deviations/:id/resolve"
+      tests:
+        - name: "resolves deviation with notes"
+          setup: "Deviation with status='investigating'"
+          request:
+            method: "POST"
+            body: |
+              {
+                "resolution_notes": "Root cause: Faulty thermometer. Replaced, recalibrated, retested."
+              }
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { status: 'resolved', resolution_notes: '...', resolved_by: uuid, ... }"
+
+        - name: "returns 400 for short resolution notes"
+          request:
+            body: "{ resolution_notes: 'Short' }"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error: 'Resolution notes must be at least 10 characters'"
+
+        - name: "returns 403 for non-QA Manager"
+          setup: "User with QA_INSPECTOR role"
+          assertions:
+            - "Returns 403 Forbidden"
+            - "Error: 'QA Manager role required'"
+
+    - suite: "POST /api/quality/haccp/ccp-deviations/:id/verify"
+      tests:
+        - name: "verifies deviation resolution"
+          setup: "Deviation with status='resolved'"
+          request:
+            method: "POST"
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { status: 'verified', verified_by: uuid, ... }"
+
+        - name: "returns 400 if deviation not in 'resolved' status"
+          setup: "Deviation with status='investigating'"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error: 'Deviation must be in resolved status'"
+
+    - suite: "GET /api/quality/haccp/ccp-deviations"
+      tests:
+        - name: "lists deviations with filters"
+          request:
+            method: "GET"
+            query: "?severity=critical&status=open"
+          assertions:
+            - "Returns 200 OK"
+            - "Response: { data: [...critical open deviations], total: N }"
+
+        - name: "filters by date range"
+          request:
+            query: "?date_from=2025-01-01&date_to=2025-01-15"
+          assertions:
+            - "Returns only deviations created in date range"
+
+        - name: "filters by batch number"
+          request:
+            query: "?batch_number=B-2025-001"
+          assertions:
+            - "Returns only deviations for batch B-2025-001"
+
+    - suite: "GET /api/quality/haccp/ccp-deviations/summary"
+      tests:
+        - name: "returns deviation summary"
+          request:
+            method: "GET"
+            query: "?date_from=2025-01-01&date_to=2025-01-15"
+          assertions:
+            - "Returns 200 OK"
+            - "Response includes: total_deviations, by_severity, by_status, by_ccp, avg_resolution_time_hours"
+
+    - suite: "RLS Enforcement"
+      tests:
+        - name: "org isolation on deviation list"
+          setup: "User A from Org A, User B from Org B"
+          request:
+            method: "GET"
+            auth: "User A"
+          assertions:
+            - "Returns only Org A deviations"
+            - "Does not return Org B deviations"
+
+        - name: "returns 404 for cross-org deviation access"
+          setup: "Deviation belongs to Org B"
+          request:
+            method: "GET"
+            path: "/api/quality/haccp/ccp-deviations/:id"
+            auth: "User A (Org A)"
+          assertions:
+            - "Returns 404 Not Found (not 403)"
+
+e2e_tests:
+  file: "tests/e2e/quality/ccp-deviation-handling.spec.ts"
+  framework: "Playwright"
+  test_suites:
+    - suite: "Deviation Creation Workflow"
+      tests:
+        - name: "auto-create deviation on monitoring fail"
+          steps:
+            - "Navigate to CCP monitoring page"
+            - "Record monitoring value outside limits (fail)"
+            - "Enter corrective action"
+            - "Submit monitoring record"
+            - "Deviation auto-created"
+            - "Navigate to /quality/haccp/ccp-deviations"
+            - "Verify deviation appears in list"
+            - "Verify severity badge (critical/major/minor)"
+            - "Verify status = 'open'"
+          assertions:
+            - "Deviation created automatically"
+            - "Severity calculated correctly"
+            - "NCR created if critical"
+
+    - suite: "Deviation Resolution Workflow"
+      tests:
+        - name: "complete workflow: investigate -> resolve -> verify"
+          steps:
+            - "Navigate to deviation detail page (open deviation)"
+            - "Click [Investigate]"
+            - "Enter investigation notes (optional)"
+            - "Confirm"
+            - "Verify status = 'investigating'"
+            - "Verify timeline shows 'Investigating' event"
+            - "Click [Resolve]"
+            - "Enter resolution notes: 'Root cause: Faulty thermometer. Replaced, recalibrated.'"
+            - "Confirm (QA Manager)"
+            - "Verify status = 'resolved'"
+            - "Verify resolution notes displayed"
+            - "Verify timeline shows 'Resolved' event"
+            - "Login as QA Director"
+            - "Click [Verify]"
+            - "Confirm"
+            - "Verify status = 'verified'"
+            - "Verify timeline shows 'Verified' event"
+          assertions:
+            - "Status progresses: open -> investigating -> resolved -> verified"
+            - "All actions logged in timeline"
+            - "Resolution notes displayed correctly"
+
+        - name: "cannot resolve without investigation"
+          steps:
+            - "Navigate to deviation detail (status='open')"
+            - "Attempt to click [Resolve]"
+            - "Verify button disabled or error message"
+          assertions:
+            - "Resolve button disabled for 'open' deviations"
+            - "Workflow enforced"
+
+    - suite: "Deviation Filters and Search"
+      tests:
+        - name: "filter deviations by severity"
+          steps:
+            - "Navigate to deviations list"
+            - "Select severity filter: 'critical'"
+            - "Verify only critical deviations shown"
+            - "Verify all rows have red severity badge"
+          assertions:
+            - "Filter applied correctly"
+
+        - name: "filter deviations by status"
+          steps:
+            - "Select status filter: 'open'"
+            - "Verify only open deviations shown"
+          assertions:
+            - "Filter applied correctly"
+
+        - name: "search by batch number"
+          steps:
+            - "Enter batch number: 'B-2025-001'"
+            - "Verify only deviations for batch B-2025-001 shown"
+          assertions:
+            - "Search filters results"
+
+    - suite: "Deviation Detail Display"
+      tests:
+        - name: "displays deviation details correctly"
+          steps:
+            - "Navigate to deviation detail page"
+            - "Verify deviation details panel shows:"
+            - "  - Monitored value (large, bold)"
+            - "  - Critical limits"
+            - "  - Deviation amount (+X over limit)"
+            - "  - Deviation percentage (X%)"
+            - "  - WO number (link)"
+            - "  - Batch number (link)"
+            - "Verify corrective action panel shows:"
+            - "  - Corrective action text"
+            - "  - Taken by (user name)"
+            - "  - Taken at (timestamp)"
+            - "Verify linked records panel shows:"
+            - "  - Monitoring record link"
+            - "  - NCR link (if critical)"
+          assertions:
+            - "All deviation details displayed correctly"
+            - "Links to related records work"
+
+    - suite: "NCR Auto-Creation"
+      tests:
+        - name: "auto-create NCR for critical deviation"
+          steps:
+            - "Record monitoring with critical deviation (>100% over limit)"
+            - "Navigate to deviation detail"
+            - "Verify NCR link appears in linked records"
+            - "Click NCR link"
+            - "Verify NCR detail page shows:"
+            - "  - Source: 'ccp_deviation'"
+            - "  - Severity: 'critical'"
+            - "  - Link to deviation"
+          assertions:
+            - "NCR created automatically"
+            - "NCR linked to deviation"
+
+        - name: "no NCR for major/minor deviation"
+          steps:
+            - "Record monitoring with major deviation (50-99% over limit)"
+            - "Navigate to deviation detail"
+            - "Verify no NCR link in linked records"
+          assertions:
+            - "NCR not created for non-critical deviations"
+
+    - suite: "Deviation Summary Dashboard"
+      tests:
+        - name: "displays summary metrics"
+          steps:
+            - "Navigate to deviations list"
+            - "Verify summary cards show:"
+            - "  - Total deviations"
+            - "  - Critical count (red card)"
+            - "  - Major count (orange card)"
+            - "  - Minor count (yellow card)"
+            - "  - Open count"
+            - "  - Avg resolution time"
+          assertions:
+            - "Summary metrics calculated correctly"
+
+        - name: "click summary card to filter"
+          steps:
+            - "Click 'Critical' card"
+            - "Verify table filtered to critical deviations only"
+          assertions:
+            - "Card click filters table"
+
+# Acceptance Criteria Coverage
+ac_coverage:
+  - id: "AC-1"
+    name: "Auto-Create Deviation on Monitoring Fail"
+    tests:
+      - "e2e_tests: auto-create deviation on monitoring fail"
+  - id: "AC-2"
+    name: "Deviation Severity Classification"
+    tests:
+      - "unit_tests: determineSeverity (all scenarios)"
+  - id: "AC-3"
+    name: "Deviation Resolution Workflow"
+    tests:
+      - "e2e_tests: complete workflow (investigate -> resolve -> verify)"
+  - id: "AC-4"
+    name: "Link to NCR on Critical Deviation"
+    tests:
+      - "e2e_tests: auto-create NCR for critical deviation"
+
+# Performance Tests
+performance_tests:
+  - scenario: "Deviation list with 100 deviations"
+    target: "<500ms"
+    test: "Load /api/quality/haccp/ccp-deviations with 100 records"
+  - scenario: "Deviation detail with linked records"
+    target: "<500ms"
+    test: "Load /api/quality/haccp/ccp-deviations/:id with monitoring, NCR, WO joins"
+  - scenario: "Deviation creation"
+    target: "<300ms"
+    test: "POST /api/quality/haccp/ccp-deviations (includes severity calc + NCR creation)"
+  - scenario: "Deviation summary calculation"
+    target: "<1s"
+    test: "GET /api/quality/haccp/ccp-deviations/summary (aggregate queries)"
+
+# Security Tests
+security_tests:
+  - test: "Cross-org deviation access"
+    scenario: "User A tries to access Org B deviation"
+    expected: "404 Not Found (RLS blocks)"
+  - test: "Non-QA Manager attempts to resolve"
+    scenario: "User with QA_INSPECTOR role attempts POST /resolve"
+    expected: "403 Forbidden"
+  - test: "Cannot delete deviation"
+    scenario: "User attempts DELETE /api/quality/haccp/ccp-deviations/:id"
+    expected: "403 Forbidden (RLS blocks DELETE)"

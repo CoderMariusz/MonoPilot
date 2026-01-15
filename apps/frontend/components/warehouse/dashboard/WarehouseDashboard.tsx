@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -21,7 +21,12 @@ import type { DashboardKPIs, DashboardAlerts, DashboardActivity } from '@/lib/ty
 import { format } from 'date-fns';
 
 export function WarehouseDashboard() {
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Initialize lastUpdated on client only to avoid hydration mismatch
+  useEffect(() => {
+    setLastUpdated(new Date());
+  }, []);
 
   // Fetch KPIs
   const {
@@ -124,7 +129,7 @@ export function WarehouseDashboard() {
         <div>
           <h1 className="text-3xl font-bold">Warehouse Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1" data-testid="last-updated">
-            Last updated: {format(lastUpdated, 'MMM dd, yyyy HH:mm:ss')}
+            Last updated: {lastUpdated ? format(lastUpdated, 'MMM dd, yyyy HH:mm:ss') : '—'}
           </p>
         </div>
         <div className="flex gap-3 items-center">

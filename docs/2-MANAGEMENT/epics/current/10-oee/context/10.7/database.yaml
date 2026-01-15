@@ -1,0 +1,61 @@
+# Story 10.7 - Database Schema
+# Shift Report Generation
+
+migrations:
+  - path: "supabase/migrations/XXX_create_shift_reports.sql"
+    type: "migration"
+
+tables:
+  - name: "shift_reports"
+    description: "Auto-generated shift summary reports"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "shift_id", type: "UUID", constraints: "REFERENCES shifts(id)" }
+      - { name: "line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "report_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "start_time", type: "TIMESTAMPTZ", constraints: "NOT NULL" }
+      - { name: "end_time", type: "TIMESTAMPTZ", constraints: "NOT NULL" }
+      - { name: "supervisor_id", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "oee_avg", type: "DECIMAL(5,2)", constraints: "" }
+      - { name: "total_downtime", type: "INTEGER", constraints: "" }
+      - { name: "total_output", type: "INTEGER", constraints: "" }
+      - { name: "good_output", type: "INTEGER", constraints: "" }
+      - { name: "scrap_count", type: "INTEGER", constraints: "" }
+      - { name: "status", type: "TEXT", constraints: "CHECK (status IN ('draft', 'approved', 'archived'))" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "generated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "approved_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "approved_at", type: "TIMESTAMPTZ", constraints: "" }
+    rls: true
+    indexes:
+      - "idx_shift_reports_org ON shift_reports(org_id)"
+      - "idx_shift_reports_date ON shift_reports(org_id, report_date DESC)"
+    constraints:
+      - "uq_shift_report UNIQUE (org_id, shift_id, line_id, report_date)"
+
+  - name: "shift_handover_notes"
+    description: "Notes passed between shifts"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "shift_report_id", type: "UUID", constraints: "REFERENCES shift_reports(id)" }
+      - { name: "from_shift_id", type: "UUID", constraints: "REFERENCES shifts(id)" }
+      - { name: "to_shift_id", type: "UUID", constraints: "REFERENCES shifts(id)" }
+      - { name: "note_type", type: "TEXT", constraints: "CHECK (note_type IN ('issue', 'action', 'info'))" }
+      - { name: "message", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "priority", type: "TEXT", constraints: "CHECK (priority IN ('low', 'medium', 'high'))" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "acknowledged_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "acknowledged_at", type: "TIMESTAMPTZ", constraints: "" }
+    rls: true
+
+rls_policies:
+  pattern: "ADR-013"
+
+functions:
+  - name: "generate_shift_report"
+    params: ["p_shift_id UUID", "p_line_id UUID", "p_report_date DATE"]
+    returns: "UUID"
+    description: "Auto-generate shift report 15min after shift end"

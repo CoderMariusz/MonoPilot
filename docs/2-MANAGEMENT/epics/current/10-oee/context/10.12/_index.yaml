@@ -1,0 +1,101 @@
+# Story 10.12 - Performance Dashboard Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (Advanced Analytics)
+
+story:
+  id: "10.12"
+  name: "Performance Dashboard"
+  slug: "performance-dashboard"
+  epic: "10-oee"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "frontend"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      provides: ["oee_snapshots table", "OEE metrics"]
+    - story: "10.5"
+      name: "Real-Time Machine Dashboard"
+      provides: ["machine status patterns"]
+    - story: "10.10"
+      name: "Machine Utilization Heatmap"
+      provides: ["heatmap widget"]
+    - story: "10.11"
+      name: "Downtime Pareto Analysis"
+      provides: ["Pareto chart widget"]
+    - story: "10.8"
+      name: "Energy Consumption Tracking"
+      provides: ["energy metrics"]
+
+  blocked_by: []
+  blocks: []
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-018 - Performance Dashboard"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.12.performance-dashboard.md"
+
+deliverables:
+  - type: "api"
+    count: 1
+    description: "GET /api/oee/dashboard - aggregated dashboard data"
+  - type: "components"
+    count: 16
+    description: "10 KPI cards + 6 chart widgets"
+  - type: "page"
+    count: 1
+    description: "/oee/dashboard - executive dashboard"
+  - type: "test"
+    count: 3
+    description: "Unit, Integration, E2E"
+
+technical_notes:
+  - "10 KPI cards: OEE, Availability, Performance, Quality, Output, Good Output, Scrap %, Downtime, Active Alerts, Energy"
+  - "6 charts: OEE trend, Downtime Pareto, Machine status, Utilization heatmap, Energy by machine, Quality yield"
+  - "Auto-refresh every 30 seconds"
+  - "Drill-down from any chart to detail view"
+  - "Export dashboard as PDF"
+  - "Responsive grid layout"
+
+business_rules:
+  - rule: "Auto-Refresh"
+    description: "Dashboard data refreshes every 30 seconds without full page reload"
+    enforcement: "React Query refetch interval"
+  - rule: "Date Range"
+    description: "Default to Today, with Week/Month options"
+    enforcement: "DateRangePicker component"
+  - rule: "Performance Target"
+    description: "All data loads within 2 seconds"
+    enforcement: "Parallel API calls, caching"
+
+summary: |
+  Story 10.12 implements comprehensive executive performance dashboard.
+
+  MVP SCOPE:
+  - 10 KPI metric cards in responsive grid
+  - 6 chart widgets (OEE trend, Pareto, status grid, heatmap, energy, quality)
+  - Auto-refresh every 30 seconds
+  - Date range selector (Today, Week, Month)
+  - Line/Machine filter
+  - Drill-down to detail views
+  - Export dashboard as PDF
+
+  INTEGRATION POINTS:
+  - Consolidates all OEE analytics in single view
+  - Embeds components from stories 10.10, 10.11
+  - Links to detail pages for each metric

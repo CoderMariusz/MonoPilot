@@ -1,0 +1,64 @@
+# Story 10.16 - MTBF/MTTR Calculation Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 3 (Advanced Reliability)
+
+story:
+  id: "10.16"
+  name: "MTBF/MTTR Calculation"
+  slug: "mtbf-mttr-calculation"
+  epic: "10-oee"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.3"
+      name: "Downtime Event Tracking"
+      provides: ["oee_downtime_events table", "failure data"]
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-022 - MTBF/MTTR Calculation"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.16.mtbf-mttr-calculation.md"
+
+deliverables:
+  - type: "service"
+    count: 1
+    description: "MTBF/MTTR calculation service"
+  - type: "api"
+    count: 2
+    description: "GET /api/oee/analytics/mtbf endpoint"
+  - type: "components"
+    count: 3
+    description: "Reliability dashboard, ranking table, trend chart"
+
+technical_notes:
+  - "MTBF = Total running time / Number of failures"
+  - "MTTR = Total repair time / Number of failures"
+  - "Failure = downtime event with is_breakdown = true"
+  - "Track by machine over configurable period"
+  - "Reliability ranking identifies least reliable machines"
+
+summary: |
+  Story 10.16 implements reliability metrics MTBF and MTTR.
+
+  MVP SCOPE:
+  - MTBF calculation (Mean Time Between Failures)
+  - MTTR calculation (Mean Time To Repair)
+  - Failure categorization (mechanical, electrical, other)
+  - Machine reliability ranking
+  - Reliability trend tracking
+  - Dashboard widget for reliability metrics

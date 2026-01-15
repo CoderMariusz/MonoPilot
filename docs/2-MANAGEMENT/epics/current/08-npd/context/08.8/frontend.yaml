@@ -1,0 +1,646 @@
+# Frontend Context for Story 08.8 - Compliance Documents Upload
+
+ux:
+  wireframes:
+    - id: "NPD-013"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-013-compliance-documents-section.md"
+      relevance: "Compliance documents section with upload, preview, and required docs checklist"
+      components: ["DocumentUploadModal", "DocumentList", "DocumentCard", "DocumentPreviewModal", "RequiredDocsChecklist"]
+  patterns:
+    modal: "ShadCN Dialog for upload and preview"
+    grid: "Responsive grid layout for document cards"
+    dropzone: "react-dropzone for drag-and-drop file upload"
+    card: "ShadCN Card with thumbnail and metadata"
+  states:
+    - "loading: Skeleton loader (3 cards)"
+    - "empty: Empty state with upload prompt"
+    - "success: Grid of DocumentCard components"
+    - "error: Error message with retry button"
+
+pages:
+  documents_tab:
+    path: "apps/frontend/app/(authenticated)/npd/projects/[id]/documents/page.tsx"
+    description: "Documents tab within NPD project detail page"
+
+    layout:
+      header:
+        title: "Compliance Documents"
+        actions:
+          - label: "[+ Upload Document]"
+            action: "Opens DocumentUploadModal"
+            roles: ["NPD_LEAD", "R&D", "REGULATORY"]
+
+      required_docs_section:
+        component: "RequiredDocsChecklist"
+        visible_when: "current_gate IN ['G4', 'Launched']"
+        shows: "Missing required documents (e.g., HACCP Plan for G4)"
+
+      document_list:
+        component: "DocumentList"
+        states:
+          - loading: "Skeleton loader (3 cards)"
+          - empty: "Empty state with upload prompt"
+          - success: "Grid of DocumentCard components"
+          - error: "Error message with retry button"
+
+    data_fetching:
+      endpoint: "GET /api/npd/projects/:id/documents"
+      query_params:
+        - "doc_type: optional filter"
+        - "sort_by: uploaded_at (default)"
+        - "sort_order: desc (default)"
+        - "page: 1"
+        - "limit: 20"
+      state_management: "React Query (useQuery)"
+
+components:
+  # ==========================================================================
+  # DocumentUploadModal
+  # ==========================================================================
+  DocumentUploadModal:
+    path: "apps/frontend/components/npd/documents/DocumentUploadModal.tsx"
+    description: "Modal for uploading compliance documents with drag-and-drop"
+
+    props:
+      - name: "projectId"
+        type: "string"
+        required: true
+
+      - name: "isOpen"
+        type: "boolean"
+        required: true
+
+      - name: "onClose"
+        type: "() => void"
+        required: true
+
+      - name: "onUploadSuccess"
+        type: "(document: ComplianceDocument) => void"
+        required: false
+
+    ui_structure:
+      header:
+        title: "Upload Compliance Document"
+        close_button: "X"
+
+      form:
+        fields:
+          - label: "Document Type"
+            name: "doc_type"
+            type: "Select (dropdown)"
+            required: true
+            options:
+              - value: "haccp_plan"
+                label: "HACCP Plan"
+              - value: "label_proof"
+                label: "Label Proof"
+              - value: "nutritional_info"
+                label: "Nutritional Information"
+              - value: "allergen_declaration"
+                label: "Allergen Declaration"
+              - value: "coa"
+                label: "Certificate of Analysis (CoA)"
+              - value: "sds"
+                label: "Safety Data Sheet (SDS)"
+              - value: "trial_report"
+                label: "Trial Report"
+              - value: "sensory_eval"
+                label: "Sensory Evaluation"
+              - value: "shelf_life"
+                label: "Shelf-Life Report"
+              - value: "other"
+                label: "Other"
+
+          - label: "File"
+            name: "file"
+            type: "File Upload (drag-and-drop)"
+            required: true
+            component: "react-dropzone"
+            accepts: ".pdf,.docx,.xlsx,.png,.jpg,.jpeg"
+            max_size: "50 MB"
+            dropzone_text: "Drag and drop file here, or click to browse"
+            shows_preview: "Filename, file size after selection"
+
+          - label: "Version (optional)"
+            name: "version"
+            type: "Text input"
+            placeholder: "e.g., v1.2"
+            max_length: 50
+
+          - label: "Description (optional)"
+            name: "description"
+            type: "Textarea"
+            placeholder: "Brief description of the document"
+            max_length: 500
+
+          - label: "Notes (optional)"
+            name: "notes"
+            type: "Textarea"
+            placeholder: "Additional notes"
+            max_length: 1000
+
+      footer:
+        buttons:
+          - label: "Cancel"
+            variant: "outline"
+            action: "Close modal"
+
+          - label: "Upload"
+            variant: "primary"
+            disabled_when: "!file || !doc_type || uploading"
+            action: "Submit form"
+
+      upload_progress:
+        visible_when: "uploading"
+        component: "UploadProgress"
+        shows: "Progress bar (0-100%), estimated time remaining, cancel button"
+
+    validation:
+      - "doc_type: required"
+      - "file: required, must be PDF/DOCX/XLSX/PNG/JPG, max 50 MB"
+      - "version: optional, max 50 chars"
+      - "description: optional, max 500 chars"
+      - "notes: optional, max 1000 chars"
+
+    behavior:
+      on_submit:
+        - "Validate form"
+        - "Create FormData with file + metadata"
+        - "POST /api/npd/projects/:id/documents"
+        - "Show UploadProgress component"
+        - "On success: Close modal, show toast, trigger onUploadSuccess"
+        - "On error: Show error message, keep modal open"
+
+      file_validation:
+        - "Check file type (MIME type)"
+        - "Check file size (< 50 MB)"
+        - "Show error if invalid"
+
+      drag_and_drop:
+        - "Use react-dropzone library"
+        - "Highlight dropzone on drag over"
+        - "Accept single file only"
+        - "Show file preview after selection"
+
+  # ==========================================================================
+  # DocumentList
+  # ==========================================================================
+  DocumentList:
+    path: "apps/frontend/components/npd/documents/DocumentList.tsx"
+    description: "Grid layout displaying document cards"
+
+    props:
+      - name: "projectId"
+        type: "string"
+        required: true
+
+      - name: "documents"
+        type: "ComplianceDocument[]"
+        required: true
+
+      - name: "onDocumentDeleted"
+        type: "(documentId: string) => void"
+        required: false
+
+    ui_structure:
+      filter_bar:
+        filters:
+          - label: "Type"
+            type: "Select"
+            options: "All types + individual doc_type options"
+
+          - label: "Sort By"
+            type: "Select"
+            options: ["Newest First", "Oldest First", "Name A-Z", "Name Z-A", "Largest First"]
+
+      grid:
+        layout: "Grid (3 columns desktop, 2 tablet, 1 mobile)"
+        item_component: "DocumentCard"
+
+      pagination:
+        visible_when: "total > 20"
+        shows: "Page 1 of 3, Previous/Next buttons"
+
+      empty_state:
+        visible_when: "documents.length === 0"
+        icon: "Document icon"
+        message: "No compliance documents yet"
+        action: "[+ Upload Document] button"
+
+  # ==========================================================================
+  # DocumentCard
+  # ==========================================================================
+  DocumentCard:
+    path: "apps/frontend/components/npd/documents/DocumentCard.tsx"
+    description: "Individual document card with thumbnail, metadata, actions"
+
+    props:
+      - name: "document"
+        type: "ComplianceDocument"
+        required: true
+
+      - name: "onDelete"
+        type: "(documentId: string) => void"
+        required: false
+
+    ui_structure:
+      thumbnail:
+        type: "Image or PDF preview"
+        size: "Full width, aspect ratio 16:9"
+        fallback: "Generic file icon if thumbnail unavailable"
+        click_action: "Opens DocumentPreviewModal"
+
+      metadata:
+        fields:
+          - label: "File Name"
+            value: "document.file_name"
+            truncate: "Max 30 chars with ellipsis"
+
+          - label: "Type Badge"
+            component: "DocumentTypeBadge"
+            value: "document.doc_type"
+
+          - label: "Version"
+            value: "document.version"
+            visible_when: "document.version != null"
+
+          - label: "Size"
+            value: "formatFileSize(document.file_size_bytes)"
+            example: "2.5 MB"
+
+          - label: "Uploaded"
+            value: "formatDate(document.uploaded_at)"
+            example: "Jan 15, 2025"
+
+          - label: "Uploaded By"
+            value: "document.uploaded_by_name"
+
+      actions:
+        component: "DocumentActionsMenu"
+        menu_items:
+          - label: "Preview"
+            icon: "Eye"
+            action: "Opens DocumentPreviewModal"
+
+          - label: "Download"
+            icon: "Download"
+            action: "Calls GET /api/npd/documents/:id/download, opens URL"
+
+          - label: "Delete"
+            icon: "Trash"
+            visible_when: "user is owner or NPD_LEAD"
+            action: "Shows delete confirmation dialog"
+
+  # ==========================================================================
+  # DocumentPreviewModal
+  # ==========================================================================
+  DocumentPreviewModal:
+    path: "apps/frontend/components/npd/documents/DocumentPreviewModal.tsx"
+    description: "Modal for previewing PDF/image documents"
+
+    props:
+      - name: "document"
+        type: "ComplianceDocument"
+        required: true
+
+      - name: "isOpen"
+        type: "boolean"
+        required: true
+
+      - name: "onClose"
+        type: "() => void"
+        required: true
+
+    ui_structure:
+      header:
+        title: "document.file_name"
+        close_button: "X"
+
+      viewer:
+        pdf:
+          library: "react-pdf or PDF.js"
+          features: ["Page navigation", "Zoom in/out", "Full screen"]
+          fallback: "Message: 'Preview not available. [Download] to view.'"
+
+        image:
+          display: "Full-size image with zoom controls"
+          features: ["Zoom in/out", "Full screen"]
+
+        unsupported:
+          message: "Preview not available for this file type"
+          action: "[Download] button"
+
+      footer:
+        buttons:
+          - label: "Download"
+            variant: "primary"
+            action: "Calls GET /api/npd/documents/:id/download"
+
+          - label: "Close"
+            variant: "outline"
+            action: "Close modal"
+
+  # ==========================================================================
+  # DocumentTypeBadge
+  # ==========================================================================
+  DocumentTypeBadge:
+    path: "apps/frontend/components/npd/documents/DocumentTypeBadge.tsx"
+    description: "Badge component displaying document type with icon"
+
+    props:
+      - name: "docType"
+        type: "string"
+        required: true
+
+    variants:
+      haccp_plan:
+        label: "HACCP Plan"
+        color: "red"
+        icon: "Shield"
+
+      label_proof:
+        label: "Label Proof"
+        color: "blue"
+        icon: "Tag"
+
+      nutritional_info:
+        label: "Nutritional Info"
+        color: "green"
+        icon: "FileText"
+
+      allergen_declaration:
+        label: "Allergen Declaration"
+        color: "orange"
+        icon: "AlertTriangle"
+
+      coa:
+        label: "CoA"
+        color: "purple"
+        icon: "FileCheck"
+
+      sds:
+        label: "SDS"
+        color: "yellow"
+        icon: "FileWarning"
+
+      trial_report:
+        label: "Trial Report"
+        color: "teal"
+        icon: "Beaker"
+
+      sensory_eval:
+        label: "Sensory Eval"
+        color: "pink"
+        icon: "Eye"
+
+      shelf_life:
+        label: "Shelf-Life"
+        color: "indigo"
+        icon: "Clock"
+
+      other:
+        label: "Other"
+        color: "gray"
+        icon: "File"
+
+  # ==========================================================================
+  # RequiredDocsChecklist
+  # ==========================================================================
+  RequiredDocsChecklist:
+    path: "apps/frontend/components/npd/documents/RequiredDocsChecklist.tsx"
+    description: "Checklist showing required documents for current gate"
+
+    props:
+      - name: "projectId"
+        type: "string"
+        required: true
+
+      - name: "currentGate"
+        type: "string"
+        required: true
+
+    ui_structure:
+      header:
+        title: "Required Documents"
+        subtitle: "Documents required for Gate {currentGate}"
+
+      checklist:
+        items:
+          - label: "HACCP Plan"
+            doc_type: "haccp_plan"
+            required_for: ["G4", "Launched"]
+            status_icon: "Check (uploaded) or X (missing)"
+            click_action: "Filter to show HACCP docs"
+
+      warning_banner:
+        visible_when: "missing_docs.length > 0"
+        variant: "warning"
+        message: "Required documents missing: HACCP Plan"
+        icon: "AlertTriangle"
+
+    data_fetching:
+      endpoint: "GET /api/npd/projects/:id/documents/validate"
+      response: "{ is_valid: boolean, missing: string[] }"
+
+  # ==========================================================================
+  # DocumentActionsMenu
+  # ==========================================================================
+  DocumentActionsMenu:
+    path: "apps/frontend/components/npd/documents/DocumentActionsMenu.tsx"
+    description: "Dropdown menu for document actions"
+
+    props:
+      - name: "document"
+        type: "ComplianceDocument"
+        required: true
+
+      - name: "onPreview"
+        type: "() => void"
+        required: true
+
+      - name: "onDownload"
+        type: "() => void"
+        required: true
+
+      - name: "onDelete"
+        type: "() => void"
+        required: false
+
+    ui_structure:
+      trigger:
+        type: "Icon button (three dots)"
+        position: "Top-right of DocumentCard"
+
+      menu:
+        items:
+          - label: "Preview"
+            icon: "Eye"
+            action: "onPreview()"
+
+          - label: "Download"
+            icon: "Download"
+            action: "onDownload()"
+
+          - label: "Delete"
+            icon: "Trash"
+            color: "destructive"
+            visible_when: "user is owner or NPD_LEAD"
+            action: "Shows confirmation dialog -> onDelete()"
+
+      delete_confirmation:
+        component: "AlertDialog"
+        title: "Delete Document"
+        message: "Are you sure you want to delete '{file_name}'? This action cannot be undone."
+        buttons:
+          - label: "Cancel"
+            variant: "outline"
+          - label: "Delete"
+            variant: "destructive"
+            action: "DELETE /api/npd/documents/:id"
+
+  # ==========================================================================
+  # UploadProgress
+  # ==========================================================================
+  UploadProgress:
+    path: "apps/frontend/components/npd/documents/UploadProgress.tsx"
+    description: "Upload progress indicator with cancel option"
+
+    props:
+      - name: "progress"
+        type: "number"
+        required: true
+        description: "Upload progress (0-100)"
+
+      - name: "onCancel"
+        type: "() => void"
+        required: false
+
+    ui_structure:
+      progress_bar:
+        type: "Linear progress bar"
+        value: "0-100%"
+        color: "primary"
+
+      status_text:
+        examples:
+          - "Uploading... 45%"
+          - "Processing... 87%"
+          - "Upload complete!"
+
+      estimated_time:
+        visible_when: "progress < 100 && progress > 10"
+        format: "Est. 5 seconds remaining"
+
+      cancel_button:
+        visible_when: "progress < 100"
+        label: "Cancel"
+        action: "Abort upload, close modal"
+
+state_management:
+  documents_list:
+    hook: "useQuery"
+    query_key: "['npd-documents', projectId]"
+    endpoint: "GET /api/npd/projects/:id/documents"
+    refetch_on:
+      - "Upload success"
+      - "Delete success"
+      - "Window focus"
+
+  upload_mutation:
+    hook: "useMutation"
+    endpoint: "POST /api/npd/projects/:id/documents"
+    on_success:
+      - "Invalidate documents_list query"
+      - "Show success toast"
+      - "Close modal"
+    on_error:
+      - "Show error toast"
+      - "Keep modal open"
+
+  delete_mutation:
+    hook: "useMutation"
+    endpoint: "DELETE /api/npd/documents/:id"
+    on_success:
+      - "Invalidate documents_list query"
+      - "Show success toast"
+    on_error:
+      - "Show error toast"
+
+  download_action:
+    hook: "useMutation"
+    endpoint: "GET /api/npd/documents/:id/download"
+    on_success:
+      - "Open signed URL in new tab"
+    on_error:
+      - "Show error toast"
+
+ui_patterns:
+  shadcn_components:
+    - "Dialog (for modals)"
+    - "Button"
+    - "Input"
+    - "Select"
+    - "Textarea"
+    - "Card"
+    - "Badge"
+    - "DropdownMenu"
+    - "AlertDialog"
+    - "Progress"
+    - "Skeleton"
+
+  icons:
+    library: "lucide-react"
+    used:
+      - "Upload"
+      - "Eye"
+      - "Download"
+      - "Trash"
+      - "FileText"
+      - "Shield"
+      - "Tag"
+      - "AlertTriangle"
+      - "FileCheck"
+      - "Beaker"
+      - "Clock"
+      - "X"
+
+  loading_states:
+    skeleton_loader: "Show 3 document card skeletons"
+    upload_progress: "Linear progress bar with percentage"
+    button_loading: "Spinner icon + 'Uploading...' text"
+
+  empty_states:
+    no_documents:
+      icon: "FileText"
+      title: "No compliance documents yet"
+      description: "Upload HACCP plans, labels, and other compliance documents"
+      action: "[+ Upload Document] button"
+
+responsive_design:
+  desktop:
+    document_grid: "3 columns"
+    modal_width: "max-w-2xl"
+
+  tablet:
+    document_grid: "2 columns"
+    modal_width: "max-w-xl"
+
+  mobile:
+    document_grid: "1 column"
+    modal_width: "full screen"
+    upload_modal: "Bottom sheet instead of centered modal"
+
+accessibility:
+  - "Keyboard navigation for modals (Esc to close)"
+  - "Focus trap in modals"
+  - "ARIA labels for icon buttons"
+  - "Alt text for document thumbnails"
+  - "Screen reader announcements for upload progress"
+  - "Error messages announced to screen readers"
+
+performance_optimizations:
+  - "Lazy load document thumbnails (IntersectionObserver)"
+  - "Virtualize document list if > 100 items"
+  - "Debounce search/filter inputs"
+  - "Cache signed URLs for 55 minutes (before 1-hour expiry)"
+  - "Optimize image thumbnails (WebP format, 300x200 size)"

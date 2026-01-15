@@ -1,0 +1,335 @@
+# Story 06.26 - CCP Deviation Alerts - API Context
+# Generated: 2025-01-15
+
+base_path: "/api/quality/haccp/alerts"
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/haccp/alerts"
+    summary: "List alerts with filters"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "PRODUCTION_LEAD"]
+    query_params:
+      - name: "acknowledged"
+        type: "boolean"
+        required: false
+        description: "Filter by acknowledgment status"
+      - name: "severity"
+        type: "string"
+        enum: ["critical", "major", "minor"]
+        required: false
+      - name: "date_from"
+        type: "string"
+        format: "date"
+        required: false
+      - name: "date_to"
+        type: "string"
+        format: "date"
+        required: false
+      - name: "sort_by"
+        type: "string"
+        enum: ["created_at", "severity"]
+        default: "created_at"
+      - name: "sort_order"
+        type: "string"
+        enum: ["asc", "desc"]
+        default: "desc"
+      - name: "page"
+        type: "integer"
+        default: 1
+      - name: "limit"
+        type: "integer"
+        default: 20
+        max: 100
+    response:
+      status: 200
+      schema: "AlertListResponse"
+    validation_schema: "alertListQuerySchema"
+
+  - method: "GET"
+    path: "/api/quality/haccp/alerts/unacknowledged"
+    summary: "Get unacknowledged alerts (dashboard widget)"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "PRODUCTION_LEAD"]
+    response:
+      status: 200
+      schema: "UnacknowledgedAlertsResponse"
+      example: |
+        {
+          "alerts": [
+            {
+              "id": "uuid",
+              "severity": "critical",
+              "ccp_number": "CCP-1",
+              "alert_message": "[CRITICAL] CCP DEVIATION: CCP-1...",
+              "created_at": "2025-01-15T14:00:00Z",
+              "elapsed_minutes": 3
+            }
+          ],
+          "count": 5
+        }
+
+  - method: "POST"
+    path: "/api/quality/haccp/alerts/:id/acknowledge"
+    summary: "Acknowledge alert"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "PRODUCTION_LEAD"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    response:
+      status: 200
+      schema: "AcknowledgeAlertResponse"
+    business_rules:
+      - "acknowledged = true"
+      - "acknowledged_by = current user"
+      - "acknowledged_at = now"
+      - "Stop escalation timer"
+
+  - method: "POST"
+    path: "/api/quality/haccp/alerts/:id/resend"
+    summary: "Resend alert (manual trigger)"
+    auth: true
+    roles: ["QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    request_body:
+      schema: "ResendAlertRequest"
+      example: |
+        {
+          "channels": ["sms", "email"]
+        }
+    response:
+      status: 200
+      schema: "ResendAlertResponse"
+    business_rules:
+      - "Resend alert to original recipients"
+      - "Update sms_sent_at, email_sent_at"
+
+# Background Jobs
+background_jobs:
+  - name: "escalation-job"
+    schedule: "Every 1 minute (cron: */1 * * * *)"
+    description: "Check for alerts >5min old and not acknowledged, then escalate"
+    logic: |
+      1. Query alerts: acknowledged=false AND escalated=false AND created_at < (NOW() - 5 minutes)
+      2. For each alert:
+         - Get escalation recipients (Director)
+         - Send SMS/Email to escalation recipients
+         - Update: escalated=true, escalated_at=now, escalation_recipients=recipients
+      3. Log escalation actions
+
+  - name: "alert-delivery-job"
+    trigger: "pg_notify('ccp_deviation_alert', deviation_id)"
+    description: "Async alert delivery on deviation creation"
+    logic: |
+      1. Get alert record by deviation_id
+      2. Parse recipients JSONB
+      3. Send SMS (Twilio API)
+      4. Send Email (SendGrid API)
+      5. Send WebSocket (Socket.io broadcast)
+      6. Update delivery status (sms_sent, email_sent, websocket_sent)
+      7. Handle errors (sms_error, email_error, websocket_error)
+
+# Service Layer
+service:
+  name: "CCPAlertService"
+  file: "lib/services/ccp-alert-service.ts"
+  methods:
+    - name: "createAlert"
+      params: ["deviationId: string"]
+      returns: "CCPAlert"
+      description: "Create alert record (called by deviation trigger or hook)"
+
+    - name: "sendSMS"
+      params: ["recipients: AlertRecipient[]", "message: string"]
+      returns: "Promise<{ sent: boolean; error: string | null }[]>"
+      description: "Send SMS via Twilio API"
+
+    - name: "sendEmail"
+      params: ["recipients: AlertRecipient[]", "message: string", "subject: string"]
+      returns: "Promise<{ sent: boolean; error: string | null }[]>"
+      description: "Send Email via SendGrid API"
+
+    - name: "sendWebSocket"
+      params: ["recipients: AlertRecipient[]", "message: string"]
+      returns: "Promise<{ sent: boolean; error: string | null }[]>"
+      description: "Send WebSocket push notification"
+
+    - name: "acknowledge"
+      params: ["alertId: string", "userId: string"]
+      returns: "CCPAlert"
+      description: "Acknowledge alert"
+
+    - name: "escalate"
+      params: ["alertId: string"]
+      returns: "CCPAlert"
+      description: "Escalate unacknowledged alert"
+
+    - name: "getUnacknowledged"
+      params: ["orgId: string"]
+      returns: "CCPAlert[]"
+      description: "Get unacknowledged alerts for org"
+
+    - name: "resend"
+      params: ["alertId: string", "channels: string[]"]
+      returns: "CCPAlert"
+      description: "Resend alert (manual trigger)"
+
+    - name: "getRecipientsBySeverity"
+      params: ["orgId: string", "severity: 'critical' | 'major' | 'minor'"]
+      returns: "AlertRecipient[]"
+      description: "Get recipients based on severity"
+
+    - name: "formatAlertMessage"
+      params: ["deviation: CCPDeviation"]
+      returns: "{ sms: string; email: { subject: string; body: string }; websocket: string }"
+      description: "Format alert message for each channel"
+
+# Integration: Twilio (SMS)
+twilio_integration:
+  service: "Twilio API"
+  endpoint: "https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json"
+  auth: "Basic Auth (AccountSid + AuthToken)"
+  request:
+    method: "POST"
+    body: |
+      {
+        "From": "+1234567890",  // Twilio phone number
+        "To": "+1987654321",    // Recipient phone
+        "Body": "[CRITICAL] CCP DEVIATION: CCP-1..."
+      }
+  response:
+    status: 201
+    body: |
+      {
+        "sid": "SMxxx",
+        "status": "queued",
+        "error_code": null
+      }
+  error_handling:
+    - code: 400
+      message: "Invalid phone number"
+      action: "Log error, mark sms_error"
+    - code: 429
+      message: "Rate limit exceeded"
+      action: "Retry with exponential backoff"
+
+# Integration: SendGrid (Email)
+sendgrid_integration:
+  service: "SendGrid API"
+  endpoint: "https://api.sendgrid.com/v3/mail/send"
+  auth: "Bearer Token (API Key)"
+  request:
+    method: "POST"
+    body: |
+      {
+        "personalizations": [
+          {
+            "to": [{"email": "qa@example.com"}],
+            "subject": "[CRITICAL] CCP Deviation Alert"
+          }
+        ],
+        "from": {"email": "alerts@monopilot.com", "name": "MonoPilot Alerts"},
+        "content": [
+          {
+            "type": "text/html",
+            "value": "<strong>CCP Deviation Alert</strong><p>...</p>"
+          }
+        ]
+      }
+  response:
+    status: 202
+    body: "Empty (Accepted)"
+  error_handling:
+    - code: 400
+      message: "Invalid email address"
+      action: "Log error, mark email_error"
+    - code: 429
+      message: "Rate limit exceeded"
+      action: "Retry with exponential backoff"
+
+# Integration: WebSocket (Real-Time)
+websocket_integration:
+  service: "Socket.io"
+  endpoint: "N/A (WebSocket server)"
+  event: "ccp_deviation_alert"
+  payload: |
+    {
+      "alert_id": "uuid",
+      "severity": "critical",
+      "ccp_number": "CCP-1",
+      "message": "[CRITICAL] CCP DEVIATION: CCP-1...",
+      "deviation_id": "uuid",
+      "created_at": "2025-01-15T14:00:00Z"
+    }
+  delivery:
+    - "Broadcast to all connected clients in org room (org_id)"
+    - "Client receives event and shows toast notification"
+    - "Client plays audio alert (if enabled)"
+    - "Client adds to notification center"
+
+# Validation Schemas
+validation:
+  file: "lib/validation/ccp-alert-validation.ts"
+  schemas:
+    - name: "alertListQuerySchema"
+      type: "z.object"
+      fields:
+        - name: "acknowledged"
+          validation: "z.boolean().optional()"
+        - name: "severity"
+          validation: "alertSeverityEnum.optional()"
+        - name: "date_from"
+          validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional()"
+        - name: "date_to"
+          validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional()"
+        - name: "sort_by"
+          validation: "z.enum(['created_at', 'severity']).default('created_at')"
+        - name: "sort_order"
+          validation: "z.enum(['asc', 'desc']).default('desc')"
+        - name: "page"
+          validation: "z.coerce.number().int().positive().default(1)"
+        - name: "limit"
+          validation: "z.coerce.number().int().min(1).max(100).default(20)"
+
+    - name: "resendAlertSchema"
+      type: "z.object"
+      fields:
+        - name: "channels"
+          validation: "z.array(z.enum(['sms', 'email', 'websocket'])).min(1)"
+
+# Error Handling
+errors:
+  - code: 400
+    scenario: "Alert already acknowledged"
+    message: "Alert already acknowledged at {timestamp}"
+  - code: 404
+    scenario: "Alert not found"
+    message: "Alert not found"
+  - code: 500
+    scenario: "SMS send failed (Twilio error)"
+    message: "Failed to send SMS: {error}"
+  - code: 500
+    scenario: "Email send failed (SendGrid error)"
+    message: "Failed to send email: {error}"
+
+# Performance Targets
+performance:
+  - endpoint: "POST /api/quality/haccp/alerts (create)"
+    target: "<30s total (including SMS/Email delivery)"
+    notes: "Async delivery: create record <300ms, send SMS/Email in background <30s"
+  - endpoint: "GET /api/quality/haccp/alerts/unacknowledged"
+    target: "<300ms"
+    notes: "Partial index on unacknowledged alerts"
+  - endpoint: "POST /api/quality/haccp/alerts/:id/acknowledge"
+    target: "<300ms"
+  - sms_delivery: "<10s"
+    notes: "Twilio API latency"
+  - email_delivery: "<10s"
+    notes: "SendGrid API latency"
+  - websocket_delivery: "<1s"
+    notes: "Real-time push notification"

@@ -1,0 +1,145 @@
+story:
+  id: "09.19"
+  name: "Cost Reporting Suite"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 5
+
+dependencies:
+  required:
+    - story: "09.1"
+      provides: ["finance_settings"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+    - story: "09.3"
+      provides: ["material_consumption_costs"]
+    - story: "09.4"
+      provides: ["labor_costs"]
+    - story: "09.6"
+      provides: ["work_order_costs"]
+    - story: "09.12"
+      provides: ["overhead_allocations", "cost_centers"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.6.1", "FR-9.6.2", "FR-9.6.3", "FR-9.6.4", "Cost Reporting"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.19.cost-reporting-suite.md"
+  patterns:
+    - "apps/frontend/components/shared/DataTable.tsx"
+    - "apps/frontend/lib/utils/export-to-csv.ts"
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/finance/reports/cost-by-product/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/cost-by-period/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/cost-by-line/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/cost-by-cost-center/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/export/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/cost-reporting-service.ts"
+    - path: "apps/frontend/lib/services/report-export-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/cost-report-schema.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/reports/cost-by-product/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/reports/cost-by-period/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/reports/cost-by-line/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/reports/cost-by-cost-center/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/reports/CostByProductTable.tsx"
+    - path: "apps/frontend/components/finance/reports/CostByPeriodTable.tsx"
+    - path: "apps/frontend/components/finance/reports/CostByLineTable.tsx"
+    - path: "apps/frontend/components/finance/reports/CostByCostCenterTable.tsx"
+    - path: "apps/frontend/components/finance/reports/CostTrendChart.tsx"
+    - path: "apps/frontend/components/finance/reports/CostComparisonChart.tsx"
+    - path: "apps/frontend/components/finance/reports/CostSummaryMetrics.tsx"
+    - path: "apps/frontend/components/finance/reports/ExportReportButton.tsx"
+    - path: "apps/frontend/components/finance/reports/PeriodTypeSelector.tsx"
+    - path: "apps/frontend/components/finance/reports/ProductCategoryFilter.tsx"
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-cost-by-product.ts"
+    - path: "apps/frontend/lib/hooks/use-cost-by-period.ts"
+    - path: "apps/frontend/lib/hooks/use-cost-by-line.ts"
+    - path: "apps/frontend/lib/hooks/use-cost-by-cost-center.ts"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/reports/cost-by-product"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/reports/cost-by-period"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/reports/cost-by-line"
+    auth: true
+    roles: ["admin", "finance_manager", "production_supervisor", "cost_accountant"]
+  - method: "GET"
+    path: "/api/finance/reports/cost-by-cost-center"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+  - method: "POST"
+    path: "/api/finance/reports/export"
+    auth: true
+    roles: ["admin", "finance_manager", "cost_accountant"]
+
+ux:
+  wireframes:
+    - id: "FIN-COST-REPORTS-001"
+      path: "docs/2-MANAGEMENT/epics/current/09-finance/09.19.cost-reporting-suite.md"
+      components: ["CostByProductTable", "CostByPeriodTable", "CostTrendChart", "ExportReportButton"]
+  patterns:
+    report: "Filterable table with summary metrics and export"
+    chart: "Recharts line/bar charts with tooltips"
+    export: "Multi-format export (CSV, Excel, PDF)"
+  states: ["loading", "empty", "data_loaded", "export_generating"]
+
+validation_rules:
+  dateFrom: "ISO date, < dateTo"
+  dateTo: "ISO date, > dateFrom"
+  periodType: "enum: daily, weekly, monthly, quarterly"
+  costCategory: "enum: material, labor, overhead, all"
+  minVariancePercent: "number 0-100"
+  productCategoryId: "valid product_category UUID"
+  lineIds: "array of valid production_line UUIDs"
+  costCenterIds: "array of valid cost_center UUIDs"
+  exportFormat: "enum: csv, excel, pdf"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  export: "Server-side generation with streaming"
+
+acceptance_checklist:
+  - "Cost by product report aggregates by product correctly"
+  - "Cost by period report groups by period type (daily/weekly/monthly/quarterly)"
+  - "Period-over-period change % calculated correctly"
+  - "Cost by line report includes efficiency metrics"
+  - "Cost by cost center report includes budget variance"
+  - "Cost trend chart renders with material/labor/overhead lines"
+  - "Export to Excel generates multi-sheet workbook with charts"
+  - "Export to PDF includes formatted tables and branding"
+  - "Export to CSV includes all data rows"
+  - "Summary metrics (totals, averages) calculated correctly"
+  - "Performance: report generation <3s, export <5s"
+  - "RLS policies enforce org isolation"
+
+output_artifacts:
+  - "Cost reporting API endpoints (4 report types)"
+  - "CostReportingService with aggregation logic"
+  - "ReportExportService for Excel/PDF/CSV generation"
+  - "Cost by product/period/line/cost center report pages"
+  - "Cost reporting tables with sortable columns"
+  - "Cost trend chart component (Recharts)"
+  - "Cost summary metrics component"
+  - "Export button with format selector"
+  - "Validation schemas for report filters"

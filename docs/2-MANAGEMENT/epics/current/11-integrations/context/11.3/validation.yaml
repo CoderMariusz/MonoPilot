@@ -1,0 +1,138 @@
+# Story 11.3 - Validation Context
+# Zod schemas for Integration Logs (backend-focused story)
+
+schemas:
+  logsQuerySchema:
+    file: "lib/validation/integration-logs.ts"
+    purpose: "Validate query parameters for logs list endpoint"
+    schema: |
+      import { z } from 'zod';
+
+      export const logsQuerySchema = z.object({
+        page: z.coerce.number().int().min(1).default(1),
+        page_size: z.coerce.number().int().min(1).max(100).default(50),
+        status: z.enum(['success', 'warning', 'error']).optional(),
+        integration_type: z.enum(['api', 'webhook', 'edi', 'comarch', 'import', 'export']).optional(),
+        date_range: z.enum(['last_24_hours', 'last_7_days', 'last_30_days', 'custom']).default('last_7_days'),
+        start_date: z.string().datetime().optional(),
+        end_date: z.string().datetime().optional(),
+        external_system: z.string().max(100).optional(),
+        search: z.string().max(255).optional(),
+      }).refine(
+        (data) => {
+          // If date_range is 'custom', start_date and end_date required
+          if (data.date_range === 'custom') {
+            return data.start_date && data.end_date;
+          }
+          return true;
+        },
+        { message: "start_date and end_date required for custom date range" }
+      );
+
+      export type LogsQueryParams = z.infer<typeof logsQuerySchema>;
+
+  exportLogsSchema:
+    file: "lib/validation/integration-logs.ts"
+    purpose: "Validate export logs request"
+    schema: |
+      export const exportLogsSchema = z.object({
+        filters: logsQuerySchema,
+        format: z.literal('csv'),
+      });
+
+      export type ExportLogsRequest = z.infer<typeof exportLogsSchema>;
+
+  createLogSchema:
+    file: "lib/validation/integration-logs.ts"
+    purpose: "Validate log creation (internal use)"
+    schema: |
+      export const createLogSchema = z.object({
+        org_id: z.string().uuid(),
+        integration_type: z.enum(['api', 'webhook', 'edi', 'comarch', 'import', 'export']),
+        event_type: z.string().min(1).max(100),
+        direction: z.enum(['inbound', 'outbound']),
+        status: z.enum(['success', 'warning', 'error']),
+        http_status: z.number().int().min(100).max(599).optional(),
+        request_body: z.record(z.any()).optional(),
+        response_body: z.record(z.any()).optional(),
+        error_message: z.string().max(5000).optional(),
+        api_key_id: z.string().uuid().optional(),
+        webhook_id: z.string().uuid().optional(),
+        external_system: z.string().max(100).optional(),
+        external_id: z.string().max(255).optional(),
+        retry_count: z.number().int().min(0).default(0),
+        duration_ms: z.number().int().min(0).optional(),
+        metadata: z.record(z.any()).default({}),
+      });
+
+      export type CreateLogData = z.infer<typeof createLogSchema>;
+
+validation_rules:
+  page:
+    - "Must be positive integer"
+    - "Default: 1"
+  page_size:
+    - "Must be 1-100"
+    - "Default: 50"
+  status:
+    - "Must be success, warning, or error"
+    - "Optional"
+  integration_type:
+    - "Must be api, webhook, edi, comarch, import, or export"
+    - "Optional"
+  date_range:
+    - "Must be last_24_hours, last_7_days, last_30_days, or custom"
+    - "Default: last_7_days"
+    - "If custom, start_date and end_date required"
+  start_date:
+    - "Must be ISO 8601 datetime"
+    - "Required if date_range=custom"
+  end_date:
+    - "Must be ISO 8601 datetime"
+    - "Required if date_range=custom"
+  external_system:
+    - "Max 100 chars"
+    - "Optional"
+  search:
+    - "Max 255 chars"
+    - "Optional"
+
+error_messages:
+  page:
+    too_small: "Page must be at least 1"
+    invalid_type: "Page must be a number"
+  page_size:
+    too_small: "Page size must be at least 1"
+    too_large: "Page size cannot exceed 100"
+  status:
+    invalid_enum: "Status must be success, warning, or error"
+  date_range:
+    custom_missing_dates: "start_date and end_date required for custom date range"
+
+usage_examples:
+  list_logs:
+    input: |
+      {
+        page: 1,
+        page_size: 50,
+        status: 'error',
+        date_range: 'last_24_hours'
+      }
+    validation: "logsQuerySchema.parse(input)"
+
+  custom_date_range:
+    input: |
+      {
+        date_range: 'custom',
+        start_date: '2024-12-01T00:00:00Z',
+        end_date: '2024-12-31T23:59:59Z'
+      }
+    validation: "logsQuerySchema.parse(input)"
+
+  export_logs:
+    input: |
+      {
+        filters: { status: 'error' },
+        format: 'csv'
+      }
+    validation: "exportLogsSchema.parse(input)"

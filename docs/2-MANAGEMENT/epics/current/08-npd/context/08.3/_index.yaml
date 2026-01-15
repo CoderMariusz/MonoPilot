@@ -1,0 +1,274 @@
+story:
+  id: "08.3"
+  name: "Stage-Gate Workflow"
+  epic: "08-npd"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 5-6
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "01.6"
+      provides: ["role_permissions"]
+    - story: "08.1"
+      provides: ["npd_projects"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/npd.md"
+  prd_sections:
+    - "Section 2.3-2.4: Stage-Gate Workflow"
+    - "FR-NPD-03: Enforce gate entry criteria"
+    - "FR-NPD-17-21: Gate Reviews"
+  story: "docs/2-MANAGEMENT/epics/current/08-npd/08.3.stage-gate-workflow.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/06-quality/06.13.ncr-workflow.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_extend_npd_projects_workflow.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_npd_gate_checklists.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_npd_checklist_completion.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_npd_gate_transitions.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/npd/projects/[id]/advance-gate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/npd/projects/[id]/move-back/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/npd/projects/[id]/checklist/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/npd/projects/[id]/checklist/[itemId]/complete/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/npd/projects/[id]/checklist/[itemId]/uncomplete/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/npd/projects/[id]/gate-history/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/npd/projects/[id]/validate-advance/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/npd-gate-workflow-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/npd-gate-schemas.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/npd/projects/[id]/page.tsx"
+      action: "extend"
+    - path: "apps/frontend/app/(authenticated)/npd/projects/[id]/gate-history/page.tsx"
+      action: "create"
+  components:
+    - path: "apps/frontend/components/npd/NPDGateTimeline.tsx"
+    - path: "apps/frontend/components/npd/NPDAdvanceGateModal.tsx"
+    - path: "apps/frontend/components/npd/NPDMoveBackModal.tsx"
+    - path: "apps/frontend/components/npd/NPDChecklistPanel.tsx"
+    - path: "apps/frontend/components/npd/NPDChecklistItem.tsx"
+    - path: "apps/frontend/components/npd/NPDGateHistory.tsx"
+    - path: "apps/frontend/components/npd/NPDGateHistoryCard.tsx"
+    - path: "apps/frontend/components/npd/NPDGateBadge.tsx"
+    - path: "apps/frontend/components/npd/NPDValidationWarning.tsx"
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-npd-gate-workflow.ts"
+    - path: "apps/frontend/lib/hooks/use-checklist.ts"
+
+database:
+  tables:
+    - name: "npd_projects"
+      action: "extend"
+      columns:
+        - "gate_entered_at TIMESTAMPTZ"
+        - "approved_by UUID"
+        - "approved_at TIMESTAMPTZ"
+        - "move_back_count INTEGER"
+        - "last_moved_back_at TIMESTAMPTZ"
+        - "last_moved_back_by UUID"
+        - "move_back_reason TEXT"
+      rls: true
+      indexes:
+        - "idx_npd_projects_gate (org_id, current_gate)"
+        - "idx_npd_projects_approver (approved_by)"
+
+    - name: "npd_gate_checklists"
+      action: "create"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL"
+        - "gate TEXT NOT NULL"
+        - "item_description TEXT NOT NULL"
+        - "is_required BOOLEAN"
+        - "sequence INTEGER"
+        - "category TEXT"
+        - "is_active BOOLEAN"
+      rls: true
+      indexes:
+        - "idx_npd_checklists_lookup (org_id, gate, is_active)"
+      unique_constraints:
+        - "(org_id, gate, item_description)"
+
+    - name: "npd_project_checklist_completion"
+      action: "create"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL"
+        - "project_id UUID NOT NULL"
+        - "checklist_id UUID NOT NULL"
+        - "is_completed BOOLEAN"
+        - "completed_by UUID"
+        - "completed_at TIMESTAMPTZ"
+        - "completion_notes TEXT"
+        - "attachment_url TEXT"
+      rls: true
+      indexes:
+        - "idx_npd_completion_project (project_id, is_completed)"
+        - "idx_npd_completion_user (completed_by, completed_at)"
+      unique_constraints:
+        - "(project_id, checklist_id)"
+
+    - name: "npd_gate_transitions"
+      action: "create"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "org_id UUID NOT NULL"
+        - "project_id UUID NOT NULL"
+        - "from_gate TEXT NOT NULL"
+        - "to_gate TEXT NOT NULL"
+        - "transition_type TEXT NOT NULL"
+        - "transitioned_by UUID NOT NULL"
+        - "transitioned_at TIMESTAMPTZ NOT NULL"
+        - "requires_approval BOOLEAN"
+        - "approved_by UUID"
+        - "approved_at TIMESTAMPTZ"
+        - "approval_notes TEXT"
+        - "transition_notes TEXT"
+        - "checklist_completion_pct DECIMAL(5,2)"
+        - "blocking_items INTEGER"
+      rls: true
+      immutable: true
+      indexes:
+        - "idx_npd_transitions_project (project_id, transitioned_at DESC)"
+        - "idx_npd_transitions_org (org_id, transitioned_at DESC)"
+        - "idx_npd_transitions_user (transitioned_by, transitioned_at DESC)"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/npd/projects/:id/advance-gate"
+    auth: true
+    roles: ["NPD_LEAD", "DIRECTOR", "ADMIN"]
+    description: "Advance project to next gate"
+
+  - method: "POST"
+    path: "/api/npd/projects/:id/move-back"
+    auth: true
+    roles: ["DIRECTOR", "ADMIN"]
+    description: "Move project back to previous gate"
+
+  - method: "GET"
+    path: "/api/npd/projects/:id/checklist"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "DIRECTOR", "ADMIN"]
+    description: "Get checklist for current gate"
+
+  - method: "POST"
+    path: "/api/npd/projects/:id/checklist/:itemId/complete"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "ADMIN"]
+    description: "Mark checklist item complete"
+
+  - method: "POST"
+    path: "/api/npd/projects/:id/checklist/:itemId/uncomplete"
+    auth: true
+    roles: ["NPD_LEAD", "ADMIN"]
+    description: "Mark checklist item incomplete"
+
+  - method: "GET"
+    path: "/api/npd/projects/:id/gate-history"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "DIRECTOR", "ADMIN"]
+    description: "Get gate transition history"
+
+  - method: "GET"
+    path: "/api/npd/projects/:id/validate-advance"
+    auth: true
+    roles: ["NPD_LEAD", "DIRECTOR", "ADMIN"]
+    description: "Validate if project can advance"
+
+ux:
+  wireframes:
+    - id: "NPD-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-003-stage-gate-timeline.md"
+      relevance: "Horizontal stepper showing gate progress (G0 -> G1 -> G2 -> G3 -> G4 -> Launched)"
+      components: ["NPDGateTimeline", "NPDGateBadge"]
+    - id: "NPD-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-004-gate-checklist-panel.md"
+      relevance: "Collapsible panel showing checklist for current gate with category grouping"
+      components: ["NPDChecklistPanel", "NPDChecklistItem"]
+    - id: "NPD-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-005-advance-gate-modal.md"
+      relevance: "Modal to advance project to next gate with validation warnings"
+      components: ["NPDAdvanceGateModal", "NPDMoveBackModal", "NPDValidationWarning"]
+
+  patterns:
+    timeline: "Horizontal stepper pattern (G0 -> G1 -> G2 -> G3 -> G4 -> Launched)"
+    modal: "ShadCN Dialog pattern with validation"
+    checklist: "Collapsible panel with category grouping"
+    history: "Timeline/card pattern with immutable audit trail"
+
+  states:
+    - "loading: Fetching checklist/history"
+    - "empty: No checklist items for gate"
+    - "error: Validation failed, blocking items"
+    - "success: Gate advanced successfully"
+    - "blocked: Cannot advance due to incomplete required items"
+
+validation_rules:
+  advance_gate:
+    - "All required checklist items must be complete"
+    - "G3+ requires Director approval"
+    - "Cannot skip gates (must be sequential)"
+
+  move_back:
+    - "Justification required (min 50 characters)"
+    - "Only Director can move back from G3+"
+    - "Must move to valid previous gate"
+
+  checklist_item:
+    - "Notes optional (recommended min 20 chars)"
+    - "Attachment URL must be valid Supabase Storage path if provided"
+
+  approval_notes:
+    - "Required for G3+ gate approvals"
+    - "Minimum 50 characters"
+
+patterns:
+  rls: "ADR-013 - Multi-tenant RLS on all tables"
+  api: "REST with org_id filter, role-based authorization"
+  service: "Class-based with static methods"
+  validation: "Zod schemas with custom validators"
+  state_machine: "Sequential gate transitions (no skipping)"
+  audit_trail: "Immutable npd_gate_transitions table (no UPDATE/DELETE)"
+
+acceptance_checklist:
+  - "Gate sequence validation (cannot skip gates)"
+  - "Checklist completion blocking (required items)"
+  - "Director approval for G3+ gates"
+  - "Move back with justification"
+  - "Immutable transition history"
+  - "Default checklists seeded per org"
+  - "RLS isolation (multi-tenant)"
+  - "Timeline displays gate progress"
+  - "Modal validates before submission"
+  - "Checklist panel shows completion %"
+
+output_artifacts:
+  - "4 database migrations (extend projects, checklists, completion, transitions)"
+  - "7 API route handlers"
+  - "1 service layer (NPDGateWorkflowService)"
+  - "1 validation schema file"
+  - "9 frontend components"
+  - "2 custom hooks"
+  - "Unit tests (>80% coverage)"
+  - "Integration tests (7 endpoints)"
+  - "E2E tests (gate workflow, move back, checklist blocking)"

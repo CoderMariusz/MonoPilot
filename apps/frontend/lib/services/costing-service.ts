@@ -103,7 +103,7 @@ export async function calculateTotalBOMCost(
   try {
     const supabase = await createServerSupabase()
 
-    // 1. Get BOM with items and routing
+    // 1. Get BOM with items (fetch routing separately to avoid join issues)
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select(`
@@ -111,14 +111,6 @@ export async function calculateTotalBOMCost(
         product_id,
         routing_id,
         output_qty,
-        routing:routings (
-          id,
-          name,
-          setup_cost,
-          working_cost_per_unit,
-          overhead_percent,
-          currency
-        ),
         items:bom_items (
           id,
           quantity,
@@ -145,7 +137,27 @@ export async function calculateTotalBOMCost(
       }
     }
 
-    // 2. Calculate material cost
+    // 2. Fetch routing separately if routing_id is set
+    let routingData: {
+      id: string
+      name: string
+      setup_cost: number
+      working_cost_per_unit: number
+      overhead_percent: number
+      currency: string
+    } | null = null
+
+    if (bom.routing_id) {
+      const { data: routing } = await supabase
+        .from('routings')
+        .select('id, name, setup_cost, working_cost_per_unit, overhead_percent, currency')
+        .eq('id', bom.routing_id)
+        .single()
+
+      routingData = routing
+    }
+
+    // 3. Calculate material cost
     const materialBreakdown: MaterialCostLine[] = (bom.items || []).map((item: any) => {
       const product = item.product
       const unitCost = product?.cost_per_unit || 0
@@ -170,7 +182,7 @@ export async function calculateTotalBOMCost(
       materialBreakdown.reduce((sum, item) => sum + item.lineCost, 0)
     )
 
-    // 3. Calculate labor cost from routing operations
+    // 4. Calculate labor cost from routing operations
     let laborCost = 0
     let setupCost = 0
     let workingCost = 0
@@ -178,9 +190,7 @@ export async function calculateTotalBOMCost(
     let operationBreakdown: OperationCostLine[] = []
     let currency = 'PLN'
 
-    const routing = bom.routing as any
-
-    if (routing && bom.routing_id) {
+    if (routingData && bom.routing_id) {
       // Get routing operations with cleanup_time
       const { data: operations, error: opsError } = await supabase
         .from('routing_operations')
@@ -217,17 +227,17 @@ export async function calculateTotalBOMCost(
       }
 
       // Routing-level costs (ADR-009)
-      setupCost = roundCurrency(routing.setup_cost || 0)
-      workingCost = roundCurrency((routing.working_cost_per_unit || 0) * quantity)
-      currency = routing.currency || 'PLN'
+      setupCost = roundCurrency(routingData.setup_cost || 0)
+      workingCost = roundCurrency((routingData.working_cost_per_unit || 0) * quantity)
+      currency = routingData.currency || 'PLN'
 
       // Overhead calculation
       const subtotal = materialCost + laborCost + setupCost + workingCost
-      const overheadPercent = routing.overhead_percent || 0
+      const overheadPercent = routingData.overhead_percent || 0
       overheadCost = roundCurrency((subtotal * overheadPercent) / 100)
     }
 
-    // 4. Calculate total cost
+    // 5. Calculate total cost
     const totalCost = roundCurrency(
       materialCost + laborCost + setupCost + workingCost + overheadCost
     )

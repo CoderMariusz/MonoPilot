@@ -1,0 +1,420 @@
+# Story 08.2 - API Endpoints
+# NPD Projects CRUD + Dashboard
+
+endpoints:
+  - method: GET
+    path: /api/npd/projects
+    auth: required
+    roles: [NPD_LEAD, R&D, ADMIN]
+    description: "List projects with filtering and pagination"
+    query_params:
+      - name: current_gate
+        type: string
+        enum: [G0, G1, G2, G3, G4, Launched]
+        required: false
+      - name: status
+        type: string
+        enum: [idea, feasibility, business_case, development, testing, launched, cancelled]
+        required: false
+      - name: priority
+        type: string
+        enum: [low, medium, high]
+        required: false
+      - name: portfolio_category
+        type: string
+        required: false
+      - name: owner_id
+        type: uuid
+        required: false
+      - name: search
+        type: string
+        required: false
+        description: "Search by project_name or project_number"
+      - name: sort_by
+        type: string
+        enum: [project_number, project_name, target_launch_date, created_at, priority]
+        default: created_at
+      - name: sort_order
+        type: string
+        enum: [asc, desc]
+        default: desc
+      - name: page
+        type: number
+        default: 1
+      - name: limit
+        type: number
+        default: 20
+        max: 100
+    response:
+      status: 200
+      body:
+        type: object
+        properties:
+          projects:
+            type: array
+            items:
+              $ref: "#/schemas/NPDProject"
+          pagination:
+            type: object
+            properties:
+              total: number
+              page: number
+              limit: number
+              pages: number
+    errors:
+      - status: 401
+        description: "Not authenticated"
+      - status: 403
+        description: "NPD module not enabled or insufficient permissions"
+
+  - method: GET
+    path: /api/npd/projects/:id
+    auth: required
+    roles: [NPD_LEAD, R&D, ADMIN]
+    description: "Get project detail with related counts"
+    path_params:
+      - name: id
+        type: uuid
+        required: true
+    response:
+      status: 200
+      body:
+        type: object
+        properties:
+          project:
+            $ref: "#/schemas/NPDProject"
+          formulation_count:
+            type: number
+          checklist_completion_pct:
+            type: number
+            description: "Percentage of checklist items completed"
+          costing_status:
+            type: string
+            enum: [draft, submitted, approved, rejected]
+            nullable: true
+          can_advance_gate:
+            type: boolean
+    errors:
+      - status: 404
+        description: "Project not found or belongs to different org"
+
+  - method: POST
+    path: /api/npd/projects
+    auth: required
+    roles: [NPD_LEAD, ADMIN]
+    description: "Create new NPD project"
+    request_body:
+      type: object
+      required: [project_name]
+      properties:
+        project_name:
+          type: string
+          minLength: 3
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        portfolio_category:
+          type: string
+          maxLength: 100
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+        owner_id:
+          type: uuid
+          description: "Defaults to current user if not provided"
+        target_launch_date:
+          type: string
+          format: date
+          example: "2025-06-30"
+    response:
+      status: 201
+      body:
+        type: object
+        properties:
+          project:
+            $ref: "#/schemas/NPDProject"
+    errors:
+      - status: 400
+        description: "Validation error"
+      - status: 409
+        description: "Project number conflict (retry with new number)"
+
+  - method: PUT
+    path: /api/npd/projects/:id
+    auth: required
+    roles: [NPD_LEAD, ADMIN]
+    description: "Update project (non-launched only)"
+    path_params:
+      - name: id
+        type: uuid
+        required: true
+    request_body:
+      type: object
+      properties:
+        project_name:
+          type: string
+          minLength: 3
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        portfolio_category:
+          type: string
+          maxLength: 100
+        priority:
+          type: string
+          enum: [low, medium, high]
+        owner_id:
+          type: uuid
+        target_launch_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [idea, feasibility, business_case, development, testing, launched, cancelled]
+    response:
+      status: 200
+      body:
+        type: object
+        properties:
+          project:
+            $ref: "#/schemas/NPDProject"
+    errors:
+      - status: 400
+        description: "Validation error or cannot edit launched project"
+      - status: 404
+        description: "Project not found"
+
+  - method: DELETE
+    path: /api/npd/projects/:id
+    auth: required
+    roles: [NPD_LEAD, ADMIN]
+    description: "Delete project (idea status only, enforced by RLS)"
+    path_params:
+      - name: id
+        type: uuid
+        required: true
+    response:
+      status: 204
+      body: null
+    errors:
+      - status: 403
+        description: "Cannot delete non-idea projects"
+      - status: 404
+        description: "Project not found"
+
+  - method: POST
+    path: /api/npd/projects/:id/advance-gate
+    auth: required
+    roles: [NPD_LEAD, ADMIN]
+    description: "Advance project to next gate in workflow"
+    path_params:
+      - name: id
+        type: uuid
+        required: true
+    request_body:
+      type: object
+      properties:
+        skip_validation:
+          type: boolean
+          default: true
+          description: "MVP: always true (no checklist validation)"
+    response:
+      status: 200
+      body:
+        type: object
+        properties:
+          project:
+            $ref: "#/schemas/NPDProject"
+          previous_gate:
+            type: string
+          new_gate:
+            type: string
+    errors:
+      - status: 400
+        description: "Cannot advance from Launched or validation failed"
+      - status: 404
+        description: "Project not found"
+
+  - method: GET
+    path: /api/npd/dashboard
+    auth: required
+    roles: [NPD_LEAD, R&D, ADMIN]
+    description: "Get Kanban dashboard data (projects grouped by gate)"
+    response:
+      status: 200
+      body:
+        type: object
+        properties:
+          kanban:
+            type: object
+            properties:
+              G0:
+                type: array
+                items:
+                  $ref: "#/schemas/NPDProject"
+              G1:
+                type: array
+              G2:
+                type: array
+              G3:
+                type: array
+              G4:
+                type: array
+              Launched:
+                type: array
+          summary:
+            type: object
+            properties:
+              total_projects:
+                type: number
+              by_gate:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    gate: string
+                    count: number
+              by_priority:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    priority: string
+                    count: number
+
+schemas:
+  NPDProject:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      org_id:
+        type: string
+        format: uuid
+      project_number:
+        type: string
+        example: "NPD-2025-00001"
+      project_name:
+        type: string
+      description:
+        type: string
+        nullable: true
+      portfolio_category:
+        type: string
+        nullable: true
+      current_gate:
+        type: string
+        enum: [G0, G1, G2, G3, G4, Launched]
+      status:
+        type: string
+        enum: [idea, feasibility, business_case, development, testing, launched, cancelled]
+      priority:
+        type: string
+        enum: [low, medium, high]
+      owner_id:
+        type: string
+        format: uuid
+        nullable: true
+      owner_name:
+        type: string
+        nullable: true
+      target_launch_date:
+        type: string
+        format: date
+        nullable: true
+      actual_launch_date:
+        type: string
+        format: date
+        nullable: true
+      created_at:
+        type: string
+        format: date-time
+      created_by:
+        type: string
+        format: uuid
+      updated_at:
+        type: string
+        format: date-time
+
+validation:
+  create_project:
+    schema: createProjectSchema
+    file: lib/validation/npd-project.ts
+    rules:
+      - field: project_name
+        required: true
+        min_length: 3
+        max_length: 200
+      - field: description
+        max_length: 5000
+      - field: portfolio_category
+        max_length: 100
+      - field: priority
+        enum: [low, medium, high]
+        default: medium
+      - field: target_launch_date
+        format: YYYY-MM-DD
+
+  update_project:
+    schema: updateProjectSchema
+    file: lib/validation/npd-project.ts
+    additional_validation:
+      - rule: "Cannot edit if status = 'launched'"
+        http_status: 400
+
+  advance_gate:
+    schema: advanceGateSchema
+    file: lib/validation/npd-project.ts
+    rules:
+      - field: skip_validation
+        type: boolean
+        default: true
+
+service_methods:
+  - name: NPDProjectService.list
+    description: "List projects with filters, pagination, search"
+    returns: "PaginatedResult<NPDProject>"
+
+  - name: NPDProjectService.getById
+    description: "Get project by ID with related counts"
+    returns: "ProjectDetail | null"
+
+  - name: NPDProjectService.create
+    description: "Create project with auto-generated number"
+    returns: "NPDProject"
+
+  - name: NPDProjectService.update
+    description: "Update project fields (non-launched only)"
+    returns: "NPDProject"
+
+  - name: NPDProjectService.delete
+    description: "Delete project (idea status only)"
+    returns: "void"
+
+  - name: NPDProjectService.advanceGate
+    description: "Advance to next gate, update status"
+    returns: "{ project, previous_gate, new_gate }"
+
+  - name: NPDProjectService.getKanbanData
+    description: "Get projects grouped by gate"
+    returns: "{ kanban, summary }"
+
+file_locations:
+  api_routes:
+    - apps/frontend/app/api/npd/projects/route.ts
+    - apps/frontend/app/api/npd/projects/[id]/route.ts
+    - apps/frontend/app/api/npd/projects/[id]/advance-gate/route.ts
+    - apps/frontend/app/api/npd/dashboard/route.ts
+
+  service:
+    - apps/frontend/lib/services/npd-project-service.ts
+
+  validation:
+    - apps/frontend/lib/validation/npd-project.ts
+
+  types:
+    - apps/frontend/lib/types/npd-project.ts

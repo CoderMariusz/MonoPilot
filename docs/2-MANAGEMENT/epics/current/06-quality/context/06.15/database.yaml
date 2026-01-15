@@ -1,0 +1,383 @@
+# Story 06.15 - Database Context
+# Generated: 2026-01-15
+# Purpose: NCR Corrective Action tables, RLS, triggers
+
+# =============================================================================
+# TABLES
+# =============================================================================
+
+tables:
+  # ---------------------------------------------------------------------------
+  # NCR Corrective Actions
+  # ---------------------------------------------------------------------------
+  ncr_corrective_actions:
+    description: "Corrective actions for NCR (immediate and long-term)"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        not_null: true
+        fk: organizations(id)
+        on_delete: CASCADE
+      - name: ncr_id
+        type: UUID
+        not_null: true
+        fk: ncr_reports(id)
+        on_delete: CASCADE
+      - name: action_number
+        type: TEXT
+        not_null: true
+        description: "CA-YYYY-NNNNN"
+
+      # Action Details
+      - name: action_type
+        type: TEXT
+        not_null: true
+        check: "action_type IN ('immediate', 'long_term')"
+        description: "immediate=containment, long_term=permanent fix"
+      - name: title
+        type: TEXT
+        not_null: true
+        description: "Brief title (max 100 chars)"
+      - name: description
+        type: TEXT
+        not_null: true
+        description: "Detailed description (min 50 chars)"
+      - name: expected_outcome
+        type: TEXT
+        description: "What should happen when action is complete"
+
+      # Assignment
+      - name: owner_id
+        type: UUID
+        not_null: true
+        fk: users(id)
+        description: "User responsible for completion"
+      - name: assigned_at
+        type: TIMESTAMPTZ
+        default: now()
+      - name: due_date
+        type: DATE
+        not_null: true
+
+      # Status
+      - name: status
+        type: TEXT
+        not_null: true
+        default: "'planned'"
+        check: "status IN ('planned', 'in_progress', 'completed', 'verified', 'cancelled')"
+      - name: priority
+        type: TEXT
+        default: "'medium'"
+        check: "priority IN ('low', 'medium', 'high', 'critical')"
+      - name: progress_percent
+        type: INTEGER
+        default: 0
+        check: "progress_percent >= 0 AND progress_percent <= 100"
+        description: "Auto-calculated from action items"
+
+      # Completion
+      - name: started_at
+        type: TIMESTAMPTZ
+      - name: completed_at
+        type: TIMESTAMPTZ
+      - name: completion_notes
+        type: TEXT
+        description: "Notes from owner upon completion"
+      - name: verified_at
+        type: TIMESTAMPTZ
+      - name: verified_by
+        type: UUID
+        fk: users(id)
+      - name: verification_notes
+        type: TEXT
+
+      # Audit
+      - name: created_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: created_by
+        type: UUID
+        fk: users(id)
+      - name: updated_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: updated_by
+        type: UUID
+        fk: users(id)
+
+    indexes:
+      - idx_corrective_actions_ncr ON ncr_corrective_actions(ncr_id)
+      - idx_corrective_actions_owner ON ncr_corrective_actions(owner_id)
+      - idx_corrective_actions_org_status ON ncr_corrective_actions(org_id, status)
+      - idx_corrective_actions_due ON ncr_corrective_actions(org_id, due_date) WHERE status IN ('planned', 'in_progress')
+
+    constraints:
+      - UNIQUE(org_id, action_number)
+
+  # ---------------------------------------------------------------------------
+  # NCR Action Items (Sub-tasks)
+  # ---------------------------------------------------------------------------
+  ncr_action_items:
+    description: "Checklist items for corrective actions"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        not_null: true
+        fk: organizations(id)
+      - name: corrective_action_id
+        type: UUID
+        not_null: true
+        fk: ncr_corrective_actions(id)
+        on_delete: CASCADE
+
+      # Item Details
+      - name: title
+        type: TEXT
+        not_null: true
+        description: "Item description"
+      - name: sequence
+        type: INTEGER
+        not_null: true
+        default: 0
+        description: "Order of item (drag-drop reorder)"
+      - name: is_required
+        type: BOOLEAN
+        default: true
+        description: "Must be completed before action complete"
+
+      # Status
+      - name: is_completed
+        type: BOOLEAN
+        default: false
+      - name: completed_at
+        type: TIMESTAMPTZ
+      - name: completed_by
+        type: UUID
+        fk: users(id)
+      - name: completion_notes
+        type: TEXT
+
+      # Audit
+      - name: created_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: updated_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+
+    indexes:
+      - idx_action_items_action ON ncr_action_items(corrective_action_id, sequence)
+
+  # ---------------------------------------------------------------------------
+  # NCR Action Evidence
+  # ---------------------------------------------------------------------------
+  ncr_action_evidence:
+    description: "Evidence files for corrective actions (completion proof)"
+    columns:
+      - name: id
+        type: UUID
+        pk: true
+        default: gen_random_uuid()
+      - name: org_id
+        type: UUID
+        not_null: true
+        fk: organizations(id)
+      - name: corrective_action_id
+        type: UUID
+        not_null: true
+        fk: ncr_corrective_actions(id)
+        on_delete: CASCADE
+
+      # File
+      - name: file_name
+        type: TEXT
+        not_null: true
+      - name: file_type
+        type: TEXT
+        not_null: true
+      - name: file_size
+        type: INTEGER
+        not_null: true
+      - name: file_path
+        type: TEXT
+        not_null: true
+      - name: storage_bucket
+        type: TEXT
+        default: "'ncr-action-evidence'"
+
+      # Metadata
+      - name: description
+        type: TEXT
+      - name: uploaded_at
+        type: TIMESTAMPTZ
+        not_null: true
+        default: now()
+      - name: uploaded_by
+        type: UUID
+        not_null: true
+        fk: users(id)
+
+    indexes:
+      - idx_action_evidence_action ON ncr_action_evidence(corrective_action_id)
+
+# =============================================================================
+# SEQUENCES
+# =============================================================================
+
+sequences:
+  - name: ncr_corrective_action_sequences
+    columns:
+      - id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+      - org_id UUID NOT NULL REFERENCES organizations(id)
+      - year INTEGER NOT NULL
+      - current_value BIGINT NOT NULL DEFAULT 0
+      - updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    constraint: UNIQUE(org_id, year)
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+
+functions:
+  - name: generate_corrective_action_number
+    params: p_org_id UUID
+    returns: TEXT
+    body: |
+      DECLARE
+        v_year INTEGER;
+        v_next_val BIGINT;
+        v_number TEXT;
+      BEGIN
+        v_year := EXTRACT(YEAR FROM CURRENT_DATE);
+
+        INSERT INTO ncr_corrective_action_sequences (org_id, year, current_value)
+        VALUES (p_org_id, v_year, 1)
+        ON CONFLICT (org_id, year)
+        DO UPDATE SET
+          current_value = ncr_corrective_action_sequences.current_value + 1,
+          updated_at = NOW()
+        RETURNING current_value INTO v_next_val;
+
+        v_number := 'CA-' || v_year::TEXT || '-' || LPAD(v_next_val::TEXT, 5, '0');
+        RETURN v_number;
+      END;
+
+  - name: update_corrective_action_progress
+    description: "Trigger to auto-calculate progress from items"
+    trigger: AFTER INSERT OR UPDATE OR DELETE ON ncr_action_items
+    body: |
+      CREATE OR REPLACE FUNCTION update_corrective_action_progress()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_total INTEGER;
+        v_completed INTEGER;
+        v_progress INTEGER;
+        v_action_id UUID;
+      BEGIN
+        -- Determine which action_id to update
+        IF TG_OP = 'DELETE' THEN
+          v_action_id := OLD.corrective_action_id;
+        ELSE
+          v_action_id := NEW.corrective_action_id;
+        END IF;
+
+        -- Calculate progress
+        SELECT
+          COUNT(*),
+          COUNT(*) FILTER (WHERE is_completed = true)
+        INTO v_total, v_completed
+        FROM ncr_action_items
+        WHERE corrective_action_id = v_action_id;
+
+        IF v_total > 0 THEN
+          v_progress := (v_completed * 100) / v_total;
+        ELSE
+          v_progress := 0;
+        END IF;
+
+        -- Update action
+        UPDATE ncr_corrective_actions
+        SET progress_percent = v_progress,
+            updated_at = NOW()
+        WHERE id = v_action_id;
+
+        RETURN NULL;
+      END;
+      $$ LANGUAGE plpgsql;
+
+# =============================================================================
+# RLS POLICIES
+# =============================================================================
+
+rls_policies:
+  ncr_corrective_actions:
+    - name: corrective_actions_select
+      operation: SELECT
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: corrective_actions_insert
+      operation: INSERT
+      check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: corrective_actions_update
+      operation: UPDATE
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: corrective_actions_delete
+      operation: DELETE
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND status = 'planned'"
+
+  ncr_action_items:
+    - name: action_items_select
+      operation: SELECT
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: action_items_insert
+      operation: INSERT
+      check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: action_items_update
+      operation: UPDATE
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: action_items_delete
+      operation: DELETE
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  ncr_action_evidence:
+    - name: action_evidence_select
+      operation: SELECT
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: action_evidence_insert
+      operation: INSERT
+      check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - name: action_evidence_delete
+      operation: DELETE
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# =============================================================================
+# TRIGGERS
+# =============================================================================
+
+triggers:
+  - name: update_corrective_actions_updated_at
+    table: ncr_corrective_actions
+    timing: BEFORE UPDATE
+    function: update_updated_at_column()
+
+  - name: update_action_items_updated_at
+    table: ncr_action_items
+    timing: BEFORE UPDATE
+    function: update_updated_at_column()
+
+  - name: auto_update_action_progress
+    table: ncr_action_items
+    timing: AFTER INSERT OR UPDATE OR DELETE
+    for_each: ROW
+    function: update_corrective_action_progress()

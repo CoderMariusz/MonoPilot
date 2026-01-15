@@ -1,0 +1,18 @@
+endpoints:
+  cost_centers_crud:
+    - method: GET
+      path: "/api/finance/cost-centers"
+    - method: POST
+      path: "/api/finance/cost-centers"
+      roles: ["admin", "finance_manager"]
+
+  get_labor_costs:
+    method: GET
+    path: "/api/finance/work-order-costs/:workOrderId/labor"
+    response:
+      status: 200
+      body:
+        costs: "Array of LaborCost"
+        summary:
+          total_labor_cost: "number"
+          total_hours: "number"

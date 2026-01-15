@@ -1,0 +1,199 @@
+# Story 04.8 - Material Reservations
+# API endpoints specification
+# Generated: 2026-01-14
+
+endpoints:
+  - method: "GET"
+    path: "/api/planning/work-orders/[id]/materials/[materialId]/available-lps"
+    description: "Get available LPs for a WO material with FIFO/FEFO sorting"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/materials/[materialId]/available-lps/route.ts"
+    auth: true
+    roles: ["operator", "supervisor", "admin"]
+    query_params:
+      sort:
+        type: "string"
+        enum: ["fifo", "fefo"]
+        default: "warehouse.default_pick_algorithm"
+      lot_number:
+        type: "string"
+        optional: true
+      location:
+        type: "string"
+        optional: true
+    response:
+      success:
+        lps:
+          type: "array"
+          items:
+            lp_id: "UUID"
+            lp_number: "string"
+            lot_number: "string | null"
+            expiry_date: "date | null"
+            location: "string | null"
+            available_qty: "number"
+            total_qty: "number"
+            created_at: "timestamp"
+            other_reservations:
+              type: "array"
+              items:
+                wo_number: "string"
+                quantity: "number"
+        total_available: "number"
+        sort_order: "fifo | fefo"
+    errors:
+      - code: "WO_NOT_FOUND"
+        status: 404
+      - code: "MATERIAL_NOT_FOUND"
+        status: 404
+
+  - method: "POST"
+    path: "/api/planning/work-orders/[id]/materials/[materialId]/reservations"
+    description: "Create reservations for specific LPs"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/materials/[materialId]/reservations/route.ts"
+    auth: true
+    roles: ["operator", "supervisor", "admin"]
+    request:
+      reservations:
+        type: "array"
+        required: true
+        items:
+          lp_id: "UUID"
+          quantity: "number"
+      acknowledge_over_reservation:
+        type: "boolean"
+        default: false
+        note: "Required if total > required_qty"
+    response:
+      success:
+        reservations:
+          type: "array"
+          items:
+            id: "UUID"
+            lp_id: "UUID"
+            lp_number: "string"
+            reserved_qty: "number"
+            status: "active"
+            reserved_at: "timestamp"
+            reserved_by:
+              id: "UUID"
+              name: "string"
+        total_reserved: "number"
+        required_qty: "number"
+        coverage_percent: "number"
+    errors:
+      - code: "WO_NOT_FOUND"
+        status: 404
+      - code: "MATERIAL_NOT_FOUND"
+        status: 404
+      - code: "LP_NOT_AVAILABLE"
+        status: 400
+        message: "LP {lp_number} is not available for reservation"
+      - code: "INSUFFICIENT_QTY"
+        status: 400
+        message: "LP {lp_number} has only {available} available, requested {requested}"
+      - code: "OVER_RESERVATION_NOT_ACKNOWLEDGED"
+        status: 400
+        message: "Total reserved exceeds required. Set acknowledge_over_reservation=true"
+      - code: "WO_STATUS_INVALID"
+        status: 400
+        message: "Cannot reserve for WO with status {status}"
+
+  - method: "GET"
+    path: "/api/production/work-orders/[id]/reservations"
+    description: "List all reservations for a Work Order"
+    file: "apps/frontend/app/api/production/work-orders/[id]/reservations/route.ts"
+    auth: true
+    roles: ["operator", "supervisor", "admin"]
+    query_params:
+      status:
+        type: "string"
+        enum: ["active", "released", "consumed", "all"]
+        default: "all"
+      material_id:
+        type: "UUID"
+        optional: true
+    response:
+      success:
+        reservations:
+          type: "array"
+          items:
+            id: "UUID"
+            lp_id: "UUID"
+            lp_number: "string"
+            wo_material_id: "UUID"
+            material_name: "string"
+            product_code: "string"
+            lot_number: "string | null"
+            expiry_date: "date | null"
+            location: "string"
+            reserved_qty: "number"
+            consumed_qty: "number"
+            remaining_qty: "number"
+            status: "active | released | consumed"
+            reserved_at: "timestamp"
+            reserved_by: "string"
+        summary:
+          total_reserved: "number"
+          total_consumed: "number"
+          total_remaining: "number"
+          materials_count: "number"
+
+  - method: "DELETE"
+    path: "/api/production/work-orders/[id]/reservations/[resId]"
+    description: "Release a specific reservation"
+    file: "apps/frontend/app/api/production/work-orders/[id]/reservations/[resId]/route.ts"
+    auth: true
+    roles: ["supervisor", "admin"]
+    response:
+      success:
+        released_qty: "number"
+        new_total_reserved: "number"
+        coverage_percent: "number"
+    errors:
+      - code: "RESERVATION_NOT_FOUND"
+        status: 404
+      - code: "ALREADY_RELEASED"
+        status: 400
+        message: "Reservation already released"
+      - code: "ALREADY_CONSUMED"
+        status: 400
+        message: "Cannot release fully consumed reservation"
+      - code: "PERMISSION_DENIED"
+        status: 403
+        message: "Only supervisor or admin can release reservations"
+
+service:
+  file: "apps/frontend/lib/services/material-reservation-service.ts"
+  class: "MaterialReservationService"
+  methods:
+    - name: "getAvailableLPs"
+      params: ["woId", "materialId", "sort", "filters"]
+      returns: "Promise<AvailableLP[]>"
+    - name: "createReservations"
+      params: ["woId", "materialId", "reservations", "acknowledgeOver"]
+      returns: "Promise<Reservation[]>"
+    - name: "getWOReservations"
+      params: ["woId", "filters"]
+      returns: "Promise<ReservationWithDetails[]>"
+    - name: "releaseReservation"
+      params: ["reservationId"]
+      returns: "Promise<ReleaseResult>"
+    - name: "releaseAllWOReservations"
+      params: ["woId"]
+      returns: "Promise<number>"
+
+validation:
+  file: "apps/frontend/lib/validation/reservation-schemas.ts"
+  schemas:
+    - name: "createReservationSchema"
+      fields:
+        lp_id: "z.string().uuid()"
+        quantity: "z.number().positive()"
+    - name: "createReservationsRequestSchema"
+      fields:
+        reservations: "z.array(createReservationSchema).min(1)"
+        acknowledge_over_reservation: "z.boolean().optional()"
+    - name: "reservationFiltersSchema"
+      fields:
+        status: "z.enum(['active', 'released', 'consumed', 'all']).optional()"
+        material_id: "z.string().uuid().optional()"

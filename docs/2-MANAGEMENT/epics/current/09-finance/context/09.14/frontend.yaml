@@ -1,0 +1,34 @@
+# Story 09.14 - Frontend Context
+# Generated: 2026-01-15
+
+pages:
+  - path: "app/(authenticated)/MODULE/resource/page.tsx"
+    type: "list"
+    description: "Resource list page"
+
+components:
+  - name: "ResourceDataTable"
+    path: "components/MODULE/ResourceDataTable.tsx"
+    type: "table"
+    description: "Main data table"
+
+  - name: "ResourceModal"
+    path: "components/MODULE/ResourceModal.tsx"
+    type: "modal"
+    description: "Create/Edit modal"
+
+hooks:
+  - name: "useResources"
+    path: "lib/hooks/use-resources.ts"
+    description: "React Query hook for resources"
+
+ux:
+  wireframes: []
+  patterns:
+    table: "ShadCN DataTable pattern"
+    modal: "ShadCN Dialog pattern"
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"

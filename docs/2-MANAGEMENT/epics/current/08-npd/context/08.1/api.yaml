@@ -1,0 +1,216 @@
+# Story 08.1 - API Specification
+# Purpose: NPD settings management endpoints
+# Agent: BACKEND-DEV (API focus)
+
+# NPD Settings Endpoints
+npd_settings_endpoints:
+  base_path: "/api/npd/settings"
+
+  - method: "GET"
+    path: "/api/npd/settings"
+    description: "Get org NPD settings (creates defaults if not exists)"
+    auth: "required"
+    roles: ["*"]
+    query_params: []
+    response:
+      status: 200
+      type: "NPDSettings"
+      schema:
+        id: "number"
+        org_id: "uuid"
+        enable_npd_module: "boolean"
+        npd_only_mode: "boolean"
+        enable_pilot_wo: "boolean"
+        default_pilot_routing: "number | null"
+        require_costing_approval: "boolean"
+        cost_variance_warning_pct: "number"
+        cost_variance_blocker_pct: "number"
+        require_compliance_docs: "boolean"
+        max_formulation_versions: "number"
+        enable_formulation_export: "boolean"
+        event_retention_days: "number"
+        created_at: "ISO timestamp"
+        updated_at: "ISO timestamp"
+    logic:
+      - "Query npd_settings WHERE org_id = user's org_id"
+      - "If no record exists, create with defaults and return"
+      - "RLS enforces org_id isolation"
+    error_responses:
+      - { status: 401, reason: "Unauthorized - no auth token" }
+      - { status: 500, reason: "Database error" }
+
+  - method: "PUT"
+    path: "/api/npd/settings"
+    description: "Update NPD settings (admin only)"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    request:
+      type: "Partial<NPDSettings>"
+      schema:
+        enable_npd_module: "boolean (optional)"
+        npd_only_mode: "boolean (optional)"
+        enable_pilot_wo: "boolean (optional)"
+        default_pilot_routing: "number | null (optional)"
+        require_costing_approval: "boolean (optional)"
+        cost_variance_warning_pct: "number (optional)"
+        cost_variance_blocker_pct: "number (optional)"
+        require_compliance_docs: "boolean (optional)"
+        max_formulation_versions: "number (optional)"
+        enable_formulation_export: "boolean (optional)"
+        event_retention_days: "number (optional)"
+      validation:
+        - "cost_variance_warning_pct >= 0"
+        - "cost_variance_blocker_pct >= 0"
+        - "cost_variance_warning_pct <= cost_variance_blocker_pct"
+        - "max_formulation_versions > 0"
+        - "event_retention_days >= 0"
+    response:
+      status: 200
+      type: "NPDSettings"
+    logic:
+      - "Validate Zod schema (updateNPDSettingsSchema)"
+      - "Check user role (SUPER_ADMIN or ADMIN)"
+      - "Update npd_settings WHERE org_id = user's org_id"
+      - "RLS enforces org_id isolation"
+      - "updated_at timestamp auto-updated by trigger"
+    error_responses:
+      - { status: 401, reason: "Unauthorized - no auth token" }
+      - { status: 403, reason: "Forbidden - not admin" }
+      - { status: 400, reason: "Validation error (Zod)" }
+      - { status: 500, reason: "Database error" }
+
+# Services
+services:
+  - path: "lib/services/npd-settings-service.ts"
+    description: "NPD settings business logic"
+    exports:
+      - name: "getSettings"
+        signature: "(orgId: string): Promise<NPDSettings>"
+        description: "Get settings for org, creates defaults if not exists"
+
+      - name: "updateSettings"
+        signature: "(orgId: string, updates: Partial<NPDSettings>): Promise<NPDSettings>"
+        description: "Update settings (admin only)"
+
+      - name: "createDefaultSettings"
+        signature: "(orgId: string): Promise<NPDSettings>"
+        description: "Create default settings for new org"
+
+      - name: "isNPDEnabled"
+        signature: "(orgId: string): Promise<boolean>"
+        description: "Check if NPD module enabled for org"
+
+      - name: "isNPDOnlyMode"
+        signature: "(orgId: string): Promise<boolean>"
+        description: "Check if org is in NPD-only mode (no production)"
+
+      - name: "canEnableNPD"
+        signature: "(orgId: string): Promise<{ allowed: boolean; reason?: string }>"
+        description: "Check if org can enable NPD (billing tier check)"
+
+      - name: "getCostVarianceThresholds"
+        signature: "(orgId: string): Promise<{ warning: number; blocker: number }>"
+        description: "Get cost variance thresholds for org"
+
+      - name: "evaluateCostVariance"
+        signature: "(orgId: string, variance: number): Promise<CostVarianceLevel>"
+        description: "Evaluate cost variance level (ok, warning, blocker)"
+
+      - name: "validateHandoffEligibility"
+        signature: "(orgId: string, projectData: any): Promise<HandoffValidation>"
+        description: "Validate if project eligible for handoff based on settings"
+
+# Type Definitions
+types:
+  NPDSettings:
+    description: "NPD settings database model"
+    fields:
+      - { name: "id", type: "number" }
+      - { name: "org_id", type: "string" }
+      - { name: "enable_npd_module", type: "boolean" }
+      - { name: "npd_only_mode", type: "boolean" }
+      - { name: "enable_pilot_wo", type: "boolean" }
+      - { name: "default_pilot_routing", type: "number | null" }
+      - { name: "require_costing_approval", type: "boolean" }
+      - { name: "cost_variance_warning_pct", type: "number" }
+      - { name: "cost_variance_blocker_pct", type: "number" }
+      - { name: "require_compliance_docs", type: "boolean" }
+      - { name: "max_formulation_versions", type: "number" }
+      - { name: "enable_formulation_export", type: "boolean" }
+      - { name: "event_retention_days", type: "number" }
+      - { name: "created_at", type: "string" }
+      - { name: "updated_at", type: "string" }
+
+  CostVarianceLevel:
+    description: "Cost variance evaluation result"
+    fields:
+      - { name: "level", type: "'ok' | 'warning' | 'blocker'" }
+      - { name: "message", type: "string | undefined" }
+      - { name: "blocking", type: "boolean" }
+
+  HandoffValidation:
+    description: "Handoff eligibility validation result"
+    fields:
+      - { name: "eligible", type: "boolean" }
+      - { name: "errors", type: "string[]" }
+      - { name: "warnings", type: "string[]" }
+      - { name: "blockers", type: "string[]" }
+
+# API Route Files
+route_files:
+  - path: "apps/frontend/app/api/npd/settings/route.ts"
+    methods: ["GET", "PUT"]
+    description: "NPD settings endpoints"
+    handlers:
+      - method: "GET"
+        logic: |
+          1. Get user's org_id from session
+          2. Call NPDSettingsService.getSettings(orgId)
+          3. Return settings (creates defaults if not exists)
+
+      - method: "PUT"
+        logic: |
+          1. Check user role (SUPER_ADMIN or ADMIN)
+          2. Validate request body with updateNPDSettingsSchema
+          3. Call NPDSettingsService.updateSettings(orgId, updates)
+          4. Return updated settings
+
+# Middleware
+middleware:
+  - name: "npd-module-enabled"
+    path: "lib/middleware/npd-module-enabled.ts"
+    description: "Middleware to check if NPD module enabled for org"
+    logic: |
+      1. Get user's org_id
+      2. Call NPDSettingsService.isNPDEnabled(orgId)
+      3. If false, return 403 Forbidden "NPD module not enabled"
+      4. If true, continue to route handler
+    usage: "Apply to all /api/npd/* routes (except /api/npd/settings)"
+
+# Helper utilities
+utilities:
+  - name: "getOrgIdFromUser"
+    path: "lib/helpers/auth-helpers.ts"
+    description: "Get org_id for authenticated user"
+
+  - name: "checkUserRole"
+    path: "lib/helpers/auth-helpers.ts"
+    description: "Check if user has required role"
+
+# Error handling patterns
+error_patterns:
+  - scenario: "NPD module not enabled"
+    status: 403
+    response: { error: "NPD module not enabled for this organization" }
+
+  - scenario: "Non-admin tries to update"
+    status: 403
+    response: { error: "Admin role required to update NPD settings" }
+
+  - scenario: "Invalid cost variance thresholds"
+    status: 400
+    response: { error: "Warning threshold must be <= blocker threshold" }
+
+  - scenario: "Settings not found (should never happen)"
+    status: 500
+    response: { error: "Failed to create default settings" }

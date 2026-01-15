@@ -1,0 +1,46 @@
+# Story 06.24 - CCP Monitoring Scanner Context
+# Generated: 2025-01-15
+
+story:
+  id: "06.24"
+  name: "CCP Monitoring Scanner"
+  slug: "ccp-monitoring-scanner"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "frontend (mobile)"
+  state: "ready"
+  priority: "P0"
+
+dependencies:
+  required:
+    - story: "06.23"
+      provides: ["haccp_ccp_monitoring table, monitoring patterns"]
+    - story: "04.1"
+      provides: ["work_orders for barcode scan"]
+
+deliverables:
+  - type: "page"
+    count: 1
+    description: "/quality/haccp/ccp-monitoring/mobile"
+  - type: "components"
+    count: 10
+    description: "Barcode scanner, offline storage, audio feedback, QR generator"
+  - type: "service"
+    count: 2
+    description: "offline-sync-service.ts, audio-feedback-service.ts"
+
+technical_notes:
+  - "Same table as desktop (haccp_ccp_monitoring)"
+  - "Offline mode: IndexedDB, 50 records max"
+  - "Audio: Web Audio API (pass=beep, fail=alarm)"
+  - "Vibration API for tactile feedback"
+  - "Camera API for barcode scanning"
+  - "Touch targets >= 48px (accessibility)"
+  - "QR code for CCP quick access"
+  - "Auto-sync on WiFi reconnect"
+
+summary: |
+  Mobile CCP monitoring for shop floor with barcode scan, offline mode (50 records),
+  audio/vibration feedback, and large touch targets for production operators.

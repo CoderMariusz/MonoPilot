@@ -1,0 +1,33 @@
+# Story 06.34 - Supplier Quality Ratings Context
+# Phase: 4 (Advanced Quality)
+
+story:
+  id: "06.34"
+  name: "Supplier Quality Ratings"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P1"
+
+dependencies:
+  required:
+    - story: "01.1"
+  blocks:
+    - story: "06.35"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "supplier_quality_ratings table"
+  - type: "api"
+    count: 5
+  - type: "components"
+    count: 6
+
+summary: |
+  Supplier scorecards with quality/delivery/response scores.
+  Weighted overall score, approval status (approved/conditional/blocked).
+  Auto-calculate from incoming inspection data.

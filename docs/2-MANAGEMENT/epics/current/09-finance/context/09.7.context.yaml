@@ -1,0 +1,171 @@
+story:
+  id: "09.7"
+  name: "Inventory Valuation FIFO/WAC"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "backend"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "02.1"
+      provides: ["products"]
+    - story: "05.1"
+      provides: ["license_plates"]
+    - story: "05.11"
+      provides: ["grns", "grn_items"]
+    - story: "09.8"
+      provides: ["currencies"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.5.1", "FR-9.5.2", "FR-9.5.4"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.7.inventory-valuation-fifo-wac.md"
+  patterns:
+    - "apps/frontend/lib/services/lp-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_inventory_cost_layers.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/inventory-valuation/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/inventory-valuation/[productId]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/inventory-valuation/[productId]/layers/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/inventory-valuation/calculate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/inventory-valuation/settings/route.ts"
+      methods: ["GET", "PATCH"]
+  services:
+    - path: "apps/frontend/lib/services/inventory-valuation-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/inventory-valuation/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/inventory-valuation/[productId]/page.tsx"
+
+database:
+  tables:
+    - name: "inventory_cost_layers"
+      columns:
+        - "id"
+        - "org_id"
+        - "product_id"
+        - "lp_id"
+        - "quantity_received"
+        - "quantity_remaining"
+        - "unit_cost"
+        - "total_cost"
+        - "receipt_date"
+        - "is_fully_consumed"
+      rls: true
+      indexes:
+        - "org_id, product_id"
+        - "lp_id"
+        - "org_id, product_id, receipt_date"
+    - name: "inventory_valuations"
+      columns:
+        - "id"
+        - "org_id"
+        - "product_id"
+        - "valuation_date"
+        - "quantity_on_hand"
+        - "total_value"
+        - "average_unit_cost"
+        - "valuation_method"
+      rls: true
+      indexes:
+        - "org_id, valuation_date"
+        - "product_id"
+    - name: "inventory_valuation_settings"
+      columns:
+        - "id"
+        - "org_id"
+        - "default_method"
+        - "auto_create_layers"
+      rls: true
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/inventory-valuation"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/inventory-valuation/:productId"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/inventory-valuation/calculate"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "GET"
+    path: "/api/finance/inventory-valuation/:productId/layers"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-005-inventory-valuation-report.md"
+      relevance: "Inventory valuation report page with FIFO/WAC calculation display, product valuations table, total value summary, and recalculate functionality"
+  patterns:
+    table: "ShadCN DataTable pattern"
+    card: "Summary card with metrics"
+  states:
+    - "loading"
+    - "calculated"
+    - "pending calculation"
+    - "error"
+
+validation_rules:
+  quantity_received: "Must be positive"
+  unit_cost: "Must be >= 0"
+  valuation_method: "Must be 'fifo' or 'average'"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  fifo: "Oldest layer first consumption"
+  wac: "Recalculate on every transaction"
+
+acceptance_checklist:
+  - "inventory_cost_layers table created with RLS"
+  - "inventory_valuations table created"
+  - "inventory_valuation_settings table created"
+  - "create_cost_layer_on_lp_receipt() function works"
+  - "consume_cost_layer_fifo() function consumes oldest first"
+  - "calculate_weighted_average_cost() function correct"
+  - "calculate_inventory_valuation() function works"
+  - "GET valuation summary API returns data"
+  - "GET product valuation detail works"
+  - "FIFO cost layer consumption order correct"
+  - "Weighted average calculation accurate"
+  - "Valuation report page displays correctly"
+  - "Cost layer detail table renders (FIFO)"
+  - "Recalculate button works"
+  - "CSV export generates valid file"
+  - "Permission enforcement for recalculate"
+  - "RLS enforces org isolation"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: inventory_cost_layers table"
+  - "Migration: inventory_valuations table"
+  - "Migration: inventory_valuation_settings table"
+  - "Function: create_cost_layer_on_lp_receipt()"
+  - "Function: consume_cost_layer_fifo()"
+  - "Function: calculate_weighted_average_cost()"
+  - "Function: calculate_inventory_valuation()"
+  - "API: 5+ valuation endpoints"
+  - "Service: InventoryValuationService with 10 methods"
+  - "Page: Inventory valuation report"
+  - "Page: Product valuation detail"
+  - "Tests: Unit, integration, E2E"

@@ -1,0 +1,234 @@
+# Story 04.7a: Output Registration Desktop - API Endpoints
+
+endpoints:
+  - method: "GET"
+    path: "/api/production/outputs/:woId"
+    auth: true
+    roles: ["production", "admin", "warehouse"]
+    description: "Get output registration page data including WO summary, yields, outputs, and by-products"
+    request_schema:
+      params:
+        woId:
+          type: "uuid"
+          required: true
+    response_schema:
+      wo:
+        id: "uuid"
+        wo_number: "string"
+        status: "string"
+        product_id: "uuid"
+        product_name: "string"
+        product_code: "string"
+        batch_number: "string"
+        planned_qty: "number"
+        output_qty: "number"
+        uom: "string"
+        progress_percent: "number"
+        remaining_qty: "number"
+        default_location_id: "uuid"
+        default_location_name: "string"
+      yields:
+        overall_yield: "number"
+        output_yield: "number"
+        material_yield: "number"
+        operation_yield: "number"
+        output_trend: "number"
+        target_yield: "number"
+      outputs:
+        type: "array"
+        items:
+          id: "uuid"
+          lp_number: "string"
+          qty: "number"
+          uom: "string"
+          batch_number: "string"
+          qa_status: "string"
+          location_name: "string"
+          expiry_date: "date"
+          created_at: "timestamp"
+          created_by_name: "string"
+      by_products:
+        type: "array"
+        items:
+          product_id: "uuid"
+          product_name: "string"
+          yield_percent: "number"
+          expected_qty: "number"
+          actual_qty: "number"
+          status: "string"
+          lp_count: "number"
+      settings:
+        auto_create_by_product_lp: "boolean"
+        require_qa_on_output: "boolean"
+        auto_complete_wo: "boolean"
+    error_codes:
+      - code: "404"
+        message: "Work order not found"
+      - code: "403"
+        message: "Access denied to this work order"
+
+  - method: "POST"
+    path: "/api/production/outputs"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Register production output - creates LP, updates genealogy, updates WO progress"
+    request_schema:
+      body:
+        wo_id:
+          type: "uuid"
+          required: true
+        quantity:
+          type: "number"
+          required: true
+          validation: "Must be greater than 0"
+        uom:
+          type: "string"
+          required: true
+        batch_number:
+          type: "string"
+          required: true
+          maxLength: 50
+        qa_status:
+          type: "string"
+          required: false
+          enum: ["approved", "pending", "rejected"]
+        location_id:
+          type: "uuid"
+          required: true
+        expiry_date:
+          type: "date"
+          required: true
+        notes:
+          type: "string"
+          required: false
+          maxLength: 500
+    response_schema:
+      lp:
+        id: "uuid"
+        lp_number: "string"
+        product_id: "uuid"
+        qty: "number"
+        batch_number: "string"
+        qa_status: "string"
+        location_id: "uuid"
+        expiry_date: "date"
+        source: "string"
+        wo_id: "uuid"
+        created_at: "timestamp"
+      genealogy:
+        parent_lps:
+          type: "array"
+          items:
+            lp_id: "uuid"
+            lp_number: "string"
+            qty_consumed: "number"
+        child_lp_id: "uuid"
+      wo_updated:
+        output_qty: "number"
+        progress_percent: "number"
+        status: "string"
+      by_products:
+        auto_created: "boolean"
+        by_products_created:
+          type: "array"
+          items:
+            lp_id: "uuid"
+            lp_number: "string"
+            product_name: "string"
+            qty: "number"
+    error_codes:
+      - code: "400"
+        message: "Validation failed"
+      - code: "400"
+        message: "Quantity must be greater than 0"
+      - code: "400"
+        message: "QA status is required"
+      - code: "404"
+        message: "Work order not found"
+      - code: "409"
+        message: "Work order is not in progress"
+
+  - method: "POST"
+    path: "/api/production/outputs/by-products"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Register by-product - creates LP with linked genealogy"
+    request_schema:
+      body:
+        wo_id:
+          type: "uuid"
+          required: true
+        main_output_lp_id:
+          type: "uuid"
+          required: true
+        by_product_id:
+          type: "uuid"
+          required: true
+        quantity:
+          type: "number"
+          required: true
+        uom:
+          type: "string"
+          required: true
+        batch_number:
+          type: "string"
+          required: true
+        qa_status:
+          type: "string"
+          required: false
+        location_id:
+          type: "uuid"
+          required: true
+        expiry_date:
+          type: "date"
+          required: true
+        notes:
+          type: "string"
+          required: false
+    response_schema:
+      lp:
+        id: "uuid"
+        lp_number: "string"
+        product_id: "uuid"
+        qty: "number"
+        batch_number: "string"
+        qa_status: "string"
+        is_by_product: "boolean"
+      genealogy:
+        parent_lps:
+          type: "array"
+        child_lp_id: "uuid"
+        linked_to_main_output: "uuid"
+    error_codes:
+      - code: "400"
+        message: "Invalid by-product for this BOM"
+      - code: "404"
+        message: "Main output LP not found"
+
+  - method: "GET"
+    path: "/api/production/outputs/:woId/export"
+    auth: true
+    roles: ["production", "admin"]
+    description: "Export output history as CSV"
+    request_schema:
+      params:
+        woId:
+          type: "uuid"
+          required: true
+    response_schema:
+      content_type: "text/csv"
+      filename: "outputs-{wo_number}.csv"
+      columns:
+        - "LP Number"
+        - "Quantity"
+        - "UoM"
+        - "Batch"
+        - "QA Status"
+        - "Location"
+        - "Expiry"
+        - "Created At"
+        - "Created By"
+        - "Notes"
+    error_codes:
+      - code: "404"
+        message: "Work order not found"

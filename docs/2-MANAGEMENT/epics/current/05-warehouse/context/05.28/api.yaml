@@ -1,0 +1,392 @@
+# Story 05.28 - API Specification
+# Purpose: Endpoint definitions, request/response schemas, auth
+
+# API Endpoints
+endpoints:
+  - path: /api/warehouse/inventory/expiring
+    method: GET
+    description: "List LPs expiring within warning period"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN, WAREHOUSE_MANAGER, WAREHOUSE_OPERATOR]
+    query_params:
+      tier:
+        type: string
+        enum: [critical, warning, caution, all]
+        required: false
+        description: "Filter by expiry tier"
+      warehouse_id:
+        type: uuid
+        required: false
+        description: "Filter by specific warehouse"
+      product_id:
+        type: uuid
+        required: false
+        description: "Filter by specific product"
+      limit:
+        type: integer
+        default: 50
+        min: 1
+        max: 500
+      offset:
+        type: integer
+        default: 0
+        min: 0
+    response:
+      success:
+        status: 200
+        schema: |
+          {
+            data: ExpiringLP[],
+            meta: {
+              total: number,
+              limit: number,
+              offset: number,
+              has_more: boolean
+            }
+          }
+      errors:
+        - status: 401
+          code: UNAUTHORIZED
+          message: "Authentication required"
+        - status: 403
+          code: FORBIDDEN
+          message: "Insufficient permissions"
+    performance:
+      target: "<300ms"
+      caching: "Redis 5min TTL"
+
+  - path: /api/warehouse/inventory/expiring/summary
+    method: GET
+    description: "Aggregated expiry statistics"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN, WAREHOUSE_MANAGER, WAREHOUSE_OPERATOR]
+    response:
+      success:
+        status: 200
+        schema: |
+          {
+            expiring_count: number,
+            expired_count: number,
+            expiring_value: number,
+            expired_value: number,
+            by_tier: {
+              critical: { count: number, value: number },
+              warning: { count: number, value: number },
+              caution: { count: number, value: number }
+            },
+            by_warehouse: Array<{
+              warehouse_id: string,
+              warehouse_name: string,
+              expiring_count: number,
+              expired_count: number
+            }>
+          }
+    performance:
+      target: "<500ms"
+      caching: "Redis 5min TTL"
+
+  - path: /api/warehouse/inventory/expired
+    method: GET
+    description: "List LPs past expiry date"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN, WAREHOUSE_MANAGER, WAREHOUSE_OPERATOR]
+    query_params:
+      warehouse_id:
+        type: uuid
+        required: false
+      limit:
+        type: integer
+        default: 50
+        min: 1
+        max: 500
+      offset:
+        type: integer
+        default: 0
+    response:
+      success:
+        status: 200
+        schema: |
+          {
+            data: ExpiredLP[],
+            meta: { total, limit, offset, has_more }
+          }
+    performance:
+      target: "<300ms"
+
+  - path: /api/warehouse/inventory/expiring/export
+    method: GET
+    description: "Export expiring items to CSV"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN, WAREHOUSE_MANAGER]
+    query_params:
+      tier:
+        type: string
+        enum: [critical, warning, caution, all]
+        required: false
+      warehouse_id:
+        type: uuid
+        required: false
+      include_expired:
+        type: boolean
+        default: false
+    response:
+      success:
+        status: 200
+        content_type: "text/csv"
+        headers:
+          Content-Disposition: "attachment; filename=expiring-inventory-{org_name}-{date}.csv"
+    performance:
+      target: "Streaming for >1000 rows"
+
+  - path: /api/warehouse/dashboard/expiry-alerts
+    method: GET
+    description: "Expiry widget data for dashboard"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN, WAREHOUSE_MANAGER, WAREHOUSE_OPERATOR]
+    response:
+      success:
+        status: 200
+        schema: |
+          {
+            expiring_soon: {
+              count: number,
+              items: ExpiringLP[] (limit 10)
+            },
+            expired: {
+              count: number,
+              items: ExpiredLP[] (limit 5),
+              total_value_at_risk: number
+            },
+            settings: {
+              warning_days: number,
+              critical_days: number,
+              orange_days: number
+            }
+          }
+    performance:
+      target: "<300ms"
+      caching: "Redis 5min TTL"
+
+  - path: /api/warehouse/settings/expiry
+    method: GET
+    description: "Get expiry alert settings"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN, WAREHOUSE_MANAGER]
+    response:
+      success:
+        status: 200
+        schema: |
+          {
+            expiry_warning_days: number,
+            expiry_critical_days: number,
+            expiry_warning_days_orange: number,
+            expiry_alert_enabled: boolean,
+            expiry_alert_email_threshold: number
+          }
+
+  - path: /api/warehouse/settings/expiry
+    method: PUT
+    description: "Update expiry alert settings"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN]
+    request_body:
+      schema: |
+        {
+          expiry_warning_days?: number (1-365),
+          expiry_critical_days?: number (1-30),
+          expiry_warning_days_orange?: number (1-60),
+          expiry_alert_enabled?: boolean,
+          expiry_alert_email_threshold?: number (0-100)
+        }
+    response:
+      success:
+        status: 200
+        schema: "ExpirySettings"
+      errors:
+        - status: 400
+          code: VALIDATION_ERROR
+          message: "Warning days must be between 1 and 365"
+        - status: 403
+          code: FORBIDDEN
+          message: "Only admins can update settings"
+
+  - path: /api/warehouse/expiry-alerts/logs
+    method: GET
+    description: "Get expiry alert history (admin)"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN]
+    query_params:
+      limit:
+        type: integer
+        default: 50
+      offset:
+        type: integer
+        default: 0
+      start_date:
+        type: date
+        required: false
+      end_date:
+        type: date
+        required: false
+    response:
+      success:
+        status: 200
+        schema: |
+          {
+            data: ExpiryAlertLog[],
+            meta: { total, limit, offset }
+          }
+
+  - path: /api/warehouse/expiry-alerts/send-test
+    method: POST
+    description: "Send test expiry notification (admin)"
+    auth: required
+    roles: [SUPER_ADMIN, ADMIN]
+    request_body:
+      schema: |
+        {
+          recipient_email?: string (optional, defaults to current user)
+        }
+    response:
+      success:
+        status: 200
+        schema: |
+          {
+            message: "Test email sent successfully",
+            sent_to: string
+          }
+      errors:
+        - status: 400
+          code: EMAIL_DISABLED
+          message: "Email notifications are disabled"
+
+# Zod Validation Schemas
+validation:
+  location: "lib/validation/expiry-alert.ts"
+  schemas:
+    expiryTierSchema:
+      type: enum
+      values: [critical, warning, caution, normal, expired]
+
+    expiringLPSchema:
+      type: object
+      fields:
+        id: uuid
+        lp_number: string
+        product_id: uuid
+        product_name: string
+        product_sku: string (optional)
+        quantity: number (positive)
+        uom: string
+        expiry_date: date
+        days_until_expiry: integer
+        tier: expiryTierSchema
+        location_id: uuid
+        location_code: string
+        warehouse_id: uuid
+        warehouse_name: string
+        unit_cost: number (optional)
+        value_at_risk: number (optional)
+
+    expirySummarySchema:
+      type: object
+      fields:
+        expiring_count: integer (nonnegative)
+        expired_count: integer (nonnegative)
+        expiring_value: number (nonnegative)
+        expired_value: number (nonnegative)
+        by_tier: object
+        by_warehouse: array
+
+    expiryQuerySchema:
+      type: object
+      fields:
+        tier: enum [critical, warning, caution, all] (optional)
+        warehouse_id: uuid (optional)
+        product_id: uuid (optional)
+        limit: integer (1-500, default 50)
+        offset: integer (min 0, default 0)
+
+    expirySettingsSchema:
+      type: object
+      fields:
+        expiry_warning_days: integer (1-365, default 30)
+        expiry_critical_days: integer (1-30, default 7)
+        expiry_warning_days_orange: integer (1-60, default 14)
+        expiry_alert_enabled: boolean (default true)
+        expiry_alert_email_threshold: integer (0-100, default 1)
+
+    updateExpirySettingsSchema:
+      type: partial
+      base: expirySettingsSchema
+
+# Service Interface
+service:
+  location: "lib/services/expiry-alert-service.ts"
+  class: ExpiryAlertService
+  methods:
+    - name: getExpiringLPs
+      params: "(orgId: string, options?: ExpiryQueryOptions)"
+      returns: "Promise<ExpiringLP[]>"
+      description: "Get LPs expiring within warning period"
+
+    - name: getExpiredLPs
+      params: "(orgId: string, limit?: number)"
+      returns: "Promise<ExpiredLP[]>"
+      description: "Get LPs past expiry date"
+
+    - name: getExpirySummary
+      params: "(orgId: string)"
+      returns: "Promise<ExpirySummary>"
+      description: "Get aggregated expiry statistics"
+
+    - name: checkExpiryAlerts
+      params: "(orgId: string)"
+      returns: "Promise<ExpiryCheckResult>"
+      description: "Check for items requiring alerts"
+
+    - name: sendExpiryNotification
+      params: "(orgId: string, alert: ExpiryAlert)"
+      returns: "Promise<void>"
+      description: "Send expiry notification email"
+
+    - name: runDailyExpiryCheck
+      params: "()"
+      returns: "Promise<JobResult>"
+      description: "Scheduled job for daily expiry check"
+
+    - name: calculateDaysUntilExpiry
+      params: "(expiryDate: Date)"
+      returns: "number"
+      description: "Calculate days remaining until expiry"
+
+    - name: getExpiryTier
+      params: "(daysRemaining: number, settings: ExpirySettings)"
+      returns: "ExpiryTier"
+      description: "Determine tier based on days remaining"
+
+    - name: calculateValueAtRisk
+      params: "(lps: ExpiringLP[])"
+      returns: "number"
+      description: "Sum value at risk for LPs"
+
+    - name: exportExpiringToCSV
+      params: "(orgId: string)"
+      returns: "Promise<Buffer>"
+      description: "Generate CSV export of expiring items"
+
+# Edge Function
+edge_function:
+  name: expiry-check
+  location: "supabase/functions/expiry-check/index.ts"
+  schedule: "0 6 * * *"  # Daily at 06:00 UTC
+  description: "Daily scheduled job to check expiring inventory and send alerts"
+  flow:
+    - "Fetch all orgs with expiry_alert_enabled = true"
+    - "For each org: get expiring items within warning period"
+    - "For each org: get newly expired items (expiry_date = yesterday)"
+    - "If count >= threshold, queue email to warehouse managers"
+    - "Log results to expiry_alert_logs"
+    - "Return summary of orgs processed and emails sent"
+  timeout: 60
+  memory: 256

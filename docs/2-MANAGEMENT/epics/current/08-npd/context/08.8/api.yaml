@@ -1,0 +1,361 @@
+# API Context for Story 08.8 - Compliance Documents Upload
+
+base_path: "/api/npd"
+
+endpoints:
+  # ============================================================================
+  # List Documents
+  # ============================================================================
+  - method: "GET"
+    path: "/api/npd/projects/:id/documents"
+    file: "apps/frontend/app/api/npd/projects/[id]/documents/route.ts"
+    auth_required: true
+    roles: ["NPD_LEAD", "R&D", "REGULATORY", "VIEWER"]
+
+    description: "List all compliance documents for an NPD project"
+
+    query_params:
+      - name: "doc_type"
+        type: "string"
+        required: false
+        enum: ["haccp_plan", "label_proof", "nutritional_info", "allergen_declaration", "coa", "sds", "trial_report", "sensory_eval", "shelf_life", "other"]
+        description: "Filter by document type"
+
+      - name: "sort_by"
+        type: "string"
+        required: false
+        enum: ["uploaded_at", "file_name", "file_size_bytes"]
+        default: "uploaded_at"
+        description: "Sort field"
+
+      - name: "sort_order"
+        type: "string"
+        required: false
+        enum: ["asc", "desc"]
+        default: "desc"
+        description: "Sort order"
+
+      - name: "page"
+        type: "number"
+        required: false
+        default: 1
+        description: "Page number for pagination"
+
+      - name: "limit"
+        type: "number"
+        required: false
+        default: 20
+        description: "Documents per page"
+
+    response_success:
+      status: 200
+      body:
+        documents:
+          - id: "doc-uuid-123"
+            npd_project_id: "proj-uuid-456"
+            doc_type: "haccp_plan"
+            file_name: "HACCP_Plan_v1.2.pdf"
+            file_size_bytes: 2621440
+            mime_type: "application/pdf"
+            storage_path: "org123/proj456/haccp_plan/e7f8a9b0_HACCP_Plan_v1.2.pdf"
+            version: "v1.2"
+            description: "Updated allergen info"
+            notes: null
+            uploaded_by: "user-uuid-789"
+            uploaded_by_name: "Jane Doe"
+            uploaded_at: "2025-01-15T14:30:00Z"
+            thumbnail_url: "https://storage.supabase.co/..."
+        pagination:
+          total: 50
+          page: 1
+          limit: 20
+          pages: 3
+
+    response_error:
+      - status: 404
+        body: { "error": "Project not found" }
+      - status: 403
+        body: { "error": "Insufficient permissions" }
+
+    implementation_notes:
+      - "Use NPDDocumentService.list(projectId, params)"
+      - "RLS automatically filters by org_id"
+      - "Exclude soft-deleted documents (deleted_at IS NULL)"
+      - "Generate thumbnail URLs with 1-hour expiry"
+
+  # ============================================================================
+  # Upload Document
+  # ============================================================================
+  - method: "POST"
+    path: "/api/npd/projects/:id/documents"
+    file: "apps/frontend/app/api/npd/projects/[id]/documents/route.ts"
+    auth_required: true
+    roles: ["NPD_LEAD", "R&D", "REGULATORY"]
+
+    description: "Upload a compliance document (multipart form data)"
+
+    request_body:
+      content_type: "multipart/form-data"
+      fields:
+        - name: "doc_type"
+          type: "string"
+          required: true
+          enum: ["haccp_plan", "label_proof", "nutritional_info", "allergen_declaration", "coa", "sds", "trial_report", "sensory_eval", "shelf_life", "other"]
+
+        - name: "file"
+          type: "File"
+          required: true
+          constraints:
+            - "Max size: 50 MB (52428800 bytes)"
+            - "Allowed MIME types: PDF, DOCX, XLSX, PNG, JPG, JPEG"
+
+        - name: "version"
+          type: "string"
+          required: false
+          example: "v1.2"
+
+        - name: "description"
+          type: "string"
+          required: false
+          max_length: 500
+
+        - name: "notes"
+          type: "string"
+          required: false
+          max_length: 1000
+
+    response_success:
+      status: 201
+      body:
+        document:
+          id: "doc-uuid-123"
+          npd_project_id: "proj-uuid-456"
+          doc_type: "haccp_plan"
+          file_name: "HACCP_Plan_v1.2.pdf"
+          file_size_bytes: 2621440
+          mime_type: "application/pdf"
+          storage_path: "org123/proj456/haccp_plan/e7f8a9b0_HACCP_Plan_v1.2.pdf"
+          version: "v1.2"
+          description: "Updated allergen info"
+          uploaded_by: "user-uuid-789"
+          uploaded_by_name: "Jane Doe"
+          uploaded_at: "2025-01-15T14:30:00Z"
+
+    response_error:
+      - status: 400
+        body: { "error": "Invalid file type. Allowed: PDF, DOCX, XLSX, PNG, JPG" }
+      - status: 413
+        body: { "error": "File size exceeds limit (50 MB)" }
+      - status: 404
+        body: { "error": "Project not found" }
+
+    implementation_notes:
+      - "Parse multipart form data with Next.js FormData API"
+      - "Validate file type and size before upload"
+      - "Use NPDDocumentService.upload(projectId, file, docType, metadata)"
+      - "Upload to Supabase Storage: bucket 'npd-compliance-docs'"
+      - "Storage path: {org_id}/{project_id}/{doc_type}/{uuid}_{filename}"
+      - "Generate UUID for file uniqueness"
+
+    example_request: |
+      const formData = new FormData();
+      formData.append('doc_type', 'haccp_plan');
+      formData.append('file', file);
+      formData.append('version', 'v1.2');
+      formData.append('description', 'Updated allergen info');
+
+      await fetch('/api/npd/projects/proj-uuid-456/documents', {
+        method: 'POST',
+        body: formData
+      });
+
+  # ============================================================================
+  # Delete Document (Soft Delete)
+  # ============================================================================
+  - method: "DELETE"
+    path: "/api/npd/documents/:id"
+    file: "apps/frontend/app/api/npd/documents/[id]/route.ts"
+    auth_required: true
+    roles: ["NPD_LEAD", "document owner"]
+
+    description: "Soft delete a document (sets deleted_at timestamp)"
+
+    response_success:
+      status: 200
+      body:
+        success: true
+        message: "Document deleted successfully"
+
+    response_error:
+      - status: 404
+        body: { "error": "Document not found" }
+      - status: 403
+        body: { "error": "Insufficient permissions to delete document" }
+
+    implementation_notes:
+      - "Use NPDDocumentService.delete(documentId)"
+      - "Soft delete only: UPDATE SET deleted_at = now(), deleted_by = auth.uid()"
+      - "Never hard delete (retain for audit trail)"
+      - "Verify user is owner or has NPD_LEAD role"
+      - "File remains in Supabase Storage (not deleted)"
+
+  # ============================================================================
+  # Download Document
+  # ============================================================================
+  - method: "GET"
+    path: "/api/npd/documents/:id/download"
+    file: "apps/frontend/app/api/npd/documents/[id]/download/route.ts"
+    auth_required: true
+    roles: ["NPD_LEAD", "R&D", "REGULATORY", "VIEWER"]
+
+    description: "Generate signed URL for document download (1-hour expiry)"
+
+    response_success:
+      status: 200
+      body:
+        download_url: "https://storage.supabase.co/.../HACCP_Plan_v1.2.pdf?token=..."
+        filename: "HACCP_Plan_v1.2.pdf"
+        mime_type: "application/pdf"
+
+    response_error:
+      - status: 404
+        body: { "error": "Document not found" }
+      - status: 403
+        body: { "error": "Insufficient permissions" }
+
+    implementation_notes:
+      - "Use NPDDocumentService.generateDownloadUrl(documentId)"
+      - "Call supabase.storage.from('npd-compliance-docs').createSignedUrl(path, 3600)"
+      - "Expiry: 3600 seconds (1 hour)"
+      - "Return signed URL to client"
+      - "Client opens URL in new tab or downloads"
+
+  # ============================================================================
+  # Validate Required Documents
+  # ============================================================================
+  - method: "GET"
+    path: "/api/npd/projects/:id/documents/validate"
+    file: "apps/frontend/app/api/npd/projects/[id]/documents/validate/route.ts"
+    auth_required: true
+    roles: ["NPD_LEAD", "R&D"]
+
+    description: "Validate required documents for current gate (used before handoff)"
+
+    response_success:
+      status: 200
+      body:
+        is_valid: true
+        missing: []
+
+    response_invalid:
+      status: 200
+      body:
+        is_valid: false
+        missing: ["HACCP Plan"]
+
+    response_error:
+      - status: 404
+        body: { "error": "Project not found" }
+
+    implementation_notes:
+      - "Use NPDDocumentService.validateRequiredDocuments(projectId)"
+      - "Call database function: SELECT check_required_documents(projectId)"
+      - "Function checks current_gate and verifies required docs exist"
+      - "G4 requires HACCP plan"
+      - "Return validation result"
+
+service_methods:
+  NPDDocumentService:
+    - name: "list"
+      signature: "static async list(projectId: string, params: DocumentListParams): Promise<PaginatedResult<ComplianceDocument>>"
+      description: "List documents with pagination and filters"
+
+    - name: "upload"
+      signature: "static async upload(projectId: string, file: File, docType: string, metadata: DocumentMetadata): Promise<ComplianceDocument>"
+      description: "Upload document to Supabase Storage and create DB record"
+
+    - name: "delete"
+      signature: "static async delete(documentId: string): Promise<void>"
+      description: "Soft delete document (set deleted_at)"
+
+    - name: "generateDownloadUrl"
+      signature: "static async generateDownloadUrl(documentId: string): Promise<string>"
+      description: "Generate signed URL for download (1-hour expiry)"
+
+    - name: "validateRequiredDocuments"
+      signature: "static async validateRequiredDocuments(projectId: string): Promise<{ is_valid: boolean; missing: string[] }>"
+      description: "Validate required documents for current gate"
+
+    - name: "uploadToStorage"
+      signature: "static async uploadToStorage(file: File, orgId: string, projectId: string, docType: string): Promise<string>"
+      description: "Upload file to Supabase Storage, returns storage_path"
+
+    - name: "generateThumbnail"
+      signature: "static async generateThumbnail(documentId: string): Promise<string>"
+      description: "Generate thumbnail for PDF (first page) or image"
+
+    - name: "checkFileType"
+      signature: "static async checkFileType(file: File): Promise<boolean>"
+      description: "Validate file MIME type against allowed types"
+
+    - name: "checkFileSize"
+      signature: "static async checkFileSize(file: File, maxSizeMB: number): Promise<boolean>"
+      description: "Validate file size does not exceed limit"
+
+validation_schemas:
+  UploadDocumentSchema:
+    file: "apps/frontend/lib/validation/npd-document-schema.ts"
+    fields:
+      - name: "doc_type"
+        type: "z.enum(['haccp_plan', 'label_proof', 'nutritional_info', 'allergen_declaration', 'coa', 'sds', 'trial_report', 'sensory_eval', 'shelf_life', 'other'])"
+
+      - name: "version"
+        type: "z.string().optional()"
+
+      - name: "description"
+        type: "z.string().max(500).optional()"
+
+      - name: "notes"
+        type: "z.string().max(1000).optional()"
+
+error_handling:
+  file_type_invalid:
+    code: "INVALID_FILE_TYPE"
+    status: 400
+    message: "Invalid file type. Allowed: PDF, DOCX, XLSX, PNG, JPG"
+
+  file_size_exceeded:
+    code: "FILE_SIZE_EXCEEDED"
+    status: 413
+    message: "File size exceeds limit (50 MB)"
+
+  project_not_found:
+    code: "PROJECT_NOT_FOUND"
+    status: 404
+    message: "NPD project not found"
+
+  document_not_found:
+    code: "DOCUMENT_NOT_FOUND"
+    status: 404
+    message: "Document not found"
+
+  insufficient_permissions:
+    code: "INSUFFICIENT_PERMISSIONS"
+    status: 403
+    message: "Insufficient permissions to perform this action"
+
+  upload_failed:
+    code: "UPLOAD_FAILED"
+    status: 500
+    message: "Failed to upload document to storage"
+
+  signed_url_expired:
+    code: "SIGNED_URL_EXPIRED"
+    status: 410
+    message: "Download link expired. Please request a new link."
+
+performance_targets:
+  list_endpoint: "< 500ms for 50 documents"
+  upload_endpoint: "< 15 seconds for 10 MB file"
+  download_endpoint: "< 200ms to generate signed URL"
+  validate_endpoint: "< 300ms"

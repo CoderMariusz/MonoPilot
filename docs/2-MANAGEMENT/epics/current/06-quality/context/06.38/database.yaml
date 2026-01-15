@@ -1,0 +1,103 @@
+# Story 06.38 - Audit Trail Database Context
+# Immutable audit log table
+
+tables:
+  - name: quality_audit_log
+    description: "Immutable audit trail for all quality entity changes"
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID NOT NULL
+      - entity_type: TEXT NOT NULL (inspection, ncr, capa, etc.)
+      - entity_id: UUID NOT NULL
+      - action: TEXT NOT NULL (create, update, delete, approve, etc.)
+      - field_name: TEXT (NULL for entity-level actions)
+      - old_value: JSONB (NULL for create)
+      - new_value: JSONB (NULL for delete)
+      - user_id: UUID NOT NULL
+      - user_name: TEXT NOT NULL (denormalized)
+      - user_email: TEXT NOT NULL (denormalized)
+      - user_role: TEXT NOT NULL (denormalized)
+      - change_reason: TEXT
+      - notes: TEXT
+      - action_timestamp: TIMESTAMPTZ NOT NULL DEFAULT now()
+      - ip_address: INET
+      - archived_at: TIMESTAMPTZ
+      - retention_until: TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '2 years')
+    constraints:
+      - "CHECK (action = 'create' AND old_value IS NULL) OR ..."
+    indexes:
+      - idx_audit_log_org_entity ON (org_id, entity_type, entity_id)
+      - idx_audit_log_org_timestamp ON (org_id, action_timestamp DESC)
+      - idx_audit_log_user ON (user_id, action_timestamp DESC)
+      - idx_audit_log_search USING gin (tsvector on change_reason + notes)
+    rls_policies:
+      - audit_log_select: FOR SELECT (org_id match)
+      - audit_log_insert: FOR INSERT (org_id match)
+      - NO UPDATE OR DELETE POLICIES (immutability)
+
+triggers:
+  - name: prevent_audit_log_update
+    description: "Prevent UPDATE on audit log (immutability)"
+    event: BEFORE UPDATE
+    function: prevent_audit_log_modification()
+    action: RAISE EXCEPTION 'Audit log records are immutable'
+
+  - name: prevent_audit_log_delete
+    description: "Prevent DELETE on audit log (immutability)"
+    event: BEFORE DELETE
+    function: prevent_audit_log_modification()
+    action: RAISE EXCEPTION 'Audit log records are immutable'
+
+functions:
+  - name: create_audit_log_entry
+    description: "Helper function to create audit log entry"
+    params:
+      - p_entity_type: TEXT
+      - p_entity_id: UUID
+      - p_action: TEXT
+      - p_field_name: TEXT DEFAULT NULL
+      - p_old_value: JSONB DEFAULT NULL
+      - p_new_value: JSONB DEFAULT NULL
+      - p_change_reason: TEXT DEFAULT NULL
+      - p_notes: TEXT DEFAULT NULL
+    returns: UUID (audit_log_id)
+    logic: |
+      1. Get current user from auth.uid()
+      2. Insert into quality_audit_log with user details denormalized
+      3. Return audit_log_id
+
+  - name: archive_old_audit_logs
+    description: "Mark expired audit logs as archived (cron job)"
+    returns: INTEGER (count archived)
+    schedule: "Daily at 2am"
+    logic: |
+      UPDATE quality_audit_log
+      SET archived_at = NOW()
+      WHERE retention_until < NOW() AND archived_at IS NULL
+
+immutability_enforcement:
+  rls_policies:
+    - SELECT: Allowed (read-only)
+    - INSERT: Allowed (application creates entries)
+    - UPDATE: BLOCKED (no policy = implicit deny)
+    - DELETE: BLOCKED (no policy = implicit deny)
+  triggers:
+    - BEFORE UPDATE: Raises exception
+    - BEFORE DELETE: Raises exception
+  application_layer:
+    - All updates go through create_audit_log_entry() function
+    - No direct UPDATE/DELETE SQL statements in application code
+
+data_denormalization:
+  reason: "Audit trail must survive user deletion or role changes"
+  fields:
+    - user_name: Copied from users table at time of action
+    - user_email: Copied from users table
+    - user_role: Copied from users table
+  tradeoff: "Storage overhead vs audit trail permanence - permanence wins"
+
+retention_policy:
+  default: 2 years
+  configurable: 1-10 years per organization
+  archival: "archived_at timestamp set, not deleted"
+  purge: "Never purge (regulatory requirement)"

@@ -1,0 +1,32 @@
+# Story 10.8 - Frontend Specification
+# Energy Consumption Tracking
+
+components:
+  - path: "apps/frontend/components/oee/energy/EnergyKPICards.tsx"
+    description: "KPI cards: Today's Use, Cost Today, kWh/Unit, vs Target"
+
+  - path: "apps/frontend/components/oee/energy/ConsumptionByMachineChart.tsx"
+    description: "Bar chart showing consumption by machine"
+
+  - path: "apps/frontend/components/oee/energy/EfficiencyTrendChart.tsx"
+    description: "Line chart: kWh per unit over time"
+
+  - path: "apps/frontend/components/oee/energy/CostBreakdownTable.tsx"
+    description: "Table showing cost breakdown by machine"
+
+  - path: "apps/frontend/components/oee/energy/EnergyReadingModal.tsx"
+    description: "Modal to log manual energy reading"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/energy/page.tsx"
+    route: "/oee/energy"
+    title: "Energy Monitoring"
+
+hooks:
+  - name: "useEnergyReadings"
+    queryKey: "['energy-readings']"
+
+ux:
+  wireframes:
+    - id: "OEE-ENERGY-001"
+      title: "Energy Monitoring Dashboard"

@@ -1,0 +1,572 @@
+# Story 08.2 - Frontend Components
+# NPD Projects Kanban Dashboard & CRUD
+
+ux:
+  wireframes:
+    - id: "NPD-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-001-projects-kanban-dashboard.md"
+      relevance: "Main Kanban board layout with 6 gate columns and drag-drop"
+      components: ["ProjectKanbanBoard", "ProjectKanbanColumn", "ProjectCard", "ProjectFilters"]
+    - id: "NPD-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-002-project-detail-page.md"
+      relevance: "Project detail page with tabs (Overview, Formulations, Checklists, Costing, Documents)"
+      components: ["ProjectHeader", "ProjectOverview", "ProjectActions"]
+    - id: "NPD-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-003-stage-gate-timeline.md"
+      relevance: "Stage-Gate timeline visualization in project detail header"
+      components: ["NPDGateTimeline", "ProjectGateBadge"]
+  patterns:
+    kanban: "Planning module Kanban pattern reference (03.13)"
+    table: "ShadCN DataTable pattern"
+    modal: "ShadCN Dialog pattern"
+  states:
+    - "loading: Skeleton loaders for cards and table rows"
+    - "empty: Empty state with 'Create Your First Project' CTA"
+    - "error: Error message with retry button"
+    - "success: Populated Kanban/List view"
+
+pages:
+  - path: app/(authenticated)/npd/dashboard/page.tsx
+    name: NPD Dashboard (Kanban View)
+    description: "Main Kanban board with 6 gate columns and drag-drop"
+    components:
+      - ProjectKanbanBoard
+      - ProjectFilters
+      - ViewToggle (Kanban/List)
+    features:
+      - Drag-and-drop between columns
+      - Real-time gate advancement
+      - Filter by category, priority, owner, status
+      - Search by name or number
+      - Create project button
+    wireframe: "NPD-001"
+    performance:
+      - Initial load: < 500ms for 50 projects
+      - Drag-drop response: < 100ms
+
+  - path: app/(authenticated)/npd/projects/page.tsx
+    name: NPD Projects List View
+    description: "DataTable view of all projects"
+    components:
+      - ProjectDataTable
+      - ProjectFilters
+      - ViewToggle
+    features:
+      - Sort by any column
+      - Pagination (20 per page)
+      - Filter and search
+      - Row click to detail
+      - Inline actions
+    wireframe: "NPD-001"
+
+  - path: app/(authenticated)/npd/projects/[id]/page.tsx
+    name: NPD Project Detail
+    description: "Detailed view of single project with tabs"
+    components:
+      - ProjectHeader
+      - ProjectOverview
+      - ProjectActions
+      - Tabs (Overview, Formulations, Checklists, Costing, Documents)
+    features:
+      - View all project fields
+      - Edit project (if permitted)
+      - Advance gate
+      - Archive/Cancel
+      - Navigate to related entities
+    wireframe: "NPD-002"
+
+  - path: app/(authenticated)/npd/projects/new/page.tsx
+    name: Create NPD Project
+    description: "Create new project form"
+    components:
+      - CreateProjectForm
+    features:
+      - Required field validation
+      - Auto-generate project number on submit
+      - Default values (gate=G0, status=idea, priority=medium)
+    wireframe: null
+
+components:
+  - name: ProjectKanbanBoard
+    path: components/npd/projects/ProjectKanbanBoard.tsx
+    description: "Main Kanban board container with 6 gate columns"
+    props:
+      - name: initialData
+        type: "Record<string, NPDProject[]>"
+        description: "Projects grouped by gate"
+    features:
+      - 6 columns: G0, G1, G2, G3, G4, Launched
+      - Drag-and-drop using dnd-kit
+      - Column headers with count
+      - Empty state per column
+      - Responsive layout (stack on mobile)
+    dependencies:
+      - "@dnd-kit/core"
+      - "@dnd-kit/sortable"
+    state_management:
+      - Local state for drag positions
+      - Mutation on drop with optimistic update
+
+  - name: ProjectKanbanColumn
+    path: components/npd/projects/ProjectKanbanColumn.tsx
+    description: "Single gate column in Kanban"
+    props:
+      - name: gate
+        type: "string"
+        values: [G0, G1, G2, G3, G4, Launched]
+      - name: projects
+        type: "NPDProject[]"
+      - name: onDrop
+        type: "function"
+    features:
+      - Gate name header
+      - Project count badge
+      - Droppable zone
+      - Empty state message
+
+  - name: ProjectCard
+    path: components/npd/projects/ProjectCard.tsx
+    description: "Project card in Kanban column"
+    props:
+      - name: project
+        type: NPDProject
+      - name: draggable
+        type: boolean
+        default: true
+    features:
+      - Compact card design (max 150px height)
+      - Project number (link)
+      - Project name (truncated)
+      - Priority badge
+      - Owner avatar
+      - Target date or "No target"
+      - Category tag (if present)
+      - Click to navigate to detail
+    styling:
+      - Border color by priority (high=red, medium=orange, low=gray)
+      - Hover effect
+      - Drag handle icon
+
+  - name: ProjectDataTable
+    path: components/npd/projects/ProjectDataTable.tsx
+    description: "List view DataTable using ShadCN pattern"
+    props:
+      - name: projects
+        type: "NPDProject[]"
+      - name: pagination
+        type: PaginationData
+      - name: onPageChange
+        type: function
+    columns:
+      - Project # (link)
+      - Name
+      - Category
+      - Gate (badge)
+      - Status (badge)
+      - Priority (badge)
+      - Owner
+      - Target Date
+      - Created
+    features:
+      - Sort by column (click header)
+      - Pagination
+      - Row click to detail
+      - Inline actions (Edit, View)
+
+  - name: ProjectFilters
+    path: components/npd/projects/ProjectFilters.tsx
+    description: "Filter panel for Kanban and List views"
+    props:
+      - name: onFilterChange
+        type: function
+    features:
+      - Filter by:
+        - Portfolio category (dropdown)
+        - Priority (multi-select)
+        - Owner (user dropdown)
+        - Status (multi-select)
+      - Search input (debounced 300ms)
+      - Clear filters button
+      - Filter count badge
+      - Persist to URL params
+
+  - name: ProjectStatusBadge
+    path: components/npd/projects/ProjectStatusBadge.tsx
+    description: "Status badge component"
+    props:
+      - name: status
+        type: string
+        enum: [idea, feasibility, business_case, development, testing, launched, cancelled]
+    styling:
+      - idea: yellow
+      - feasibility: blue
+      - business_case: purple
+      - development: orange
+      - testing: cyan
+      - launched: green
+      - cancelled: gray
+
+  - name: ProjectPriorityBadge
+    path: components/npd/projects/ProjectPriorityBadge.tsx
+    description: "Priority badge component"
+    props:
+      - name: priority
+        type: string
+        enum: [low, medium, high]
+    styling:
+      - high: red background
+      - medium: orange background
+      - low: gray background
+
+  - name: ProjectGateBadge
+    path: components/npd/projects/ProjectGateBadge.tsx
+    description: "Gate badge component"
+    props:
+      - name: gate
+        type: string
+        enum: [G0, G1, G2, G3, G4, Launched]
+    styling:
+      - G0: blue
+      - G1-G4: progressive colors
+      - Launched: green
+
+  - name: ProjectHeader
+    path: components/npd/projects/ProjectHeader.tsx
+    description: "Header section of project detail page"
+    props:
+      - name: project
+        type: NPDProject
+    features:
+      - Project number (large)
+      - Project name
+      - Status badge
+      - Priority badge
+      - Gate badge
+      - Action buttons ([Edit], [Advance Gate], [Archive])
+
+  - name: ProjectOverview
+    path: components/npd/projects/ProjectOverview.tsx
+    description: "Overview section with project fields"
+    props:
+      - name: project
+        type: NPDProject
+    features:
+      - Description
+      - Portfolio category
+      - Owner (avatar + name)
+      - Target launch date
+      - Actual launch date (if launched)
+      - Created at / by
+      - Updated at
+
+  - name: ProjectActions
+    path: components/npd/projects/ProjectActions.tsx
+    description: "Action buttons based on status and permissions"
+    props:
+      - name: project
+        type: NPDProject
+      - name: canEdit
+        type: boolean
+      - name: canDelete
+        type: boolean
+      - name: canAdvance
+        type: boolean
+    features:
+      - "[Edit] - opens EditProjectModal"
+      - "[Advance to GX] - opens AdvanceGateModal"
+      - "[Cancel Project] - opens CancelProjectDialog"
+      - "[Archive] - soft delete for launched projects"
+      - "[Delete] - hard delete for idea projects"
+      - Disabled states with tooltips
+
+  - name: CreateProjectModal
+    path: components/npd/projects/CreateProjectModal.tsx
+    description: "Modal for creating new project"
+    props:
+      - name: open
+        type: boolean
+      - name: onClose
+        type: function
+      - name: onSuccess
+        type: function
+    features:
+      - "Form fields:"
+      - "  - Project name (required)"
+      - "  - Description (textarea)"
+      - "  - Portfolio category (dropdown or text)"
+      - "  - Priority (select)"
+      - "  - Owner (user dropdown, default current user)"
+      - "  - Target launch date (date picker)"
+      - Validation on submit
+      - Loading state
+      - Success toast on create
+
+  - name: EditProjectModal
+    path: components/npd/projects/EditProjectModal.tsx
+    description: "Modal for editing project"
+    props:
+      - name: project
+        type: NPDProject
+      - name: open
+        type: boolean
+      - name: onClose
+        type: function
+      - name: onSuccess
+        type: function
+    features:
+      - Pre-filled form with current values
+      - Same fields as CreateProjectModal
+      - "Disabled if status = 'launched'"
+      - Validation on submit
+
+  - name: AdvanceGateModal
+    path: components/npd/projects/AdvanceGateModal.tsx
+    description: "Confirmation modal for gate advancement"
+    props:
+      - name: project
+        type: NPDProject
+      - name: open
+        type: boolean
+      - name: onClose
+        type: function
+      - name: onConfirm
+        type: function
+    features:
+      - "Display:"
+      - "  - Current gate (large badge)"
+      - "  - Arrow icon"
+      - "  - Next gate (large badge)"
+      - '  - Status change explanation (e.g., "idea -> feasibility")'
+      - "  - Warning if checklist incomplete (Phase 1+)"
+      - "[Confirm] and [Cancel] buttons"
+      - Loading state during mutation
+
+  - name: CancelProjectDialog
+    path: components/npd/projects/CancelProjectDialog.tsx
+    description: "Confirmation dialog for cancelling project"
+    props:
+      - name: project
+        type: NPDProject
+      - name: open
+        type: boolean
+      - name: onClose
+        type: function
+      - name: onConfirm
+        type: function
+    features:
+      - Warning message
+      - Cancellation reason (textarea, required)
+      - "[Confirm] and [Cancel] buttons"
+
+  - name: ProjectSummaryCard
+    path: components/npd/projects/ProjectSummaryCard.tsx
+    description: "Summary card for dashboard widget (future)"
+    props:
+      - name: project
+        type: NPDProject
+    features:
+      - Compact display
+      - Key metrics
+      - Link to detail
+
+  - name: ProjectOwnerAvatar
+    path: components/npd/projects/ProjectOwnerAvatar.tsx
+    description: "Owner avatar with name"
+    props:
+      - name: owner_id
+        type: string
+      - name: owner_name
+        type: string
+    features:
+      - Avatar (initials or photo)
+      - Name tooltip
+      - '"Unassigned" state'
+
+hooks:
+  - name: useNPDProjects
+    path: lib/hooks/use-npd-projects.ts
+    description: "Fetch and manage project list"
+    params:
+      - name: filters
+        type: ProjectFilters
+    returns:
+      - "projects: NPDProject[]"
+      - "pagination: PaginationData"
+      - "isLoading: boolean"
+      - "error: Error | null"
+      - "refetch: function"
+    uses:
+      - React Query for caching
+      - Debounced search
+
+  - name: useNPDProject
+    path: lib/hooks/use-npd-project.ts
+    description: "Fetch single project detail"
+    params:
+      - name: id
+        type: string
+    returns:
+      - "project: ProjectDetail | null"
+      - "isLoading: boolean"
+      - "error: Error | null"
+      - "refetch: function"
+
+  - name: useAdvanceGate
+    path: lib/hooks/use-advance-gate.ts
+    description: "Mutation for advancing gate"
+    returns:
+      - "advanceGate: function"
+      - "isLoading: boolean"
+      - "error: Error | null"
+    features:
+      - Optimistic update
+      - Invalidate queries on success
+      - Error handling
+
+  - name: useKanbanData
+    path: lib/hooks/use-kanban-data.ts
+    description: "Fetch Kanban dashboard data"
+    returns:
+      - "kanban: Record<string, NPDProject[]>"
+      - "summary: DashboardSummary"
+      - "isLoading: boolean"
+      - "error: Error | null"
+      - "refetch: function"
+
+routing:
+  - path: /npd/dashboard
+    name: "NPD Dashboard (Kanban)"
+    component: app/(authenticated)/npd/dashboard/page.tsx
+    permissions: [NPD_LEAD, R&D, ADMIN]
+
+  - path: /npd/projects
+    name: "NPD Projects List"
+    component: app/(authenticated)/npd/projects/page.tsx
+    permissions: [NPD_LEAD, R&D, ADMIN]
+
+  - path: /npd/projects/new
+    name: "Create Project"
+    component: app/(authenticated)/npd/projects/new/page.tsx
+    permissions: [NPD_LEAD, ADMIN]
+
+  - path: /npd/projects/:id
+    name: "Project Detail"
+    component: app/(authenticated)/npd/projects/[id]/page.tsx
+    permissions: [NPD_LEAD, R&D, ADMIN]
+
+navigation:
+  sidebar:
+    - section: NPD
+      icon: Lightbulb
+      items:
+        - label: Dashboard
+          path: /npd/dashboard
+          icon: LayoutDashboard
+        - label: Projects
+          path: /npd/projects
+          icon: FolderKanban
+        - label: Formulations (08.3)
+          path: /npd/formulations
+          icon: FlaskConical
+          disabled: true # Phase 1+
+
+state_management:
+  - "Query keys:"
+  - '  - ["npd", "projects", filters] - project list'
+  - '  - ["npd", "project", id] - single project'
+  - '  - ["npd", "kanban"] - Kanban data'
+  - "Mutations:"
+  - "  - createProject"
+  - "  - updateProject"
+  - "  - deleteProject"
+  - "  - advanceGate"
+  - "  - cancelProject"
+  - "Optimistic updates:"
+  - "  - Gate advancement (immediate UI update)"
+  - "  - Priority/status changes"
+
+ux_patterns:
+  kanban:
+    - Use Planning module Kanban as reference
+    - Smooth drag animations
+    - Clear drop zones
+    - Confirmation on gate change
+
+  badges:
+    - Consistent color scheme across all badges
+    - Tooltips for abbreviated text
+    - Icon + text for clarity
+
+  modals:
+    - Modal overlay darkens background
+    - Focus trap (keyboard navigation)
+    - Escape key to close
+    - Click outside to close (with unsaved changes warning)
+
+  loading_states:
+    - Skeleton loaders for cards
+    - Spinner for mutations
+    - Disabled buttons during loading
+    - Progress indicators for long operations
+
+  error_handling:
+    - Toast notifications for errors
+    - Inline validation messages
+    - Retry buttons on failure
+    - Error boundaries for component crashes
+
+accessibility:
+  - "Keyboard navigation:"
+  - "  - Tab through form fields"
+  - "  - Enter to submit"
+  - "  - Arrow keys in dropdowns"
+  - "  - Escape to close modals"
+  - "ARIA labels:"
+  - '  - role="region" for Kanban columns'
+  - "  - aria-label for icon buttons"
+  - "  - aria-describedby for tooltips"
+  - "Screen reader support:"
+  - "  - Announce status changes"
+  - "  - Describe drag-drop actions"
+  - "  - Read badge content"
+
+performance:
+  - Virtual scrolling for large lists (Phase 1+)
+  - Lazy load project cards (intersection observer)
+  - Debounce search input (300ms)
+  - Optimistic updates for mutations
+  - React Query caching (5 min default)
+
+file_structure:
+  pages:
+    - app/(authenticated)/npd/dashboard/page.tsx
+    - app/(authenticated)/npd/projects/page.tsx
+    - app/(authenticated)/npd/projects/new/page.tsx
+    - app/(authenticated)/npd/projects/[id]/page.tsx
+
+  components:
+    - components/npd/projects/ProjectKanbanBoard.tsx
+    - components/npd/projects/ProjectKanbanColumn.tsx
+    - components/npd/projects/ProjectCard.tsx
+    - components/npd/projects/ProjectDataTable.tsx
+    - components/npd/projects/ProjectFilters.tsx
+    - components/npd/projects/ProjectStatusBadge.tsx
+    - components/npd/projects/ProjectPriorityBadge.tsx
+    - components/npd/projects/ProjectGateBadge.tsx
+    - components/npd/projects/ProjectHeader.tsx
+    - components/npd/projects/ProjectOverview.tsx
+    - components/npd/projects/ProjectActions.tsx
+    - components/npd/projects/CreateProjectModal.tsx
+    - components/npd/projects/EditProjectModal.tsx
+    - components/npd/projects/AdvanceGateModal.tsx
+    - components/npd/projects/CancelProjectDialog.tsx
+    - components/npd/projects/ProjectOwnerAvatar.tsx
+
+  hooks:
+    - lib/hooks/use-npd-projects.ts
+    - lib/hooks/use-npd-project.ts
+    - lib/hooks/use-advance-gate.ts
+    - lib/hooks/use-kanban-data.ts
+
+  types:
+    - lib/types/npd-project.ts

@@ -1,0 +1,68 @@
+# Story 04.6c - Database Schema
+# No new tables - uses existing wo_materials.consume_whole_lp
+
+tables: []
+# Uses existing tables from 04.6a and 03.11a
+
+existing_tables:
+  - name: "wo_materials"
+    relevant_columns:
+      - name: "consume_whole_lp"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+        description: "If true, entire LP must be consumed (1:1 mode)"
+    note: "Already exists from story 03.11a"
+
+  - name: "wo_material_consumptions"
+    relevant_columns:
+      - name: "is_full_lp"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+        description: "True if entire LP was consumed in this consumption"
+    note: "Created in story 04.6a"
+
+validation_logic:
+  api_level:
+    condition: "wo_materials.consume_whole_lp = true AND request.consume_qty != LP.quantity"
+    action: "Return 400 error"
+    error:
+      code: "FULL_LP_REQUIRED"
+      message: "Full LP consumption required. LP quantity is {qty}"
+      response:
+        error: "FULL_LP_REQUIRED"
+        message: "Full LP consumption required. LP quantity is 100"
+        lp_qty: 100
+        requested_qty: 50
+
+  database_level:
+    note: "Validation performed at API level, not database constraint"
+    reason: "Allows flexibility for future override permissions"
+
+migrations: []
+# No migrations needed - validation is API-level logic
+
+functions:
+  - name: "validate_full_lp_consumption"
+    description: "Validate that consume_qty equals LP.qty when consume_whole_lp=true"
+    params:
+      - "p_wo_material_id UUID"
+      - "p_lp_id UUID"
+      - "p_consume_qty DECIMAL"
+    returns: "BOOLEAN"
+    body: |
+      DECLARE
+        v_consume_whole_lp BOOLEAN;
+        v_lp_qty DECIMAL;
+      BEGIN
+        SELECT consume_whole_lp INTO v_consume_whole_lp
+        FROM wo_materials WHERE id = p_wo_material_id;
+
+        SELECT quantity INTO v_lp_qty
+        FROM license_plates WHERE id = p_lp_id;
+
+        IF v_consume_whole_lp AND p_consume_qty != v_lp_qty THEN
+          RETURN FALSE;
+        END IF;
+
+        RETURN TRUE;
+      END;

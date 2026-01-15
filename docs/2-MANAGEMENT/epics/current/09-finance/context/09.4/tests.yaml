@@ -1,0 +1,11 @@
+unit_tests:
+  LaborCostService:
+    - "calculate() computes hours × rate correctly"
+    - "Cost center assigned from production line"
+
+integration_tests:
+  - "GET /work-order-costs/:id/labor returns summary"
+  - "Labor cost created from operation time log"
+
+e2e_tests:
+  - "Record operation time → Labor cost calculated → Linked to WO"

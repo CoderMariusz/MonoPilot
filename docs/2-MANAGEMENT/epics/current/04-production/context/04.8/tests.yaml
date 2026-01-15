@@ -1,0 +1,329 @@
+# Story 04.8 - Material Reservations
+# Testing specification
+# Generated: 2026-01-14
+
+unit_tests:
+  - name: "FIFO/FEFO sorting logic"
+    file: "apps/frontend/__tests__/services/material-reservation-service.test.ts"
+    cases:
+      - name: "sortLPsByFIFO returns oldest created_at first"
+        input:
+          lps:
+            - lp_number: "LP-001"
+              created_at: "2026-01-05"
+            - lp_number: "LP-002"
+              created_at: "2026-01-01"
+            - lp_number: "LP-003"
+              created_at: "2026-01-03"
+          sort: "fifo"
+        expected: ["LP-002", "LP-003", "LP-001"]
+      - name: "sortLPsByFEFO returns earliest expiry first"
+        input:
+          lps:
+            - lp_number: "LP-001"
+              expiry_date: "2026-06-15"
+            - lp_number: "LP-002"
+              expiry_date: "2026-03-01"
+            - lp_number: "LP-003"
+              expiry_date: null
+          sort: "fefo"
+        expected: ["LP-002", "LP-001", "LP-003"]
+      - name: "NULL expiry sorted last in FEFO"
+        input:
+          lps:
+            - lp_number: "LP-001"
+              expiry_date: null
+            - lp_number: "LP-002"
+              expiry_date: "2026-03-01"
+          sort: "fefo"
+        expected: ["LP-002", "LP-001"]
+
+  - name: "Reservation quantity calculations"
+    file: "apps/frontend/__tests__/utils/reservation-calculations.test.ts"
+    cases:
+      - name: "calculateRemainingQty returns reserved minus consumed"
+        input:
+          reserved_qty: 100
+          consumed_qty: 40
+        expected: 60
+      - name: "calculateCoveragePercent returns percentage of required"
+        input:
+          required_qty: 250
+          reserved_qty: 200
+        expected: 80
+      - name: "getCoverageStatus returns full for 100%"
+        input:
+          required_qty: 100
+          reserved_qty: 100
+        expected: "full"
+      - name: "getCoverageStatus returns over for >100%"
+        input:
+          required_qty: 100
+          reserved_qty: 120
+        expected: "over"
+      - name: "getCoverageStatus returns partial for <100%"
+        input:
+          required_qty: 100
+          reserved_qty: 80
+        expected: "partial"
+      - name: "getCoverageStatus returns none for 0%"
+        input:
+          required_qty: 100
+          reserved_qty: 0
+        expected: "none"
+
+  - name: "ReservationStatusBadge component"
+    file: "apps/frontend/__tests__/components/ReservationStatusBadge.test.tsx"
+    cases:
+      - name: "renders green badge for full coverage"
+        props:
+          requiredQty: 100
+          reservedQty: 100
+        expected:
+          color: "bg-green-100"
+          text: "Full 100%"
+      - name: "renders yellow badge for partial coverage"
+        props:
+          requiredQty: 100
+          reservedQty: 80
+        expected:
+          color: "bg-yellow-100"
+          text: "Partial 80%"
+      - name: "renders gray badge for no coverage"
+        props:
+          requiredQty: 100
+          reservedQty: 0
+        expected:
+          color: "bg-gray-100"
+          text: "None 0%"
+      - name: "renders blue badge for over coverage"
+        props:
+          requiredQty: 100
+          reservedQty: 120
+        expected:
+          color: "bg-blue-100"
+          text: "Over 120%"
+
+  - name: "Validation schemas"
+    file: "apps/frontend/__tests__/validation/reservation-schemas.test.ts"
+    cases:
+      - name: "createReservationSchema requires positive quantity"
+        input:
+          lp_id: "uuid-123"
+          quantity: -10
+        expected: "validation error"
+      - name: "createReservationSchema requires valid UUID"
+        input:
+          lp_id: "invalid"
+          quantity: 100
+        expected: "validation error"
+      - name: "createReservationsRequestSchema requires at least 1 reservation"
+        input:
+          reservations: []
+        expected: "validation error"
+
+integration_tests:
+  - name: "Reserve/Release flow"
+    file: "apps/frontend/__tests__/integration/reservations.test.ts"
+    setup:
+      - "Create test organization"
+      - "Create test WO with materials"
+      - "Create test LPs with available qty"
+    cases:
+      - name: "GET available-lps returns LPs sorted by FIFO"
+        steps:
+          - "GET /api/planning/work-orders/{woId}/materials/{materialId}/available-lps?sort=fifo"
+        expected:
+          - "Status 200"
+          - "LPs sorted by created_at ASC"
+          - "Only status=available and qa_status=passed LPs returned"
+          - "Expired LPs excluded"
+      - name: "POST reservations creates reservation records"
+        steps:
+          - "POST /api/planning/work-orders/{woId}/materials/{materialId}/reservations"
+          - "Body: { reservations: [{ lp_id: 'uuid', quantity: 100 }] }"
+        expected:
+          - "Status 200"
+          - "Reservation record created in database"
+          - "reserved_by set to current user"
+          - "status = 'active'"
+      - name: "DELETE reservation releases and updates LP availability"
+        steps:
+          - "DELETE /api/production/work-orders/{woId}/reservations/{resId}"
+        expected:
+          - "Status 200"
+          - "Reservation status changed to 'released'"
+          - "released_at and released_by set"
+          - "LP available qty restored"
+      - name: "POST reservations rejects over-reservation without acknowledgment"
+        steps:
+          - "POST with total qty > required_qty"
+          - "acknowledge_over_reservation = false"
+        expected:
+          - "Status 400"
+          - "Error code: OVER_RESERVATION_NOT_ACKNOWLEDGED"
+      - name: "POST reservations accepts over-reservation with acknowledgment"
+        steps:
+          - "POST with total qty > required_qty"
+          - "acknowledge_over_reservation = true"
+        expected:
+          - "Status 200"
+          - "All reservations created"
+
+  - name: "Concurrent reservation handling"
+    file: "apps/frontend/__tests__/integration/concurrent-reservations.test.ts"
+    cases:
+      - name: "Second reservation sees reduced available qty"
+        steps:
+          - "User A reserves 50 kg from LP-001 (100 kg total)"
+          - "User B fetches available LPs"
+        expected:
+          - "LP-001 shows available_qty = 50 kg"
+          - "other_reservations shows User A's reservation"
+      - name: "Soft reservation allows multiple WO reservations"
+        steps:
+          - "WO-001 reserves 50 kg from LP-001"
+          - "WO-002 reserves 40 kg from LP-001"
+        expected:
+          - "Both reservations created successfully"
+          - "LP-001 available_qty = 10 kg"
+
+  - name: "RLS policy enforcement"
+    file: "apps/frontend/__tests__/integration/reservations-rls.test.ts"
+    cases:
+      - name: "User cannot view reservations from other org"
+        steps:
+          - "Create reservation in org_A"
+          - "Query as user from org_B"
+        expected:
+          - "Empty result set"
+      - name: "User cannot delete reservation from other org"
+        steps:
+          - "Create reservation in org_A"
+          - "DELETE as user from org_B"
+        expected:
+          - "Status 404"
+
+e2e_tests:
+  - name: "Full reservation workflow"
+    file: "apps/frontend/e2e/reservations.spec.ts"
+    cases:
+      - name: "User reserves LPs for WO material"
+        steps:
+          - "Navigate to /production/work-orders/{woId}"
+          - "Click Materials tab"
+          - "Click '+ Reserve Materials' on a material row"
+          - "Wait for ReserveLPModal to open"
+          - "Verify available LPs loaded"
+          - "Select first 2 LPs by checking checkboxes"
+          - "Enter quantities"
+          - "Click 'Reserve Selected'"
+          - "Verify success toast"
+          - "Verify reservations appear in WOReservationsPanel"
+        expected:
+          - "Modal opens and loads LPs"
+          - "Checkboxes selectable"
+          - "Quantities update progress bar"
+          - "Reservations created and displayed"
+      - name: "User releases a reservation"
+        steps:
+          - "Navigate to WO with existing reservations"
+          - "Click 'Release' on an active reservation"
+          - "Confirm in release dialog"
+          - "Verify success toast"
+          - "Verify reservation status changed to 'Released'"
+        expected:
+          - "Confirmation dialog appears"
+          - "Status updates to 'Released'"
+          - "Summary totals update"
+      - name: "Over-reservation warning flow"
+        steps:
+          - "Open ReserveLPModal"
+          - "Select LPs totaling > required qty"
+          - "Observe over-reservation warning"
+          - "Check acknowledgment checkbox"
+          - "Click Reserve Selected"
+        expected:
+          - "Warning appears when total > required"
+          - "Reserve button disabled until acknowledged"
+          - "Reservation succeeds after acknowledgment"
+      - name: "FIFO/FEFO toggle updates sorting"
+        steps:
+          - "Open ReserveLPModal"
+          - "Note LP order (FIFO default)"
+          - "Toggle to FEFO"
+          - "Observe LP order changes"
+        expected:
+          - "LPs re-sorted by expiry_date"
+          - "Suggestion badges update"
+
+  - name: "Responsive and accessibility"
+    file: "apps/frontend/e2e/reservations-a11y.spec.ts"
+    cases:
+      - name: "Keyboard navigation through modal"
+        steps:
+          - "Open ReserveLPModal"
+          - "Tab through all interactive elements"
+          - "Press Escape to close"
+        expected:
+          - "Focus moves logically through checkboxes, inputs, buttons"
+          - "Escape closes modal"
+      - name: "Screen reader announcements"
+        steps:
+          - "Use axe-core to check modal"
+        expected:
+          - "No critical accessibility violations"
+          - "ARIA labels present on all interactive elements"
+
+performance_tests:
+  - name: "Available LPs query performance"
+    cases:
+      - name: "Query completes in <500ms for 100+ LPs"
+        setup: "Seed 150 LPs for product"
+        query: "GET /api/.../available-lps"
+        expected: "Response time < 500ms"
+  - name: "Reservation creation performance"
+    cases:
+      - name: "Creating 5 reservations completes in <1.5s"
+        setup: "5 LPs selected"
+        action: "POST /api/.../reservations"
+        expected: "Response time < 1500ms"
+  - name: "WOReservationsPanel load performance"
+    cases:
+      - name: "Panel loads in <300ms for 50 reservations"
+        setup: "50 reservations for WO"
+        action: "Render WOReservationsPanel"
+        expected: "Time to interactive < 300ms"
+
+test_data:
+  organizations:
+    - id: "org-test-001"
+      name: "Test Food Co"
+  work_orders:
+    - id: "wo-test-001"
+      number: "WO-2026-00001"
+      status: "planned"
+      org_id: "org-test-001"
+  wo_materials:
+    - id: "mat-test-001"
+      wo_id: "wo-test-001"
+      product_id: "prod-flour-001"
+      required_qty: 100
+      uom: "kg"
+  license_plates:
+    - id: "lp-test-001"
+      lp_number: "LP-00001"
+      product_id: "prod-flour-001"
+      quantity: 50
+      status: "available"
+      qa_status: "passed"
+      expiry_date: "2026-06-15"
+      created_at: "2026-01-01"
+    - id: "lp-test-002"
+      lp_number: "LP-00002"
+      product_id: "prod-flour-001"
+      quantity: 60
+      status: "available"
+      qa_status: "passed"
+      expiry_date: "2026-07-20"
+      created_at: "2026-01-03"

@@ -1,0 +1,12 @@
+# Story 06.32 - Test Specifications
+
+unit_tests:
+  - create action item
+  - complete action with evidence
+  - calculate progress percentage
+  - block CAPA closure with incomplete actions
+
+integration_tests:
+  - POST /api/quality/capa/:capaId/actions
+  - POST /api/quality/capa/actions/:id/complete
+  - GET /api/quality/capa/:capaId/progress

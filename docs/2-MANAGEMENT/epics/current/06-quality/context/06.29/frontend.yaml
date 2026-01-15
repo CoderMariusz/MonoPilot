@@ -1,0 +1,80 @@
+# Story 06.29 - CoA PDF Export Frontend
+
+components:
+  GeneratePDFButton:
+    file: components/quality/coa/GeneratePDFButton.tsx
+    description: "Button to generate PDF from approved CoA"
+    location: "CoA detail page"
+    states:
+      - enabled: "status = 'approved' AND pdf_url IS NULL"
+      - disabled: "status != 'approved' OR pdf_url EXISTS"
+      - loading: "PDF generation in progress"
+
+  DownloadPDFButton:
+    file: components/quality/coa/DownloadPDFButton.tsx
+    description: "Download button for generated PDF"
+    condition: "pdf_url IS NOT NULL"
+    action: "Triggers file download"
+
+  EmailCoAModal:
+    file: components/quality/coa/EmailCoAModal.tsx
+    description: "Modal to email CoA to customer"
+    fields:
+      - recipient_email: string (required, email validation)
+      - recipient_name: string (optional)
+      - message: string (optional, textarea)
+    validation:
+      - Email format required
+      - PDF must be generated first
+    success: "Email sent to {recipient_email}"
+
+  PreviewPDFModal:
+    file: components/quality/coa/PreviewPDFModal.tsx
+    description: "Preview PDF in modal before email"
+    implementation: "Embedded PDF viewer (react-pdf or iframe)"
+    features:
+      - Zoom controls
+      - Page navigation
+      - Download from preview
+
+  VerificationPage:
+    file: app/verify/[token]/page.tsx (public route)
+    description: "Public verification page for QR code"
+    layout: "Minimal layout (no auth, no sidebar)"
+    sections:
+      - Header: "Certificate of Analysis Verification"
+      - CoA Info: CoA #, Product, Batch, Issue Date
+      - Status Badge: "Verified" (green) or "Invalid" (red)
+      - Test Results: Read-only table
+      - Footer: "Verified by {org_name}"
+    states:
+      - valid: "Display CoA data"
+      - invalid: "CoA not found or invalid verification code"
+
+ux_patterns:
+  pdf_generation:
+    - Button on CoA detail page
+    - Loading state during generation
+    - Success toast with download link
+    - PDF icon appears in list
+
+  email:
+    - [Email CoA] button on detail page
+    - Modal with recipient info
+    - Preview PDF before send
+    - Success confirmation
+    - Email delivery tracking
+
+  verification:
+    - QR code on PDF links to public page
+    - No login required
+    - Clean, minimal layout
+    - Print-friendly
+
+states:
+  - pdf_generating: "Generating PDF... (progress bar or spinner)"
+  - pdf_ready: "PDF available for download"
+  - emailing: "Sending email..."
+  - email_sent: "Email sent successfully to {recipient}"
+  - verification_valid: "Verification successful (green badge)"
+  - verification_invalid: "Invalid verification code (red banner)"

@@ -1,0 +1,156 @@
+# Story 10.11 - Frontend Specification
+# Purpose: Components, pages, hooks, types, UX wireframes
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/downtime-analysis.ts"
+    content: |
+      export interface ParetoAnalysisParams {
+        date_from: string;
+        date_to: string;
+        limit?: number;
+        line_id?: string;
+        machine_id?: string;
+        category?: string;
+      }
+
+      export interface ReasonTotal {
+        reason_code: string;
+        reason_name: string;
+        category?: string;
+        event_count: number;
+        total_duration: number;
+        avg_duration: number;
+        percentage: number;
+        cumulative_percentage: number;
+        rank: number;
+      }
+
+      export interface ParetoSummary {
+        total_downtime: number;
+        total_events: number;
+        unique_reasons: number;
+        top_reason: string;
+        top_reason_percentage: number;
+        reasons_for_80_percent: number;
+      }
+
+      export interface DowntimeParetoResponse {
+        reasons: ReasonTotal[];
+        summary: ParetoSummary;
+        period: {
+          date_from: string;
+          date_to: string;
+        };
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/oee/analytics/ParetoChart.tsx"
+    description: "Pareto chart with bars and cumulative line"
+    props:
+      - { name: "data", type: "ReasonTotal[]", required: true }
+      - { name: "onBarClick", type: "(reasonCode: string) => void", required: false }
+      - { name: "showEightyLine", type: "boolean", default: true }
+    features:
+      - "Bar chart: duration by reason (descending)"
+      - "Line chart: cumulative percentage"
+      - "80% reference line (dashed)"
+      - "Click handler for drill-down"
+      - "Dual Y-axis: duration (left), percentage (right)"
+      - "Responsive sizing"
+
+  - path: "apps/frontend/components/oee/analytics/ParetoSummaryCards.tsx"
+    description: "Summary cards above Pareto chart"
+    props:
+      - { name: "summary", type: "ParetoSummary", required: true }
+    displays:
+      - { label: "Total Downtime", value: "total_downtime", format: "duration (h:mm)" }
+      - { label: "Total Events", value: "total_events", format: "number" }
+      - { label: "Top Reason", value: "top_reason", subValue: "top_reason_percentage", format: "text + %" }
+      - { label: "Reasons for 80%", value: "reasons_for_80_percent", format: "number", color: "highlight" }
+
+  - path: "apps/frontend/components/oee/analytics/ParetoTooltip.tsx"
+    description: "Custom tooltip for Pareto chart hover"
+    props:
+      - { name: "reasonName", type: "string", required: true }
+      - { name: "duration", type: "number", required: true }
+      - { name: "eventCount", type: "number", required: true }
+      - { name: "percentage", type: "number", required: true }
+      - { name: "cumulativePercentage", type: "number", required: true }
+    displays:
+      - "Reason: Machine Jams"
+      - "Duration: 3h 00min (37%)"
+      - "Events: 15"
+      - "Cumulative: 67%"
+
+  - path: "apps/frontend/components/oee/analytics/TopIssuesTable.tsx"
+    description: "Table view of top downtime reasons"
+    props:
+      - { name: "reasons", type: "ReasonTotal[]", required: true }
+      - { name: "onRowClick", type: "(reasonCode: string) => void", required: false }
+    columns:
+      - { id: "rank", header: "#" }
+      - { id: "reason_name", header: "Reason" }
+      - { id: "category", header: "Category" }
+      - { id: "event_count", header: "Events" }
+      - { id: "total_duration", header: "Duration", format: "h:mm" }
+      - { id: "percentage", header: "%" }
+      - { id: "cumulative_percentage", header: "Cumulative %" }
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/analytics/downtime/page.tsx"
+    route: "/oee/analytics/downtime"
+    title: "Downtime Pareto Analysis"
+    description: "Analyze top downtime reasons using Pareto principle"
+    sections:
+      - name: "Filters"
+        components: ["DateRangePicker", "LineFilter", "CategoryFilter"]
+      - name: "Summary"
+        component: "ParetoSummaryCards"
+      - name: "Chart"
+        component: "ParetoChart"
+      - name: "Table"
+        component: "TopIssuesTable"
+    permissions: ["*"]
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-downtime-pareto.ts"
+    description: "React Query hooks for Pareto analysis"
+    exports:
+      - name: "useDowntimePareto"
+        type: "query"
+        params: ["params: ParetoAnalysisParams"]
+        returns: "UseQueryResult<DowntimeParetoResponse>"
+        queryKey: "['downtime-pareto', params]"
+
+# UX Wireframes
+ux:
+  wireframes:
+    - id: "OEE-PARETO-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/OEE-PARETO-001.md"
+      title: "Pareto Analysis Page"
+      components: ["ParetoChart", "SummaryCards", "TopIssuesTable"]
+
+  patterns:
+    chart: "Chart.js or Recharts ComposedChart (bar + line)"
+    table: "ShadCN DataTable with row click"
+
+  states:
+    - loading: "Skeleton chart placeholder"
+    - empty: "Empty state: 'No downtime events in selected period'"
+    - error: "Error toast + retry button"
+
+  interactions:
+    - "Click bar to drill-down to events filtered by reason"
+    - "Hover shows detailed tooltip"
+    - "80% line highlighted with annotation"
+
+# Integration Points
+integration:
+  - description: "Click reason navigates to /oee/downtime?reason={code}"
+  - description: "Pareto widget embedded in Performance Dashboard (10.12)"
+  - description: "Shares date range state with other analytics pages"

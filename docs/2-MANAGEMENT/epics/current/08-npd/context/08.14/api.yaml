@@ -1,0 +1,59 @@
+# Story 08.14 - API Specification
+# Purpose: Formulation export endpoints (PDF, Excel)
+# Agent: BACKEND-DEV
+# SEE: markdown lines 315-568
+
+endpoints:
+  - method: "GET"
+    path: "/api/npd/formulations/:id/export/pdf"
+    description: "Export formulation as PDF recipe card"
+    auth: "required"
+    roles: ["NPD_LEAD", "R&D"]
+    response:
+      content_type: "application/pdf"
+      content_disposition: "attachment; filename={PROJECT}_{VERSION}.pdf"
+      binary: "PDF buffer"
+
+  - method: "GET"
+    path: "/api/npd/formulations/:id/export/excel"
+    description: "Export formulation as Excel ingredient list"
+    auth: "required"
+    roles: ["NPD_LEAD", "R&D"]
+    response:
+      content_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      content_disposition: "attachment; filename={PROJECT}_{VERSION}.xlsx"
+      binary: "Excel buffer"
+
+service:
+  name: "NPDExportService"
+  path: "lib/services/npd-export-service.ts"
+  methods:
+    - "exportToPDF(formulationId, userId): Buffer"
+    - "exportToExcel(formulationId, userId): Buffer"
+    - "getFormulationForExport(formulationId): FormulationExportData"
+    - "logExport(formulationId, userId, format): void"
+
+pdf_content:
+  - "Header: Org name, formulation number, version"
+  - "Project Info: Project name, owner, gate, status"
+  - "Formulation Details: Total qty, UoM, effective dates"
+  - "Ingredient Table: Product, quantity, UoM, percentage"
+  - "Allergen Declaration: Contains/May Contain (if 08.5 available)"
+  - "Costing Summary: Target, estimated, variance (if 08.7 available)"
+  - "Compliance Status: HACCP, Label (if 08.8 available)"
+  - "Footer: Exported by, date"
+
+excel_sheets:
+  - "Formulation Info: Project, formulation metadata"
+  - "Ingredients: Product code, name, qty, UoM, %"
+  - "Allergens: Allergen, status (if 08.5 available)"
+  - "Costing: Target, estimated, actual, variance (if 08.7 available)"
+
+libraries:
+  - "pdfkit: ^0.13.0"
+  - "exceljs: ^4.3.0"
+
+audit:
+  table: "audit_log"
+  action: "export_pdf | export_excel"
+  metadata: "{ format: 'pdf' | 'excel', file_name: string }"

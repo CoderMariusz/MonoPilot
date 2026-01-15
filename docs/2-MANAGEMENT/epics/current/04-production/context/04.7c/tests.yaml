@@ -1,0 +1,223 @@
+# Story 04.7c - Test Specification
+# Purpose: Acceptance criteria, test cases for by-product registration
+# Agent: QA / DEV (testing focus)
+
+# Acceptance Criteria (from PRD FR-PROD-013)
+acceptance_criteria:
+  - id: "AC1"
+    description: "GIVEN WO.planned_qty = 1000 AND by-product yield_percent = 5, WHEN by-product prompt displays, THEN expected qty shows as 50"
+    type: "calculation"
+    test_type: "unit"
+
+  - id: "AC2"
+    description: "GIVEN auto_create_by_product_lp = true, WHEN main output registered, THEN by-product LPs auto-created with expected quantities"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC3"
+    description: "GIVEN auto_create_by_product_lp = false, WHEN main output registered, THEN user manually enters by-product quantities"
+    type: "functional"
+    test_type: "e2e"
+
+  - id: "AC4"
+    description: "GIVEN by-product expected = 50 AND user enters actual = 45, WHEN registered, THEN LP created with qty = 45"
+    type: "functional"
+    test_type: "integration"
+
+  - id: "AC5"
+    description: "GIVEN by-product registered, WHEN genealogy queried, THEN by-product LP has same parent_lp_ids as main output LP"
+    type: "data"
+    test_type: "integration"
+
+# Unit Tests
+unit_tests:
+  - file: "apps/frontend/lib/services/__tests__/by-product-service.test.ts"
+    tests:
+      - name: "calculateExpectedByProductQty calculates correctly"
+        assertions:
+          - "calculateExpectedByProductQty(1000, 5) === 50"
+          - "calculateExpectedByProductQty(5000, 2.5) === 125"
+          - "calculateExpectedByProductQty(100, 0) === 0"
+          - "calculateExpectedByProductQty(0, 10) === 0"
+
+      - name: "generateByProductBatch creates correct format"
+        assertions:
+          - "generateByProductBatch('B-2025-0156', 'BRAN') === 'B-2025-0156-BP-BRAN'"
+          - "generateByProductBatch('WO-001', 'DUST') === 'WO-001-BP-DUST'"
+
+  - file: "apps/frontend/lib/validation/__tests__/by-product-schemas.test.ts"
+    tests:
+      - name: "registerByProductSchema validates required fields"
+        assertions:
+          - "Schema rejects missing wo_id"
+          - "Schema rejects missing by_product_id"
+          - "Schema rejects missing quantity"
+          - "Schema rejects missing location_id"
+          - "Schema accepts valid complete request"
+
+      - name: "registerByProductSchema allows zero quantity"
+        assertions:
+          - "Schema accepts quantity = 0"
+          - "Schema rejects quantity = -1"
+
+  - file: "apps/frontend/components/production/outputs/__tests__/RegisterByProductModal.test.tsx"
+    tests:
+      - name: "renders by-product details correctly"
+        assertions:
+          - "Shows product name"
+          - "Shows expected quantity"
+          - "Shows UoM"
+
+      - name: "pre-fills form with calculated values"
+        assertions:
+          - "Quantity input pre-filled with expected qty"
+          - "Batch number auto-generated"
+          - "Expiry date auto-calculated"
+
+      - name: "shows zero qty warning when quantity is 0"
+        assertions:
+          - "Warning modal appears when qty = 0"
+          - "User can cancel, skip, or confirm"
+
+# Integration Tests
+integration_tests:
+  - file: "apps/frontend/app/api/production/outputs/by-products/__tests__/route.test.ts"
+    tests:
+      - name: "creates by-product LP with correct data"
+        setup: |
+          WO with by-product material (yield_percent = 5)
+          Main output LP registered
+        assertions:
+          - "LP created with is_by_product = true"
+          - "LP qty matches request quantity"
+          - "LP batch follows format {main_batch}-BP-{code}"
+          - "production_outputs record created"
+
+      - name: "copies genealogy from main output"
+        setup: |
+          Main output LP with 2 parent LPs
+        assertions:
+          - "By-product LP has same 2 parent LPs"
+          - "Genealogy qty_consumed matches"
+
+      - name: "returns 400 for non-by-product material"
+        setup: |
+          Product not marked as by-product in wo_materials
+        assertions:
+          - "Status 400"
+          - "Error message 'Product is not a by-product in this WO'"
+
+  - file: "apps/frontend/app/api/production/work-orders/[id]/by-products/__tests__/route.test.ts"
+    tests:
+      - name: "returns all by-products with status"
+        setup: |
+          WO with 3 by-products: 2 registered, 1 not
+        assertions:
+          - "Returns 3 by-products"
+          - "2 have status = 'registered'"
+          - "1 has status = 'not_registered'"
+          - "Expected qty calculated correctly"
+
+      - name: "aggregates LP counts correctly"
+        setup: |
+          By-product with 3 LPs registered
+        assertions:
+          - "lp_count = 3"
+          - "actual_qty = sum of LP quantities"
+
+# E2E Tests
+e2e_tests:
+  - file: "e2e/production/by-product-registration.spec.ts"
+    tests:
+      - name: "Manual by-product registration flow"
+        steps:
+          - "Login as Operator"
+          - "Navigate to WO output registration"
+          - "Register main output"
+          - "Verify By-Products section displays"
+          - "Click 'Register Now' on unregistered by-product"
+          - "Verify modal shows expected qty"
+          - "Enter actual qty = 45"
+          - "Click 'Register By-Product'"
+          - "Verify success toast"
+          - "Verify by-product status = Registered"
+
+      - name: "Auto-create by-products flow"
+        steps:
+          - "Login as Operator"
+          - "Verify auto_create_by_product_lp = true"
+          - "Navigate to WO output registration"
+          - "Register main output"
+          - "Verify by-products auto-created"
+          - "Verify all by-products show Registered status"
+          - "Verify LP counts match by-product count"
+
+      - name: "Zero quantity warning flow"
+        steps:
+          - "Open by-product registration modal"
+          - "Set quantity to 0"
+          - "Click Register"
+          - "Verify warning modal appears"
+          - "Click 'Confirm Anyway'"
+          - "Verify LP created with qty = 0"
+
+      - name: "Expected qty calculation verification"
+        steps:
+          - "Create WO with planned_qty = 1000"
+          - "Add by-product with yield_percent = 5"
+          - "Navigate to output registration"
+          - "Open by-product registration"
+          - "Verify expected qty displays as 50"
+
+      - name: "Genealogy linkage verification"
+        steps:
+          - "Register main output from 2 source LPs"
+          - "Register by-product"
+          - "Navigate to by-product LP detail"
+          - "View genealogy"
+          - "Verify same 2 parent LPs listed"
+
+# Performance Tests
+performance_tests:
+  - name: "By-product registration API response"
+    target: "<500ms"
+    description: "Single by-product registration including LP and genealogy creation"
+
+  - name: "Auto-create all by-products"
+    target: "<1500ms"
+    description: "Creating 3 by-product LPs in single transaction"
+
+  - name: "By-products list load"
+    target: "<300ms"
+    description: "GET /api/production/work-orders/:id/by-products"
+
+# Test Data Requirements
+test_data:
+  work_orders:
+    - wo_number: "WO-2025-0156"
+      planned_qty: 5000
+      status: "in_progress"
+  by_products:
+    - product_code: "SKU-BP-BRAN"
+      product_name: "Wheat Bran"
+      yield_percent: 5.0
+      shelf_life_days: 90
+    - product_code: "SKU-BP-DUST"
+      product_name: "Flour Dust"
+      yield_percent: 1.0
+      shelf_life_days: 30
+    - product_code: "SKU-BP-GERM"
+      product_name: "Wheat Germ"
+      yield_percent: 2.0
+      shelf_life_days: 60
+  main_output:
+    lp_number: "LP-2025-05482"
+    qty: 500
+    batch_number: "B-2025-0156"
+  parent_lps:
+    - lp_number: "LP-2025-05401"
+      product_name: "Flour Type A"
+      qty_consumed: 400
+    - lp_number: "LP-2025-05402"
+      product_name: "Water"
+      qty_consumed: 50

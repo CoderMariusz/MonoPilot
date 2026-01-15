@@ -1,0 +1,60 @@
+# Story 10.3 - Database Schema
+# Downtime Event Tracking
+
+migrations:
+  - path: "supabase/migrations/XXX_create_oee_downtime_events.sql"
+    type: "migration"
+    description: "Create oee_downtime_events table with generated columns for duration and severity"
+
+tables:
+  - name: "oee_downtime_events"
+    description: "Individual downtime events with start/end times, reason, and impact"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "work_order_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "downtime_type", type: "TEXT", constraints: "NOT NULL DEFAULT 'unplanned' CHECK (downtime_type IN ('planned', 'unplanned'))" }
+      - { name: "reason_code_id", type: "UUID", constraints: "NOT NULL REFERENCES oee_downtime_reasons(id)" }
+      - { name: "start_time", type: "TIMESTAMPTZ", constraints: "NOT NULL" }
+      - { name: "end_time", type: "TIMESTAMPTZ", constraints: "NULLABLE" }
+      - { name: "duration_minutes", type: "INTEGER", constraints: "GENERATED ALWAYS AS (EXTRACT(EPOCH FROM (COALESCE(end_time, NOW()) - start_time)) / 60) STORED" }
+      - { name: "impact_severity", type: "TEXT", constraints: "GENERATED ALWAYS AS (CASE WHEN duration_minutes < 5 THEN 'minor' WHEN duration_minutes < 15 THEN 'moderate' ELSE 'major' END) STORED" }
+      - { name: "logged_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "notes", type: "TEXT", constraints: "NULLABLE" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_downtime_org ON oee_downtime_events(org_id)"
+      - "idx_downtime_machine ON oee_downtime_events(machine_id) WHERE machine_id IS NOT NULL"
+      - "idx_downtime_line ON oee_downtime_events(line_id) WHERE line_id IS NOT NULL"
+      - "idx_downtime_reason ON oee_downtime_events(reason_code_id)"
+      - "idx_downtime_start ON oee_downtime_events(org_id, start_time DESC)"
+      - "idx_downtime_active ON oee_downtime_events(org_id, machine_id, start_time) WHERE end_time IS NULL"
+      - "idx_downtime_severity ON oee_downtime_events(org_id, impact_severity)"
+    constraints:
+      - "chk_end_after_start CHECK (end_time IS NULL OR end_time >= start_time)"
+      - "chk_machine_or_line CHECK (machine_id IS NOT NULL OR line_id IS NOT NULL)"
+
+rls_policies:
+  pattern: "ADR-013 Users Table Lookup"
+  policies:
+    - { table: "oee_downtime_events", name: "downtime_select", operation: "SELECT" }
+    - { table: "oee_downtime_events", name: "downtime_insert", operation: "INSERT" }
+    - { table: "oee_downtime_events", name: "downtime_update", operation: "UPDATE" }
+    - { table: "oee_downtime_events", name: "downtime_delete", operation: "DELETE" }
+
+triggers:
+  - { name: "update_oee_downtime_events_updated_at", table: "oee_downtime_events", event: "BEFORE UPDATE", function: "update_updated_at_column()" }
+
+business_rules:
+  - rule: "Active Event Duration"
+    description: "For events with end_time=NULL, duration_minutes calculated as NOW() - start_time"
+    enforcement: "Generated column with COALESCE"
+
+  - rule: "Severity Classification"
+    description: "minor <5min, moderate <15min, major >=15min"
+    enforcement: "Generated column impact_severity"

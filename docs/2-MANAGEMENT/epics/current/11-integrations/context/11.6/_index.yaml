@@ -1,0 +1,131 @@
+story:
+  id: "11.6"
+  name: "Supplier Portal & Comarch Basic"
+  epic: "11-integrations"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "03.x"
+      provides: ["purchase_orders, po_lines tables"]
+    - story: "11.1"
+      provides: ["dashboard nav"]
+    - story: "11.3"
+      provides: ["integration_logs for sync logging"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/integrations.md"
+  prd_sections: ["FR-INT-009", "FR-INT-010", "FR-INT-011", "FR-INT-012"]
+  story: "docs/2-MANAGEMENT/epics/current/11-integrations/11.6.supplier-portal-comarch-basic.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_supplier_portal_comarch.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/portal/supplier/login/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/portal/supplier/orders/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/portal/supplier/orders/[id]/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/portal/supplier/orders/[id]/confirm/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/integrations/comarch/config/route.ts"
+      methods: ["GET", "PUT"]
+    - path: "apps/frontend/app/api/integrations/comarch/test/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/integrations/comarch/push-invoice/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/supplier-portal-service.ts"
+    - path: "apps/frontend/lib/services/comarch-optima-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/supplier-portal.ts"
+    - path: "apps/frontend/lib/validation/comarch.ts"
+  pages:
+    - path: "apps/frontend/app/(unauthenticated)/portal/supplier/login/page.tsx"
+    - path: "apps/frontend/app/(unauthenticated)/portal/supplier/dashboard/page.tsx"
+    - path: "apps/frontend/app/(unauthenticated)/portal/supplier/orders/[id]/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/integrations/comarch/page.tsx"
+  components:
+    - path: "apps/frontend/components/supplier-portal/SupplierLogin.tsx"
+    - path: "apps/frontend/components/supplier-portal/SupplierPOList.tsx"
+    - path: "apps/frontend/components/supplier-portal/SupplierPODetail.tsx"
+    - path: "apps/frontend/components/supplier-portal/ConfirmDeliveryModal.tsx"
+    - path: "apps/frontend/components/integrations/comarch/ComarchConfigForm.tsx"
+    - path: "apps/frontend/components/integrations/comarch/TestConnectionButton.tsx"
+    - path: "apps/frontend/components/integrations/comarch/InvoiceSyncStatus.tsx"
+    - path: "apps/frontend/components/integrations/comarch/PushInvoiceButton.tsx"
+
+database:
+  tables:
+    - name: "supplier_portal_users"
+      columns: ["id", "org_id", "supplier_id", "email", "password_hash", "token", "name", "status", "last_login_at"]
+      rls: true
+      indexes: ["org_id", "supplier_id", "email", "token"]
+    - name: "supplier_delivery_confirmations"
+      columns: ["id", "org_id", "purchase_order_id", "supplier_id", "confirmed_by", "confirmed_at", "delivery_note_number", "delivery_note_file", "line_confirmations", "status"]
+      rls: true
+      indexes: ["org_id", "purchase_order_id", "status"]
+    - name: "comarch_optima_config"
+      columns: ["id", "org_id", "enabled", "api_url", "api_key", "api_secret_encrypted", "company_code", "test_mode", "auto_sync", "last_sync_at"]
+      rls: true
+      indexes: ["org_id"]
+    - name: "comarch_invoice_sync"
+      columns: ["id", "org_id", "invoice_id", "sync_status", "comarch_invoice_id", "synced_at", "error_message"]
+      rls: true
+      indexes: ["org_id", "sync_status"]
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/portal/supplier/login"
+    auth: false
+    public: true
+  - method: "GET"
+    path: "/api/portal/supplier/orders"
+    auth: "portal_token"
+    public: true
+  - method: "PUT"
+    path: "/api/integrations/comarch/config"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+patterns:
+  rls: "ADR-013"
+  portal_auth: "Separate JWT for supplier portal users"
+  encryption: "AES-256 for Comarch api_secret"
+  supplier_isolation: "RLS filters by supplier_id"
+  comarch_api: "Comarch Optima API v2, JSON format"
+
+acceptance_checklist:
+  - "Supplier portal login works with email/password"
+  - "Suppliers see only own POs (RLS by supplier_id)"
+  - "PO detail displays header, line items, delivery address"
+  - "Delivery confirmation creates pending approval record"
+  - "File upload for delivery note works (S3)"
+  - "Email notification sent to purchaser on confirmation"
+  - "Buyer can approve/reject confirmations"
+  - "Comarch config form saves with encrypted secret"
+  - "Test connection validates Comarch credentials"
+  - "Invoice push maps fields correctly to Comarch format"
+  - "Invoice sync status displays on invoice list/detail"
+  - "Failed syncs can be retried manually"
+  - "RLS enforces org and supplier isolation"
+  - "Unit tests >80% coverage"
+
+output_artifacts:
+  - "supplier_portal_users, delivery_confirmations tables with RLS"
+  - "comarch_optima_config, comarch_invoice_sync tables with RLS"
+  - "API endpoints for portal auth, PO view, delivery confirm"
+  - "API endpoints for Comarch config, test, push invoice"
+  - "SupplierPortalService with auth, PO access"
+  - "ComarchOptimaService with config, invoice mapping, push"
+  - "Frontend supplier portal pages (login, PO list, detail)"
+  - "Frontend Comarch config page with test button"
+  - "AES-256 encryption for secrets"
+  - "Unit + integration + E2E tests"

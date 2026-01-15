@@ -161,7 +161,6 @@ export async function POST(request: NextRequest) {
       uom: item.uom,
       scrap_percent: item.scrap_percent || 0,
       sequence: item.sequence || index + 1,
-      line_ids: item.line_ids || null,
       consume_whole_lp: item.consume_whole_lp || false,
       notes: item.notes || null,
     }))
@@ -176,7 +175,7 @@ export async function POST(request: NextRequest) {
           id,
           code,
           name,
-          uom,
+          base_uom,
           product_type:product_types(code, name)
         )
       `)

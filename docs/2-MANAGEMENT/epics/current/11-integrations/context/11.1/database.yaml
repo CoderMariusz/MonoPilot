@@ -1,0 +1,125 @@
+# Story 11.1 - Database Context
+# Tables, indexes, RLS policies, functions for integrations dashboard
+
+tables:
+  integration_health:
+    purpose: "Cache integration health status for dashboard performance"
+    columns:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        description: "Health record ID"
+      - name: "org_id"
+        type: "UUID NOT NULL REFERENCES organizations(id)"
+        description: "Organization (multi-tenant)"
+      - name: "integration_type"
+        type: "TEXT NOT NULL"
+        description: "Type: comarch, edi, api_keys, webhooks, export, import"
+        constraint: "CHECK (integration_type IN ('comarch', 'edi', 'api_keys', 'webhooks', 'export', 'import'))"
+      - name: "status"
+        type: "TEXT NOT NULL"
+        description: "Status: connected, disconnected, error, not_configured"
+        constraint: "CHECK (status IN ('connected', 'disconnected', 'error', 'not_configured'))"
+      - name: "last_sync_at"
+        type: "TIMESTAMPTZ"
+        description: "Last successful sync timestamp"
+      - name: "last_error_at"
+        type: "TIMESTAMPTZ"
+        description: "Last error timestamp"
+      - name: "last_error_message"
+        type: "TEXT"
+        description: "Last error message for troubleshooting"
+      - name: "success_count_24h"
+        type: "INTEGER DEFAULT 0"
+        description: "Successful operations in last 24h"
+      - name: "error_count_24h"
+        type: "INTEGER DEFAULT 0"
+        description: "Failed operations in last 24h"
+      - name: "metadata"
+        type: "JSONB DEFAULT '{}'"
+        description: "Integration-specific metadata (API key count, webhook count, etc.)"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ NOT NULL DEFAULT now()"
+        description: "Last update timestamp"
+
+    indexes:
+      - name: "idx_integration_health_org"
+        columns: ["org_id"]
+        description: "RLS filter performance"
+      - name: "idx_integration_health_status"
+        columns: ["org_id", "status"]
+        description: "Filter by status"
+
+    constraints:
+      - type: "UNIQUE"
+        columns: ["org_id", "integration_type"]
+        name: "uq_integration_health"
+        description: "One health record per integration type per org"
+
+    rls_policies:
+      - name: "integration_health_select"
+        operation: "SELECT"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      - name: "integration_health_insert"
+        operation: "INSERT"
+        check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      - name: "integration_health_update"
+        operation: "UPDATE"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    triggers:
+      - name: "update_integration_health_updated_at"
+        timing: "BEFORE UPDATE"
+        event: "UPDATE"
+        function: "update_updated_at_column()"
+
+functions:
+  refresh_integration_health:
+    purpose: "Calculate and update health status from integration_logs"
+    parameters:
+      - name: "p_org_id"
+        type: "UUID"
+        description: "Organization ID"
+      - name: "p_integration_type"
+        type: "TEXT"
+        description: "Integration type to refresh"
+    returns: "VOID"
+    logic: |
+      1. Query integration_logs for last 24h events of given type
+      2. Calculate success_count, error_count
+      3. Get last_sync_at (max timestamp WHERE status='success')
+      4. Get last_error_at, last_error_message (max timestamp WHERE status='error')
+      5. Determine status:
+         - If no syncs and no errors: 'not_configured'
+         - If last_error > last_sync: 'error'
+         - If success_count > 0: 'connected'
+         - Else: 'disconnected'
+      6. UPSERT into integration_health
+    performance: "< 100ms (uses index on integration_logs.timestamp)"
+
+migration_file:
+  name: "YYYYMMDDHHMMSS_create_integration_health.sql"
+  order: 1
+  dependencies: []
+
+seed_data:
+  integration_health:
+    - org_id: "demo-org-uuid"
+      integration_type: "api_keys"
+      status: "not_configured"
+      success_count_24h: 0
+      error_count_24h: 0
+    - org_id: "demo-org-uuid"
+      integration_type: "webhooks"
+      status: "not_configured"
+      success_count_24h: 0
+      error_count_24h: 0
+    - org_id: "demo-org-uuid"
+      integration_type: "comarch"
+      status: "not_configured"
+      success_count_24h: 0
+      error_count_24h: 0
+    - org_id: "demo-org-uuid"
+      integration_type: "edi"
+      status: "not_configured"
+      success_count_24h: 0
+      error_count_24h: 0

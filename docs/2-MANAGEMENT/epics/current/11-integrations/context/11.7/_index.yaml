@@ -1,0 +1,62 @@
+# Story 11.7 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.7"
+  name: "Customer Portal"
+  slug: "customer-portal"
+  epic: "11-integrations"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users"]
+    - story: "03.8"
+      name: "Sales Orders (future)"
+      provides: ["sales_orders"]
+      status: "planned"
+    - story: "05.15"
+      name: "Shipments"
+      provides: ["shipments", "shipment_items"]
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-013", "FR-INT-014"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.7.customer-portal.md"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "customer_portal_users table + RLS"
+  - type: "service"
+    count: 1
+    description: "customer-portal-service.ts"
+  - type: "api"
+    count: 4
+    description: "Login, orders list, order detail, shipment tracking"
+  - type: "page"
+    count: 4
+    description: "Login, orders list, order detail, shipment tracking"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + RLS + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "JWT authentication (separate from MonoPilot users)"
+  - "RLS enforces customer_id isolation"
+  - "Auto-refresh shipment tracking (5-minute interval)"
+  - "Customer-branded header (logo, colors)"

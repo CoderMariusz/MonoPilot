@@ -1,0 +1,232 @@
+unit_tests:
+  service_layer:
+    - file: "lib/services/formulation-service.test.ts"
+      tests:
+        - name: "compareFormulations() - returns diff with added items"
+          setup: "v1 with 3 items, v2 with 4 items (1 added)"
+          assertion: "diff.added.length === 1"
+
+        - name: "compareFormulations() - returns diff with removed items"
+          setup: "v1 with 5 items, v2 with 3 items (2 removed)"
+          assertion: "diff.removed.length === 2"
+
+        - name: "compareFormulations() - returns diff with changed items"
+          setup: "v1 Flour 50kg, v2 Flour 60kg"
+          assertion: "diff.changed.length === 1 && diff.changed[0].change_qty === 10"
+
+        - name: "compareFormulations() - handles unchanged items"
+          setup: "v1 and v2 have identical items"
+          assertion: "diff.unchanged.length === 5 && diff.added.length === 0"
+
+        - name: "compareFormulations() - throws error for different projects"
+          setup: "v1 from NPD-001, v2 from NPD-002"
+          assertion: "throws 'Cannot compare formulations from different projects'"
+
+        - name: "compareFormulations() - includes cost difference if available"
+          setup: "v1 cost $100, v2 cost $120"
+          assertion: "summary.cost_difference.difference === 20"
+
+        - name: "compareFormulations() - handles missing costing data"
+          setup: "v1 has no costing record"
+          assertion: "summary.cost_difference === null"
+
+        - name: "cloneFormulation() - creates new formulation with status draft"
+          setup: "Clone v1.0 to v2.0"
+          assertion: "newFormulation.status === 'draft' && newFormulation.formulation_number === 'v2.0'"
+
+        - name: "cloneFormulation() - sets parent_formulation_id"
+          setup: "Clone formulation ID 123"
+          assertion: "newFormulation.parent_formulation_id === 123"
+
+        - name: "cloneFormulation() - copies all items"
+          setup: "Source formulation has 5 items"
+          assertion: "clonedItemsCount === 5"
+
+        - name: "cloneFormulation() - recalculates percentages if total_qty changed"
+          setup: "Source total_qty 100kg, clone with total_qty 200kg"
+          assertion: "item Flour: source 50%, cloned 25%"
+
+        - name: "cloneFormulation() - throws error for duplicate version"
+          setup: "Project already has v2.0"
+          assertion: "throws 'Version v2.0 already exists'"
+
+        - name: "cloneFormulation() - validates version format"
+          setup: "Attempt clone with version '2.0' (missing v)"
+          assertion: "throws 'Version must be in format v1.0'"
+
+        - name: "calculateDiff() - categorizes items correctly"
+          setup: "v1: [A, B, C], v2: [B, C, D]"
+          assertion: "added: [D], removed: [A], unchanged: [B, C]"
+
+integration_tests:
+  api_endpoints:
+    - file: "app/api/npd/formulations/compare/route.test.ts"
+      tests:
+        - name: "GET /api/npd/formulations/compare - returns comparison data"
+          request: "GET /api/npd/formulations/compare?v1=1&v2=2"
+          assertions:
+            - "status 200"
+            - "response.diff.added is array"
+            - "response.summary.added_count is number"
+
+        - name: "GET - returns 404 for non-existent formulations"
+          request: "GET /api/npd/formulations/compare?v1=999&v2=888"
+          assertions:
+            - "status 404"
+            - "error message includes 'not found'"
+
+        - name: "GET - returns 400 for different projects"
+          request: "GET /api/npd/formulations/compare?v1=1&v2=5 (different projects)"
+          assertions:
+            - "status 400"
+            - "error message includes 'different projects'"
+
+        - name: "GET - returns 400 for invalid query params"
+          request: "GET /api/npd/formulations/compare?v1=abc&v2=def"
+          assertions:
+            - "status 400"
+            - "error message includes 'Invalid version IDs'"
+
+        - name: "GET - enforces RLS (cross-org access blocked)"
+          request: "GET /api/npd/formulations/compare?v1=1&v2=2 (user from different org)"
+          assertions:
+            - "status 404 or 403"
+
+    - file: "app/api/npd/formulations/[id]/clone/route.test.ts"
+      tests:
+        - name: "POST /api/npd/formulations/:id/clone - creates cloned formulation"
+          request: "POST /api/npd/formulations/1/clone {formulation_number: 'v3.0'}"
+          assertions:
+            - "status 201"
+            - "response.formulation.formulation_number === 'v3.0'"
+            - "response.formulation.status === 'draft'"
+            - "response.cloned_items_count > 0"
+
+        - name: "POST - returns 400 for duplicate version"
+          request: "POST /api/npd/formulations/1/clone {formulation_number: 'v2.0' (exists)}"
+          assertions:
+            - "status 400"
+            - "error message includes 'already exists'"
+
+        - name: "POST - returns 400 for invalid version format"
+          request: "POST /api/npd/formulations/1/clone {formulation_number: '2.0'}"
+          assertions:
+            - "status 400"
+            - "error message includes 'format v1.0'"
+
+        - name: "POST - returns 404 for non-existent source"
+          request: "POST /api/npd/formulations/999/clone"
+          assertions:
+            - "status 404"
+            - "error message includes 'not found'"
+
+        - name: "POST - validates effective date range"
+          request: "POST /api/npd/formulations/1/clone {effective_to before effective_from}"
+          assertions:
+            - "status 400"
+            - "error message includes 'Effective To must be after'"
+
+        - name: "POST - enforces RLS (cross-org blocked)"
+          request: "POST /api/npd/formulations/1/clone (user from different org)"
+          assertions:
+            - "status 403 or 404"
+
+e2e_tests:
+  workflows:
+    - name: "Full comparison workflow"
+      steps:
+        - "Navigate to formulation list for project NPD-001"
+        - "Click [Compare Versions]"
+        - "Select v1.0 and v2.0 from dropdowns"
+        - "Click [Compare]"
+        - "Verify comparison page loads with diff highlighting"
+        - "Verify summary cards show correct counts"
+        - "Verify added items have green highlight"
+        - "Verify removed items have red highlight"
+        - "Verify changed items have yellow highlight"
+        - "Verify cost difference displays if available"
+        - "Click [Back to List]"
+        - "Verify returns to formulation list"
+
+    - name: "Full clone workflow"
+      steps:
+        - "Navigate to comparison page (v1.0 vs v2.0)"
+        - "Click [Clone v1.0]"
+        - "Verify clone modal opens with defaults"
+        - "Change version from v3.0 to v2.1"
+        - "Update total_qty from 100 to 150"
+        - "Add notes 'Increased batch size'"
+        - "Click [Clone Formulation]"
+        - "Verify success toast displays"
+        - "Verify redirects to edit page for new formulation"
+        - "Verify formulation v2.1 has status 'draft'"
+        - "Verify all items copied with recalculated percentages"
+        - "Verify parent_formulation_id set to v1.0"
+
+    - name: "Clone validation errors"
+      steps:
+        - "Open clone modal"
+        - "Enter version '2.0' (invalid format, missing v)"
+        - "Verify inline error 'Version must be in format v1.0'"
+        - "Fix to 'v2.0' (duplicate version)"
+        - "Click [Clone]"
+        - "Verify error toast 'Version v2.0 already exists'"
+        - "Change to 'v2.5' (unique)"
+        - "Click [Clone]"
+        - "Verify success"
+
+    - name: "Comparison with cost data"
+      steps:
+        - "Ensure v1.0 has estimated_cost = $100"
+        - "Ensure v2.0 has estimated_cost = $120"
+        - "Navigate to comparison page"
+        - "Verify cost card shows:"
+        - "  v1 Cost: $100.00"
+        - "  v2 Cost: $120.00"
+        - "  Difference: +$20.00 (+20%) [red]"
+
+    - name: "Comparison without cost data"
+      steps:
+        - "Ensure v1.0 has no costing record"
+        - "Navigate to comparison page"
+        - "Verify cost card shows 'Costing data not available'"
+        - "Verify card is grayed out"
+
+test_data:
+  formulations:
+    - id: 1
+      formulation_number: "v1.0"
+      npd_project_id: 1
+      total_qty: 100
+      uom: "kg"
+      items:
+        - product: "Flour", quantity: 50, uom: "kg"
+        - product: "Sugar", quantity: 30, uom: "kg"
+        - product: "Water", quantity: 20, uom: "kg"
+
+    - id: 2
+      formulation_number: "v2.0"
+      npd_project_id: 1
+      total_qty: 100
+      uom: "kg"
+      items:
+        - product: "Flour", quantity: 60, uom: "kg" # changed
+        - product: "Sugar", quantity: 30, uom: "kg" # unchanged
+        - product: "Salt", quantity: 10, uom: "kg"  # added
+        # Water removed
+
+coverage_requirements:
+  unit: ">80% on FormulationService.compareFormulations() and cloneFormulation()"
+  integration: "100% on compare and clone API endpoints"
+  e2e: "Critical paths: comparison view and clone workflow"
+
+mocking:
+  - "Mock Supabase client in unit tests"
+  - "Mock database queries for comparison and clone"
+  - "Mock user auth (auth.uid()) in integration tests"
+  - "Use test database for E2E tests"
+
+performance_assertions:
+  - "Comparison API: <500ms for 50 items each"
+  - "Clone API: <300ms including items copy"
+  - "Comparison page load: <1000ms total (including rendering)"

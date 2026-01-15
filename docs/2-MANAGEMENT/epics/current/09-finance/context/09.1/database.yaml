@@ -1,0 +1,55 @@
+tables:
+  finance_settings:
+    description: "Organization-level finance module configuration"
+    columns:
+      id: "UUID PRIMARY KEY"
+      org_id: "UUID NOT NULL REFERENCES organizations(id)"
+      finance_enabled: "BOOLEAN DEFAULT false"
+      valuation_method: "TEXT CHECK IN (fifo, weighted_average, standard_cost)"
+      variance_warning_percent: "NUMERIC(5,2) CHECK 0-100"
+      variance_critical_percent: "NUMERIC(5,2) CHECK 0-100"
+      overhead_allocation_method: "TEXT CHECK IN (labor_hours, machine_hours, units_produced, none)"
+      cost_center_hierarchy_levels: "INTEGER CHECK 1-5"
+      enable_cost_center_budgets: "BOOLEAN DEFAULT true"
+      base_currency_id: "UUID REFERENCES currencies(id)"
+      auto_calculate_wo_costs: "BOOLEAN DEFAULT true"
+      auto_calculate_bom_costs: "BOOLEAN DEFAULT true"
+      include_scrap_in_variance: "BOOLEAN DEFAULT true"
+      cost_rounding_decimals: "INTEGER CHECK 2-6"
+      created_at: "TIMESTAMPTZ DEFAULT now()"
+      updated_at: "TIMESTAMPTZ DEFAULT now()"
+    constraints:
+      - "UNIQUE (org_id)"
+      - "CHECK (variance_critical_percent >= variance_warning_percent)"
+    indexes:
+      - "idx_finance_settings_org ON (org_id)"
+      - "idx_finance_settings_enabled ON (org_id, finance_enabled) WHERE finance_enabled = true"
+    rls_policies:
+      - "SELECT: org_id matches user's org"
+      - "INSERT: admin or finance_manager role"
+      - "UPDATE: admin or finance_manager role"
+      - "DELETE: not allowed"
+
+functions:
+  initialize_finance_settings:
+    description: "Create default finance settings for new org"
+    parameters:
+      - "p_org_id UUID"
+      - "p_user_id UUID"
+    returns: "UUID (settings_id)"
+    logic: "Insert default settings with PLN currency, finance_enabled=false"
+
+  validate_finance_settings_update:
+    description: "Trigger to validate settings changes"
+    trigger: "BEFORE UPDATE ON finance_settings"
+    validations:
+      - "critical >= warning threshold"
+      - "hierarchy levels 1-5"
+      - "rounding decimals 2-6"
+
+  log_finance_settings_changes:
+    description: "Audit log trigger"
+    trigger: "AFTER UPDATE ON finance_settings"
+    logic: "Insert audit_log with old/new values"
+
+migration_file: "supabase/migrations/YYYYMMDDHHMMSS_create_finance_settings.sql"

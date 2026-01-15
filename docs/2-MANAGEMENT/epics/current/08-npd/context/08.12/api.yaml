@@ -1,0 +1,37 @@
+# Story 08.12 - API Specification
+# Purpose: Formulation → BOM conversion endpoint
+# Agent: BACKEND-DEV
+# SEE: markdown lines 400-709
+
+endpoint:
+  - method: "POST"
+    path: "/api/npd/projects/:projectId/handoff/create-bom"
+    description: "Convert formulation to BOM"
+    auth: "required"
+    roles: ["NPD_LEAD", "ADMIN"]
+    request: "CreateBOMFromFormulationRequest"
+    response: "CreateBOMFromFormulationResponse | BOMCreationErrorResponse"
+
+service:
+  name: "NPDHandoffService"
+  path: "lib/services/npd-handoff-service.ts"
+  methods:
+    - "createBOMFromFormulation(projectId, data, userId): CreateBOMFromFormulationResponse"
+    - "validateFormulation(formulationId, projectId): Formulation"
+    - "createProduct(data, userId): Product"
+    - "updateProduct(productId, data, userId): Product"
+    - "generateBOMNumber(productCode): string"
+    - "createBOM(data, userId): BOM"
+    - "copyFormulationItemsToBOM(formulationId, bomId): number"
+
+key_logic:
+  - "Validate formulation status = 'locked'"
+  - "Create or update product with NPD linkage"
+  - "Generate BOM number: BOM-{PRODUCT_CODE}-v{VERSION}"
+  - "Copy formulation_items to bom_items (batch INSERT)"
+  - "Set traceability: npd_formulation_id, source='npd'"
+  - "Transaction with rollback on failure"
+
+validation:
+  - path: "lib/validation/npd/handoff-schemas.ts"
+    schema: "createBOMFromFormulationSchema (Zod)"

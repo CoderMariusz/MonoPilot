@@ -1,0 +1,59 @@
+# Story 10.18 - API Specification
+# Purpose: Mobile-optimized downtime API
+# Agent: BACKEND-DEV
+
+endpoints:
+  - method: "POST"
+    path: "/api/oee/downtime/mobile"
+    description: "Create downtime event from mobile (simplified payload)"
+    auth: "required"
+    request:
+      body:
+        machine_id: "string (required) - from QR scan"
+        reason_code: "string (required)"
+        notes: "string (optional)"
+        photo: "file (optional) - multipart"
+        offline_id: "string (optional) - for sync deduplication"
+    response:
+      event: "DowntimeEvent"
+      synced: "boolean"
+
+  - method: "POST"
+    path: "/api/oee/downtime/:id/end"
+    description: "End active downtime event"
+    auth: "required"
+
+  - method: "POST"
+    path: "/api/oee/downtime/sync"
+    description: "Bulk sync offline events"
+    auth: "required"
+    request:
+      body:
+        events: "DowntimeEvent[] (max 50)"
+    response:
+      synced: "number"
+      failed: "FailedSync[]"
+
+  - method: "GET"
+    path: "/api/machines/by-qr/:code"
+    description: "Lookup machine by QR code"
+    auth: "required"
+
+services:
+  - path: "apps/frontend/lib/services/mobile-downtime-service.ts"
+    exports:
+      - name: "MobileDowntimeService"
+        methods:
+          - "createDowntime"
+          - "endDowntime"
+          - "uploadPhoto"
+          - "syncOfflineEvents"
+
+  - path: "apps/frontend/lib/services/offline-storage-service.ts"
+    exports:
+      - name: "OfflineStorageService"
+        methods:
+          - "saveEvent"
+          - "getQueuedEvents"
+          - "clearSyncedEvents"
+          - "getQueueCount"

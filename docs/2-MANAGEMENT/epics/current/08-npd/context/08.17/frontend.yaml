@@ -1,0 +1,184 @@
+# Frontend Context: 08.17 - Finance Approval Workflow
+# Approval modal, submit button, pending dashboard
+
+components:
+  - name: "CostingSubmitButton"
+    path: "components/npd/costing/CostingSubmitButton.tsx"
+    type: "action"
+    description: "Submit button for NPD Lead to submit costing for approval"
+    props:
+      - name: "costingId"
+        type: "number"
+        required: true
+      - name: "status"
+        type: "'draft' | 'submitted' | 'approved' | 'rejected'"
+        required: true
+      - name: "onSubmit"
+        type: "() => void"
+        required: true
+    state:
+      - "isSubmitting: boolean"
+    actions:
+      - name: "handleSubmit"
+        endpoint: "POST /api/npd/costing/:id/submit"
+        success: "Show toast: 'Costing submitted for approval' or 'Costing auto-approved'"
+        error: "Show error toast"
+    ui:
+      - "Disabled if status != 'draft' or status == 'rejected'"
+      - "Shows 'Submit for Approval' if draft"
+      - "Shows 'Resubmit for Approval' if rejected"
+
+  - name: "CostingApprovalModal"
+    path: "components/npd/costing/CostingApprovalModal.tsx"
+    type: "modal"
+    description: "Finance approval modal with variance analysis"
+    props:
+      - name: "isOpen"
+        type: "boolean"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+      - name: "costing"
+        type: "CostingApprovalDetails"
+        required: true
+      - name: "onApprove"
+        type: "(notes?: string) => void"
+        required: true
+      - name: "onReject"
+        type: "(reason: string) => void"
+        required: true
+    content:
+      - section: "Project Info"
+        fields: ["Project: NPD-001 Vegan Protein Bar", "Formulation: v2.0"]
+      - section: "Costing Data"
+        fields:
+          - "Target Cost: $10.00"
+          - "Estimated Cost: $11.50"
+          - "Variance: $1.50 (15%)"
+          - "Variance Status: ⚠️ Exceeds threshold (10%)"
+      - section: "Actions"
+        fields:
+          - "Notes (optional): <textarea>"
+          - "Rejection Reason (required if reject): <textarea>"
+          - "[Approve] [Reject] buttons"
+    validation:
+      - "Rejection reason required if reject button clicked"
+      - "Rejection reason min length 10 characters"
+    ui:
+      - "Approve button: green"
+      - "Reject button: red"
+      - "Variance > threshold: yellow/red badge"
+      - "Variance < threshold: green badge"
+
+  - name: "CostingApprovalBadge"
+    path: "components/npd/costing/CostingApprovalBadge.tsx"
+    type: "presentational"
+    description: "Status badge for costing approval status"
+    props:
+      - name: "status"
+        type: "'draft' | 'submitted' | 'approved' | 'rejected'"
+        required: true
+      - name: "auto_approved"
+        type: "boolean"
+        required: false
+    ui:
+      - "draft: Gray badge 'Draft'"
+      - "submitted: Yellow badge 'Pending Approval'"
+      - "approved: Green badge 'Approved' (or 'Auto-Approved' if auto_approved)"
+      - "rejected: Red badge 'Rejected'"
+
+  - name: "PendingApprovalsTable"
+    path: "components/npd/costing/PendingApprovalsTable.tsx"
+    type: "table"
+    description: "Finance dashboard showing pending approvals"
+    props:
+      - name: "approvals"
+        type: "PendingApproval[]"
+        required: true
+      - name: "onApprove"
+        type: "(costingId: number) => void"
+        required: true
+      - name: "onReject"
+        type: "(costingId: number) => void"
+        required: true
+    columns:
+      - name: "Project"
+        field: "project_number + project_name"
+      - name: "Formulation"
+        field: "formulation_number"
+      - name: "Target Cost"
+        field: "target_cost"
+        format: "$X.XX"
+      - name: "Estimated Cost"
+        field: "estimated_cost"
+        format: "$X.XX"
+      - name: "Variance"
+        field: "variance_pct"
+        format: "X.XX%"
+        color: "green if <10%, yellow if 10-20%, red if >20%"
+      - name: "Submitted"
+        field: "submitted_at"
+        format: "time ago (e.g., '2 hours ago')"
+      - name: "Actions"
+        buttons: ["[Approve]", "[Reject]"]
+    sorting:
+      - "Default: submitted_at ASC (oldest first)"
+    filtering:
+      - "Filter by variance: <10%, 10-20%, >20%"
+    actions:
+      - "Click [Approve] opens approval modal"
+      - "Click [Reject] opens rejection modal"
+
+  - name: "CostingApprovalHistory"
+    path: "components/npd/costing/CostingApprovalHistory.tsx"
+    type: "presentational"
+    description: "Display approval/rejection history"
+    props:
+      - name: "costing"
+        type: "CostingApprovalDetails"
+        required: true
+    content:
+      - "Submitted: {submitted_at} by {submitted_by}"
+      - "Approved: {approved_at} by {approved_by}" (if approved)
+      - "Rejected: {rejected_at} by {rejected_by}" (if rejected)
+      - "Rejection Reason: {rejection_reason}" (if rejected)
+      - "Auto-Approved: Yes" (if auto_approved)
+
+pages:
+  - path: "/npd/approvals"
+    name: "NPDApprovalsPage"
+    description: "Finance pending approvals dashboard"
+    access: ["FINANCE", "ADMIN"]
+    components:
+      - "PendingApprovalsTable"
+      - "CostingApprovalModal (shown on approve/reject)"
+    state:
+      - "approvals: PendingApproval[]"
+      - "selectedCostingId: number | null"
+      - "isApprovalModalOpen: boolean"
+
+  - path: "/npd/projects/:id/costing (existing page)"
+    components_added:
+      - "CostingSubmitButton"
+      - "CostingApprovalBadge"
+      - "CostingApprovalHistory"
+
+state_management:
+  - "Pending approvals fetched on mount"
+  - "Optimistic update on approve/reject (update table immediately)"
+  - "Revalidate after approve/reject completes"
+
+responsive_design:
+  mobile:
+    - "Approval modal full screen on mobile"
+    - "Table cards on mobile (not table)"
+    - "Approve/Reject buttons stacked"
+  tablet:
+    - "Table remains table"
+    - "Modal responsive"
+
+accessibility:
+  - "Approval modal keyboard navigable"
+  - "Focus trap in modal"
+  - "ARIA labels on approve/reject buttons"

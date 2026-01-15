@@ -1,0 +1,350 @@
+# Story 06.12 Database Context
+# Batch Release Approval
+# Tables, RLS policies, migrations, triggers, indexes
+
+database:
+  migrations:
+    - name: "Add e-signature fields to batch_release_records"
+      type: "alter_table"
+      description: |
+        Add FDA 21 CFR Part 11 compliant e-signature fields to batch_release_records.
+        Captures: user, meaning, timestamp, method, intent, IP, user agent.
+      columns:
+        - name: "signature_user_id"
+          type: "UUID"
+          references: "users(id)"
+          nullable: true
+          comment: "User who signed the release decision"
+        - name: "signature_meaning"
+          type: "TEXT"
+          nullable: true
+          comment: "Statement signed (e.g., 'I approve release of batch BATCH-001')"
+        - name: "signature_timestamp"
+          type: "TIMESTAMPTZ"
+          nullable: true
+          comment: "When signature was captured"
+        - name: "signature_method"
+          type: "TEXT"
+          check: "signature_method IN ('password', 'pin', 'email_confirm')"
+          nullable: true
+          comment: "Method used: password (default), PIN, email confirmation"
+        - name: "signature_intent"
+          type: "TEXT"
+          check: "signature_intent IN ('approve', 'reject')"
+          nullable: true
+          comment: "Intent of signature: approve or reject"
+        - name: "signature_ip_address"
+          type: "TEXT"
+          nullable: true
+          comment: "IP address at time of signature for audit"
+        - name: "signature_user_agent"
+          type: "TEXT"
+          nullable: true
+          comment: "Browser user agent at time of signature for audit"
+        - name: "rejection_reason"
+          type: "TEXT"
+          nullable: true
+          comment: "Required reason when rejecting (min 20 chars)"
+        - name: "rejected_by"
+          type: "UUID"
+          references: "users(id)"
+          nullable: true
+          comment: "User who rejected the release"
+        - name: "rejected_at"
+          type: "TIMESTAMPTZ"
+          nullable: true
+          comment: "Timestamp when release was rejected"
+
+    - name: "Update release_decision constraint"
+      type: "alter_constraint"
+      description: |
+        Update release_decision check to include 'pending_release' status.
+        Workflow: pending -> pending_release -> approved/rejected/conditional
+      sql: |
+        ALTER TABLE batch_release_records
+        DROP CONSTRAINT IF EXISTS batch_release_records_release_decision_check;
+
+        ALTER TABLE batch_release_records
+        ADD CONSTRAINT batch_release_records_release_decision_check
+        CHECK (release_decision IN ('pending', 'pending_release', 'approved', 'rejected', 'conditional'));
+
+    - name: "Create release_conditions_log table"
+      type: "create_table"
+      description: |
+        Logs each condition validation result for a release.
+        Stores the 7-point checklist validation history.
+      schema:
+        table_name: "release_conditions_log"
+        columns:
+          # Identity
+          - name: "id"
+            type: "UUID"
+            primary_key: true
+            default: "gen_random_uuid()"
+          - name: "org_id"
+            type: "UUID"
+            references: "organizations(id)"
+            index: true
+            rls: true
+          - name: "release_id"
+            type: "UUID"
+            references: "batch_release_records(id)"
+            on_delete: "CASCADE"
+            nullable: false
+            index: true
+
+          # Condition Check
+          - name: "check_type"
+            type: "TEXT"
+            nullable: false
+            check: |
+              check_type IN (
+                'final_inspection',
+                'ccp_records',
+                'in_process_inspections',
+                'operation_checkpoints',
+                'quality_holds',
+                'ncr_review',
+                'specification_compliance'
+              )
+            comment: "Type of condition being validated"
+          - name: "check_result"
+            type: "TEXT"
+            nullable: false
+            check: "check_result IN ('pass', 'fail', 'warning', 'not_applicable')"
+            comment: "Result of validation: pass, fail, warning, or N/A"
+          - name: "check_details"
+            type: "JSONB"
+            nullable: true
+            comment: "JSON with details (inspection ID, NCR IDs, etc.)"
+
+          # References
+          - name: "reference_type"
+            type: "TEXT"
+            nullable: true
+            comment: "Type of referenced entity (inspection, ncr, hold, etc.)"
+          - name: "reference_id"
+            type: "UUID"
+            nullable: true
+            comment: "ID of referenced entity"
+
+          # Audit
+          - name: "checked_at"
+            type: "TIMESTAMPTZ"
+            default: "now()"
+            nullable: false
+          - name: "checked_by"
+            type: "UUID"
+            references: "users(id)"
+            nullable: true
+
+          # Constraints
+          - name: "unique_constraint"
+            type: "UNIQUE"
+            columns: ["release_id", "check_type"]
+
+  indexes:
+    # Approval queue indexes
+    - table: "batch_release_records"
+      name: "idx_batch_release_pending_approval"
+      columns: ["org_id", "release_decision"]
+      where: "release_decision = 'pending_release'"
+      comment: "Fast lookup for QA Manager approval queue"
+
+    - table: "batch_release_records"
+      name: "idx_batch_release_signature_user"
+      columns: ["signature_user_id"]
+      where: "signature_user_id IS NOT NULL"
+      comment: "Audit trail lookup by signer"
+
+    - table: "batch_release_records"
+      name: "idx_batch_release_rejected_by"
+      columns: ["rejected_by"]
+      where: "rejected_by IS NOT NULL"
+      comment: "Audit trail lookup for rejections"
+
+    # Conditions log indexes
+    - table: "release_conditions_log"
+      name: "idx_release_conditions_release"
+      columns: ["release_id"]
+      comment: "Fast lookup for conditions by release"
+
+    - table: "release_conditions_log"
+      name: "idx_release_conditions_type"
+      columns: ["release_id", "check_type"]
+      comment: "Lookup specific condition type"
+
+  rls_policies:
+    - table: "release_conditions_log"
+      enabled: true
+      policies:
+        - name: "release_conditions_select"
+          action: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "release_conditions_insert"
+          action: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "release_conditions_delete"
+          action: "DELETE"
+          using: "false"
+          comment: "Conditions log is immutable - no deletes allowed"
+
+    - table: "batch_release_records"
+      note: "Update existing policies from 06.11"
+      policies:
+        - name: "batch_release_no_update_after_decision"
+          action: "UPDATE"
+          using: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (
+              release_decision IN ('pending', 'pending_release')
+              OR (
+                -- Allow setting signature fields on first approval/rejection
+                release_decision IN ('approved', 'rejected', 'conditional')
+                AND signature_user_id IS NULL
+              )
+            )
+          comment: "Cannot update after signed approval/rejection"
+
+  functions:
+    - name: "validate_release_conditions"
+      params: ["p_release_id UUID"]
+      returns: "TABLE (check_type TEXT, check_result TEXT, check_details JSONB)"
+      description: |
+        Validates all 7 release conditions for a batch.
+        Returns table with each condition's pass/fail/warning/N/A status.
+      language: "plpgsql"
+      security: "DEFINER"
+      logic: |
+        1. Get release record (batch_number, wo_id, org_id)
+        2. Check each of 7 conditions:
+
+        CHECK 1: Final Inspection
+        - Query quality_inspections WHERE type='final' AND (wo_id OR batch_number)
+        - pass: result='pass'
+        - warning: result='conditional'
+        - fail: result='fail' OR no inspection found
+
+        CHECK 2: CCP Records
+        - Query haccp_monitoring_records WHERE wo_id
+        - pass: all within_limits=true
+        - fail: any within_limits=false (unresolved)
+        - not_applicable: no CCP records exist
+
+        CHECK 3: In-Process Inspections
+        - Query quality_inspections WHERE type='in_process' AND (wo_id OR batch_number)
+        - pass: no result='fail'
+        - fail: any result='fail'
+
+        CHECK 4: Operation Checkpoints
+        - Query operation_checkpoint_results WHERE wo_id
+        - pass: all passed
+        - fail: any failed
+        - not_applicable: no checkpoints defined
+
+        CHECK 5: Quality Holds
+        - Query quality_holds WHERE status='active' AND batch reference
+        - pass: no active holds
+        - fail: active hold exists
+
+        CHECK 6: NCR Review
+        - Query ncr_reports WHERE batch reference AND status NOT IN ('closed', 'cancelled')
+        - pass: no open NCRs
+        - fail: open NCR exists
+
+        CHECK 7: Specification Compliance
+        - Query quality_test_results WHERE inspection.batch AND result_status='fail'
+        - pass: no failed tests
+        - fail: any failed test
+
+        3. Return all 7 checks with results
+
+    - name: "log_release_conditions"
+      params: ["p_release_id UUID", "p_user_id UUID"]
+      returns: "void"
+      description: "Run validation and log results to release_conditions_log"
+      logic: |
+        1. Delete existing conditions for this release (allows re-validation)
+        2. Call validate_release_conditions(p_release_id)
+        3. INSERT each result into release_conditions_log
+        4. Get org_id from release record for RLS
+
+    - name: "can_approve_release"
+      params: ["p_release_id UUID"]
+      returns: "BOOLEAN"
+      description: "Check if release can be approved (all blocking conditions pass)"
+      logic: |
+        1. Call validate_release_conditions(p_release_id)
+        2. Return FALSE if any check_result = 'fail'
+        3. Return TRUE otherwise (pass or warning allowed)
+
+  audit_logging:
+    - table: "quality_audit_log"
+      events:
+        - action: "release_conditions_validated"
+          entity_type: "batch_release_records"
+          when: "validate_release_conditions() called"
+          captures: ["all 7 condition results", "blockers", "warnings"]
+
+        - action: "release_approved"
+          entity_type: "batch_release_records"
+          when: "QA Manager approves release"
+          captures: |
+            - signature_user_id
+            - signature_meaning
+            - signature_timestamp
+            - signature_method
+            - signature_ip_address
+            - signature_user_agent
+            - all condition results at time of approval
+
+        - action: "release_rejected"
+          entity_type: "batch_release_records"
+          when: "QA Manager rejects release"
+          captures: |
+            - rejected_by
+            - rejected_at
+            - rejection_reason
+            - signature metadata
+            - ncr_id (if created)
+
+        - action: "release_signature_failed"
+          entity_type: "batch_release_records"
+          when: "E-signature validation fails"
+          captures: |
+            - user_id attempting
+            - signature_method attempted
+            - ip_address
+            - failure reason
+
+        - action: "release_certificate_generated"
+          entity_type: "batch_release_records"
+          when: "Certificate PDF generated"
+          captures: |
+            - document_id
+            - generated_by
+            - generated_at
+
+  sequences:
+    note: "Uses release_number_sequences from 06.11"
+
+  data_integrity:
+    - rule: "E-signature required for approval"
+      enforcement: |
+        CHECK constraint or service layer:
+        IF release_decision = 'approved' THEN
+          signature_user_id IS NOT NULL AND
+          signature_meaning IS NOT NULL AND
+          signature_timestamp IS NOT NULL
+
+    - rule: "Rejection reason required"
+      enforcement: |
+        CHECK constraint or service layer:
+        IF release_decision = 'rejected' THEN
+          rejection_reason IS NOT NULL AND
+          LENGTH(rejection_reason) >= 20
+
+    - rule: "Conditions logged before approval"
+      enforcement: |
+        Service layer checks release_conditions_log has entries
+        for release_id before allowing approval

@@ -1,0 +1,10 @@
+# Story 06.33 - API Schema
+
+endpoints:
+  - GET /api/quality/capa/:capaId/effectiveness-checks
+  - POST /api/quality/capa/:capaId/effectiveness-checks
+  - PUT /api/quality/capa/effectiveness-checks/:id
+  - POST /api/quality/capa/effectiveness-checks/:id/complete
+  - POST /api/quality/capa/:capaId/reopen
+
+service: "capa-effectiveness-service.ts"

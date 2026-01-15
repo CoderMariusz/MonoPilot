@@ -1,0 +1,54 @@
+# Story 06.23 - CCP Monitoring Desktop - Database Context
+# Generated: 2025-01-15
+# See: docs/2-MANAGEMENT/epics/current/06-quality/06.23.ccp-monitoring-desktop.md
+
+tables:
+  haccp_ccp_monitoring:
+    columns:
+      - "id UUID PRIMARY KEY"
+      - "org_id UUID REFERENCES organizations"
+      - "ccp_id UUID REFERENCES haccp_ccp"
+      - "ccp_number TEXT"
+      - "ccp_name TEXT"
+      - "wo_id UUID REFERENCES work_orders"
+      - "wo_number TEXT"
+      - "wo_operation_id UUID REFERENCES wo_operations"
+      - "product_id UUID REFERENCES products"
+      - "batch_number TEXT"
+      - "lp_id UUID REFERENCES license_plates"
+      - "monitored_value NUMERIC NOT NULL"
+      - "unit_of_measure TEXT NOT NULL"
+      - "critical_limit_min NUMERIC"
+      - "critical_limit_max NUMERIC"
+      - "target_value NUMERIC"
+      - "result TEXT CHECK (result IN ('pass', 'fail', 'marginal'))"
+      - "deviation_detected BOOLEAN DEFAULT false"
+      - "corrective_action_taken TEXT"
+      - "corrective_action_by UUID REFERENCES users"
+      - "corrective_action_at TIMESTAMPTZ"
+      - "monitoring_method TEXT"
+      - "equipment_used TEXT"
+      - "monitored_by UUID REFERENCES users NOT NULL"
+      - "monitored_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+      - "verified_by UUID REFERENCES users"
+      - "verified_at TIMESTAMPTZ"
+      - "is_locked BOOLEAN DEFAULT false"
+      - "locked_at TIMESTAMPTZ"
+    constraints:
+      - "UNIQUE (org_id, ccp_id, monitored_at)"
+      - "CHECK corrective_action_if_fail"
+    indexes:
+      - "idx_ccp_monitoring_org (org_id)"
+      - "idx_ccp_monitoring_ccp (ccp_id)"
+      - "idx_ccp_monitoring_deviation (org_id, deviation_detected) WHERE deviation_detected"
+      - "idx_ccp_monitoring_time (org_id, monitored_at DESC)"
+    rls: true
+
+functions:
+  - name: "determine_monitoring_result"
+    params: ["value NUMERIC", "min NUMERIC", "max NUMERIC"]
+    returns: "TEXT"
+  - name: "auto_lock_monitoring_record"
+    trigger: "BEFORE UPDATE"
+
+migration_file: "YYYYMMDDHHMMSS_create_haccp_ccp_monitoring.sql"

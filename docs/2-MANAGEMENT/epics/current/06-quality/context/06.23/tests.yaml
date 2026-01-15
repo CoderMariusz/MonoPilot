@@ -1,0 +1,53 @@
+# Story 06.23 - CCP Monitoring Desktop - Tests Context
+
+test_coverage: ">80%"
+
+unit_tests:
+  - suite: "CCPMonitoringService.create"
+    tests:
+      - "creates monitoring record with pass result"
+      - "creates with fail result and corrective action"
+      - "validates corrective action required for fail"
+      - "determines result: pass (within limits)"
+      - "determines result: fail (outside limits)"
+      - "determines result: marginal (within 5% of limit)"
+  - suite: "CCPMonitoringService.update"
+    tests:
+      - "updates record within 5min"
+      - "blocks update after 5min (is_locked=true)"
+      - "blocks update if verified"
+
+integration_tests:
+  - "POST /api/quality/haccp/ccp-monitoring (valid)"
+  - "POST returns 400 if fail without corrective action"
+  - "PUT /api/quality/haccp/ccp-monitoring/:id (within 5min)"
+  - "PUT returns 400 if locked"
+  - "POST /verify (QA only)"
+  - "RLS: org isolation"
+  - "DELETE blocked by RLS policy"
+
+e2e_tests:
+  - name: "Record CCP monitoring - pass"
+    steps:
+      - "Select CCP-1 (Receiving Temperature)"
+      - "Enter value 2.5°C (within 0-4°C)"
+      - "Validation shows GREEN (pass)"
+      - "Submit"
+      - "Success toast shown"
+  - name: "Record CCP monitoring - fail with corrective action"
+    steps:
+      - "Select CCP-1"
+      - "Enter value 6.5°C (above 4°C)"
+      - "Deviation warning modal appears"
+      - "Enter corrective action"
+      - "Submit"
+      - "Alert triggered"
+
+ac_coverage:
+  - AC-1: "Monitoring Table Creation"
+  - AC-2: "Create Monitoring Record - Pass"
+  - AC-3: "Create Monitoring Record - Fail"
+  - AC-4: "Marginal Result Detection"
+  - AC-5: "Real-Time Validation"
+  - AC-9: "Edit Monitoring Record (5min)"
+  - AC-15: "RLS Enforcement"

@@ -1,0 +1,132 @@
+story:
+  id: "09.8"
+  name: "Currency Management"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.8.1", "FR-9.8.2", "FR-9.8.3", "FR-9.8.4", "FR-9.8.5"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.8.currency-management.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_currencies.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/currencies/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/currencies/[id]/route.ts"
+      methods: ["GET", "PATCH", "DELETE"]
+    - path: "apps/frontend/app/api/finance/currencies/[id]/exchange-rates/route.ts"
+      methods: ["GET", "POST"]
+  services:
+    - path: "apps/frontend/lib/services/currency-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+  components:
+    - path: "apps/frontend/components/finance/CurrencySelector.tsx"
+    - path: "apps/frontend/components/finance/ExchangeRateForm.tsx"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/settings/currencies/page.tsx"
+
+database:
+  tables:
+    - name: "currencies"
+      columns:
+        - "id"
+        - "org_id"
+        - "code"
+        - "name"
+        - "symbol"
+        - "is_base"
+        - "is_active"
+        - "exchange_rate"
+      rls: true
+      indexes:
+        - "org_id"
+        - "org_id, is_active"
+    - name: "exchange_rates"
+      columns:
+        - "id"
+        - "org_id"
+        - "currency_id"
+        - "effective_date"
+        - "rate"
+        - "source"
+      rls: true
+      indexes:
+        - "org_id, currency_id"
+        - "org_id, currency_id, effective_date DESC"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/currencies"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/currencies"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "GET"
+    path: "/api/finance/currencies/:id/exchange-rates"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/currencies/:id/exchange-rates"
+    auth: true
+    roles: ["finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-006-currency-management.md"
+      relevance: "Currency management page with DataTable, base currency indicator, exchange rate form, and currency selector dropdown"
+  patterns:
+    table: "ShadCN DataTable"
+    form: "ShadCN Form with Zod validation"
+    selector: "ShadCN Select dropdown"
+
+validation_rules:
+  code: "Must be 3-letter ISO 4217 code"
+  rate: "Must be > 0"
+  is_base: "Only one base currency per org"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "currencies table created with RLS"
+  - "exchange_rates table created"
+  - "convert_currency() function works"
+  - "get_base_currency() function works"
+  - "Currency CRUD endpoints work"
+  - "Exchange rate CRUD endpoints work"
+  - "Currency selector component renders"
+  - "Only one base currency enforced"
+  - "Historical rate lookup works"
+  - "Currency conversion accurate"
+  - "PLN default for Polish orgs"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: currencies and exchange_rates tables"
+  - "Function: convert_currency()"
+  - "Function: get_base_currency()"
+  - "API: 6 currency endpoints"
+  - "Service: CurrencyService"
+  - "Component: CurrencySelector"
+  - "Component: ExchangeRateForm"
+  - "Page: Currency management"
+  - "Tests: Unit, integration, E2E"

@@ -1,0 +1,59 @@
+# Story 10.6 - Test Specification
+# OEE Threshold Alerts
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/oee-alert-service.test.ts"
+    type: "unit"
+  - path: "supabase/tests/performance_alerts.test.sql"
+    type: "integration"
+  - path: "tests/e2e/oee-alerts.spec.ts"
+    type: "e2e"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "Mixer-01 OEE = 70%, critical_threshold = 75%"
+    when: "check_oee_thresholds() runs"
+    then: "performance_alert created with severity=critical, alert_type=oee_low"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "Labeler-03 OEE = 82%, warning_threshold = 85%, critical_threshold = 75%"
+    when: "check_oee_thresholds() runs"
+    then: "alert created with severity=warning"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "active alert exists"
+    when: "user clicks [Acknowledge]"
+    then: "acknowledged_by and acknowledged_at set, alert remains in list"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "acknowledged alert exists"
+    when: "user clicks [Resolve]"
+    then: "resolved_at set, alert moves to resolved list"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "GET /api/oee/alerts/active"
+    when: "endpoint queried"
+    then: "returns only alerts with resolved_at=NULL"
+    test_type: "integration"
+    priority: "P0"
+
+definition_of_done:
+  - "performance_alerts table created"
+  - "check_oee_thresholds() function triggers alerts"
+  - "GET /api/oee/alerts/active returns active alerts"
+  - "PATCH acknowledge/resolve endpoints work"
+  - "Active Alerts panel on dashboard displays alerts"
+  - "Toast notifications on new critical alerts"
+  - "Unit tests >80% coverage"
+
+coverage:
+  unit: 80
+  integration: 80

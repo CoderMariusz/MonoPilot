@@ -1,0 +1,79 @@
+# Story 10.12 - API Specification
+# Purpose: Dashboard data aggregation endpoint
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/dashboard"
+    description: "Get all dashboard data in single call"
+    file: "apps/frontend/app/api/oee/dashboard/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query_params:
+        period: "string (optional) - 'today' | 'week' | 'month', default: 'today'"
+        line_id: "string (optional) - UUID"
+        machine_id: "string (optional) - UUID"
+
+    response:
+      status: 200
+      type: "DashboardResponse"
+      schema:
+        kpis:
+          oee: "number"
+          availability: "number"
+          performance: "number"
+          quality: "number"
+          total_output: "number"
+          good_output: "number"
+          scrap_percentage: "number"
+          downtime_minutes: "number"
+          active_alerts: "number"
+          energy_kwh: "number"
+        oee_trend:
+          - date: "string"
+            oee: "number"
+        machine_status:
+          - machine_id: "string"
+            name: "string"
+            status: "string"
+            current_oee: "number"
+        period:
+          start: "string"
+          end: "string"
+
+    performance:
+      target_ms: 2000
+
+services:
+  - path: "apps/frontend/lib/services/dashboard-service.ts"
+    description: "Dashboard data aggregation service"
+    exports:
+      - name: "DashboardService"
+        type: "class"
+        methods:
+          - name: "getDashboardData"
+            type: "static async"
+            params: ["params: DashboardParams"]
+            returns: "Promise<DashboardResponse>"
+          - name: "getKPIs"
+            type: "static async"
+            params: ["period: string"]
+            returns: "Promise<KPIs>"
+          - name: "getOEETrend"
+            type: "static async"
+            params: ["days: number"]
+            returns: "Promise<TrendPoint[]>"
+          - name: "getMachineStatus"
+            type: "static async"
+            returns: "Promise<MachineStatus[]>"
+
+types:
+  - path: "apps/frontend/lib/types/dashboard.ts"
+    exports:
+      - "DashboardParams"
+      - "DashboardResponse"
+      - "KPIs"
+      - "TrendPoint"
+      - "MachineStatus"

@@ -1,0 +1,527 @@
+# Database Context - Story 08.3: Stage-Gate Workflow
+
+migrations:
+  - file: "YYYYMMDDHHMMSS_extend_npd_projects_workflow.sql"
+    description: "Extend npd_projects with gate tracking columns"
+    changes:
+      - "Add gate_entered_at TIMESTAMPTZ"
+      - "Add approved_by UUID"
+      - "Add approved_at TIMESTAMPTZ"
+      - "Add move_back_count INTEGER"
+      - "Add last_moved_back_at TIMESTAMPTZ"
+      - "Add last_moved_back_by UUID"
+      - "Add move_back_reason TEXT"
+      - "Update current_gate CHECK constraint"
+      - "Create indexes for gate queries"
+
+  - file: "YYYYMMDDHHMMSS_create_npd_gate_checklists.sql"
+    description: "Create gate checklists configuration table"
+    changes:
+      - "Create npd_gate_checklists table"
+      - "Add RLS policies (select, admin)"
+      - "Create seed function: seed_npd_gate_checklists(org_id)"
+      - "Seed default checklists (G0: 3, G1: 4, G2: 5, G3: 6, G4: 7 items)"
+      - "Create indexes for lookups"
+
+  - file: "YYYYMMDDHHMMSS_create_npd_checklist_completion.sql"
+    description: "Create checklist completion tracking table"
+    changes:
+      - "Create npd_project_checklist_completion table"
+      - "Add RLS policies (select, insert, update)"
+      - "Create indexes for project and user queries"
+      - "Unique constraint on (project_id, checklist_id)"
+
+  - file: "YYYYMMDDHHMMSS_create_npd_gate_transitions.sql"
+    description: "Create immutable gate transition audit trail"
+    changes:
+      - "Create npd_gate_transitions table"
+      - "Add RLS policies (select, insert only)"
+      - "Explicitly deny UPDATE and DELETE (immutable)"
+      - "Create indexes for history queries"
+
+tables:
+  npd_projects:
+    action: "extend"
+    new_columns:
+      gate_entered_at:
+        type: "TIMESTAMPTZ"
+        nullable: true
+        default: "now()"
+        description: "Timestamp when entered current gate"
+
+      approved_by:
+        type: "UUID"
+        nullable: true
+        references: "users(id)"
+        description: "User who approved current gate"
+
+      approved_at:
+        type: "TIMESTAMPTZ"
+        nullable: true
+        description: "Timestamp of gate approval"
+
+      move_back_count:
+        type: "INTEGER"
+        nullable: false
+        default: 0
+        description: "Number of times project has moved back"
+
+      last_moved_back_at:
+        type: "TIMESTAMPTZ"
+        nullable: true
+        description: "Last move back timestamp"
+
+      last_moved_back_by:
+        type: "UUID"
+        nullable: true
+        references: "users(id)"
+        description: "User who last moved project back"
+
+      move_back_reason:
+        type: "TEXT"
+        nullable: true
+        description: "Justification for last move back"
+
+    constraints:
+      - name: "npd_projects_current_gate_check"
+        type: "CHECK"
+        expression: "current_gate IN ('G0', 'G1', 'G2', 'G3', 'G4', 'launched', 'cancelled')"
+
+    indexes:
+      - name: "idx_npd_projects_gate"
+        columns: ["org_id", "current_gate"]
+        where: "current_gate != 'cancelled'"
+
+      - name: "idx_npd_projects_approver"
+        columns: ["approved_by"]
+        where: "approved_by IS NOT NULL"
+
+  npd_gate_checklists:
+    action: "create"
+    description: "Default gate checklists per organization"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+        default: "gen_random_uuid()"
+
+      org_id:
+        type: "UUID"
+        nullable: false
+        references: "organizations(id) ON DELETE CASCADE"
+
+      gate:
+        type: "TEXT"
+        nullable: false
+        constraint: "CHECK (gate IN ('G0', 'G1', 'G2', 'G3', 'G4'))"
+
+      item_description:
+        type: "TEXT"
+        nullable: false
+
+      is_required:
+        type: "BOOLEAN"
+        nullable: false
+        default: true
+
+      sequence:
+        type: "INTEGER"
+        nullable: false
+        default: 0
+        description: "Display order"
+
+      category:
+        type: "TEXT"
+        nullable: true
+        description: "Technical, Business, Compliance"
+
+      is_active:
+        type: "BOOLEAN"
+        nullable: false
+        default: true
+
+      created_at:
+        type: "TIMESTAMPTZ"
+        default: "now()"
+
+      updated_at:
+        type: "TIMESTAMPTZ"
+        default: "now()"
+
+    constraints:
+      - name: "unique_checklist_item"
+        type: "UNIQUE"
+        columns: ["org_id", "gate", "item_description"]
+
+    indexes:
+      - name: "idx_npd_checklists_lookup"
+        columns: ["org_id", "gate", "is_active"]
+        where: "is_active = true"
+
+    rls:
+      enabled: true
+      policies:
+        - name: "npd_checklists_select"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+        - name: "npd_checklists_admin"
+          operation: "ALL"
+          using: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+
+  npd_project_checklist_completion:
+    action: "create"
+    description: "Checklist item completion tracking per NPD project"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+        default: "gen_random_uuid()"
+
+      org_id:
+        type: "UUID"
+        nullable: false
+        references: "organizations(id) ON DELETE CASCADE"
+
+      project_id:
+        type: "UUID"
+        nullable: false
+        references: "npd_projects(id) ON DELETE CASCADE"
+
+      checklist_id:
+        type: "UUID"
+        nullable: false
+        references: "npd_gate_checklists(id) ON DELETE CASCADE"
+
+      is_completed:
+        type: "BOOLEAN"
+        nullable: false
+        default: false
+
+      completed_by:
+        type: "UUID"
+        nullable: true
+        references: "users(id)"
+
+      completed_at:
+        type: "TIMESTAMPTZ"
+        nullable: true
+
+      completion_notes:
+        type: "TEXT"
+        nullable: true
+
+      attachment_url:
+        type: "TEXT"
+        nullable: true
+        description: "Supabase Storage path"
+
+      created_at:
+        type: "TIMESTAMPTZ"
+        default: "now()"
+
+      updated_at:
+        type: "TIMESTAMPTZ"
+        default: "now()"
+
+    constraints:
+      - name: "unique_project_checklist"
+        type: "UNIQUE"
+        columns: ["project_id", "checklist_id"]
+
+    indexes:
+      - name: "idx_npd_completion_project"
+        columns: ["project_id", "is_completed"]
+
+      - name: "idx_npd_completion_user"
+        columns: ["completed_by", "completed_at DESC"]
+
+    rls:
+      enabled: true
+      policies:
+        - name: "npd_completion_select"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+        - name: "npd_completion_insert"
+          operation: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+        - name: "npd_completion_update"
+          operation: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  npd_gate_transitions:
+    action: "create"
+    description: "Immutable audit trail for NPD gate transitions (FDA 21 CFR Part 11)"
+    immutable: true
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+        default: "gen_random_uuid()"
+
+      org_id:
+        type: "UUID"
+        nullable: false
+        references: "organizations(id) ON DELETE CASCADE"
+
+      project_id:
+        type: "UUID"
+        nullable: false
+        references: "npd_projects(id) ON DELETE CASCADE"
+
+      from_gate:
+        type: "TEXT"
+        nullable: false
+
+      to_gate:
+        type: "TEXT"
+        nullable: false
+
+      transition_type:
+        type: "TEXT"
+        nullable: false
+        constraint: "CHECK (transition_type IN ('advance', 'move_back', 'cancel'))"
+
+      transitioned_by:
+        type: "UUID"
+        nullable: false
+        references: "users(id)"
+
+      transitioned_at:
+        type: "TIMESTAMPTZ"
+        nullable: false
+        default: "now()"
+
+      requires_approval:
+        type: "BOOLEAN"
+        nullable: false
+        default: false
+
+      approved_by:
+        type: "UUID"
+        nullable: true
+        references: "users(id)"
+
+      approved_at:
+        type: "TIMESTAMPTZ"
+        nullable: true
+
+      approval_notes:
+        type: "TEXT"
+        nullable: true
+
+      transition_notes:
+        type: "TEXT"
+        nullable: true
+
+      checklist_completion_pct:
+        type: "DECIMAL(5,2)"
+        nullable: true
+        description: "% of required items completed"
+
+      blocking_items:
+        type: "INTEGER"
+        nullable: true
+        description: "Count of required items incomplete"
+
+      created_at:
+        type: "TIMESTAMPTZ"
+        nullable: false
+        default: "now()"
+
+    indexes:
+      - name: "idx_npd_transitions_project"
+        columns: ["project_id", "transitioned_at DESC"]
+
+      - name: "idx_npd_transitions_org"
+        columns: ["org_id", "transitioned_at DESC"]
+
+      - name: "idx_npd_transitions_user"
+        columns: ["transitioned_by", "transitioned_at DESC"]
+
+    rls:
+      enabled: true
+      policies:
+        - name: "npd_transitions_select"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+        - name: "npd_transitions_insert"
+          operation: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+        - name: "npd_transitions_no_update"
+          operation: "UPDATE"
+          using: "false"
+          description: "Explicitly deny UPDATE (immutable)"
+
+        - name: "npd_transitions_no_delete"
+          operation: "DELETE"
+          using: "false"
+          description: "Explicitly deny DELETE (immutable)"
+
+functions:
+  - name: "seed_npd_gate_checklists"
+    description: "Seed default gate checklists for organization"
+    parameters:
+      - name: "p_org_id"
+        type: "UUID"
+    returns: "void"
+    language: "plpgsql"
+    logic: |
+      Inserts default checklist items for each gate:
+      - G0: 3 items (all required)
+      - G1: 4 items (3 required, 1 optional)
+      - G2: 5 items (4 required, 1 optional)
+      - G3: 6 items (4 required, 2 optional)
+      - G4: 7 items (6 required, 1 optional)
+
+      Uses ON CONFLICT DO NOTHING to prevent duplicates
+      Categories: Technical, Business, Compliance
+
+default_checklists:
+  G0:
+    - description: "Initial concept documented"
+      required: true
+      category: "Technical"
+    - description: "Target market identified"
+      required: true
+      category: "Business"
+    - description: "Preliminary resource estimate"
+      required: false
+      category: "Business"
+
+  G1:
+    - description: "Technical feasibility confirmed"
+      required: true
+      category: "Technical"
+    - description: "Key ingredients identified"
+      required: true
+      category: "Technical"
+    - description: "Initial allergen assessment"
+      required: true
+      category: "Compliance"
+    - description: "Rough cost estimate"
+      required: false
+      category: "Business"
+
+  G2:
+    - description: "Business case documented"
+      required: true
+      category: "Business"
+    - description: "Target cost approved by Finance"
+      required: true
+      category: "Business"
+    - description: "Target margin confirmed"
+      required: true
+      category: "Business"
+    - description: "Resource plan approved"
+      required: true
+      category: "Business"
+    - description: "Market research completed"
+      required: false
+      category: "Business"
+
+  G3:
+    - description: "Formulation created and locked"
+      required: true
+      category: "Technical"
+    - description: "Trial batches executed"
+      required: true
+      category: "Technical"
+    - description: "Allergen declaration validated"
+      required: true
+      category: "Compliance"
+    - description: "Sensory evaluation passed"
+      required: true
+      category: "Technical"
+    - description: "Packaging design approved"
+      required: false
+      category: "Business"
+    - description: "Supplier agreements in place"
+      required: false
+      category: "Business"
+
+  G4:
+    - description: "Shelf-life testing complete"
+      required: true
+      category: "Compliance"
+    - description: "HACCP plan approved"
+      required: true
+      category: "Compliance"
+    - description: "Label proof approved"
+      required: true
+      category: "Compliance"
+    - description: "Compliance documents uploaded"
+      required: true
+      category: "Compliance"
+    - description: "Costing approved by Finance"
+      required: true
+      category: "Business"
+    - description: "Production routing defined"
+      required: true
+      category: "Technical"
+    - description: "Marketing materials ready"
+      required: false
+      category: "Business"
+
+gate_sequence:
+  - gate: "G0"
+    name: "Idea"
+    next: "G1"
+    previous: null
+    requires_approval: false
+    approver_roles: ["NPD_LEAD", "ADMIN"]
+
+  - gate: "G1"
+    name: "Feasibility"
+    next: "G2"
+    previous: "G0"
+    requires_approval: false
+    approver_roles: ["NPD_LEAD", "ADMIN"]
+
+  - gate: "G2"
+    name: "Business Case"
+    next: "G3"
+    previous: "G1"
+    requires_approval: true
+    approver_roles: ["NPD_LEAD", "FINANCE", "ADMIN"]
+
+  - gate: "G3"
+    name: "Development"
+    next: "G4"
+    previous: "G2"
+    requires_approval: true
+    approver_roles: ["QA_MANAGER", "DIRECTOR", "ADMIN"]
+
+  - gate: "G4"
+    name: "Testing"
+    next: "launched"
+    previous: "G3"
+    requires_approval: true
+    approver_roles: ["QA_MANAGER", "DIRECTOR", "ADMIN"]
+
+  - gate: "launched"
+    name: "Launched"
+    next: null
+    previous: "G4"
+    requires_approval: true
+    approver_roles: ["DIRECTOR", "ADMIN"]
+
+testing:
+  unit_tests:
+    - "Test seed function creates all checklist items"
+    - "Test unique constraint on (org_id, gate, item_description)"
+    - "Test RLS isolates checklists by org"
+    - "Test immutable policies on transitions table"
+    - "Test CHECK constraints on gate values"
+
+  integration_tests:
+    - "Test org creation triggers checklist seeding"
+    - "Test transition history ordering (DESC)"
+    - "Test completion unique constraint enforcement"
+    - "Test foreign key cascades on project delete"

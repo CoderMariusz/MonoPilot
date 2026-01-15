@@ -1,0 +1,129 @@
+story:
+  id: "09.12"
+  name: "Overhead Allocation"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "backend"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "03.10"
+      provides: ["work_orders"]
+    - story: "04.3"
+      provides: ["operation_labor", "machine_hours"]
+    - story: "09.1"
+      provides: ["finance_settings"]
+    - story: "09.6"
+      provides: ["work_order_costs", "labor_costs"]
+    - story: "09.10"
+      provides: ["cost_centers"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.1.3", "FR-9.3.3", "FR-FIN-054"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.12.overhead-allocation.md"
+  patterns:
+    - "apps/frontend/lib/services/work-order-cost-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_overhead_allocation.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/overhead-rates/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/overhead-rates/[id]/route.ts"
+      methods: ["GET", "PATCH", "DELETE"]
+    - path: "apps/frontend/app/api/finance/work-order-costs/[id]/overhead/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/overhead-variance/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/overhead-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+      note: "Extend existing"
+
+database:
+  tables:
+    - name: "overhead_rates"
+      columns: ["id", "org_id", "cost_center_id", "effective_from", "effective_to", "allocation_basis", "rate", "budgeted_overhead", "budgeted_activity", "currency_id", "is_active"]
+      rls: true
+      indexes: ["org_id", "cost_center_id", "effective_from"]
+    - name: "overhead_allocations"
+      columns: ["id", "org_id", "work_order_id", "cost_center_id", "overhead_rate_id", "allocation_basis", "basis_quantity", "rate", "total_cost", "budgeted_overhead", "applied_overhead", "spending_variance", "volume_variance", "total_variance", "currency_id", "allocation_date"]
+      rls: true
+      indexes: ["org_id", "work_order_id", "cost_center_id"]
+  functions:
+    - name: "get_active_overhead_rate"
+      type: "lookup"
+      parameters: ["p_org_id", "p_cost_center_id", "p_effective_date"]
+    - name: "calculate_work_order_overhead"
+      type: "calculation"
+      parameters: ["p_org_id", "p_work_order_id"]
+    - name: "calculate_overhead_variance"
+      type: "variance"
+      parameters: ["p_org_id", "p_work_order_id", "p_actual_overhead", "p_budgeted_overhead", "p_applied_overhead"]
+  triggers:
+    - name: "wo_overhead_allocation"
+      on: "work_orders UPDATE"
+      event: "status = 'completed'"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/overhead-rates"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/overhead-rates"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:id/overhead"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "GET"
+    path: "/api/finance/reports/overhead-variance"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+
+validation_rules:
+  allocation_basis: "enum: labor_hours, machine_hours, units_produced, direct_labor_cost"
+  budgeted_overhead: "numeric >= 0"
+  budgeted_activity: "numeric > 0"
+  rate: "calculated = budgeted_overhead / budgeted_activity"
+  effective_dates: "effective_to >= effective_from OR NULL"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  triggers: "Auto-allocate on WO completion"
+
+acceptance_checklist:
+  - "overhead_rates table created with RLS"
+  - "overhead_allocations table created"
+  - "Overhead rate calculated from budget and activity"
+  - "Auto-allocation trigger fires on WO completion"
+  - "All allocation bases supported (4 types)"
+  - "Spending variance calculated correctly"
+  - "Volume variance calculated correctly"
+  - "Variance report generates < 1s"
+  - "RLS enforces org isolation"
+  - "All tests pass (unit, integration, edge cases)"
+
+output_artifacts:
+  - "Migration: overhead_rates table"
+  - "Migration: overhead_allocations table"
+  - "Function: get_active_overhead_rate()"
+  - "Function: calculate_work_order_overhead()"
+  - "Function: calculate_overhead_variance()"
+  - "Trigger: wo_overhead_allocation"
+  - "API: 4 endpoints"
+  - "Service: OverheadService with 5 methods"
+  - "Tests: Unit, integration, edge cases"

@@ -1,0 +1,39 @@
+# Story 08.12 - Database Schema
+# Purpose: Product and BOM linkage to NPD formulations
+# Agent: BACKEND-DEV
+# SEE: _index.yaml for full details, markdown lines 757-797
+
+migrations:
+  - path: "supabase/migrations/XXX_add_npd_linkage_to_products_boms.sql"
+    type: "migration"
+    description: "Add NPD linkage columns to products and boms tables"
+
+extensions:
+  - table: "products"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "npd_project_id", type: "INTEGER", constraints: "REFERENCES npd_projects(id)" }
+      - { name: "npd_origin", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "source", type: "VARCHAR(30)" }
+    indexes:
+      - "idx_products_npd_project ON products(npd_project_id) WHERE npd_project_id IS NOT NULL"
+      - "idx_products_npd_origin ON products(npd_origin) WHERE npd_origin = true"
+    note: "Traceability from products back to NPD projects"
+
+  - table: "boms"
+    action: "ALTER TABLE"
+    columns:
+      - { name: "npd_formulation_id", type: "INTEGER", constraints: "REFERENCES npd_formulations(id)" }
+      - { name: "source", type: "VARCHAR(30)" }
+    indexes:
+      - "idx_boms_npd_formulation ON boms(npd_formulation_id) WHERE npd_formulation_id IS NOT NULL"
+      - "idx_boms_source ON boms(source) WHERE source = 'npd'"
+    note: "Traceability from BOMs back to NPD formulations"
+
+dependencies:
+  required_tables:
+    - "npd_projects (08.2)"
+    - "npd_formulations (08.4)"
+    - "products (02.1)"
+    - "boms (02.2)"
+    - "bom_items (02.2)"

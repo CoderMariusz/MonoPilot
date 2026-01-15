@@ -49,6 +49,7 @@ interface Allergen {
   id: string
   code: string
   name: string
+  name_en?: string // Database uses name_en
 }
 
 interface Supplier {
@@ -156,7 +157,12 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
         const response = await fetch('/api/v1/settings/allergens')
         if (response.ok) {
           const data = await response.json()
-          setAllergens(data.allergens || [])
+          // API returns array directly, map name_en to name for display
+          const allergenList = (Array.isArray(data) ? data : data.allergens || []).map((a: Allergen & { name_en?: string }) => ({
+            ...a,
+            name: a.name || a.name_en || a.code, // Fallback to code if no name
+          }))
+          setAllergens(allergenList)
         }
       } catch (error) {
         console.error('Error fetching allergens:', error)

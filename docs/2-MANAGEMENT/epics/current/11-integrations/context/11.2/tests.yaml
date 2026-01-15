@@ -1,0 +1,354 @@
+# Story 11.2 - Tests Context
+# Test specifications, acceptance criteria mapping, coverage requirements
+
+unit_tests:
+  service:
+    file: "lib/services/api-key-service.test.ts"
+    coverage_target: 85%
+    tests:
+      - describe: "generateKey"
+        tests:
+          - "generates key with format mp_live_{32chars}"
+          - "generates key with format mp_test_{32chars} for test env"
+          - "keys are cryptographically random (unique)"
+          - "keys are base62 encoded"
+
+      - describe: "hashKey"
+        tests:
+          - "hashes key with bcrypt cost 12"
+          - "hash is 60 chars long"
+          - "same key produces different hashes (salt)"
+
+      - describe: "verifyKey"
+        tests:
+          - "correct key verifies successfully"
+          - "incorrect key fails verification"
+          - "returns boolean"
+
+      - describe: "create"
+        tests:
+          - "creates API key with all fields"
+          - "returns plain key_value ONCE"
+          - "stores bcrypt hash (not plain key)"
+          - "stores key_prefix for display"
+          - "auto-adds read scopes for write scopes"
+          - "validates at least one scope required"
+          - "throws on duplicate key name"
+
+      - describe: "list"
+        tests:
+          - "returns all org API keys"
+          - "masks key_value (shows prefix only)"
+          - "enforces RLS (org isolation)"
+          - "filters by status if provided"
+          - "orders by created_at DESC"
+
+      - describe: "update"
+        tests:
+          - "updates name, scopes, tier, expires_at"
+          - "does NOT update key_value"
+          - "validates scopes"
+          - "enforces RLS"
+
+      - describe: "regenerate"
+        tests:
+          - "generates new key_value"
+          - "updates key_value_hash"
+          - "updates key_prefix"
+          - "returns new plain key ONCE"
+          - "old key immediately invalid"
+          - "maintains other metadata"
+
+      - describe: "suspend/activate"
+        tests:
+          - "suspend sets status='suspended'"
+          - "activate sets status='active'"
+          - "cannot activate revoked key"
+          - "enforces RLS"
+
+      - describe: "revoke"
+        tests:
+          - "sets status='revoked'"
+          - "sets revoked_at timestamp"
+          - "sets revoked_by user ID"
+          - "stores revocation_reason"
+          - "revoked key cannot be reactivated"
+
+      - describe: "authenticate"
+        tests:
+          - "valid active key authenticates"
+          - "returns org_id and scopes"
+          - "updates last_used_at"
+          - "increments request_count"
+          - "invalid key fails"
+          - "suspended key fails"
+          - "revoked key fails"
+          - "expired key fails"
+
+      - describe: "checkScope"
+        tests:
+          - "returns true if scope present"
+          - "returns false if scope missing"
+          - "write scope includes read"
+
+      - describe: "checkRateLimit"
+        tests:
+          - "allows request if under limit"
+          - "blocks request if over limit"
+          - "returns limit, remaining, reset timestamp"
+          - "uses Redis token bucket"
+
+integration_tests:
+  api:
+    file: "app/api/integrations/api-keys/route.test.ts"
+    tests:
+      - describe: "POST /api/integrations/api-keys"
+        tests:
+          - "creates API key successfully"
+          - "returns plain key_value ONCE"
+          - "hashes key before storage"
+          - "returns 400 on validation error"
+          - "returns 409 on duplicate name"
+          - "returns 403 for non-admin"
+          - "enforces RLS (org isolation)"
+
+      - describe: "GET /api/integrations/api-keys"
+        tests:
+          - "returns all org API keys"
+          - "masks key values"
+          - "filters by status"
+          - "returns 403 for non-admin/IT_MANAGER"
+          - "response time < 500ms"
+
+      - describe: "PUT /api/integrations/api-keys/:id"
+        tests:
+          - "updates API key metadata"
+          - "cannot update key_value"
+          - "validates scopes"
+          - "returns 404 for non-existent key"
+          - "returns 403 for other org's key"
+
+      - describe: "POST /api/integrations/api-keys/:id/regenerate"
+        tests:
+          - "generates new key_value"
+          - "returns new plain key ONCE"
+          - "old key immediately invalid"
+          - "returns 403 for non-admin"
+
+      - describe: "POST /api/integrations/api-keys/:id/suspend"
+        tests:
+          - "suspends API key"
+          - "suspended key fails authentication"
+
+      - describe: "POST /api/integrations/api-keys/:id/activate"
+        tests:
+          - "reactivates suspended key"
+          - "returns 400 for revoked key"
+
+      - describe: "DELETE /api/integrations/api-keys/:id"
+        tests:
+          - "revokes API key"
+          - "stores revocation metadata"
+          - "revoked key fails authentication"
+          - "revoked key cannot be reactivated"
+
+  rls:
+    file: "__tests__/rls/integration-api-keys.test.ts"
+    tests:
+      - "User A cannot see User B's API keys"
+      - "User A cannot update User B's API keys"
+      - "User A cannot delete User B's API keys"
+      - "Admin can manage own org's keys"
+      - "IT_MANAGER can view but not modify"
+      - "Regular user cannot access API keys"
+
+  authentication:
+    file: "__tests__/integration/api-authentication.test.ts"
+    tests:
+      - "Valid API key authenticates request"
+      - "Invalid API key returns 401"
+      - "Suspended key returns 401"
+      - "Revoked key returns 401"
+      - "Expired key returns 401"
+      - "Insufficient scope returns 403"
+      - "Rate limit exceeded returns 429"
+      - "Rate limit headers included"
+
+e2e_tests:
+  file: "e2e/integrations/api-keys.spec.ts"
+  framework: "Playwright"
+  tests:
+    - describe: "Create API Key"
+      tests:
+        - "Navigate to /integrations/api-keys"
+        - "Click [Create API Key]"
+        - "Fill form (name, scopes, tier)"
+        - "Submit"
+        - "Key displayed ONCE"
+        - "Copy key to clipboard"
+        - "Modal shows warning"
+        - "Key appears in table (masked)"
+
+    - describe: "Edit API Key"
+      tests:
+        - "Click [Edit] on key"
+        - "Change scopes"
+        - "Change rate limit tier"
+        - "Save"
+        - "Key updated in table"
+        - "key_value NOT changed"
+
+    - describe: "Regenerate API Key"
+      tests:
+        - "Click [Regenerate] on key"
+        - "Confirm action"
+        - "New key displayed ONCE"
+        - "Copy new key"
+        - "Old key immediately invalid"
+
+    - describe: "Suspend/Activate"
+      tests:
+        - "Click [Suspend]"
+        - "Status changes to 'Suspended'"
+        - "Click [Activate]"
+        - "Status changes to 'Active'"
+
+    - describe: "Revoke API Key"
+      tests:
+        - "Click [Revoke]"
+        - "Enter reason"
+        - "Confirm"
+        - "Status changes to 'Revoked'"
+        - "[Activate] button not shown"
+        - "Revocation metadata displayed"
+
+    - describe: "Permissions"
+      tests:
+        - "Admin can create, edit, revoke"
+        - "IT_Manager can view only"
+        - "Regular user redirected with 403"
+
+    - describe: "Filters"
+      tests:
+        - "Filter by status='active'"
+        - "Only active keys shown"
+        - "Search by name"
+        - "Results filtered"
+
+performance_tests:
+  file: "lib/services/__tests__/api-key-service-perf.test.ts"
+  tests:
+    - name: "List 100 API keys"
+      setup: "Insert 100 API keys"
+      assertion: "list() < 500ms"
+
+    - name: "Authenticate with API key"
+      setup: "Create API key"
+      assertion: "authenticate() < 100ms"
+
+    - name: "Check rate limit (Redis)"
+      setup: "100 concurrent requests"
+      assertion: "checkRateLimit() < 50ms avg"
+
+acceptance_criteria_mapping:
+  AC-1:
+    tests:
+      - "e2e/integrations/api-keys.spec.ts: Create API Key"
+      - "app/api/integrations/api-keys/route.test.ts: POST creates key"
+
+  AC-2:
+    tests:
+      - "e2e/integrations/api-keys.spec.ts: Navigate to /integrations/api-keys"
+      - "app/api/integrations/api-keys/route.test.ts: GET returns masked keys"
+
+  AC-3:
+    tests:
+      - "lib/services/api-key-service.test.ts: create auto-adds read scopes"
+
+  AC-4:
+    tests:
+      - "__tests__/integration/api-authentication.test.ts: Rate limit exceeded"
+
+  AC-5:
+    tests:
+      - "e2e/integrations/api-keys.spec.ts: Edit API Key"
+
+  AC-6:
+    tests:
+      - "e2e/integrations/api-keys.spec.ts: Suspend/Activate"
+
+  AC-7:
+    tests:
+      - "e2e/integrations/api-keys.spec.ts: Revoke API Key"
+      - "lib/services/api-key-service.test.ts: revoke cannot reactivate"
+
+  AC-8:
+    tests:
+      - "e2e/integrations/api-keys.spec.ts: Regenerate API Key"
+
+  AC-9:
+    tests:
+      - "__tests__/integration/api-authentication.test.ts: Expired key returns 401"
+
+  AC-10:
+    tests:
+      - "lib/services/api-key-service.test.ts: authenticate updates last_used_at"
+
+  AC-11:
+    tests:
+      - "__tests__/integration/api-authentication.test.ts: Valid API key authenticates"
+
+  AC-12:
+    tests:
+      - "e2e/integrations/api-keys.spec.ts: Permissions"
+      - "__tests__/rls/integration-api-keys.test.ts: IT_MANAGER can view only"
+
+test_data:
+  organizations:
+    - id: "org-a-uuid"
+      name: "Org A"
+    - id: "org-b-uuid"
+      name: "Org B"
+
+  users:
+    - id: "admin-a-uuid"
+      org_id: "org-a-uuid"
+      role: "ADMIN"
+    - id: "it-mgr-a-uuid"
+      org_id: "org-a-uuid"
+      role: "IT_MANAGER"
+    - id: "user-a-uuid"
+      org_id: "org-a-uuid"
+      role: "USER"
+
+  integration_api_keys:
+    - id: "key-1-uuid"
+      org_id: "org-a-uuid"
+      name: "Mobile App Production"
+      key_prefix: "mp_live_abc123"
+      scopes: ["read:products", "write:orders"]
+      rate_limit_tier: "standard"
+      status: "active"
+      request_count: 1247
+
+    - id: "key-2-uuid"
+      org_id: "org-a-uuid"
+      name: "Legacy Integration"
+      key_prefix: "mp_live_xyz789"
+      scopes: ["read:products"]
+      rate_limit_tier: "basic"
+      status: "suspended"
+
+    - id: "key-3-uuid"
+      org_id: "org-b-uuid"
+      name: "Org B Key"
+      key_prefix: "mp_live_def456"
+      scopes: ["read:inventory"]
+      rate_limit_tier: "premium"
+      status: "active"
+
+coverage_requirements:
+  overall: ">80%"
+  service_layer: ">85%"
+  api_routes: ">80%"
+  critical_paths: "100%"

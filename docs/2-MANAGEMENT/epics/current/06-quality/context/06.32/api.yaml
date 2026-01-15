@@ -1,0 +1,11 @@
+# Story 06.32 - API Schema
+
+endpoints:
+  - GET /api/quality/capa/:capaId/actions
+  - POST /api/quality/capa/:capaId/actions
+  - PUT /api/quality/capa/actions/:id
+  - DELETE /api/quality/capa/actions/:id
+  - POST /api/quality/capa/actions/:id/complete
+  - GET /api/quality/capa/:capaId/progress
+
+service: "capa-action-service.ts"

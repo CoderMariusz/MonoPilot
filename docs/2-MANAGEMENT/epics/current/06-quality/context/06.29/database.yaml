@@ -1,0 +1,38 @@
+# Story 06.29 - CoA PDF Export Database Schema
+
+tables:
+  certificates_of_analysis:
+    add_columns:
+      - pdf_url: TEXT (CDN URL)
+      - pdf_generated_at: TIMESTAMPTZ
+      - pdf_generated_by: UUID (FK users)
+      - qr_code_url: TEXT (CDN URL for QR code image)
+      - verification_token: TEXT UNIQUE (UUID for /verify/{token})
+
+    add_indexes:
+      - idx_coas_verification_token: (verification_token) WHERE verification_token IS NOT NULL
+
+  coa_email_deliveries:
+    description: "Track email deliveries of CoAs to customers"
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID (FK organizations)
+      - coa_id: UUID (FK certificates_of_analysis ON DELETE CASCADE)
+      - recipient_email: TEXT NOT NULL
+      - recipient_name: TEXT
+      - sent_at: TIMESTAMPTZ DEFAULT now()
+      - sent_by: UUID (FK users)
+      - email_status: TEXT (sent/delivered/bounced/failed)
+      - delivery_confirmed_at: TIMESTAMPTZ
+      - bounce_reason: TEXT
+      - created_at: TIMESTAMPTZ
+
+    indexes:
+      - idx_coa_emails_coa: (coa_id)
+      - idx_coa_emails_org: (org_id)
+
+    rls: true
+    policies:
+      - ALL: org_id match
+
+migration_file: "YYYYMMDDHHMMSS_add_coa_pdf_fields.sql"

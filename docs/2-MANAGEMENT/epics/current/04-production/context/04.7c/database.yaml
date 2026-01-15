@@ -1,0 +1,200 @@
+# Story 04.7c - Database Schema
+# Purpose: Table updates for by-product registration
+# Agent: BACKEND-DEV (database focus)
+
+# Tables Modified
+tables_modified:
+  - name: "production_outputs"
+    description: "Output records - add by-product tracking fields"
+    existing_table: true
+    source: "Story 04.7a - Output Registration Desktop"
+    added_columns:
+      - name: "is_by_product"
+        type: "BOOLEAN"
+        constraints: "NOT NULL DEFAULT false"
+        description: "Flag indicating if output is a by-product"
+      - name: "parent_output_id"
+        type: "UUID"
+        constraints: "REFERENCES production_outputs(id)"
+        description: "Links by-product to main output that triggered it"
+      - name: "by_product_material_id"
+        type: "UUID"
+        constraints: "REFERENCES wo_materials(id)"
+        description: "Reference to BOM by-product definition"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_production_outputs_by_product ON production_outputs(wo_id, is_by_product)"
+      - "idx_production_outputs_parent ON production_outputs(parent_output_id)"
+
+  - name: "wo_materials"
+    description: "BOM snapshot - by-product definition"
+    existing_table: true
+    source: "Story 03.11a - WO BOM Snapshot"
+    used_columns:
+      - name: "is_by_product"
+        type: "BOOLEAN"
+        description: "True for by-product materials"
+      - name: "yield_percent"
+        type: "DECIMAL(10,4)"
+        description: "Expected yield percentage for by-products"
+    rls: true
+
+  - name: "license_plates"
+    description: "LP table - by-product LP creation"
+    existing_table: true
+    source: "Epic 05 - Warehouse Module"
+    insert_fields:
+      - name: "source"
+        value: "'production'"
+      - name: "is_by_product"
+        type: "BOOLEAN"
+        description: "Flag for by-product LPs"
+    rls: true
+
+  - name: "lp_genealogy"
+    description: "Genealogy records - shared parent linkage"
+    existing_table: true
+    source: "Epic 05 - Warehouse Module"
+    usage: "By-product LPs share same parent_lp_ids as main output"
+    rls: true
+
+# Migration SQL
+migration_sql: |
+  -- Add by-product fields to production_outputs
+  ALTER TABLE production_outputs
+    ADD COLUMN IF NOT EXISTS is_by_product BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS parent_output_id UUID REFERENCES production_outputs(id),
+    ADD COLUMN IF NOT EXISTS by_product_material_id UUID REFERENCES wo_materials(id);
+
+  -- Add is_by_product to license_plates if not exists
+  ALTER TABLE license_plates
+    ADD COLUMN IF NOT EXISTS is_by_product BOOLEAN NOT NULL DEFAULT false;
+
+  -- Index for by-product queries
+  CREATE INDEX IF NOT EXISTS idx_production_outputs_by_product
+    ON production_outputs(wo_id, is_by_product);
+
+  -- Index for parent output lookup
+  CREATE INDEX IF NOT EXISTS idx_production_outputs_parent
+    ON production_outputs(parent_output_id)
+    WHERE parent_output_id IS NOT NULL;
+
+  -- Index for by-product LPs
+  CREATE INDEX IF NOT EXISTS idx_license_plates_by_product
+    ON license_plates(wo_id, is_by_product)
+    WHERE is_by_product = true;
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "production_outputs"
+      name: "by_product_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND EXISTS (
+          SELECT 1 FROM users u
+          JOIN roles r ON r.id = u.role_id
+          WHERE u.id = auth.uid()
+          AND (r.name IN ('admin', 'production_manager', 'operator', 'owner'))
+        )
+      note: "Operators can register by-products"
+
+# Data Queries
+queries:
+  get_by_products_for_wo: |
+    SELECT
+      wm.id as material_id,
+      wm.product_id,
+      p.name as product_name,
+      p.code as product_code,
+      wm.yield_percent,
+      wo.planned_qty,
+      (wo.planned_qty * wm.yield_percent / 100) as expected_qty,
+      p.uom,
+      p.shelf_life_days,
+      p.default_location_id,
+      COALESCE(SUM(po.quantity), 0) as actual_qty,
+      COUNT(po.id) as lp_count,
+      MAX(po.created_at) as last_registered_at
+    FROM wo_materials wm
+    JOIN work_orders wo ON wo.id = wm.wo_id
+    JOIN products p ON p.id = wm.product_id
+    LEFT JOIN production_outputs po ON po.wo_id = wm.wo_id
+      AND po.is_by_product = true
+      AND po.by_product_material_id = wm.id
+    WHERE wm.wo_id = :wo_id
+    AND wm.is_by_product = true
+    AND wm.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    GROUP BY wm.id, wm.product_id, p.name, p.code, wm.yield_percent,
+             wo.planned_qty, p.uom, p.shelf_life_days, p.default_location_id
+
+  create_by_product_output: |
+    INSERT INTO production_outputs (
+      org_id,
+      wo_id,
+      lp_id,
+      product_id,
+      quantity,
+      uom,
+      batch_number,
+      is_by_product,
+      parent_output_id,
+      by_product_material_id,
+      created_by,
+      created_at
+    ) VALUES (
+      (SELECT org_id FROM users WHERE id = auth.uid()),
+      :wo_id,
+      :lp_id,
+      :product_id,
+      :quantity,
+      :uom,
+      :batch_number,
+      true,
+      :parent_output_id,
+      :by_product_material_id,
+      auth.uid(),
+      NOW()
+    )
+    RETURNING *
+
+  get_main_output_genealogy: |
+    SELECT
+      parent_lp_id,
+      qty_consumed,
+      consumption_id
+    FROM lp_genealogy
+    WHERE child_lp_id = :main_output_lp_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+  create_by_product_genealogy: |
+    INSERT INTO lp_genealogy (
+      org_id,
+      parent_lp_id,
+      child_lp_id,
+      qty_consumed,
+      consumption_id,
+      created_at
+    )
+    SELECT
+      org_id,
+      parent_lp_id,
+      :by_product_lp_id,
+      qty_consumed,
+      consumption_id,
+      NOW()
+    FROM lp_genealogy
+    WHERE child_lp_id = :main_output_lp_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    RETURNING *
+
+# Batch Number Generation
+batch_generation:
+  format: "{main_batch}-BP-{product_code}"
+  example: "B-2025-0156-BP-BRAN"
+  max_length: 50

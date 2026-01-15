@@ -1,0 +1,45 @@
+pages:
+  - path: "/finance/costs/standard"
+    component: "StandardCostsListPage"
+    features:
+      - "DataTable with filters (status, product)"
+      - "Create New button"
+      - "Status badges (draft, approved, active)"
+
+  - path: "/finance/costs/standard/new"
+    component: "StandardCostFormPage"
+    form_fields:
+      - "Product selector"
+      - "Effective From date"
+      - "Material Cost (auto-calc total)"
+      - "Labor Cost"
+      - "Overhead Cost"
+      - "Total Cost (read-only, calculated)"
+      - "Currency selector"
+      - "Notes"
+    actions:
+      - "Save Draft"
+      - "Save & Approve (if Finance Manager)"
+
+  - path: "/finance/costs/standard/:id"
+    component: "StandardCostDetailPage"
+    sections:
+      - "Cost breakdown"
+      - "Status and approval info"
+      - "History (versions)"
+    actions:
+      - "Approve (if draft)"
+      - "Activate (if approved)"
+      - "Create New Version"
+
+components:
+  - "StandardCostForm.tsx - form with validation"
+  - "StandardCostStatusBadge.tsx - status badge"
+  - "StandardCostHistoryTable.tsx - history view"
+  - "CurrencySelector.tsx - currency dropdown"
+
+ux:
+  wireframes:
+    - id: "FIN-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/FIN-002-standard-cost-definition.md"
+      relevance: "Complete standard cost definition UI including list, form, and detail pages with approval workflow"

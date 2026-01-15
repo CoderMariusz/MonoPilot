@@ -1,0 +1,108 @@
+# Story 10.5 - Frontend Specification
+# Real-Time Machine Dashboard
+
+types:
+  - path: "apps/frontend/lib/types/oee-dashboard.ts"
+    exports: ["MachineRealtimeData", "DashboardData", "MachineStatus", "AlertLevel", "DashboardSummary"]
+
+components:
+  - path: "apps/frontend/components/oee/dashboard/OEEDashboard.tsx"
+    description: "Main OEE dashboard page component"
+    layout: "3-column grid: KPI cards (top) + Machine status grid (main) + Active alerts (sidebar)"
+
+  - path: "apps/frontend/components/oee/dashboard/DashboardKPICards.tsx"
+    description: "4 KPI cards: OEE Today, Availability, Performance, Quality"
+    features:
+      - "Current value with trend indicator (▲/▼ vs yesterday)"
+      - "Target comparison"
+      - "Color coding (green/yellow/red)"
+
+  - path: "apps/frontend/components/oee/dashboard/MachineStatusGrid.tsx"
+    description: "Grid of machine cards showing real-time status"
+    card_content:
+      - "Machine name + status badge (running/down/idle)"
+      - "OEE gauge"
+      - "Active WO number + progress"
+      - "Downtime duration (if down)"
+      - "Quick actions: [View] [Log Downtime]"
+    features:
+      - "Auto-refresh every 30s"
+      - "Filter by line"
+      - "Sort by OEE, status, downtime duration"
+
+  - path: "apps/frontend/components/oee/dashboard/MachineStatusCard.tsx"
+    description: "Individual machine status card"
+    props:
+      - { name: "data", type: "MachineRealtimeData", required: true }
+      - { name: "onViewClick", type: "() => void" }
+      - { name: "onLogDowntime", type: "() => void" }
+    states:
+      - { status: "running", color: "green", icon: "Play" }
+      - { status: "down", color: "red", icon: "AlertCircle" }
+      - { status: "idle", color: "gray", icon: "Pause" }
+
+  - path: "apps/frontend/components/oee/dashboard/ActiveAlertsPanel.tsx"
+    description: "Sidebar showing active alerts"
+    alert_types:
+      - { type: "critical", color: "red", condition: "OEE < critical_threshold" }
+      - { type: "warning", color: "yellow", condition: "OEE < warning_threshold" }
+      - { type: "downtime", color: "orange", condition: "Machine down > 15min" }
+    features:
+      - "Auto-refresh every 15s"
+      - "Quick acknowledge button"
+      - "Link to machine detail"
+
+  - path: "apps/frontend/components/oee/dashboard/OEETrendChart.tsx"
+    description: "Line chart showing OEE trend (last 7 days)"
+    library: "Recharts"
+    chartType: "Line chart with multiple series (OEE, Availability, Performance, Quality)"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/dashboard/page.tsx"
+    route: "/oee/dashboard"
+    title: "OEE Dashboard"
+    description: "Real-time OEE monitoring dashboard"
+    components: ["OEEDashboard", "DashboardKPICards", "MachineStatusGrid", "ActiveAlertsPanel", "OEETrendChart"]
+    permissions: ["*"]
+
+hooks:
+  - name: "useOEEDashboard"
+    type: "query"
+    params: ["lineId?: string"]
+    queryKey: "['oee-dashboard', lineId]"
+    refetchInterval: 30000
+
+  - name: "useMachineRealtime"
+    type: "query"
+    params: ["machineId: string"]
+    queryKey: "['machine-realtime', machineId]"
+    refetchInterval: 30000
+
+  - name: "useActiveAlerts"
+    type: "query"
+    queryKey: "['oee-alerts', 'active']"
+    refetchInterval: 15000
+
+ux:
+  wireframes:
+    - id: "OEE-DASHBOARD-001"
+      title: "OEE Dashboard Main View"
+      components: ["KPI Cards", "Machine Status Grid", "Active Alerts Panel", "Trend Chart"]
+      path: "docs/3-ARCHITECTURE/ux/wireframes/OEE-DASHBOARD-001.md"
+
+  patterns:
+    grid: "Responsive grid (3-4 cols desktop, 2 cols tablet, 1 col mobile)"
+    card: "ShadCN Card with status indicator"
+    chart: "Recharts line chart"
+    refresh: "Polling every 30s (auto-refresh)"
+
+  states:
+    - all_machines_running: "All green cards, no alerts"
+    - machine_down: "Red card, alert in sidebar"
+    - low_performance: "Yellow card, warning indicator"
+    - no_data: "Empty state: 'No OEE data yet. Enable OEE tracking in settings.'"
+
+  accessibility:
+    - "Status indicated by color + icon + text"
+    - "ARIA live regions for auto-updating data"
+    - "Keyboard navigation for machine cards"

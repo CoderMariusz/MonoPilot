@@ -1,0 +1,39 @@
+# Story 10.15 - Test Specification
+# Purpose: Production rate tests
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "operation produced 250 units in 1 hour"
+    when: "calculating rate"
+    then: "production_rate = 250 units/hour"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "target rate = 300 units/hour, actual = 250"
+    when: "comparing to target"
+    then: "variance = -16.7%, efficiency = 83.3%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "rate trend for 8 hours"
+    when: "viewing rate chart"
+    then: "line chart with actual and target lines, below-target highlighted"
+    test_type: "e2e"
+    priority: "P0"
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/production-rate-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/performance/rate/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-production-rate.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "Rate calculation service works correctly"
+  - "API returns rate vs target comparison"
+  - "Trend chart displays accurately"
+  - "Below-target periods flagged"

@@ -1,0 +1,284 @@
+# Story 11.2 - Frontend Context
+# Pages, components, hooks for API Keys Management
+
+pages:
+  - path: "/integrations/api-keys"
+    file: "apps/frontend/app/(authenticated)/integrations/api-keys/page.tsx"
+    description: "API keys list page"
+    layout: "IntegrationsLayout (with sidebar nav)"
+    access: "ADMIN, IT_MANAGER"
+    features:
+      - "API keys table (masked values)"
+      - "Create key button (admin only)"
+      - "Filter by status"
+      - "Search by name"
+    performance:
+      - "Initial render: < 2s"
+
+  - path: "/integrations/api-keys/:id"
+    file: "apps/frontend/app/(authenticated)/integrations/api-keys/[id]/page.tsx"
+    description: "API key detail/edit page"
+    access: "ADMIN, IT_MANAGER"
+    features:
+      - "Key metadata display"
+      - "Usage statistics"
+      - "Edit button (admin only)"
+      - "Regenerate button (admin only)"
+      - "Suspend/Activate toggle (admin only)"
+      - "Revoke button (admin only)"
+
+components:
+  - name: "ApiKeysTable"
+    file: "components/integrations/api-keys/ApiKeysTable.tsx"
+    type: "table"
+    description: "DataTable for API keys with actions"
+    props:
+      - apiKeys: "ApiKey[]"
+      - loading: "boolean"
+      - onEdit: "(id: string) => void"
+      - onRegenerate: "(id: string) => void"
+      - onSuspend: "(id: string) => void"
+      - onRevoke: "(id: string) => void"
+    columns:
+      - "Name"
+      - "Key (masked)"
+      - "Scopes (count)"
+      - "Rate Limit"
+      - "Status (badge)"
+      - "Last Used"
+      - "Created"
+      - "Actions"
+    features:
+      - "Sortable columns"
+      - "Status filter"
+      - "Pagination"
+      - "Row actions menu"
+
+  - name: "CreateApiKeyModal"
+    file: "components/integrations/api-keys/CreateApiKeyModal.tsx"
+    type: "modal"
+    description: "Create new API key form"
+    props:
+      - open: "boolean"
+      - onClose: "() => void"
+      - onSuccess: "(key: CreateApiKeyResponse) => void"
+    form_fields:
+      - name: "text input"
+      - scopes: "ScopeSelector component"
+      - rate_limit_tier: "RateLimitTierSelector component"
+      - expires_at: "date picker (optional)"
+    features:
+      - "Shows generated key ONCE"
+      - "Copy to clipboard button"
+      - "Warning: key won't be shown again"
+      - "Form validation"
+    states:
+      - initial: "Form entry"
+      - created: "Show key + copy button"
+
+  - name: "EditApiKeyModal"
+    file: "components/integrations/api-keys/EditApiKeyModal.tsx"
+    type: "modal"
+    description: "Edit API key metadata (not key value)"
+    props:
+      - open: "boolean"
+      - apiKey: "ApiKey"
+      - onClose: "() => void"
+      - onSuccess: "() => void"
+    form_fields:
+      - name: "text input"
+      - scopes: "ScopeSelector"
+      - rate_limit_tier: "RateLimitTierSelector"
+      - expires_at: "date picker"
+    note: "Cannot edit key_value (use regenerate instead)"
+
+  - name: "ScopeSelector"
+    file: "components/integrations/api-keys/ScopeSelector.tsx"
+    type: "presentational"
+    description: "Grouped scope checkboxes"
+    props:
+      - selectedScopes: "string[]"
+      - onChange: "(scopes: string[]) => void"
+      - disabled: "boolean"
+    groups:
+      - "Products: read:products, write:products"
+      - "Orders: read:orders, write:orders"
+      - "Inventory: read:inventory, write:inventory"
+      - "Production: read:production, write:production"
+      - "Shipping: read:shipping"
+      - "Webhooks: webhook:manage"
+    features:
+      - "Auto-select read when write selected"
+      - "Validation: at least one scope required"
+      - "Grouped layout"
+
+  - name: "RateLimitTierSelector"
+    file: "components/integrations/api-keys/RateLimitTierSelector.tsx"
+    type: "presentational"
+    description: "Rate limit tier dropdown with info"
+    props:
+      - value: "string"
+      - onChange: "(tier: string) => void"
+      - disabled: "boolean"
+    options:
+      - tier: "basic"
+        label: "Basic - 60/min, 1K/hour"
+      - tier: "standard"
+        label: "Standard - 300/min, 10K/hour"
+      - tier: "premium"
+        label: "Premium - 1K/min, 50K/hour"
+    features:
+      - "Info tooltip per tier"
+      - "Default: basic"
+
+  - name: "RegenerateKeyDialog"
+    file: "components/integrations/api-keys/RegenerateKeyDialog.tsx"
+    type: "dialog"
+    description: "Confirm regeneration + show new key"
+    props:
+      - open: "boolean"
+      - apiKeyId: "string"
+      - onClose: "() => void"
+      - onSuccess: "(newKey: string) => void"
+    steps:
+      - "Confirm action (warning about breaking integrations)"
+      - "Show new key ONCE with copy button"
+    features:
+      - "Copy to clipboard"
+      - "Warning message"
+      - "Disable close until key copied/saved"
+
+  - name: "RevokeKeyDialog"
+    file: "components/integrations/api-keys/RevokeKeyDialog.tsx"
+    type: "dialog"
+    description: "Confirm revocation with reason"
+    props:
+      - open: "boolean"
+      - apiKey: "ApiKey"
+      - onClose: "() => void"
+      - onSuccess: "() => void"
+    form_fields:
+      - reason: "text area (optional)"
+    features:
+      - "Warning: revocation is permanent"
+      - "Reason input (optional)"
+      - "Confirm button"
+
+  - name: "ApiKeyUsageStats"
+    file: "components/integrations/api-keys/ApiKeyUsageStats.tsx"
+    type: "presentational"
+    description: "Usage statistics widget"
+    props:
+      - apiKey: "ApiKey"
+    stats:
+      - "Total Requests"
+      - "Last Used (relative time)"
+      - "Avg Requests/Day"
+      - "Created (relative time)"
+    features:
+      - "Card layout"
+      - "Icons per stat"
+
+  - name: "ApiKeyStatusBadge"
+    file: "components/integrations/api-keys/ApiKeyStatusBadge.tsx"
+    type: "presentational"
+    description: "Status badge component"
+    props:
+      - status: "string (active | suspended | revoked)"
+      - size: "sm | md | lg"
+    variants:
+      - active: "Green bg, 'Active' text"
+      - suspended: "Yellow bg, 'Suspended' text"
+      - revoked: "Gray bg, 'Revoked' text"
+
+hooks:
+  - name: "useApiKeys"
+    file: "lib/hooks/use-api-keys.ts"
+    description: "Fetch and manage API keys list"
+    parameters:
+      - statusFilter: "string | undefined"
+    returns:
+      - apiKeys: "ApiKey[]"
+      - loading: "boolean"
+      - error: "string | null"
+      - refresh: "() => Promise<void>"
+    logic:
+      - "Fetch /api/integrations/api-keys"
+      - "Apply status filter"
+      - "Handle errors"
+
+  - name: "useApiKey"
+    file: "lib/hooks/use-api-key.ts"
+    description: "Fetch single API key by ID"
+    parameters:
+      - id: "string"
+    returns:
+      - apiKey: "ApiKey | null"
+      - loading: "boolean"
+      - error: "string | null"
+
+  - name: "useApiKeyActions"
+    file: "lib/hooks/use-api-key-actions.ts"
+    description: "API key CRUD actions"
+    returns:
+      - createApiKey: "(data) => Promise<CreateApiKeyResponse>"
+      - updateApiKey: "(id, data) => Promise<void>"
+      - regenerateApiKey: "(id) => Promise<{key_value}>"
+      - suspendApiKey: "(id) => Promise<void>"
+      - activateApiKey: "(id) => Promise<void>"
+      - revokeApiKey: "(id, reason?) => Promise<void>"
+
+services:
+  - name: "apiKeyService"
+    file: "lib/services/api-key-service.ts"
+    description: "API key data fetching service"
+    methods:
+      - getApiKeys(statusFilter?): Promise<ApiKey[]>
+      - getApiKey(id): Promise<ApiKey>
+      - createApiKey(data): Promise<CreateApiKeyResponse>
+      - updateApiKey(id, data): Promise<ApiKey>
+      - regenerateApiKey(id): Promise<{key_value, key_prefix}>
+      - suspendApiKey(id): Promise<void>
+      - activateApiKey(id): Promise<void>
+      - revokeApiKey(id, reason?): Promise<void>
+
+state_management:
+  approach: "React Query (TanStack Query)"
+  queries:
+    - key: "['api-keys', statusFilter]"
+      staleTime: "5 minutes"
+      refetchOnMount: true
+  mutations:
+    - createApiKey: "invalidates ['api-keys']"
+    - updateApiKey: "invalidates ['api-keys', id]"
+    - regenerateApiKey: "invalidates ['api-keys', id]"
+    - suspendApiKey: "invalidates ['api-keys', id]"
+    - revokeApiKey: "invalidates ['api-keys', id]"
+
+ui_patterns:
+  table:
+    pattern: "ShadCN DataTable component"
+    sorting: "Client-side"
+    pagination: "Client-side (if <100 items)"
+
+  modals:
+    pattern: "ShadCN Dialog component"
+    size: "md (500px width)"
+    close_on_overlay: false
+
+  forms:
+    pattern: "React Hook Form + Zod validation"
+    validation: "Client + server-side"
+
+accessibility:
+  - "ARIA labels on all interactive elements"
+  - "Keyboard navigation (Tab, Enter, Escape)"
+  - "Focus indicators visible"
+  - "Status badges have aria-label"
+  - "Copy button announces success to screen readers"
+
+performance:
+  - "Lazy load modals (React.lazy)"
+  - "Debounce search input (300ms)"
+  - "Optimize re-renders with React.memo"
+  - "Use React Query caching"

@@ -1,0 +1,67 @@
+# Story 10.17 - Bottleneck Analysis Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 3 (Advanced Analytics)
+
+story:
+  id: "10.17"
+  name: "Bottleneck Analysis"
+  slug: "bottleneck-analysis"
+  epic: "10-oee"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      provides: ["cycle time data", "production metrics"]
+    - story: "02.x"
+      name: "BOM/Routing"
+      provides: ["operation sequence", "cycle times"]
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-024 - Bottleneck Analysis"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.17.bottleneck-analysis.md"
+
+deliverables:
+  - type: "service"
+    count: 1
+    description: "Bottleneck analysis algorithm"
+  - type: "api"
+    count: 2
+    description: "GET /api/oee/analytics/bottlenecks"
+  - type: "components"
+    count: 3
+    description: "Line balance diagram, bottleneck visualization, capacity calculator"
+
+technical_notes:
+  - "Bottleneck = operation with longest cycle time or lowest capacity"
+  - "Line balance analysis: compare cycle times across operations"
+  - "Capacity utilization calculation per operation"
+  - "Bottleneck impact: potential throughput improvement if resolved"
+  - "Theory of Constraints (TOC) approach"
+
+summary: |
+  Story 10.17 implements production line bottleneck analysis.
+
+  MVP SCOPE:
+  - Bottleneck identification algorithm
+  - Line balance analysis
+  - Capacity utilization by operation
+  - Bottleneck visualization (line diagram)
+  - Impact calculation (potential throughput gain)
+  - Bottleneck analysis page

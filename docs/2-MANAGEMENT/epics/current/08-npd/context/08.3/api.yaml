@@ -1,0 +1,461 @@
+# API Context - Story 08.3: Stage-Gate Workflow
+
+endpoints:
+  - method: "POST"
+    path: "/api/npd/projects/:id/advance-gate"
+    file: "apps/frontend/app/api/npd/projects/[id]/advance-gate/route.ts"
+    description: "Advance project to next gate"
+    auth_required: true
+    roles: ["NPD_LEAD", "DIRECTOR", "ADMIN"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "NPD project ID"
+          required: true
+
+      body:
+        notes:
+          type: "string"
+          description: "Transition notes"
+          required: false
+          min_length: 0
+
+        approval_notes:
+          type: "string"
+          description: "Approval justification (required for G3+)"
+          required: "conditional (G3+)"
+          min_length: 50
+
+    response:
+      success: "200 OK"
+      body:
+        project:
+          type: "NPDProject"
+          description: "Updated project with new gate"
+        transition:
+          from_gate: "string"
+          to_gate: "string"
+          transitioned_at: "string (ISO 8601)"
+          requires_approval: "boolean"
+          approved_by: "string (UUID) | null"
+
+    errors:
+      - code: "400"
+        message: "Cannot advance: X required checklist items incomplete"
+        condition: "Required checklist items not complete"
+
+      - code: "400"
+        message: "Cannot skip gates: must advance sequentially"
+        condition: "Attempting to skip gate"
+
+      - code: "400"
+        message: "Approval notes required for G3+ gates (minimum 50 characters)"
+        condition: "G3+ advance without approval notes"
+
+      - code: "403"
+        message: "G3+ requires Director approval"
+        condition: "Non-Director attempting G3+ advance"
+
+      - code: "404"
+        message: "Project not found"
+        condition: "Invalid project ID or cross-org access"
+
+    validation:
+      - "Project exists and belongs to user's org"
+      - "User has required role for gate approval"
+      - "All required checklist items complete"
+      - "Sequential gate transition (no skipping)"
+      - "Approval notes length >= 50 chars for G3+"
+
+    logic:
+      - "Get project and current gate"
+      - "Calculate next gate"
+      - "Validate transition (checklist, permissions)"
+      - "Calculate checklist completion %"
+      - "Update npd_projects (current_gate, gate_entered_at, approved_by, approved_at)"
+      - "Insert npd_gate_transitions record"
+      - "Return updated project + transition metadata"
+
+  - method: "POST"
+    path: "/api/npd/projects/:id/move-back"
+    file: "apps/frontend/app/api/npd/projects/[id]/move-back/route.ts"
+    description: "Move project back to previous gate"
+    auth_required: true
+    roles: ["DIRECTOR", "ADMIN"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "NPD project ID"
+          required: true
+
+      body:
+        target_gate:
+          type: "string"
+          description: "Target gate to move back to"
+          required: true
+          enum: ["G0", "G1", "G2", "G3", "G4"]
+
+        justification:
+          type: "string"
+          description: "Reason for moving back"
+          required: true
+          min_length: 50
+
+    response:
+      success: "200 OK"
+      body:
+        project:
+          type: "NPDProject"
+          description: "Updated project with target gate"
+        transition:
+          from_gate: "string"
+          to_gate: "string"
+          transitioned_at: "string (ISO 8601)"
+          justification: "string"
+
+    errors:
+      - code: "400"
+        message: "Move back reason required (minimum 50 characters)"
+        condition: "Justification too short"
+
+      - code: "400"
+        message: "Invalid target gate"
+        condition: "Target gate not valid previous gate"
+
+      - code: "403"
+        message: "Only Director can move back from G3+"
+        condition: "Non-Director attempting G3+ move back"
+
+      - code: "404"
+        message: "Project not found"
+        condition: "Invalid project ID or cross-org access"
+
+    validation:
+      - "Project exists and belongs to user's org"
+      - "User is Director or Admin"
+      - "Target gate is valid previous gate"
+      - "Justification >= 50 chars"
+
+    logic:
+      - "Get project and current gate"
+      - "Validate target gate is previous in sequence"
+      - "Update npd_projects (current_gate, gate_entered_at, move_back_count++, last_moved_back_at, last_moved_back_by, move_back_reason)"
+      - "Insert npd_gate_transitions record (type: 'move_back')"
+      - "Return updated project + transition metadata"
+
+  - method: "GET"
+    path: "/api/npd/projects/:id/checklist"
+    file: "apps/frontend/app/api/npd/projects/[id]/checklist/route.ts"
+    description: "Get checklist for project's current gate"
+    auth_required: true
+    roles: ["NPD_LEAD", "R&D", "DIRECTOR", "ADMIN"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "NPD project ID"
+          required: true
+
+    response:
+      success: "200 OK"
+      body:
+        project_id: "string (UUID)"
+        current_gate: "string"
+        items:
+          type: "ChecklistItem[]"
+          description: "Array of checklist items with completion status"
+        summary:
+          total_items: "number"
+          required_items: "number"
+          completed_items: "number"
+          required_completed: "number"
+          completion_pct: "number"
+          required_completion_pct: "number"
+          can_advance: "boolean"
+          blocking_items: "string[]"
+
+    errors:
+      - code: "404"
+        message: "Project not found"
+        condition: "Invalid project ID or cross-org access"
+
+    logic:
+      - "Get project current gate"
+      - "Query npd_gate_checklists for gate items"
+      - "Left join npd_project_checklist_completion"
+      - "Calculate completion percentages"
+      - "Identify blocking items (required + incomplete)"
+      - "Return items + summary"
+
+  - method: "POST"
+    path: "/api/npd/projects/:id/checklist/:itemId/complete"
+    file: "apps/frontend/app/api/npd/projects/[id]/checklist/[itemId]/complete/route.ts"
+    description: "Mark checklist item complete"
+    auth_required: true
+    roles: ["NPD_LEAD", "R&D", "ADMIN"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "NPD project ID"
+          required: true
+
+        itemId:
+          type: "string (UUID)"
+          description: "Checklist item ID"
+          required: true
+
+      body:
+        notes:
+          type: "string"
+          description: "Completion notes"
+          required: false
+
+        attachment_url:
+          type: "string"
+          description: "Supabase Storage path for supporting document"
+          required: false
+
+    response:
+      success: "200 OK"
+      body:
+        item:
+          type: "ChecklistItem"
+          description: "Updated checklist item"
+        completion:
+          completed_by: "string (UUID)"
+          completed_at: "string (ISO 8601)"
+
+    errors:
+      - code: "404"
+        message: "Project or checklist item not found"
+        condition: "Invalid IDs or cross-org access"
+
+      - code: "409"
+        message: "Checklist item already completed"
+        condition: "Item already marked complete"
+
+    logic:
+      - "Validate project and checklist item exist"
+      - "Upsert npd_project_checklist_completion"
+      - "Set is_completed = true, completed_by, completed_at"
+      - "Store notes and attachment_url"
+      - "Return updated item with completion metadata"
+
+  - method: "POST"
+    path: "/api/npd/projects/:id/checklist/:itemId/uncomplete"
+    file: "apps/frontend/app/api/npd/projects/[id]/checklist/[itemId]/uncomplete/route.ts"
+    description: "Mark checklist item incomplete (allow re-work)"
+    auth_required: true
+    roles: ["NPD_LEAD", "ADMIN"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "NPD project ID"
+          required: true
+
+        itemId:
+          type: "string (UUID)"
+          description: "Checklist item ID"
+          required: true
+
+    response:
+      success: "200 OK"
+      body:
+        item:
+          type: "ChecklistItem"
+          description: "Updated checklist item"
+        is_completed: false
+
+    errors:
+      - code: "404"
+        message: "Project or checklist item not found"
+        condition: "Invalid IDs or cross-org access"
+
+    logic:
+      - "Validate project and checklist item exist"
+      - "Update npd_project_checklist_completion"
+      - "Set is_completed = false"
+      - "Clear completed_by, completed_at (optional: keep history)"
+      - "Return updated item"
+
+  - method: "GET"
+    path: "/api/npd/projects/:id/gate-history"
+    file: "apps/frontend/app/api/npd/projects/[id]/gate-history/route.ts"
+    description: "Get gate transition history for project"
+    auth_required: true
+    roles: ["NPD_LEAD", "R&D", "DIRECTOR", "ADMIN"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "NPD project ID"
+          required: true
+
+    response:
+      success: "200 OK"
+      body:
+        project_id: "string (UUID)"
+        project_number: "string"
+        current_gate: "string"
+        gate_entered_at: "string (ISO 8601)"
+        history:
+          type: "GateTransitionEntry[]"
+          description: "Array of gate transitions ordered by transitioned_at DESC"
+
+    errors:
+      - code: "404"
+        message: "Project not found"
+        condition: "Invalid project ID or cross-org access"
+
+    logic:
+      - "Get project metadata"
+      - "Query npd_gate_transitions for project"
+      - "Join users table for transitioned_by_name and approved_by_name"
+      - "Calculate days_in_previous_gate"
+      - "Order by transitioned_at DESC"
+      - "Return history array"
+
+  - method: "GET"
+    path: "/api/npd/projects/:id/validate-advance"
+    file: "apps/frontend/app/api/npd/projects/[id]/validate-advance/route.ts"
+    description: "Validate if project can advance to next gate (read-only check)"
+    auth_required: true
+    roles: ["NPD_LEAD", "DIRECTOR", "ADMIN"]
+
+    request:
+      params:
+        id:
+          type: "string (UUID)"
+          description: "NPD project ID"
+          required: true
+
+    response:
+      success: "200 OK"
+      body:
+        can_advance: "boolean"
+        next_gate: "string"
+        requires_approval: "boolean"
+        required_roles: "string[]"
+        blocking_reasons: "string[]"
+        checklist_summary:
+          required_completed: "number"
+          required_total: "number"
+          blocking_items: "string[]"
+
+    errors:
+      - code: "404"
+        message: "Project not found"
+        condition: "Invalid project ID or cross-org access"
+
+    logic:
+      - "Get project current gate"
+      - "Calculate next gate"
+      - "Check checklist completion"
+      - "Check user permissions"
+      - "Return validation result without modifying data"
+
+shared_types:
+  NPDProject:
+    id: "UUID"
+    org_id: "UUID"
+    project_number: "string"
+    project_name: "string"
+    current_gate: "string"
+    status: "string"
+    gate_entered_at: "string (ISO 8601)"
+    approved_by: "UUID | null"
+    approved_at: "string (ISO 8601) | null"
+    move_back_count: "number"
+    owner_id: "UUID"
+    target_launch_date: "string (ISO 8601) | null"
+    created_at: "string (ISO 8601)"
+    updated_at: "string (ISO 8601)"
+
+  ChecklistItem:
+    id: "UUID"
+    item_description: "string"
+    is_required: "boolean"
+    category: "string"
+    sequence: "number"
+    is_completed: "boolean"
+    completed_by: "UUID | null"
+    completed_by_name: "string | null"
+    completed_at: "string (ISO 8601) | null"
+    completion_notes: "string | null"
+    attachment_url: "string | null"
+
+  GateTransitionEntry:
+    id: "UUID"
+    from_gate: "string"
+    to_gate: "string"
+    transition_type: "advance | move_back | cancel"
+    transitioned_by: "UUID"
+    transitioned_by_name: "string"
+    transitioned_at: "string (ISO 8601)"
+    transition_notes: "string | null"
+    requires_approval: "boolean"
+    approved_by: "UUID | null"
+    approved_by_name: "string | null"
+    approved_at: "string (ISO 8601) | null"
+    approval_notes: "string | null"
+    checklist_completion_pct: "number"
+    blocking_items: "number"
+    days_in_previous_gate: "number | null"
+
+error_handling:
+  validation_errors:
+    - "Return 400 Bad Request with descriptive error message"
+    - "Include field-specific errors in response body"
+    - "Log validation failures for debugging"
+
+  authorization_errors:
+    - "Return 403 Forbidden for role violations"
+    - "Return 404 Not Found for cross-org access attempts (security)"
+    - "Log unauthorized access attempts"
+
+  database_errors:
+    - "Catch unique constraint violations (409 Conflict)"
+    - "Catch foreign key violations (400 Bad Request)"
+    - "Return 500 Internal Server Error for unexpected DB errors"
+    - "Log all database errors with context"
+
+rate_limiting:
+  - "Apply standard rate limits per endpoint"
+  - "POST endpoints: 60 requests/minute per user"
+  - "GET endpoints: 300 requests/minute per user"
+
+testing:
+  unit_tests:
+    - "Test advance-gate validation logic"
+    - "Test move-back permission checks"
+    - "Test checklist completion calculation"
+    - "Test gate history ordering"
+
+  integration_tests:
+    - "Test POST /advance-gate with valid checklist"
+    - "Test POST /advance-gate with incomplete checklist (400)"
+    - "Test POST /advance-gate with non-Director for G3+ (403)"
+    - "Test POST /move-back with justification"
+    - "Test POST /move-back without justification (400)"
+    - "Test GET /checklist returns completion summary"
+    - "Test POST /complete marks item complete"
+    - "Test POST /uncomplete allows re-work"
+    - "Test GET /gate-history returns ordered transitions"
+    - "Test GET /validate-advance returns blocking reasons"
+    - "Test cross-org isolation (404)"
+
+  e2e_tests:
+    - "Complete gate workflow (G0 -> Launched)"
+    - "Move back workflow (G3 -> G2)"
+    - "Checklist blocking prevents advance"
+    - "Director approval for G3+"

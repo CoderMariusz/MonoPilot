@@ -1,0 +1,196 @@
+# Frontend Context: 08.18 - Access Control & Audit Trail
+# Audit trail table, filters, entry modal
+
+pages:
+  - path: "/npd/audit-trail"
+    name: "NPDAuditTrailPage"
+    description: "Audit trail page for Admin/Quality Director"
+    access: ["ADMIN", "QUALITY_DIRECTOR"]
+    components:
+      - "AuditTrailTable"
+      - "AuditTrailFilters"
+      - "AuditLogEntryModal (shown on row click)"
+
+components:
+  - name: "AuditTrailTable"
+    path: "components/npd/audit/AuditTrailTable.tsx"
+    type: "table"
+    description: "Audit trail table with pagination"
+    props:
+      - name: "auditLogs"
+        type: "AuditLogEntry[]"
+        required: true
+      - name: "pagination"
+        type: "PaginationInfo"
+        required: true
+      - name: "onPageChange"
+        type: "(page: number) => void"
+        required: true
+      - name: "onRowClick"
+        type: "(entry: AuditLogEntry) => void"
+        required: true
+    columns:
+      - name: "Timestamp"
+        field: "created_at"
+        format: "YYYY-MM-DD HH:mm:ss"
+        width: "180px"
+      - name: "User"
+        field: "user.name"
+        format: "link to /settings/users/:id"
+        width: "150px"
+      - name: "Action"
+        field: "action"
+        format: "badge (INSERT=green, UPDATE=blue, DELETE=red)"
+        width: "100px"
+      - name: "Entity Type"
+        field: "entity_type"
+        format: "friendly name (npd_formulations → 'Formulation')"
+        width: "120px"
+      - name: "Entity"
+        field: "entity_name"
+        format: "truncate if > 30 chars"
+        width: "200px"
+      - name: "Changed Fields"
+        field: "changed_fields"
+        format: "comma-separated (or '-' if INSERT/DELETE)"
+        width: "200px"
+    sorting:
+      - "Default: created_at DESC (newest first)"
+    actions:
+      - "Click row opens AuditLogEntryModal with full old/new values"
+
+  - name: "AuditTrailFilters"
+    path: "components/npd/audit/AuditTrailFilters.tsx"
+    type: "form"
+    description: "Filter controls for audit trail"
+    props:
+      - name: "filters"
+        type: "AuditTrailFilters"
+        required: true
+      - name: "onChange"
+        type: "(filters: AuditTrailFilters) => void"
+        required: true
+    fields:
+      - name: "project"
+        type: "select"
+        label: "Project"
+        options: "Dynamic from npd_projects"
+        clearable: true
+      - name: "user"
+        type: "select"
+        label: "User"
+        options: "Dynamic from users"
+        clearable: true
+      - name: "entity_type"
+        type: "select"
+        label: "Entity Type"
+        options: ["All", "Projects", "Formulations", "Costing", "Compliance Docs", "Gate Checklists"]
+        clearable: true
+      - name: "action"
+        type: "select"
+        label: "Action"
+        options: ["All", "INSERT", "UPDATE", "DELETE"]
+        clearable: true
+      - name: "date_range"
+        type: "date-range-picker"
+        label: "Date Range"
+        format: "YYYY-MM-DD"
+        clearable: true
+    ui:
+      - "Filter chips shown above table"
+      - "[Clear All Filters] button"
+      - "Filters collapse into dropdown on mobile"
+
+  - name: "AuditLogEntryModal"
+    path: "components/npd/audit/AuditLogEntryModal.tsx"
+    type: "modal"
+    description: "Modal to view full audit log entry with old/new values"
+    props:
+      - name: "isOpen"
+        type: "boolean"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+      - name: "entry"
+        type: "AuditLogEntry"
+        required: true
+    content:
+      - section: "Event Details"
+        fields:
+          - "User: {user.name} ({user.email})"
+          - "Action: {action}"
+          - "Entity: {entity_type} #{entity_id} ({entity_name})"
+          - "Timestamp: {created_at}"
+      - section: "Changed Fields"
+        display: "Only for UPDATE actions"
+        format: "List of changed field names"
+      - section: "Old Values"
+        display: "For UPDATE/DELETE actions"
+        format: "JSON viewer (syntax highlighted)"
+      - section: "New Values"
+        display: "For INSERT/UPDATE actions"
+        format: "JSON viewer (syntax highlighted)"
+    ui:
+      - "Syntax-highlighted JSON (use react-json-view or similar)"
+      - "Diff view for UPDATE (show old → new side-by-side)"
+      - "Copy to clipboard button for JSON"
+
+  - name: "AuditLogEntryRow"
+    path: "components/npd/audit/AuditLogEntryRow.tsx"
+    type: "presentational"
+    description: "Table row component"
+    props:
+      - name: "entry"
+        type: "AuditLogEntry"
+        required: true
+      - name: "onClick"
+        type: "() => void"
+        required: true
+    styling:
+      - "Hover effect (opacity 0.8)"
+      - "Cursor pointer"
+      - "Action badge color: INSERT=green, UPDATE=blue, DELETE=red"
+
+  - name: "AuditTrailExportButton"
+    path: "components/npd/audit/AuditTrailExportButton.tsx"
+    type: "action"
+    description: "Export audit trail to CSV"
+    props:
+      - name: "filters"
+        type: "AuditTrailFilters"
+        required: true
+    actions:
+      - name: "Export CSV"
+        endpoint: "GET /api/npd/audit-trail?...&format=csv"
+        filename: "NPD-Audit-Trail-{date}.csv"
+    notes:
+      - "CSV includes all fields (user, action, entity, old/new values as JSON strings)"
+
+state_management:
+  - "Audit logs fetched on mount and filter change"
+  - "Filters stored in URL params (project_id, user_id, entity_type, action, date_from, date_to, page)"
+  - "Selected entry stored in component state (for modal)"
+
+responsive_design:
+  mobile:
+    - "Table switches to card view (< 768px)"
+    - "Each card shows: timestamp, user, action badge, entity"
+    - "Tap card opens modal"
+    - "Filters collapse into dropdown"
+  tablet:
+    - "Table remains table"
+    - "Filters remain expanded"
+  desktop:
+    - "Full table with all columns (> 1024px)"
+
+accessibility:
+  - "Table keyboard navigable (arrow keys)"
+  - "ARIA labels on action badges"
+  - "Modal focus trap"
+  - "Screen reader announces filter changes"
+
+performance:
+  - "Paginate results (20 per page)"
+  - "Debounce filter changes (300ms)"
+  - "Virtual scrolling for >100 rows (optional)"

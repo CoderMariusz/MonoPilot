@@ -1,0 +1,51 @@
+# Story 10.7 - API Specification
+# Shift Report Generation
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/shift-reports"
+    description: "List shift reports"
+    query_params:
+      start_date: "YYYY-MM-DD"
+      end_date: "YYYY-MM-DD"
+      line_id: "UUID"
+      status: "draft | approved | archived"
+    response:
+      status: 200
+
+  - method: "POST"
+    path: "/api/oee/shift-reports/generate"
+    description: "Manually generate shift report"
+    request:
+      body:
+        shift_id: "UUID"
+        line_id: "UUID"
+        report_date: "YYYY-MM-DD"
+    response:
+      status: 201
+
+  - method: "PATCH"
+    path: "/api/oee/shift-reports/:id/approve"
+    description: "Approve shift report"
+    roles: ["supervisor", "production_manager", "admin"]
+    response:
+      status: 200
+
+  - method: "GET"
+    path: "/api/oee/shift-reports/:id/export"
+    description: "Export report to PDF"
+    response:
+      status: 200
+      content_type: "application/pdf"
+
+services:
+  - path: "apps/frontend/lib/services/shift-report-service.ts"
+    methods:
+      - { name: "list", returns: "Promise<ShiftReport[]>" }
+      - { name: "generate", params: ["params"], returns: "Promise<ShiftReport>" }
+      - { name: "approve", params: ["id"], returns: "Promise<ShiftReport>" }
+      - { name: "exportPDF", params: ["id"], returns: "Promise<Blob>" }
+
+types:
+  - "ShiftReport"
+  - "ShiftHandoverNote"

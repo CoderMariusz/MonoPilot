@@ -1,0 +1,76 @@
+# Story 08.17 - Finance Approval Workflow Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview
+# Phase: 3 (Enterprise Features)
+
+story:
+  id: "08.17"
+  name: "Finance Approval Workflow"
+  slug: "finance-approval-workflow"
+  epic: "08-npd"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Costing approval fields, variance threshold
+  - api.yaml         # 5 endpoints (submit, approve, reject, approval details, pending list)
+  - frontend.yaml    # Approval modal, submit button, pending dashboard
+  - tests.yaml       # Unit, integration, E2E tests
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["org context", "RLS pattern", "user roles"]
+    - story: "08.2"
+      provides: ["npd_projects table"]
+    - story: "08.7"
+      provides: ["npd_costing table with variance"]
+
+  blocks:
+    - story: "08.11"
+      reason: "Handoff wizard requires approved costing"
+
+deliverables:
+  - type: "database"
+    count: 1
+    description: "Migration: approval fields + variance threshold + RLS policies"
+  - type: "api"
+    count: 5
+    description: "Submit, approve, reject, approval details, pending approvals"
+  - type: "service"
+    count: 1
+    description: "NPDCostingApprovalService with 6 methods + email functions"
+  - type: "components"
+    count: 5
+    description: "Approval modal, submit button, approval badge, pending dashboard, approval history"
+  - type: "test"
+    count: 3
+    description: "Unit (service), Integration (API), E2E (approval workflow)"
+
+technical_notes:
+  - "Auto-approve: variance < threshold (default 10%)"
+  - "Rejection requires reason (mandatory field)"
+  - "Email notifications: Finance on submission, NPD Lead on approval/rejection"
+  - "Costing status: draft → submitted → approved/rejected"
+  - "Handoff blocked until status = 'approved'"
+  - "RLS policies: Finance can view submitted costing, NPD Lead can submit draft"
+
+business_rules:
+  - rule: "Auto-Approve Threshold"
+    description: "Configurable per org, default 10%. Variance < threshold = auto-approve."
+  - rule: "Rejection Reason Mandatory"
+    description: "Finance must provide reason when rejecting costing."
+  - rule: "Resubmission Allowed"
+    description: "Rejected costing can be updated and resubmitted by NPD Lead."
+  - rule: "Finance Role Required"
+    description: "Only users with FINANCE role can approve/reject."
+  - rule: "Handoff Blocked"
+    description: "Handoff wizard disabled until costing.status = 'approved'."
+
+summary: |
+  Story 08.17 implements Finance approval workflow for NPD costing. NPD Leads submit costing for approval, Finance reviews variance analysis and approves/rejects with auto-approve for low-variance projects. Email notifications ensure timely approvals, and handoff is blocked until Finance sign-off obtained.

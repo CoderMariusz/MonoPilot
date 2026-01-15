@@ -1,0 +1,105 @@
+# Story 10.11 - Database Schema
+# Purpose: Tables, views, indexes for Pareto analysis
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story primarily uses existing tables (oee_downtime_events, downtime_reasons)
+# No new tables required - only aggregation views for performance
+
+views:
+  - name: "downtime_pareto_summary"
+    description: "Aggregated downtime by reason for Pareto analysis"
+    sql: |
+      CREATE OR REPLACE VIEW downtime_pareto_summary AS
+      WITH reason_totals AS (
+        SELECT
+            de.org_id,
+            de.reason_code,
+            dr.name as reason_name,
+            dr.category as reason_category,
+            COUNT(*) as event_count,
+            SUM(de.duration_minutes) as total_duration,
+            AVG(de.duration_minutes) as avg_duration,
+            MIN(de.start_time) as first_occurrence,
+            MAX(de.start_time) as last_occurrence
+        FROM oee_downtime_events de
+        LEFT JOIN downtime_reasons dr ON de.reason_code = dr.code AND de.org_id = dr.org_id
+        WHERE de.end_time IS NOT NULL  -- Only completed events
+        GROUP BY de.org_id, de.reason_code, dr.name, dr.category
+      ),
+      ranked AS (
+        SELECT
+            *,
+            SUM(total_duration) OVER (PARTITION BY org_id ORDER BY total_duration DESC) as cumulative_duration,
+            SUM(total_duration) OVER (PARTITION BY org_id) as grand_total,
+            ROW_NUMBER() OVER (PARTITION BY org_id ORDER BY total_duration DESC) as rank
+        FROM reason_totals
+      )
+      SELECT
+          org_id,
+          reason_code,
+          reason_name,
+          reason_category,
+          event_count,
+          total_duration,
+          avg_duration,
+          first_occurrence,
+          last_occurrence,
+          rank,
+          cumulative_duration,
+          grand_total,
+          ROUND((total_duration::numeric / NULLIF(grand_total, 0) * 100), 2) as percentage,
+          ROUND((cumulative_duration::numeric / NULLIF(grand_total, 0) * 100), 2) as cumulative_percentage
+      FROM ranked;
+    rls_note: "RLS inherited from oee_downtime_events base table"
+
+# Indexes for performance
+indexes:
+  - table: "oee_downtime_events"
+    name: "idx_downtime_events_pareto"
+    columns: ["org_id", "reason_code", "start_time", "duration_minutes"]
+    description: "Optimizes Pareto aggregation queries"
+    where: "end_time IS NOT NULL"
+
+  - table: "oee_downtime_events"
+    name: "idx_downtime_events_reason_duration"
+    columns: ["org_id", "reason_code", "duration_minutes"]
+    description: "Covers grouping and summing by reason"
+
+# Existing tables used
+existing_tables:
+  - name: "oee_downtime_events"
+    columns_used:
+      - "org_id"
+      - "reason_code"
+      - "duration_minutes"
+      - "start_time"
+      - "end_time"
+      - "machine_id"
+    aggregations:
+      - "SUM(duration_minutes) as total_duration"
+      - "COUNT(*) as event_count"
+      - "AVG(duration_minutes) as avg_duration"
+
+  - name: "downtime_reasons"
+    columns_used:
+      - "code"
+      - "name"
+      - "category"
+      - "org_id"
+    purpose: "Display names and categories for reason codes"
+
+# No migrations needed - views created inline
+migrations: []
+
+# RLS Policies
+rls_notes:
+  - "Pareto view inherits RLS from oee_downtime_events table"
+  - "All aggregations automatically filtered by org_id"
+  - "No additional RLS policies needed for this story"
+
+# Performance Notes
+performance:
+  - "Partial index on end_time IS NOT NULL reduces scan size"
+  - "Window functions calculate cumulative in single pass"
+  - "Query should complete <500ms for 30-day range"
+  - "Consider materialized view for very high-volume orgs"

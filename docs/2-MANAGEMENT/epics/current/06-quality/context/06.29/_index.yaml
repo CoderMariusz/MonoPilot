@@ -1,0 +1,58 @@
+# Story 06.29 - CoA PDF Export Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 3 (CoA & HACCP)
+
+story:
+  id: "06.29"
+  name: "CoA PDF Export"
+  slug: "coa-pdf-export"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "06.27"
+      provides: ["coa_templates for PDF rendering"]
+    - story: "06.28"
+      provides: ["certificates_of_analysis", "coa_parameters"]
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add PDF fields to certificates_of_analysis + coa_email_deliveries"
+  - type: "api"
+    count: 4
+    description: "generate-pdf, email, download, verify/:token"
+  - type: "service"
+    count: 1
+    description: "CoAPDFService with PDF generation, QR code, email"
+
+technical_notes:
+  - "PDF/A-1a or PDF/A-2a format for archival compliance"
+  - "QR code with verification URL: /verify/{token}"
+  - "PDF generation <5 seconds using library (puppeteer/pdfmake)"
+  - "S3/Supabase Storage upload with 10-year retention"
+  - "Email delivery with SendGrid/Resend"
+  - "Verification page is public (no auth required)"
+
+business_rules:
+  - rule: "PDF Generation Only for Approved CoAs"
+    enforcement: "API validates status = 'approved' before generation"
+  - rule: "PDF Archival Format"
+    enforcement: "PDF/A format with embedded fonts, no external dependencies"
+  - rule: "QR Code Verification"
+    enforcement: "Public /verify/{token} page displays CoA data"
+  - rule: "10-Year Retention"
+    enforcement: "S3 bucket lifecycle policy configured"

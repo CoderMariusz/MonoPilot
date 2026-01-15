@@ -1,0 +1,464 @@
+# Story 06.13 - Tests Context
+# Generated: 2026-01-15
+# Purpose: Test specifications, acceptance criteria verification
+
+# =============================================================================
+# TEST STRATEGY
+# =============================================================================
+
+test_strategy:
+  unit_tests:
+    coverage_target: 85%
+    framework: vitest
+    focus_areas:
+      - NCRWorkflowService methods
+      - State transition validation
+      - SLA calculation logic
+      - Auto-assignment resolution
+  integration_tests:
+    framework: vitest
+    focus_areas:
+      - Transition API endpoints
+      - Workflow history API
+      - Available transitions API
+      - Database triggers
+  e2e_tests:
+    framework: playwright
+    focus_areas:
+      - Full NCR workflow from draft to closed
+      - Reopen flow
+      - Permission enforcement
+      - Timeline UI updates
+
+# =============================================================================
+# UNIT TESTS
+# =============================================================================
+
+unit_tests:
+  file: lib/services/__tests__/ncr-workflow-service.test.ts
+
+  describe_blocks:
+    - name: NCRWorkflowService
+      tests:
+        # executeTransition
+        - describe: executeTransition
+          tests:
+            - it: validates from_state matches current state
+              given: NCR in 'investigation' state
+              when: executeTransition with from='open'
+              then: throws INVALID_TRANSITION error
+
+            - it: validates user role is in allowed_roles
+              given: transition requires QA_MANAGER
+              and: user is QA_INSPECTOR
+              when: executeTransition called
+              then: throws PERMISSION_DENIED error
+
+            - it: validates notes if required
+              given: transition requires_notes=true
+              and: notes=null
+              when: executeTransition called
+              then: throws NOTES_REQUIRED error
+
+            - it: validates notes length
+              given: min_notes_length=50
+              and: notes.length=20
+              when: executeTransition called
+              then: throws NOTES_TOO_SHORT error
+
+            - it: validates confirmation if required
+              given: confirmation_required=true
+              and: confirmed=false
+              when: executeTransition called
+              then: throws CONFIRMATION_REQUIRED error
+
+            - it: updates NCR status
+              given: valid transition from investigation to root_cause
+              when: executeTransition called
+              then: ncr.status = 'root_cause'
+
+            - it: creates history record
+              given: valid transition
+              when: executeTransition called
+              then: ncr_state_history entry created
+              assertions:
+                - "entry.from_state = 'investigation'"
+                - "entry.to_state = 'root_cause'"
+                - "entry.transitioned_by = userId"
+                - "entry.transition_notes = notes"
+
+            - it: calculates new due date from SLA
+              given: transition sla_hours=72
+              when: executeTransition called
+              then: ncr.state_due_at = now + 72 hours
+
+            - it: resolves auto-assign role to user
+              given: transition auto_assign_role='QA_MANAGER'
+              and: org has QA Manager with id='abc123'
+              when: executeTransition called
+              then: ncr.current_state_owner='abc123'
+
+            - it: increments reopen_count
+              given: transition code='reopen'
+              when: executeTransition called
+              then: ncr.reopen_count incremented
+
+            - it: tracks overdue status
+              given: ncr.state_due_at in past
+              when: executeTransition called
+              then: history.was_overdue=true
+
+        # getAvailableTransitions
+        - describe: getAvailableTransitions
+          tests:
+            - it: filters by current state
+              given: NCR in 'investigation' state
+              when: getAvailableTransitions called
+              then: only transitions from='investigation' returned
+
+            - it: marks user_can_execute based on role
+              given: transition requires QA_MANAGER
+              and: user is QA_INSPECTOR
+              when: getAvailableTransitions called
+              then: transition.user_can_execute=false
+              and: transition.blocked_reason='Requires QA Manager role'
+
+            - it: excludes inactive transitions
+              given: transition is_active=false
+              when: getAvailableTransitions called
+              then: transition NOT returned
+
+        # calculateDueDate
+        - describe: calculateDueDate
+          tests:
+            - it: returns null for null SLA
+              given: slaHours=null
+              when: calculateDueDate called
+              then: returns null
+
+            - it: adds hours to now
+              given: slaHours=48
+              when: calculateDueDate called
+              then: returns now + 48 hours
+
+        # isOverdue
+        - describe: isOverdue
+          tests:
+            - it: returns false for draft/closed
+              given: ncr.status='draft'
+              when: isOverdue called
+              then: returns false
+
+            - it: returns false if no due date
+              given: ncr.state_due_at=null
+              when: isOverdue called
+              then: returns false
+
+            - it: returns true if past due
+              given: ncr.state_due_at='2026-01-01'
+              and: now='2026-01-02'
+              when: isOverdue called
+              then: returns true
+
+            - it: returns false if not yet due
+              given: ncr.state_due_at='2026-01-20'
+              and: now='2026-01-15'
+              when: isOverdue called
+              then: returns false
+
+# =============================================================================
+# INTEGRATION TESTS
+# =============================================================================
+
+integration_tests:
+  file: app/api/quality/ncrs/__tests__/transition.test.ts
+
+  describe_blocks:
+    - name: Transition API
+      tests:
+        # POST /api/quality/ncrs/:id/transition
+        - describe: "POST /api/quality/ncrs/:id/transition"
+          tests:
+            - it: executes valid transition
+              given: NCR in 'open' state
+              and: user is QA_INSPECTOR
+              and: transition='start_investigation'
+              when: POST /transition with {transition_code, notes}
+              then: 200, NCR status updated to 'investigation'
+
+            - it: returns 404 for non-existent NCR
+              when: POST /transition with invalid ncrId
+              then: 404 NOT_FOUND
+
+            - it: returns 404 for cross-org access
+              given: NCR belongs to org A
+              and: user belongs to org B
+              when: POST /transition
+              then: 404 NOT_FOUND (RLS block)
+
+            - it: returns 400 for invalid transition
+              given: NCR in 'investigation'
+              when: POST /transition with code='submit' (from='draft')
+              then: 400 INVALID_TRANSITION
+
+            - it: returns 403 for permission denied
+              given: transition requires QA_MANAGER
+              and: user is QA_INSPECTOR
+              when: POST /transition
+              then: 403 PERMISSION_DENIED
+
+            - it: creates immutable history record
+              when: POST /transition succeeds
+              then: ncr_state_history entry created
+              and: entry cannot be updated or deleted
+
+        # GET /api/quality/ncrs/:id/workflow
+        - describe: "GET /api/quality/ncrs/:id/workflow"
+          tests:
+            - it: returns workflow history
+              given: NCR has 3 transitions
+              when: GET /workflow
+              then: 200, history array with 3 entries
+
+            - it: calculates time_in_state_hours
+              given: transition A at 10:00, transition B at 12:00
+              when: GET /workflow
+              then: entry A has time_in_state_hours=2
+
+            - it: returns is_overdue flag
+              given: NCR was overdue at transition time
+              when: GET /workflow
+              then: entry.was_overdue=true
+
+            - it: enforces RLS
+              given: NCR belongs to org A
+              and: user belongs to org B
+              when: GET /workflow
+              then: 404 NOT_FOUND
+
+        # GET /api/quality/ncrs/:id/available-transitions
+        - describe: "GET /api/quality/ncrs/:id/available-transitions"
+          tests:
+            - it: returns valid transitions for current state
+              given: NCR in 'root_cause' state
+              when: GET /available-transitions
+              then: 200, transitions from='root_cause'
+
+            - it: includes user_can_execute flag
+              given: transition requires QA_MANAGER
+              and: user is QA_INSPECTOR
+              when: GET /available-transitions
+              then: transition.user_can_execute=false
+
+            - it: includes blocked_reason
+              given: user lacks required role
+              when: GET /available-transitions
+              then: transition.blocked_reason='Requires QA Manager role'
+
+# =============================================================================
+# E2E TESTS
+# =============================================================================
+
+e2e_tests:
+  file: tests/e2e/ncr-workflow.spec.ts
+
+  describe_blocks:
+    - name: NCR Workflow E2E
+      tests:
+        - describe: full workflow from draft to closed
+          steps:
+            - action: Login as QA Inspector
+            - action: Create NCR (draft)
+            - verify: Workflow timeline shows 'draft' as current
+            - verify: 'Submit NCR' button visible
+            - action: Click 'Submit NCR', confirm
+            - verify: Status changes to 'open'
+            - verify: Timeline updates to show 'open'
+            - verify: 'Start Investigation' button visible
+            - action: Click 'Start Investigation', enter notes
+            - verify: Status changes to 'investigation'
+            - verify: Due date shown (48h SLA)
+            - action: Complete investigation, move to 'root_cause'
+            - verify: Status changes to 'root_cause'
+            - action: Complete root cause, move to 'corrective_action'
+            - verify: Status changes to 'corrective_action'
+            - action: Implement action, move to 'verification'
+            - verify: Status changes to 'verification'
+            - action: Logout, login as QA Manager
+            - action: Click 'Verify Effective & Close', confirm
+            - verify: Status changes to 'closed'
+            - verify: Timeline shows all states completed
+
+        - describe: reopen flow
+          steps:
+            - action: Login as QA Manager
+            - action: Navigate to closed NCR
+            - verify: 'Reopen NCR' button visible
+            - action: Click 'Reopen NCR', enter justification
+            - verify: Confirmation dialog shown
+            - action: Confirm reopen
+            - verify: Status changes to 'reopened'
+            - verify: reopen_count incremented
+            - verify: Timeline shows branch to 'reopened'
+
+        - describe: permission enforcement
+          steps:
+            - action: Login as QA Inspector
+            - action: Navigate to NCR in 'verification' state
+            - verify: 'Verify Effective & Close' button disabled
+            - verify: Tooltip shows 'Requires QA Manager role'
+            - action: Logout, login as QA Manager
+            - verify: 'Verify Effective & Close' button enabled
+
+        - describe: overdue indicator
+          steps:
+            - action: Create NCR in 'investigation' state
+            - action: Mock system time past due date
+            - verify: Overdue badge shown in timeline
+            - verify: Badge shows days overdue
+            - action: Execute transition
+            - verify: History shows was_overdue=true
+
+# =============================================================================
+# RLS TESTS
+# =============================================================================
+
+rls_tests:
+  file: supabase/__tests__/rls/ncr-workflow.test.ts
+
+  describe_blocks:
+    - name: Workflow RLS Policies
+      tests:
+        - it: user can only see own org transitions
+          given: user A in org A, transition in org B
+          when: user A queries ncr_state_transitions
+          then: transition NOT returned
+
+        - it: history is immutable
+          given: ncr_state_history entry exists
+          when: attempt UPDATE
+          then: operation blocked (RLS policy)
+
+        - it: history is immutable (delete)
+          given: ncr_state_history entry exists
+          when: attempt DELETE
+          then: operation blocked (RLS policy)
+
+        - it: admin can modify transition config
+          given: user is ADMIN
+          when: update ncr_state_transitions
+          then: update allowed
+
+        - it: non-admin cannot modify transition config
+          given: user is QA_INSPECTOR
+          when: update ncr_state_transitions
+          then: update blocked
+
+# =============================================================================
+# ACCEPTANCE CRITERIA MAPPING
+# =============================================================================
+
+acceptance_criteria_mapping:
+  AC-1: # Extended status constraint
+    tests:
+      - "Database migration adds 8 states to CHECK constraint"
+      - "Unit: executeTransition validates state values"
+    coverage: "Integration + Manual"
+
+  AC-2: # State transitions table
+    tests:
+      - "Database migration creates ncr_state_transitions"
+      - "Seed function populates default transitions"
+    coverage: "Integration"
+
+  AC-3: # State history table
+    tests:
+      - "Database migration creates ncr_state_history"
+      - "RLS: history is immutable"
+    coverage: "RLS tests"
+
+  AC-4: # Transition validation
+    tests:
+      - "Unit: validates from_state"
+      - "Integration: POST /transition rejects invalid"
+    coverage: "Unit + Integration"
+
+  AC-5: # Role-based authorization
+    tests:
+      - "Unit: validates user role"
+      - "Integration: POST /transition returns 403"
+      - "E2E: permission enforcement"
+    coverage: "Unit + Integration + E2E"
+
+  AC-6: # Notes requirement
+    tests:
+      - "Unit: validates notes presence and length"
+      - "E2E: modal enforces min length"
+    coverage: "Unit + E2E"
+
+  AC-7: # SLA calculation
+    tests:
+      - "Unit: calculateDueDate returns correct timestamp"
+      - "Integration: state_due_at updated on transition"
+    coverage: "Unit + Integration"
+
+  AC-8: # Auto-assignment
+    tests:
+      - "Unit: resolveAutoAssign finds user by role"
+      - "Integration: current_state_owner updated"
+    coverage: "Unit + Integration"
+
+  AC-9: # Reopen logic
+    tests:
+      - "Unit: executeTransition increments reopen_count"
+      - "E2E: reopen flow test"
+    coverage: "Unit + E2E"
+
+  AC-10: # Timeline UI
+    tests:
+      - "E2E: timeline shows all states"
+      - "E2E: timeline updates on transition"
+    coverage: "E2E"
+
+  AC-11: # Available transitions API
+    tests:
+      - "Integration: GET /available-transitions filters by state"
+      - "Integration: user_can_execute flag accurate"
+    coverage: "Integration"
+
+  AC-12: # Workflow history API
+    tests:
+      - "Integration: GET /workflow returns ordered history"
+      - "Integration: time_in_state_hours calculated"
+    coverage: "Integration"
+
+# =============================================================================
+# TEST DATA / FIXTURES
+# =============================================================================
+
+fixtures:
+  - name: defaultTransitions
+    description: "Default transition configuration for org"
+    data:
+      - { code: "submit", from: "draft", to: "open", roles: ["QA_INSPECTOR", "QA_MANAGER"] }
+      - { code: "start_investigation", from: "open", to: "investigation", roles: ["QA_INSPECTOR", "QA_MANAGER"], requires_notes: true }
+      - { code: "complete_investigation", from: "investigation", to: "root_cause", roles: ["QA_INSPECTOR", "QA_MANAGER"], requires_notes: true, min_notes: 50 }
+      - { code: "verify_effective", from: "verification", to: "closed", roles: ["QA_MANAGER"], confirmation_required: true }
+
+  - name: ncrWithHistory
+    description: "NCR with 3 state transitions"
+    data:
+      ncr:
+        status: "root_cause"
+        state_entered_at: "2026-01-15T10:00:00Z"
+      history:
+        - { from: "draft", to: "open", transitioned_at: "2026-01-10T09:00:00Z" }
+        - { from: "open", to: "investigation", transitioned_at: "2026-01-12T11:00:00Z" }
+        - { from: "investigation", to: "root_cause", transitioned_at: "2026-01-15T10:00:00Z" }
+
+  - name: overdueNCR
+    description: "NCR past due date"
+    data:
+      status: "investigation"
+      state_due_at: "2026-01-10T00:00:00Z"
+      state_entered_at: "2026-01-08T00:00:00Z"

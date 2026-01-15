@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getAuthContext, checkPermission, validateOrigin } from '@/lib/api/auth-helpers'
-import { createLocationSchema, locationListParamsSchema } from '@/lib/validation/location-schemas'
+import { createLocationSchema } from '@/lib/validation/location-schemas'
 import { createLocation, getLocations } from '@/lib/services/location-service'
 import { ZodError } from 'zod'
 
@@ -48,18 +48,6 @@ export async function GET(
       parent_id: searchParams.get('parent_id') || undefined,
       search: searchParams.get('search') || undefined,
       include_capacity: searchParams.get('include_capacity') === 'true',
-    }
-
-    // Validate filters
-    try {
-      locationListParamsSchema.parse(filters)
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return NextResponse.json(
-          { error: 'Invalid query parameters', details: error.errors },
-          { status: 400 }
-        )
-      }
     }
 
     // Get locations

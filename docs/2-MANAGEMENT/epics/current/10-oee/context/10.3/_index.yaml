@@ -1,0 +1,85 @@
+# Story 10.3 - Downtime Event Tracking Context
+# Generated: 2025-01-15
+# Phase: 1A (Core OEE)
+
+story:
+  id: "10.3"
+  name: "Downtime Event Tracking"
+  slug: "downtime-event-tracking"
+  epic: "10-oee"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations, users"]
+    - story: "01.3"
+      provides: ["machines table"]
+    - story: "01.5"
+      provides: ["production_lines table"]
+    - story: "04.1"
+      provides: ["work_orders table (soft)"]
+    - story: "10.2"
+      provides: ["reason_code_id reference"]
+  blocks:
+    - story: "10.4"
+      reason: "Downtime data feeds availability metric"
+    - story: "10.5"
+      reason: "Active downtime displayed on dashboard"
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-003 - Downtime Event Tracking"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.3.downtime-event-tracking.md"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "oee_downtime_events table + trigger function"
+  - type: "function"
+    count: 1
+    description: "create_downtime_on_wo_pause() trigger"
+  - type: "service"
+    count: 1
+    description: "downtime-event-service.ts"
+  - type: "api"
+    count: 6
+    description: "GET list, POST create, PATCH update, PATCH end, DELETE, GET active"
+  - type: "components"
+    count: 6
+    description: "Log page, active panel, modal, badges, table"
+  - type: "page"
+    count: 1
+    description: "/oee/downtime"
+
+technical_notes:
+  - "Event status: active (end_time=NULL) vs completed (end_time set)"
+  - "Generated columns: duration_minutes, impact_severity (minor/moderate/major)"
+  - "Auto-create event when WO paused (configurable)"
+  - "Impact severity: minor (<5min), moderate (5-15min), major (>15min)"
+  - "Real-time duration updates for active events"
+  - "Link downtime to work_order_id for WO timeline"
+
+business_rules:
+  - rule: "Active Event Duration"
+    enforcement: "GENERATED column calculates duration from start_time to COALESCE(end_time, NOW())"
+  - rule: "Impact Severity Auto-Classification"
+    enforcement: "GENERATED column based on duration thresholds"
+  - rule: "Auto-Create on WO Pause"
+    enforcement: "Database trigger on work_orders status change"
+  - rule: "24-Hour Edit Window"
+    enforcement: "Application logic - events older than 24h require supervisor approval"

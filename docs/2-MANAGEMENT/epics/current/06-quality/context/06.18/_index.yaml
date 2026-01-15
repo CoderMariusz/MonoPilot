@@ -1,0 +1,131 @@
+# Story 06.18 - Index File (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.18"
+  name: "Test Result Trending & Charts"
+  slug: "test-result-trending-charts"
+  epic: "06-quality"
+  phase: "2B"
+  complexity: "M"
+  estimate_days: 4
+  type: "frontend (data visualization)"
+  state: "ready"
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml        # This file - metadata, dependencies
+  - database.yaml      # Views (test_result_trends), indexes
+  - api.yaml           # Endpoints (GET /trends, export)
+  - frontend.yaml      # Components (TrendChart, filters), Recharts patterns
+  - tests.yaml         # Acceptance criteria, unit/integration/E2E tests
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table with org_id"
+        - "RLS foundation"
+    - story: "02.1"
+      name: "Product Module"
+      provides:
+        - "products table for filtering"
+    - story: "06.3"
+      name: "Quality Specifications"
+      provides:
+        - "quality_specifications table"
+        - "product_id relationship"
+    - story: "06.4"
+      name: "Test Parameters"
+      provides:
+        - "quality_spec_parameters table"
+        - "min_value, max_value, target_value, unit"
+        - "parameter_name for chart labels"
+    - story: "06.5"
+      name: "Incoming Inspection"
+      provides:
+        - "quality_inspections table"
+        - "inspection reference for linking"
+    - story: "06.6"
+      name: "Test Results Recording"
+      provides:
+        - "quality_test_results table"
+        - "numeric_value for trending"
+        - "result_status for pass/fail highlighting"
+        - "tested_at for time series"
+  optional: []
+  blocked_by: []
+  dependents:
+    - story: "06.20"
+      name: "Quality Dashboard"
+      requires: "Embedded trend mini-charts"
+    - story: "06.22"
+      name: "Quality Analytics"
+      requires: "Trend data for advanced analytics"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-004", "FR-QA-022", "Section 15"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.18.test-result-trending-charts.md"
+  patterns:
+    - path: "apps/frontend/components/technical/costing/CostTrendChart.tsx"
+      description: "Existing Recharts line chart pattern"
+    - path: "apps/frontend/components/technical/costing/CostChartTooltip.tsx"
+      description: "Custom tooltip pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "view"
+    count: 3
+    description: "test_result_trends (daily, weekly, monthly aggregation views)"
+  - type: "index"
+    count: 2
+    description: "Performance indexes on quality_test_results"
+  - type: "validation"
+    count: 2
+    description: "Zod schemas (trendQuery, trendExport)"
+  - type: "service"
+    count: 1
+    description: "TrendAnalysisService with linear regression"
+  - type: "api"
+    count: 2
+    description: "GET /test-results/trends, GET /test-results/trends/export"
+  - type: "page"
+    count: 1
+    description: "/quality/trends page"
+  - type: "component"
+    count: 8
+    description: "TrendChart, TrendFilters, TrendIndicatorBadge, etc."
+  - type: "test"
+    count: 4
+    description: "Unit (service), Component (chart), Integration (API), E2E"
+
+# Technical notes
+technical_notes:
+  - "Chart library: Recharts (already in package.json)"
+  - "Export PNG: html-to-image library (already in package.json)"
+  - "Export PDF: jspdf library (already in package.json)"
+  - "Views use quality_test_results WHERE numeric_value IS NOT NULL"
+  - "Aggregation: daily (test_date), weekly (DATE_TRUNC), monthly"
+  - "Trend calculation: Simple linear regression with slope detection"
+  - "Control limits: ReferenceLine component for spec min/max"
+  - "Out-of-spec highlighting: Red dots for fail, yellow for marginal"
+  - "Max 6 parameters per chart for readability"
+  - "Max 1000 data points per query for performance"
+
+# Implementation notes
+implementation_notes:
+  - "Follow CostTrendChart.tsx pattern for Recharts implementation"
+  - "Use existing DateRangePicker patterns from other modules"
+  - "Views inherit RLS from underlying quality_test_results table"
+  - "Trend direction relative to spec limits (toward limit = degrading)"
+  - "Minimum 5 data points required for trend calculation"
+  - "CSV export as alternative to PDF for large datasets"

@@ -1,0 +1,321 @@
+# Story 06.26 - CCP Deviation Alerts - Frontend Context
+# Generated: 2025-01-15
+
+pages:
+  - path: "app/(authenticated)/quality/haccp/alerts/page.tsx"
+    name: "Alerts List Page"
+    components: ["AlertDataTable", "AlertFilters", "UnacknowledgedAlertsSummary"]
+    layout: "Authenticated Layout"
+    features:
+      - "DataTable with pagination"
+      - "Filter by acknowledged status, severity, date range"
+      - "Unacknowledged alerts count badge"
+      - "Acknowledge button (inline)"
+      - "Severity badges"
+      - "Elapsed time indicators"
+
+components:
+  # Alert Notification Center (Global)
+  - name: "AlertNotificationCenter.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Global Widget (in Layout)"
+    props:
+      - name: "alerts"
+        type: "CCPAlert[]"
+    features:
+      - "Bell icon with unacknowledged count badge"
+      - "Dropdown panel on click"
+      - "List of recent unacknowledged alerts (max 10)"
+      - "Acknowledge button (inline)"
+      - "Link to alert detail (deviation)"
+      - "WebSocket listener for real-time updates"
+      - "Audio alert player (critical only)"
+      - "Auto-refresh every 30s"
+    position: "Top-right header (next to user profile)"
+
+  # WebSocket Alert Listener
+  - name: "WebSocketAlertListener.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Global Component"
+    props: []
+    features:
+      - "Connect to WebSocket on auth (Socket.io client)"
+      - "Join org room (org_id)"
+      - "Listen for 'ccp_deviation_alert' event"
+      - "On event: show toast, play audio, add to notification center"
+      - "Disconnect on logout"
+    implementation: |
+      useEffect(() => {
+        const socket = io('/api/socket', { auth: { token: authToken } });
+        socket.emit('join_org_room', { org_id: currentOrgId });
+        socket.on('ccp_deviation_alert', (alert) => {
+          // Show toast
+          toast.error(alert.message);
+          // Play audio
+          if (alert.severity === 'critical') {
+            playAlertSound();
+          }
+          // Add to notification center
+          addAlertToCenter(alert);
+        });
+        return () => socket.disconnect();
+      }, [authToken, currentOrgId]);
+
+  # Alert Toast Notification
+  - name: "AlertToast.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Toast"
+    props:
+      - name: "alert"
+        type: "CCPAlert"
+    features:
+      - "Color-coded by severity (red=critical, orange=major, yellow=minor)"
+      - "Large icon (AlertTriangle)"
+      - "Alert message"
+      - "Acknowledge button (inline)"
+      - "Link to deviation detail"
+      - "Auto-dismiss (30s for minor, no auto-dismiss for critical)"
+      - "Sound on show (if critical)"
+
+  # Alert Audio Player
+  - name: "AlertAudioPlayer.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Audio Service"
+    features:
+      - "Play alert sound (1kHz, 3 beeps)"
+      - "Web Audio API"
+      - "User gesture required before first play"
+      - "Mute toggle (localStorage)"
+    implementation: |
+      const playAlertSound = () => {
+        const audioContext = new AudioContext();
+        const oscillator = audioContext.createOscillator();
+        oscillator.frequency.value = 1000; // 1kHz
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.3); // 3 x 100ms beeps
+      };
+
+  # Alert Data Table
+  - name: "AlertDataTable.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "DataTable"
+    pattern: "ShadCN DataTable"
+    props:
+      - name: "data"
+        type: "CCPAlert[]"
+      - name: "onAcknowledge"
+        type: "(id: string) => void"
+    features:
+      - "Columns: Severity, CCP, Message, Created, Elapsed, Acknowledged By, Actions"
+      - "Severity badge (color-coded)"
+      - "Elapsed time (e.g., '3 minutes ago', '1 hour ago')"
+      - "Acknowledged badge (green checkmark if acknowledged)"
+      - "Acknowledge button (inline, if not acknowledged)"
+      - "Link to deviation detail"
+      - "Sortable columns"
+      - "Pagination"
+
+  # Unacknowledged Alerts Summary
+  - name: "UnacknowledgedAlertsSummary.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Metrics Cards"
+    props:
+      - name: "alerts"
+        type: "CCPAlert[]"
+    features:
+      - "Total unacknowledged count"
+      - "Critical count (red card, pulsing animation)"
+      - "Major count (orange card)"
+      - "Minor count (yellow card)"
+      - "Oldest unacknowledged alert (elapsed time)"
+      - "Click to filter by severity"
+
+  # Alert Filters
+  - name: "AlertFilters.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Filter Panel"
+    props:
+      - name: "filters"
+        type: "AlertFilterState"
+      - name: "onChange"
+        type: "(filters: AlertFilterState) => void"
+    features:
+      - "Acknowledged status filter (all/acknowledged/unacknowledged)"
+      - "Severity filter (multi-select: critical/major/minor)"
+      - "Date range picker (from/to)"
+      - "Clear filters button"
+
+  # Acknowledge Alert Dialog
+  - name: "AcknowledgeAlertDialog.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Dialog"
+    pattern: "ShadCN AlertDialog"
+    props:
+      - name: "alert"
+        type: "CCPAlert"
+      - name: "open"
+        type: "boolean"
+      - name: "onClose"
+        type: "() => void"
+      - name: "onConfirm"
+        type: "() => void"
+    features:
+      - "Alert summary (severity, CCP, message)"
+      - "Acknowledge confirmation button"
+      - "Link to deviation detail (opens in new tab)"
+      - "Auto-dismiss on acknowledge"
+
+  # Elapsed Time Indicator
+  - name: "ElapsedTimeIndicator.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Display"
+    props:
+      - name: "createdAt"
+        type: "string (ISO 8601)"
+    features:
+      - "Human-readable elapsed time (e.g., '3 minutes ago')"
+      - "Color-coded: <5min=green, 5-10min=yellow, >10min=red"
+      - "Auto-update every 30s (live countdown)"
+    implementation: |
+      const elapsedMinutes = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+      const color = elapsedMinutes < 5 ? 'green' : elapsedMinutes < 10 ? 'yellow' : 'red';
+
+  # Alert Severity Badge
+  - name: "AlertSeverityBadge.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Badge"
+    props:
+      - name: "severity"
+        type: "'critical' | 'major' | 'minor'"
+    colors:
+      critical: "red (#EF4444), pulsing animation"
+      major: "orange (#F97316)"
+      minor: "yellow (#F59E0B)"
+
+  # Escalation Indicator
+  - name: "EscalationIndicator.tsx"
+    path: "components/quality/haccp/alerts/"
+    type: "Badge"
+    props:
+      - name: "escalated"
+        type: "boolean"
+      - name: "escalatedAt"
+        type: "string | null"
+    features:
+      - "If escalated: red badge 'ESCALATED' + timestamp"
+      - "If not escalated but >5min: yellow badge 'PENDING ESCALATION'"
+
+# Hooks
+hooks:
+  - name: "useAlertList"
+    file: "lib/hooks/use-alert-list.ts"
+    params: ["filters: AlertFilterState"]
+    returns: "{ alerts: CCPAlert[]; loading: boolean; error: Error | null }"
+
+  - name: "useUnacknowledgedAlerts"
+    file: "lib/hooks/use-unacknowledged-alerts.ts"
+    returns: "{ alerts: CCPAlert[]; count: number; loading: boolean }"
+    features:
+      - "Auto-refresh every 30s"
+      - "WebSocket real-time updates"
+
+  - name: "useAcknowledgeAlert"
+    file: "lib/hooks/use-acknowledge-alert.ts"
+    returns: "{ acknowledge: (id: string) => Promise<void>; loading: boolean }"
+
+  - name: "useWebSocketAlerts"
+    file: "lib/hooks/use-websocket-alerts.ts"
+    returns: "{ connected: boolean; alerts: CCPAlert[] }"
+    features:
+      - "Connect to WebSocket on mount"
+      - "Listen for 'ccp_deviation_alert' event"
+      - "Add alerts to state on event"
+      - "Disconnect on unmount"
+
+  - name: "useAlertAudio"
+    file: "lib/hooks/use-alert-audio.ts"
+    returns: "{ play: () => void; muted: boolean; toggleMute: () => void }"
+    features:
+      - "Web Audio API wrapper"
+      - "Mute toggle (localStorage)"
+
+# Types
+types:
+  file: "lib/types/ccp-alert.ts"
+  interfaces:
+    - name: "CCPAlert"
+      extends: "Database['public']['Tables']['ccp_deviation_alerts']['Row']"
+    - name: "AlertRecipient"
+      fields:
+        - user_id: "string"
+        - name: "string"
+        - role: "string"
+        - channels: "('sms' | 'email' | 'websocket')[]"
+        - phone: "string | null"
+        - email: "string"
+    - name: "AlertFilterState"
+      fields:
+        - acknowledged: "boolean | null"
+        - severity: "'critical' | 'major' | 'minor' | null"
+        - date_from: "string | null"
+        - date_to: "string | null"
+
+# WebSocket Integration
+websocket:
+  library: "Socket.io Client"
+  connection:
+    url: "/api/socket"
+    auth: "{ token: authToken }"
+  events:
+    - name: "join_org_room"
+      direction: "emit"
+      payload: "{ org_id: string }"
+    - name: "ccp_deviation_alert"
+      direction: "on"
+      payload: "{ alert_id: string; severity: string; ccp_number: string; message: string; deviation_id: string; created_at: string }"
+      handler: |
+        socket.on('ccp_deviation_alert', (alert) => {
+          toast.error(alert.message);
+          if (alert.severity === 'critical') playAlertSound();
+          addAlertToCenter(alert);
+        });
+
+# UX Patterns
+ux_patterns:
+  - pattern: "Real-Time Notifications"
+    description: "WebSocket push notifications for instant alerts"
+    implementation: "Socket.io client + toast notifications"
+
+  - pattern: "Audio Alerts"
+    description: "Sound on critical deviation alerts"
+    implementation: "Web Audio API"
+
+  - pattern: "Notification Center"
+    description: "Global widget with unacknowledged alerts"
+    implementation: "Dropdown panel in header"
+
+  - pattern: "Elapsed Time"
+    description: "Live countdown of unacknowledged time"
+    implementation: "Auto-update every 30s"
+
+  - pattern: "Color-Coded Severity"
+    description: "Visual severity indicators"
+    implementation: "Red (critical), Orange (major), Yellow (minor)"
+
+# Responsive Design
+responsive:
+  - breakpoint: "mobile"
+    layout: "Alert list as cards (not table), notification center at bottom"
+  - breakpoint: "tablet"
+    layout: "Simplified table"
+  - breakpoint: "desktop"
+    layout: "Full table, notification center in header"
+
+# Accessibility
+accessibility:
+  - "Audio alerts respect user preference (mute toggle)"
+  - "Visual alerts (toast) for users with audio disabilities"
+  - "Color + text labels for severity (not just color)"
+  - "Keyboard navigation (acknowledge button, notification center)"
+  - "Screen reader labels (badges, elapsed time)"
+  - "Focus indicators"

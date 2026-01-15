@@ -1,0 +1,7 @@
+# Story 06.33 - Test Specifications
+
+unit_tests:
+  - schedule effectiveness check
+  - complete check with result
+  - reopen CAPA if ineffective
+  - block closure if checks pending

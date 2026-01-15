@@ -1,0 +1,32 @@
+# Story 11.13 - API Context
+# Generated: 2026-01-15
+
+endpoints:
+  - method: "GET"
+    path: "/api/MODULE/resource"
+    auth: true
+    roles: ["ADMIN", "USER"]
+    description: "List resources"
+
+  - method: "POST"
+    path: "/api/MODULE/resource"
+    auth: true
+    roles: ["ADMIN"]
+    description: "Create resource"
+
+services:
+  - name: "ResourceService"
+    path: "lib/services/resource-service.ts"
+    methods:
+      - name: "list"
+        description: "List resources with pagination"
+      - name: "create"
+        description: "Create new resource"
+
+validation:
+  - schema: "resourceSchema"
+    path: "lib/validation/resource.ts"
+    fields:
+      - name: "field_name"
+        type: "string"
+        required: true

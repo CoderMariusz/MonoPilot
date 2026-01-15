@@ -1,0 +1,40 @@
+# Story 08.13 - API Specification
+# Purpose: Pilot WO creation endpoint
+# Agent: BACKEND-DEV
+# SEE: markdown lines 375-651
+
+endpoint:
+  - method: "POST"
+    path: "/api/npd/projects/:projectId/handoff/create-pilot-wo"
+    description: "Create pilot Work Order"
+    auth: "required"
+    roles: ["NPD_LEAD", "ADMIN"]
+    request: "CreatePilotWORequest"
+    response: "CreatePilotWOResponse | PilotWOErrorResponse"
+
+service:
+  name: "NPDHandoffService (extension)"
+  path: "lib/services/npd-handoff-service.ts"
+  methods:
+    - "createPilotWO(projectId, data, userId): CreatePilotWOResponse"
+    - "validateProductBOM(productId, bomId): void"
+    - "getDefaultPilotRouting(orgId): string | null"
+    - "generatePilotWONumber(projectNumber): string"
+    - "getDefaultScheduledDate(): string (+7 days)"
+    - "createWorkOrder(data, userId): WorkOrder"
+    - "enrichWOResponse(wo): EnrichedWO"
+    - "updateCostingFromPilotWO(projectId, woId, actualCost): void"
+
+key_logic:
+  - "Set WO.type = 'pilot'"
+  - "Generate WO number: WO-PILOT-{PROJECT}-{SEQ}"
+  - "Default quantity from formulation.total_qty"
+  - "Default scheduled_date = +7 days"
+  - "Default routing from npd_settings.default_pilot_routing"
+  - "Auto-assign to NPD Lead (project owner)"
+  - "Link WO.npd_project_id for traceability"
+  - "Actual cost feeds back to npd_costing.actual_cost"
+
+validation:
+  - path: "lib/validation/npd/handoff-schemas.ts"
+    schema: "createPilotWOSchema (Zod)"

@@ -108,6 +108,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
+
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
 
     // Basic validation
@@ -115,49 +126,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Missing required fields',
+          error: 'Missing required fields: product_id, quantity, warehouse_id, location_id',
         },
         { status: 400 }
       )
     }
 
-    // Create mock LP
-    const newLP = {
-      id: `lp-${Date.now()}`,
-      org_id: 'test-org',
-      lp_number: body.lp_number || `LP${String(Date.now()).slice(-8)}`,
+    // Create LP via service
+    const newLP = await LicensePlateService.create(supabase, {
+      lp_number: body.lp_number,
       product_id: body.product_id,
       quantity: body.quantity,
-      uom: body.uom || 'KG',
+      uom: body.uom || 'kg',
       location_id: body.location_id,
       warehouse_id: body.warehouse_id,
-      status: 'available',
-      qa_status: 'pending',
-      batch_number: body.batch_number || null,
-      supplier_batch_number: body.supplier_batch_number || null,
-      expiry_date: body.expiry_date || null,
-      manufacture_date: body.manufacture_date || null,
+      batch_number: body.batch_number,
+      supplier_batch_number: body.supplier_batch_number,
+      expiry_date: body.expiry_date,
+      manufacture_date: body.manufacture_date,
       source: body.source || 'manual',
-      po_number: body.po_number || null,
-      grn_id: body.grn_id || null,
-      asn_id: null,
-      wo_id: null,
-      consumed_by_wo_id: null,
-      parent_lp_id: null,
-      pallet_id: null,
-      gtin: null,
-      sscc: null,
-      catch_weight_kg: body.catch_weight_kg || null,
-      created_at: new Date().toISOString(),
-      created_by: 'user-1',
-      updated_at: new Date().toISOString(),
-    }
+      po_number: body.po_number,
+      grn_id: body.grn_id,
+      catch_weight_kg: body.catch_weight_kg,
+    })
 
     return NextResponse.json({
       success: true,
       data: newLP,
     })
   } catch (error) {
+    console.error('License plate POST error:', error)
     return NextResponse.json(
       {
         success: false,

@@ -1,0 +1,30 @@
+# Story 06.14 - Tests Context
+# Generated: 2026-01-15
+# Purpose: Test specifications for NCR Root Cause Analysis
+
+# This story requires comprehensive testing.
+# Please refer to story 06.17 tests.yaml as a template.
+
+test_coverage_summary:
+  unit_tests:
+    - NCRRootCauseService methods
+    - 5-Why validation logic
+    - Fishbone primary factor enforcement
+    - Impact calculation
+
+  integration_tests:
+    - Root cause CRUD APIs
+    - Factor CRUD APIs
+    - Evidence upload/download
+    - Approval workflow
+    - RLS policies
+
+  e2e_tests:
+    - Complete root cause analysis flow
+    - 5-Why wizard interaction
+    - Fishbone diagram editing
+    - Evidence upload
+    - Approval/rejection flow
+
+# See _index.yaml acceptance_summary for full AC mapping
+# Pattern: Follow 06.17 tests.yaml structure

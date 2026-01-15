@@ -1,0 +1,35 @@
+# Story 06.18 - Tests Context
+# Generated: 2026-01-15
+# Purpose: Test result trending test specifications
+
+# =============================================================================
+# TEST COVERAGE
+# =============================================================================
+
+unit_tests:
+  - TrendAnalysisService.calculateLinearRegression
+  - TrendAnalysisService.determineTrendDirection
+  - View aggregation logic (daily/weekly/monthly)
+
+integration_tests:
+  - GET /trends with various aggregations
+  - GET /trends/export (PNG/PDF/CSV)
+  - Query performance with 1000 data points
+  - RLS via underlying quality_test_results
+
+component_tests:
+  - TrendChart renders correctly
+  - TrendChart shows spec limits
+  - TrendChart highlights out-of-spec
+  - TrendFilters max 6 parameters
+  - Export PNG functionality
+  - Export PDF functionality
+
+e2e_tests:
+  - Navigate to /quality/trends
+  - Select product and parameters
+  - Set date range
+  - Chart updates
+  - Export chart
+  - Switch aggregation (daily->weekly->monthly)
+  - Chart refreshes

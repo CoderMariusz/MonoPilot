@@ -1,0 +1,203 @@
+# Story 06.37 - Quality Dashboard Tests
+# Unit, integration, E2E test specifications
+
+unit_tests:
+  file: lib/services/__tests__/dashboard-service.test.ts
+  coverage_target: ">80%"
+  tests:
+    - name: "DashboardService.getKPIs - calculates all KPIs correctly"
+      scenario: |
+        Given inspections and NCRs exist
+        When calling getKPIs()
+        Then returns all 5 KPIs with correct values
+        And trends calculated correctly (up/down/stable)
+
+    - name: "DashboardService.getNCRTrend - returns time series data"
+      scenario: |
+        Given NCR data for last 90 days
+        When calling getNCRTrend(dateFrom, dateTo, 'day')
+        Then returns daily NCR counts
+        And includes severity breakdown
+
+    - name: "DashboardService.getDefectPareto - returns top 10 defects"
+      scenario: |
+        Given test results with defects
+        When calling getDefectPareto(dateFrom, dateTo, 10)
+        Then returns top 10 defect types by frequency
+        And includes cumulative percentage
+
+    - name: "DashboardService.calculateTrend - determines trend direction"
+      scenario: |
+        Given current = 95, previous = 90
+        When calling calculateTrend(95, 90)
+        Then returns 'up'
+        Given current = 95, previous = 95
+        Then returns 'stable'
+        Given current = 85, previous = 90
+        Then returns 'down'
+
+    - name: "DashboardService.exportDashboardPDF - generates PDF"
+      scenario: |
+        Given dashboard data
+        When calling exportDashboardPDF(dateFrom, dateTo, true)
+        Then PDF generated and uploaded to storage
+        And signed URL returned
+
+integration_tests:
+  file: app/api/quality/dashboard/__tests__/dashboard.test.ts
+  tests:
+    - name: "GET /api/quality/dashboard/kpis - returns KPIs"
+      scenario: |
+        Given authenticated user with QA_MANAGER role
+        When GET /api/quality/dashboard/kpis?date_from=2025-01-01&date_to=2025-01-15
+        Then status 200
+        And response contains all 5 KPIs
+        And RLS enforces org isolation
+
+    - name: "GET /api/quality/dashboard/ncr-trend - returns NCR trend"
+      scenario: |
+        Given NCR data exists
+        When GET /api/quality/dashboard/ncr-trend?date_from=2025-01-01&date_to=2025-01-15&bucket=day
+        Then status 200
+        And response contains time series data
+
+    - name: "POST /api/quality/dashboard/export-pdf - exports PDF"
+      scenario: |
+        Given authenticated user with QA_MANAGER role
+        When POST /api/quality/dashboard/export-pdf with body {date_from, date_to}
+        Then status 200
+        And response contains pdf_url and filename
+        And PDF downloads successfully
+
+    - name: "GET /api/quality/dashboard/kpis - unauthorized access blocked"
+      scenario: |
+        Given user with VIEWER role
+        When GET /api/quality/dashboard/kpis
+        Then status 200 (viewer can view dashboard)
+        But export-pdf returns 403 (viewer cannot export)
+
+e2e_tests:
+  file: tests/e2e/quality/dashboard.spec.ts
+  framework: Playwright
+  tests:
+    - name: "Dashboard loads and displays all widgets"
+      steps:
+        - Navigate to /quality/dashboard
+        - Wait for page load
+        - Verify 5 KPI cards displayed
+        - Verify NCR trend chart rendered
+        - Verify Defect Pareto chart rendered
+        - Verify Inspection status pie chart rendered
+        - Verify Supplier heatmap table rendered
+        - Verify date filter displayed (default: Last 90 Days)
+      assertions:
+        - Page loads within 2 seconds
+        - All widgets visible
+        - No console errors
+
+    - name: "Date filter updates all widgets"
+      steps:
+        - Load dashboard
+        - Click date filter
+        - Select "Last 30 Days"
+        - Wait for widgets to refresh
+        - Verify KPI values changed
+        - Verify charts updated
+      assertions:
+        - All widgets refresh within 1 second
+        - URL updated with date params
+
+    - name: "Drill-down navigation works"
+      steps:
+        - Load dashboard
+        - Click on NCR trend data point
+        - Verify navigation to /quality/ncr?date={date}
+        - Go back to dashboard
+        - Click on Defect Pareto bar
+        - Verify navigation to /quality/test-results?defect_type={type}
+      assertions:
+        - Navigation works correctly
+        - Filters applied on destination page
+
+    - name: "PDF export works"
+      steps:
+        - Load dashboard
+        - Click [Export PDF] button
+        - Wait for PDF generation (max 5 seconds)
+        - Verify PDF downloads
+        - Open PDF
+        - Verify PDF contains all dashboard data
+      assertions:
+        - PDF downloads successfully
+        - PDF contains KPIs, charts, header, footer
+
+    - name: "WebSocket real-time updates work"
+      steps:
+        - Load dashboard
+        - Note current First Pass Yield value
+        - Trigger inspection completion (via API or separate session)
+        - Wait for WebSocket update (max 5 seconds)
+        - Verify First Pass Yield value updated
+        - Verify update badge shown
+      assertions:
+        - KPI updates within 5 seconds
+        - Update badge visible
+        - No page reload required
+
+    - name: "Mobile responsive layout"
+      steps:
+        - Set viewport to mobile (375x667)
+        - Load dashboard
+        - Verify KPI cards stack vertically
+        - Verify charts resize to full width
+        - Scroll through dashboard
+        - Verify all interactions work on mobile
+      assertions:
+        - Layout adapts to mobile
+        - All widgets functional
+
+performance_tests:
+  file: tests/performance/dashboard-load.spec.ts
+  tests:
+    - name: "Dashboard load time with 10,000 inspections"
+      setup:
+        - Seed database with 10,000 inspections, 5,000 NCRs
+      steps:
+        - Load /quality/dashboard
+        - Measure time to interactive (TTI)
+      assertions:
+        - TTI < 2 seconds
+        - First Contentful Paint (FCP) < 1 second
+
+    - name: "KPI refresh performance"
+      steps:
+        - Load dashboard
+        - Change date filter
+        - Measure KPI refresh time
+      assertions:
+        - All KPIs refresh within 500ms
+
+    - name: "PDF export performance"
+      steps:
+        - Load dashboard with full data
+        - Click [Export PDF]
+        - Measure time to PDF download
+      assertions:
+        - PDF generation completes within 5 seconds
+
+rls_tests:
+  file: tests/rls/dashboard-isolation.test.ts
+  tests:
+    - name: "Org isolation on dashboard KPIs"
+      scenario: |
+        Given User A from Org A and User B from Org B
+        When User A loads dashboard
+        Then sees only Org A data
+        And cannot access Org B data via API tampering
+
+    - name: "Cross-org KPI access blocked"
+      scenario: |
+        Given User A from Org A
+        When User A attempts GET /api/quality/dashboard/kpis with org_id=B in headers
+        Then API returns 404 or filters to Org A data only
+        And RLS policy blocks Org B data

@@ -1,0 +1,13 @@
+# Story 06.34 - Database Schema
+
+tables:
+  - name: "supplier_quality_ratings"
+    columns:
+      - id, org_id, supplier_id
+      - rating_period (e.g., 2025-Q1)
+      - quality_score, delivery_score, response_score
+      - overall_score (weighted: 50%/30%/20%)
+      - rating_status (excellent/good/fair/poor)
+      - approval_status (approved/conditional/blocked)
+      - rated_by, rated_at, notes
+      - created_at, updated_at

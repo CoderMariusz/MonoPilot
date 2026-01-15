@@ -1,0 +1,384 @@
+# Story 06.25 - CCP Deviation Handling - API Context
+# Generated: 2025-01-15
+
+base_path: "/api/quality/haccp/ccp-deviations"
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-deviations"
+    summary: "List CCP deviations with filters"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "PRODUCTION_LEAD"]
+    query_params:
+      - name: "ccp_id"
+        type: "string"
+        format: "uuid"
+        required: false
+      - name: "severity"
+        type: "string"
+        enum: ["critical", "major", "minor"]
+        required: false
+      - name: "status"
+        type: "string"
+        enum: ["open", "investigating", "resolved", "verified", "closed"]
+        required: false
+      - name: "wo_id"
+        type: "string"
+        format: "uuid"
+        required: false
+      - name: "batch_number"
+        type: "string"
+        required: false
+      - name: "date_from"
+        type: "string"
+        format: "date (YYYY-MM-DD)"
+        required: false
+      - name: "date_to"
+        type: "string"
+        format: "date (YYYY-MM-DD)"
+        required: false
+      - name: "sort_by"
+        type: "string"
+        enum: ["created_at", "severity", "status"]
+        default: "created_at"
+      - name: "sort_order"
+        type: "string"
+        enum: ["asc", "desc"]
+        default: "desc"
+      - name: "page"
+        type: "integer"
+        default: 1
+      - name: "limit"
+        type: "integer"
+        default: 20
+        max: 100
+    response:
+      status: 200
+      schema: "DeviationListResponse"
+    validation_schema: "deviationListQuerySchema"
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-deviations/:id"
+    summary: "Get deviation detail"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "PRODUCTION_LEAD"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    response:
+      status: 200
+      schema: "DeviationDetailResponse"
+      includes:
+        - "Deviation record"
+        - "Monitoring record (linked)"
+        - "CCP definition (linked)"
+        - "NCR record (if critical)"
+        - "Resolution history"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-deviations"
+    summary: "Create deviation record (auto-called by monitoring hook)"
+    auth: true
+    roles: ["SYSTEM", "QA_INSPECTOR", "QA_MANAGER"]
+    request_body:
+      schema: "CreateDeviationRequest"
+      example: |
+        {
+          "ccp_monitoring_id": "uuid",
+          "ccp_id": "uuid",
+          "ccp_number": "CCP-1",
+          "monitored_value": 10,
+          "critical_limit_min": 0,
+          "critical_limit_max": 4,
+          "wo_id": "uuid",
+          "batch_number": "B-2025-001",
+          "corrective_action": "Rejected shipment"
+        }
+    response:
+      status: 201
+      schema: "CreateDeviationResponse"
+    validation_schema: "createDeviationSchema"
+    business_rules:
+      - "Auto-calculate severity based on deviation percentage"
+      - "Auto-calculate deviation_amount"
+      - "Auto-create NCR if severity='critical'"
+      - "Link to monitoring record"
+      - "status = 'open' by default"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-deviations/:id/investigate"
+    summary: "Mark deviation as investigating (QA action)"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    request_body:
+      schema: "InvestigateDeviationRequest"
+      example: |
+        {
+          "notes": "Investigating root cause, reviewing temperature logs"
+        }
+    response:
+      status: 200
+      schema: "InvestigateDeviationResponse"
+    business_rules:
+      - "Can only investigate 'open' deviations"
+      - "status changes to 'investigating'"
+      - "Audit log entry created"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-deviations/:id/resolve"
+    summary: "Resolve deviation (QA Manager action)"
+    auth: true
+    roles: ["QA_MANAGER"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    request_body:
+      schema: "ResolveDeviationRequest"
+      example: |
+        {
+          "resolution_notes": "Root cause: Faulty thermometer. Replaced thermometer, recalibrated, retested.",
+          "resolved_at": "2025-01-15T16:30:00Z"
+        }
+    response:
+      status: 200
+      schema: "ResolveDeviationResponse"
+    validation_schema: "resolveDeviationSchema"
+    business_rules:
+      - "Can only resolve 'investigating' deviations"
+      - "resolution_notes required (min 10 chars)"
+      - "status changes to 'resolved'"
+      - "resolved_by = current user"
+      - "resolved_at = now (or provided)"
+      - "Audit log entry created"
+
+  - method: "POST"
+    path: "/api/quality/haccp/ccp-deviations/:id/verify"
+    summary: "Verify deviation resolution (QA Director action)"
+    auth: true
+    roles: ["QA_MANAGER", "DIRECTOR"]
+    path_params:
+      - name: "id"
+        type: "string"
+        format: "uuid"
+    request_body:
+      schema: "VerifyDeviationRequest"
+      example: |
+        {
+          "verified_at": "2025-01-15T17:00:00Z"
+        }
+    response:
+      status: 200
+      schema: "VerifyDeviationResponse"
+    business_rules:
+      - "Can only verify 'resolved' deviations"
+      - "status changes to 'verified'"
+      - "verified_by = current user"
+      - "verified_at = now (or provided)"
+      - "Deviation considered closed after verification"
+      - "Audit log entry created"
+
+  - method: "GET"
+    path: "/api/quality/haccp/ccp-deviations/summary"
+    summary: "Get deviation summary (dashboard metrics)"
+    auth: true
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    query_params:
+      - name: "date_from"
+        type: "string"
+        format: "date"
+        default: "30 days ago"
+      - name: "date_to"
+        type: "string"
+        format: "date"
+        default: "today"
+    response:
+      status: 200
+      schema: "DeviationSummaryResponse"
+      example: |
+        {
+          "total_deviations": 25,
+          "by_severity": {
+            "critical": 3,
+            "major": 10,
+            "minor": 12
+          },
+          "by_status": {
+            "open": 2,
+            "investigating": 5,
+            "resolved": 12,
+            "verified": 6
+          },
+          "by_ccp": [
+            { "ccp_number": "CCP-1", "count": 8 },
+            { "ccp_number": "CCP-2", "count": 5 }
+          ],
+          "avg_resolution_time_hours": 12.5
+        }
+
+# Service Layer
+service:
+  name: "CCPDeviationService"
+  file: "lib/services/ccp-deviation-service.ts"
+  methods:
+    - name: "list"
+      params: ["DeviationListParams"]
+      returns: "PaginatedResult<CCPDeviation>"
+      description: "List deviations with filters and pagination"
+
+    - name: "getById"
+      params: ["id: string"]
+      returns: "DeviationDetail | null"
+      description: "Get deviation by ID with linked records"
+
+    - name: "create"
+      params: ["input: CreateDeviationInput"]
+      returns: "CCPDeviation"
+      description: "Create deviation record (auto-called by monitoring hook)"
+
+    - name: "investigate"
+      params: ["id: string", "notes: string"]
+      returns: "CCPDeviation"
+      description: "Mark deviation as investigating"
+
+    - name: "resolve"
+      params: ["id: string", "resolutionNotes: string", "resolvedAt?: string"]
+      returns: "CCPDeviation"
+      description: "Resolve deviation"
+
+    - name: "verify"
+      params: ["id: string", "verifiedAt?: string"]
+      returns: "CCPDeviation"
+      description: "Verify deviation resolution"
+
+    - name: "determineSeverity"
+      params: ["value: number", "min: number | null", "max: number | null"]
+      returns: "'critical' | 'major' | 'minor'"
+      description: "Calculate severity based on deviation percentage"
+
+    - name: "calculateDeviationAmount"
+      params: ["value: number", "min: number | null", "max: number | null"]
+      returns: "number"
+      description: "Calculate how much over/under limit"
+
+    - name: "calculateDeviationPercentage"
+      params: ["value: number", "min: number | null", "max: number | null"]
+      returns: "number"
+      description: "Calculate % deviation from limit"
+
+    - name: "createNCRForCriticalDeviation"
+      params: ["deviationId: string"]
+      returns: "NCRReport"
+      description: "Auto-create NCR if severity='critical'"
+
+    - name: "getSummary"
+      params: ["dateFrom: string", "dateTo: string"]
+      returns: "DeviationSummary"
+      description: "Get deviation summary for dashboard"
+
+    - name: "getResolutionTime"
+      params: ["deviationId: string"]
+      returns: "number (hours)"
+      description: "Calculate time from open to resolved"
+
+# Validation Schemas
+validation:
+  file: "lib/validation/ccp-deviation-validation.ts"
+  schemas:
+    - name: "createDeviationSchema"
+      type: "z.object"
+      fields:
+        - name: "ccp_monitoring_id"
+          validation: "z.string().uuid()"
+        - name: "ccp_id"
+          validation: "z.string().uuid()"
+        - name: "ccp_number"
+          validation: "z.string().min(1)"
+        - name: "monitored_value"
+          validation: "z.number()"
+        - name: "critical_limit_min"
+          validation: "z.number().optional()"
+        - name: "critical_limit_max"
+          validation: "z.number().optional()"
+        - name: "wo_id"
+          validation: "z.string().uuid().optional()"
+        - name: "batch_number"
+          validation: "z.string().optional()"
+        - name: "lp_id"
+          validation: "z.string().uuid().optional()"
+        - name: "corrective_action"
+          validation: "z.string().min(10).max(2000)"
+
+    - name: "resolveDeviationSchema"
+      type: "z.object"
+      fields:
+        - name: "resolution_notes"
+          validation: "z.string().min(10).max(2000)"
+        - name: "resolved_at"
+          validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}T/).optional()"
+
+    - name: "deviationListQuerySchema"
+      type: "z.object"
+      fields:
+        - name: "ccp_id"
+          validation: "z.string().uuid().optional()"
+        - name: "severity"
+          validation: "deviationSeverityEnum.optional()"
+        - name: "status"
+          validation: "deviationStatusEnum.optional()"
+        - name: "wo_id"
+          validation: "z.string().uuid().optional()"
+        - name: "batch_number"
+          validation: "z.string().optional()"
+        - name: "date_from"
+          validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional()"
+        - name: "date_to"
+          validation: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional()"
+        - name: "sort_by"
+          validation: "z.enum(['created_at', 'severity', 'status']).default('created_at')"
+        - name: "sort_order"
+          validation: "z.enum(['asc', 'desc']).default('desc')"
+        - name: "page"
+          validation: "z.coerce.number().int().positive().default(1)"
+        - name: "limit"
+          validation: "z.coerce.number().int().min(1).max(100).default(20)"
+
+# Error Handling
+errors:
+  - code: 400
+    scenario: "Cannot investigate deviation not in 'open' status"
+    message: "Deviation must be in 'open' status to investigate"
+  - code: 400
+    scenario: "Cannot resolve deviation not in 'investigating' status"
+    message: "Deviation must be in 'investigating' status to resolve"
+  - code: 400
+    scenario: "Cannot verify deviation not in 'resolved' status"
+    message: "Deviation must be in 'resolved' status to verify"
+  - code: 400
+    scenario: "Resolution notes too short"
+    message: "Resolution notes must be at least 10 characters"
+  - code: 403
+    scenario: "Non-QA Manager attempting to resolve"
+    message: "Deviation resolution requires QA Manager role"
+  - code: 404
+    scenario: "Deviation not found"
+    message: "Deviation not found"
+
+# Performance Targets
+performance:
+  - endpoint: "GET /api/quality/haccp/ccp-deviations"
+    target: "<500ms"
+    notes: "With pagination and proper indexes"
+  - endpoint: "GET /api/quality/haccp/ccp-deviations/:id"
+    target: "<500ms"
+    notes: "With linked records join"
+  - endpoint: "POST /api/quality/haccp/ccp-deviations"
+    target: "<300ms"
+    notes: "Includes severity calculation + NCR creation if critical"
+  - endpoint: "POST /api/quality/haccp/ccp-deviations/:id/resolve"
+    target: "<300ms"

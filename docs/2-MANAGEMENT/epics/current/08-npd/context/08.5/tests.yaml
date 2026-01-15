@@ -1,0 +1,379 @@
+tests:
+  unit_tests:
+    file: "apps/frontend/lib/services/__tests__/npd-formulation-service.test.ts"
+
+    test_cases:
+      - id: "UT-01"
+        name: "getFormulationAllergens - returns allergens for valid formulation"
+        setup: |
+          Mock Supabase RPC to return:
+          [
+            { id: '...', code: 'A01', name_en: 'Gluten', ... },
+            { id: '...', code: 'A03', name_en: 'Eggs', ... },
+            { id: '...', code: 'A07', name_en: 'Milk', ... }
+          ]
+        action: |
+          const allergens = await NPDFormulationService.getFormulationAllergens(
+            'formulation-id', 'org-id'
+          );
+        assertions:
+          - "allergens.length === 3"
+          - "allergens[0].code === 'A01'"
+          - "allergens[1].code === 'A03'"
+          - "allergens[2].code === 'A07'"
+
+      - id: "UT-02"
+        name: "getFormulationAllergens - deduplicates allergens"
+        setup: |
+          Mock formulation with 2 items both containing A07-Milk
+          RPC returns A07 only once (DISTINCT in SQL)
+        action: "const allergens = await NPDFormulationService.getFormulationAllergens()"
+        assertions:
+          - "allergens.length === 1"
+          - "allergens[0].code === 'A07'"
+
+      - id: "UT-03"
+        name: "getFormulationAllergens - returns empty array for empty formulation"
+        setup: "Mock RPC to return []"
+        action: "const allergens = await NPDFormulationService.getFormulationAllergens()"
+        assertions:
+          - "allergens.length === 0"
+          - "allergens === []"
+
+      - id: "UT-04"
+        name: "getFormulationAllergens - throws error for RPC failure"
+        setup: "Mock RPC to return error: 'RPC call failed'"
+        action: "await NPDFormulationService.getFormulationAllergens()"
+        assertions:
+          - "expect(fn).rejects.toThrow('Failed to fetch allergens')"
+
+      - id: "UT-05"
+        name: "getAllergenCount - returns correct count"
+        setup: "Mock getFormulationAllergens to return 3 allergens"
+        action: "const count = await NPDFormulationService.getAllergenCount()"
+        assertions:
+          - "count === 3"
+
+      - id: "UT-06"
+        name: "getAllergenName - returns Polish name"
+        setup: "allergen = { name_en: 'Eggs', name_pl: 'Jaja', ... }"
+        action: "const name = NPDFormulationService.getAllergenName(allergen, 'pl')"
+        assertions:
+          - "name === 'Jaja'"
+
+      - id: "UT-07"
+        name: "getAllergenName - falls back to English if German is null"
+        setup: "allergen = { name_en: 'Eggs', name_de: null, ... }"
+        action: "const name = NPDFormulationService.getAllergenName(allergen, 'de')"
+        assertions:
+          - "name === 'Eggs'"
+
+      - id: "UT-08"
+        name: "getFormulationAllergens - returns allergens sorted by code"
+        setup: "Mock RPC to return allergens: A07, A01, A03 (unsorted from DB)"
+        action: "const allergens = await NPDFormulationService.getFormulationAllergens()"
+        assertions:
+          - "allergens[0].code === 'A01'"
+          - "allergens[1].code === 'A03'"
+          - "allergens[2].code === 'A07'"
+        notes: "Sorting handled by SQL ORDER BY a.code ASC"
+
+  integration_tests:
+    file: "apps/frontend/app/api/npd/formulations/__tests__/allergens-route.test.ts"
+
+    test_cases:
+      - id: "IT-01"
+        name: "GET /allergens - returns 200 with allergen array for valid formulation"
+        setup: |
+          Create test formulation with 3 items:
+          - Item 1: Product A (allergens: A01, A07)
+          - Item 2: Product B (allergens: A03)
+          - Item 3: Product C (no allergens)
+        action: "GET /api/npd/formulations/{formulation-id}/allergens"
+        assertions:
+          - "response.status === 200"
+          - "response.body.allergens.length === 3"
+          - "response.body.total === 3"
+          - "response.body.allergens[0].code === 'A01'"
+
+      - id: "IT-02"
+        name: "GET /allergens - returns 404 for invalid formulation ID"
+        setup: "No setup (formulation doesn't exist)"
+        action: "GET /api/npd/formulations/invalid-uuid/allergens"
+        assertions:
+          - "response.status === 404"
+          - "response.body.error === 'Not Found'"
+
+      - id: "IT-03"
+        name: "GET /allergens - returns 401 for unauthenticated request"
+        setup: "Remove auth token"
+        action: "GET /api/npd/formulations/{id}/allergens (no auth)"
+        assertions:
+          - "response.status === 401"
+          - "response.body.error === 'Unauthorized'"
+
+      - id: "IT-04"
+        name: "GET /allergens - returns 403 for formulation in different org"
+        setup: |
+          Create formulation in Org A
+          Authenticate as user in Org B
+        action: "GET /api/npd/formulations/{org-a-formulation-id}/allergens"
+        assertions:
+          - "response.status === 403"
+          - "response.body.error === 'Forbidden'"
+
+      - id: "IT-05"
+        name: "GET /allergens - response includes all language fields"
+        setup: "Create formulation with item containing A01"
+        action: "GET /api/npd/formulations/{id}/allergens"
+        assertions:
+          - "response.body.allergens[0].name_en === 'Gluten'"
+          - "response.body.allergens[0].name_pl === 'Gluten'"
+          - "response.body.allergens[0].name_de === 'Gluten'"
+          - "response.body.allergens[0].name_fr === 'Gluten'"
+
+      - id: "IT-06"
+        name: "GET /allergens - response ordered by code"
+        setup: |
+          Create formulation with items containing A07, A01, A03
+        action: "GET /api/npd/formulations/{id}/allergens"
+        assertions:
+          - "response.body.allergens[0].code === 'A01'"
+          - "response.body.allergens[1].code === 'A03'"
+          - "response.body.allergens[2].code === 'A07'"
+
+      - id: "IT-07"
+        name: "GET /allergens - allergens deduplicated"
+        setup: |
+          Create formulation with 2 items both containing A07
+        action: "GET /api/npd/formulations/{id}/allergens"
+        assertions:
+          - "response.body.allergens.length === 1"
+          - "response.body.allergens[0].code === 'A07'"
+          - "No duplicate allergen IDs"
+
+      - id: "IT-08"
+        name: "GET /allergens - performance check for 20 items"
+        setup: |
+          Create formulation with 20 items, 5 duplicate allergens
+        action: "GET /api/npd/formulations/{id}/allergens"
+        assertions:
+          - "response.time < 200ms"
+          - "response.status === 200"
+
+  e2e_tests:
+    file: "apps/frontend/tests/e2e/npd/formulation-allergen-panel.spec.ts"
+
+    test_cases:
+      - id: "E2E-01"
+        name: "Navigate to formulation detail - allergen panel displayed"
+        steps:
+          - "Login as R&D user"
+          - "Navigate to /npd/formulations/{formulation-id}"
+          - "Wait for page load"
+        assertions:
+          - "Panel with header 'Allergen Declaration' is visible"
+
+      - id: "E2E-02"
+        name: "Formulation with 3 allergens - shows 3 allergens in panel"
+        setup: |
+          Create formulation with items containing A01, A03, A07
+        steps:
+          - "Navigate to formulation detail page"
+          - "Wait for allergen panel to load"
+        assertions:
+          - "Panel shows 3 allergen items"
+          - "A01 - Gluten is visible"
+          - "A03 - Eggs is visible"
+          - "A07 - Milk is visible"
+
+      - id: "E2E-03"
+        name: "Formulation with 0 allergens - shows 'No allergens detected' message"
+        setup: "Create formulation with 0 items (or items with no allergens)"
+        steps:
+          - "Navigate to formulation detail page"
+          - "Wait for panel load"
+        assertions:
+          - "Panel shows message 'No allergens detected'"
+          - "No allergen list items visible"
+
+      - id: "E2E-04"
+        name: "Allergen badge displays count with correct color"
+        setup: "Create formulation with 3 allergens"
+        steps:
+          - "Navigate to formulation detail page"
+          - "Locate allergen count badge"
+        assertions:
+          - "Badge shows '3 Allergens'"
+          - "Badge has yellow/warning background (1-5 allergens)"
+
+      - id: "E2E-05"
+        name: "Allergen icons load or fallback shown"
+        setup: |
+          Create formulation with A01 (icon exists) and A99 (mock allergen with no icon)
+        steps:
+          - "Navigate to formulation detail page"
+          - "Wait for panel load"
+        assertions:
+          - "A01 icon displays from icon_url"
+          - "A99 fallback icon (warning triangle) displays"
+
+      - id: "E2E-06"
+        name: "Add formulation item with allergen - panel auto-refreshes"
+        setup: "Create formulation with 0 allergens"
+        steps:
+          - "Navigate to formulation detail page"
+          - "Click 'Add Item' button"
+          - "Select Product A (contains A01-Gluten)"
+          - "Save item"
+          - "Wait for page refresh/re-render"
+        assertions:
+          - "Allergen panel now shows A01-Gluten"
+          - "Badge shows '1 Allergen'"
+        notes: "Phase 1: Manual page refresh. Phase 2: Real-time update"
+
+      - id: "E2E-07"
+        name: "Remove formulation item - allergen count decreases"
+        setup: |
+          Create formulation with 2 items:
+          - Item 1: Product A (A01)
+          - Item 2: Product B (A03)
+        steps:
+          - "Navigate to formulation detail page"
+          - "Delete Item 1 (Product A)"
+          - "Confirm deletion"
+          - "Wait for page refresh"
+        assertions:
+          - "Allergen panel now shows only A03"
+          - "A01 is no longer visible"
+          - "Badge shows '1 Allergen'"
+
+      - id: "E2E-08"
+        name: "Language change (EN → PL) - allergen names update to Polish"
+        setup: "Create formulation with A03-Eggs"
+        steps:
+          - "Navigate to formulation detail page (EN)"
+          - "Panel shows 'A03 - Eggs'"
+          - "Change user language to Polish"
+          - "Wait for page re-render"
+        assertions:
+          - "Panel now shows 'A03 - Jaja'"
+        notes: "Requires user language preference setting"
+
+      - id: "E2E-09"
+        name: "Panel loads under 300ms"
+        setup: "Create formulation with 5 allergens"
+        steps:
+          - "Navigate to formulation detail page"
+          - "Measure panel load time"
+        assertions:
+          - "Panel renders within 300ms (p95)"
+
+  database_function_tests:
+    file: "supabase/migrations/__tests__/aggregate_formulation_allergens.test.sql"
+
+    test_cases:
+      - id: "DB-01"
+        name: "Function returns allergens for formulation with 3 items"
+        setup: |
+          INSERT formulation with 3 items:
+          - Item 1: Product A (allergens: A01, A07)
+          - Item 2: Product B (allergens: A03)
+          - Item 3: Product C (no allergens)
+        query: "SELECT * FROM aggregate_formulation_allergens('formulation-id');"
+        expected: "3 rows: A01, A03, A07 (sorted by code)"
+
+      - id: "DB-02"
+        name: "Function deduplicates allergens"
+        setup: |
+          INSERT formulation with 2 items both containing A07
+        query: "SELECT * FROM aggregate_formulation_allergens('formulation-id');"
+        expected: "1 row: A07"
+
+      - id: "DB-03"
+        name: "Function returns 0 rows for empty formulation"
+        setup: "INSERT formulation with 0 items"
+        query: "SELECT * FROM aggregate_formulation_allergens('formulation-id');"
+        expected: "0 rows"
+
+      - id: "DB-04"
+        name: "Function filters out inactive allergens"
+        setup: |
+          INSERT formulation with item containing A01
+          UPDATE allergens SET is_active = false WHERE code = 'A01'
+        query: "SELECT * FROM aggregate_formulation_allergens('formulation-id');"
+        expected: "0 rows (A01 filtered out)"
+
+      - id: "DB-05"
+        name: "Function filters out inactive formulation items"
+        setup: |
+          INSERT formulation with 2 items (A01, A03)
+          UPDATE npd_formulation_items SET is_active = false WHERE product_id = item_1
+        query: "SELECT * FROM aggregate_formulation_allergens('formulation-id');"
+        expected: "1 row: A03 (A01 from inactive item filtered out)"
+
+      - id: "DB-06"
+        name: "Function returns allergens sorted by code"
+        setup: |
+          INSERT formulation with items containing A07, A01, A03 (in random order)
+        query: "SELECT code FROM aggregate_formulation_allergens('formulation-id');"
+        expected: "Order: A01, A03, A07"
+
+      - id: "DB-07"
+        name: "Performance test - 20 items with 5 duplicate allergens"
+        setup: |
+          INSERT formulation with 20 items
+          Items contain: A01 (5x), A03 (3x), A07 (7x), A05 (2x), A11 (3x)
+        query: "EXPLAIN ANALYZE SELECT * FROM aggregate_formulation_allergens('formulation-id');"
+        expected: "Query time < 200ms, 5 unique allergens returned"
+
+test_data:
+  formulations:
+    - id: "f1111111-1111-1111-1111-111111111111"
+      org_id: "org-a"
+      items:
+        - product_id: "prod-a"  # Contains A01, A07
+        - product_id: "prod-b"  # Contains A03
+        - product_id: "prod-c"  # No allergens
+
+    - id: "f2222222-2222-2222-2222-222222222222"
+      org_id: "org-a"
+      items:
+        - product_id: "prod-d"  # Contains A07
+        - product_id: "prod-e"  # Contains A07 (duplicate)
+
+    - id: "f3333333-3333-3333-3333-333333333333"
+      org_id: "org-a"
+      items: []  # Empty formulation
+
+  products:
+    - id: "prod-a"
+      name: "Wheat Flour"
+      allergens: ["A01", "A07"]
+
+    - id: "prod-b"
+      name: "Egg Powder"
+      allergens: ["A03"]
+
+    - id: "prod-c"
+      name: "Water"
+      allergens: []
+
+    - id: "prod-d"
+      name: "Milk Powder"
+      allergens: ["A07"]
+
+    - id: "prod-e"
+      name: "Cream"
+      allergens: ["A07"]
+
+test_coverage_targets:
+  unit_tests: ">80%"
+  integration_tests: "100% of API endpoints"
+  e2e_tests: "Critical user flows (panel rendering, auto-refresh)"
+
+ci_pipeline:
+  - "Run unit tests on every commit"
+  - "Run integration tests on PR to main"
+  - "Run E2E tests nightly"
+  - "Performance tests on staging before deploy"

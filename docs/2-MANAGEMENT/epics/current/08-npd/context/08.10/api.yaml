@@ -1,0 +1,259 @@
+# Story 08.10 - API Specification
+# Purpose: Risk management endpoints
+# Agent: BACKEND-DEV (API focus)
+
+# Risk Management Endpoints
+risk_endpoints:
+  base_path: "/api/npd"
+
+  - method: "GET"
+    path: "/api/npd/projects/:projectId/risks"
+    description: "List risks for project with filtering and sorting"
+    auth: "required"
+    roles: ["NPD_LEAD", "R&D", "VIEWER"]
+    query_params:
+      - { name: "status", type: "enum", values: ["open", "mitigated", "closed"], optional: true }
+      - { name: "owner_id", type: "uuid", optional: true }
+      - { name: "min_score", type: "integer", optional: true }
+      - { name: "sort_by", type: "enum", values: ["risk_score", "status", "owner", "created_at"], default: "risk_score" }
+      - { name: "sort_order", type: "enum", values: ["asc", "desc"], default: "desc" }
+    response:
+      status: 200
+      type: "RisksListResponse"
+      schema:
+        risks: "RiskWithOwner[]"
+        total: "number"
+        summary:
+          total_count: "number"
+          open_count: "number"
+          mitigated_count: "number"
+          closed_count: "number"
+          critical_count: "number (score >= 20)"
+          high_count: "number (score >= 12)"
+    logic:
+      - "Query npd_risks WHERE npd_project_id = :projectId"
+      - "Apply filters (status, owner_id, min_score)"
+      - "Join with users table for owner name"
+      - "Calculate summary counts"
+      - "Sort by specified column and order"
+      - "RLS enforces org_id isolation"
+    error_responses:
+      - { status: 401, reason: "Unauthorized" }
+      - { status: 404, reason: "Project not found" }
+      - { status: 500, reason: "Database error" }
+
+  - method: "POST"
+    path: "/api/npd/risks"
+    description: "Create new risk"
+    auth: "required"
+    roles: ["NPD_LEAD", "R&D"]
+    request:
+      type: "CreateRiskRequest"
+      schema:
+        npd_project_id: "number (required)"
+        risk_description: "string (min 10, max 2000, required)"
+        likelihood: "1 | 2 | 3 | 4 | 5 (required)"
+        impact: "1 | 2 | 3 | 4 | 5 (required)"
+        mitigation_plan: "string (max 2000, optional)"
+        status: "enum (default: 'open')"
+        owner_id: "uuid | null (optional)"
+      validation:
+        - "risk_description: min 10 chars, max 2000 chars"
+        - "likelihood: 1-5"
+        - "impact: 1-5"
+        - "risk_score auto-calculated by trigger"
+    response:
+      status: 201
+      type: "RiskWithOwner"
+    logic:
+      - "Validate Zod schema (createRiskSchema)"
+      - "Validate npd_project_id exists"
+      - "Validate owner_id exists (if provided)"
+      - "Insert risk record (risk_score calculated by trigger)"
+      - "Return risk with owner joined"
+    error_responses:
+      - { status: 401, reason: "Unauthorized" }
+      - { status: 403, reason: "Forbidden - not NPD_LEAD/R&D" }
+      - { status: 400, reason: "Validation error (Zod)" }
+      - { status: 404, reason: "Project not found" }
+      - { status: 500, reason: "Database error" }
+
+  - method: "PUT"
+    path: "/api/npd/risks/:id"
+    description: "Update existing risk"
+    auth: "required"
+    roles: ["NPD_LEAD", "R&D (owner only)"]
+    request:
+      type: "UpdateRiskRequest (partial)"
+      schema:
+        risk_description: "string (optional)"
+        likelihood: "1-5 (optional)"
+        impact: "1-5 (optional)"
+        mitigation_plan: "string | null (optional)"
+        status: "enum (optional)"
+        owner_id: "uuid | null (optional)"
+    response:
+      status: 200
+      type: "RiskWithOwner"
+    logic:
+      - "Validate Zod schema (updateRiskSchema)"
+      - "Check user role (NPD_LEAD or R&D owner)"
+      - "Update risk (risk_score recalculated if likelihood/impact changed)"
+      - "Return updated risk with owner joined"
+    error_responses:
+      - { status: 401, reason: "Unauthorized" }
+      - { status: 403, reason: "Forbidden - not owner or NPD_LEAD" }
+      - { status: 400, reason: "Validation error" }
+      - { status: 404, reason: "Risk not found" }
+      - { status: 500, reason: "Database error" }
+
+  - method: "DELETE"
+    path: "/api/npd/risks/:id"
+    description: "Delete risk"
+    auth: "required"
+    roles: ["NPD_LEAD"]
+    response:
+      status: 204
+    logic:
+      - "Check user role (NPD_LEAD only)"
+      - "Delete risk WHERE id = :id"
+      - "RLS enforces org_id isolation"
+    error_responses:
+      - { status: 401, reason: "Unauthorized" }
+      - { status: 403, reason: "Forbidden - not NPD_LEAD" }
+      - { status: 404, reason: "Risk not found" }
+      - { status: 500, reason: "Database error" }
+
+  - method: "GET"
+    path: "/api/npd/projects/:projectId/risks/matrix"
+    description: "Get risk matrix data (5x5 grid)"
+    auth: "required"
+    roles: ["NPD_LEAD", "R&D", "VIEWER"]
+    response:
+      status: 200
+      type: "RiskMatrixResponse"
+      schema:
+        project:
+          id: "number"
+          project_number: "string"
+          project_name: "string"
+        matrix: "RiskMatrixCell[][] (5x5 array)"
+        total_risks: "number"
+    logic:
+      - "Fetch all open/mitigated risks for project"
+      - "Build 5×5 matrix (likelihood × impact)"
+      - "Count risks in each cell"
+      - "Categorize severity (critical/high/medium/low)"
+      - "Return matrix with risk details per cell"
+    error_responses:
+      - { status: 401, reason: "Unauthorized" }
+      - { status: 404, reason: "Project not found" }
+      - { status: 500, reason: "Database error" }
+
+# Services
+services:
+  - path: "lib/services/risk-service.ts"
+    description: "Risk management business logic"
+    exports:
+      - name: "listRisks"
+        signature: "(projectId: number, filters?: RiskFilters): Promise<RisksListResponse>"
+        description: "List risks with filtering and sorting"
+
+      - name: "getRisk"
+        signature: "(id: number): Promise<RiskWithOwner>"
+        description: "Get single risk by ID"
+
+      - name: "createRisk"
+        signature: "(data: CreateRiskRequest): Promise<RiskWithOwner>"
+        description: "Create new risk"
+
+      - name: "updateRisk"
+        signature: "(id: number, data: UpdateRiskRequest): Promise<RiskWithOwner>"
+        description: "Update existing risk"
+
+      - name: "deleteRisk"
+        signature: "(id: number): Promise<void>"
+        description: "Delete risk"
+
+      - name: "getRiskMatrix"
+        signature: "(projectId: number): Promise<RiskMatrixResponse>"
+        description: "Get 5x5 risk matrix for visualization"
+
+      - name: "getRiskSummary"
+        signature: "(projectId: number): Promise<RiskSummary>"
+        description: "Get risk counts by status and severity"
+
+      - name: "calculateSeverity"
+        signature: "(score: number): 'critical' | 'high' | 'medium' | 'low'"
+        description: "Calculate severity from risk_score"
+
+      - name: "canEditRisk"
+        signature: "(riskId: number, userId: string): Promise<boolean>"
+        description: "Check if user can edit risk (permission check)"
+
+# Type Definitions
+types:
+  RiskWithOwner:
+    description: "Risk record with owner details"
+    fields:
+      - { name: "id", type: "number" }
+      - { name: "org_id", type: "string" }
+      - { name: "npd_project_id", type: "number" }
+      - { name: "risk_description", type: "string" }
+      - { name: "likelihood", type: "1 | 2 | 3 | 4 | 5" }
+      - { name: "impact", type: "1 | 2 | 3 | 4 | 5" }
+      - { name: "risk_score", type: "number" }
+      - { name: "mitigation_plan", type: "string | null" }
+      - { name: "status", type: "'open' | 'mitigated' | 'closed'" }
+      - { name: "owner_id", type: "string | null" }
+      - { name: "owner", type: "{ id: string, name: string, email: string } | null" }
+      - { name: "created_at", type: "string" }
+      - { name: "updated_at", type: "string" }
+      - { name: "created_by", type: "string" }
+      - { name: "created_by_name", type: "string" }
+
+  RiskMatrixCell:
+    description: "Individual cell in 5x5 risk matrix"
+    fields:
+      - { name: "likelihood", type: "1 | 2 | 3 | 4 | 5" }
+      - { name: "impact", type: "1 | 2 | 3 | 4 | 5" }
+      - { name: "count", type: "number" }
+      - { name: "risk_score", type: "number" }
+      - { name: "severity", type: "'critical' | 'high' | 'medium' | 'low'" }
+      - { name: "risks", type: "RiskMatrixRisk[]" }
+
+# API Route Files
+route_files:
+  - path: "apps/frontend/app/api/npd/projects/[projectId]/risks/route.ts"
+    methods: ["GET"]
+    description: "List risks for project"
+
+  - path: "apps/frontend/app/api/npd/risks/route.ts"
+    methods: ["POST"]
+    description: "Create new risk"
+
+  - path: "apps/frontend/app/api/npd/risks/[id]/route.ts"
+    methods: ["PUT", "DELETE"]
+    description: "Update or delete risk"
+
+  - path: "apps/frontend/app/api/npd/projects/[projectId]/risks/matrix/route.ts"
+    methods: ["GET"]
+    description: "Get risk matrix visualization data"
+
+# Error handling patterns
+error_patterns:
+  - scenario: "Risk description too short"
+    status: 400
+    response: { error: "Risk description must be at least 10 characters" }
+
+  - scenario: "Invalid likelihood/impact value"
+    status: 400
+    response: { error: "Likelihood and impact must be between 1 and 5" }
+
+  - scenario: "Non-owner tries to update"
+    status: 403
+    response: { error: "Only risk owner or NPD Lead can update this risk" }
+
+  - scenario: "Non-NPD-Lead tries to delete"
+    status: 403
+    response: { error: "Only NPD Lead can delete risks" }

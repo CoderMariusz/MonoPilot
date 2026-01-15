@@ -1,0 +1,50 @@
+# Story 08.11 - Frontend Specification
+# Purpose: 8-step handoff wizard UI
+# Agent: FRONTEND-DEV
+# SEE: docs/2-MANAGEMENT/epics/current/08-npd/08.11.handoff-wizard.md (lines 935-960)
+
+page:
+  path: "apps/frontend/app/(authenticated)/npd/projects/[id]/handoff/page.tsx"
+  description: "Handoff wizard main page with 8 steps"
+
+components:
+  wizard:
+    - path: "components/npd/handoff/HandoffWizard.tsx"
+      description: "Main wizard container with stepper"
+    - path: "components/npd/handoff/HandoffProgressBar.tsx"
+      description: "Progress indicator (1-8)"
+
+  steps:
+    - path: "components/npd/handoff/ValidationChecklistStep.tsx"
+      description: "Step 1: Validation checks with pass/fail"
+    - path: "components/npd/handoff/ProductDecisionStep.tsx"
+      description: "Step 2: Create new or update existing product"
+    - path: "components/npd/handoff/BOMPreviewStep.tsx"
+      description: "Step 3: Formulation → BOM mapping preview"
+    - path: "components/npd/handoff/PilotWOToggleStep.tsx"
+      description: "Step 4: Optional pilot WO toggle"
+    - path: "components/npd/handoff/RoutingSelectionStep.tsx"
+      description: "Step 5: Routing selection (if pilot WO)"
+    - path: "components/npd/handoff/SummaryReviewStep.tsx"
+      description: "Step 6: Summary of all actions"
+    - path: "components/npd/handoff/ExecuteHandoffStep.tsx"
+      description: "Step 7: Execute with progress bar"
+    - path: "components/npd/handoff/SuccessConfirmationStep.tsx"
+      description: "Step 8: Success with links to created records"
+
+  shared:
+    - "ValidationCheckItem.tsx - Individual check with ✅/❌"
+    - "BlockerAlert.tsx - Blocker message with fix action"
+    - "ProductCreationForm.tsx - New product form"
+    - "ProductSelector.tsx - Existing product search"
+    - "BOMPreviewTable.tsx - Formulation → BOM mapping"
+    - "PilotWOForm.tsx - Pilot WO fields"
+    - "RoutingSelector.tsx - Routing dropdown"
+    - "HandoffSummaryCard.tsx - Summary section"
+    - "HandoffErrorAlert.tsx - Error with retry"
+
+state_machine:
+  steps: 8
+  navigation: "Linear (can go back, not forward until validated)"
+  validation_blocking: "Step 1 must pass before proceeding"
+  state_persistence: "Form state preserved on back navigation"

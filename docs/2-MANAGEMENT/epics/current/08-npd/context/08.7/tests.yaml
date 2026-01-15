@@ -1,0 +1,650 @@
+# Story 08.7 - Tests Context
+# Generated: 2026-01-15
+# Purpose: Test specifications, acceptance criteria, test cases for formulation costing
+
+# Test Strategy
+test_strategy:
+  unit_tests:
+    framework: "Vitest"
+    coverage_target: ">80%"
+    focus:
+      - "formulation-costing-service.ts (all methods)"
+      - "Helper functions (calculateVariancePercent, getVarianceType)"
+      - "Component logic (FormulationCostingCard state management)"
+
+  integration_tests:
+    framework: "Vitest + Supertest"
+    coverage_target: "All API endpoints"
+    focus:
+      - "PUT /api/npd/formulations/:id/costing/target"
+      - "GET /api/npd/formulations/:id/costing"
+      - "POST /api/npd/formulations/:id/costing/recalculate"
+      - "POST /api/npd/formulations/:id/costing/submit"
+      - "POST /api/npd/formulations/:id/costing/approve"
+      - "POST /api/npd/formulations/:id/costing/reject"
+      - "GET /api/npd/formulations/:id/costing/history"
+
+  e2e_tests:
+    framework: "Playwright"
+    coverage_target: "Critical user flows"
+    focus:
+      - "Complete costing workflow: Set target → Recalculate → Submit → Approve"
+      - "Variance alert display and handoff blocking"
+      - "Cost history navigation"
+
+# Unit Tests
+unit_tests:
+  - file: "formulation-costing-service.test.ts"
+    description: "Tests for formulation costing service methods"
+    tests:
+      - name: "calculateVariancePercent() - positive variance"
+        test: |
+          const variance = calculateVariancePercent(100, 110);
+          expect(variance).toBe(10);
+
+      - name: "calculateVariancePercent() - negative variance (favorable)"
+        test: |
+          const variance = calculateVariancePercent(100, 90);
+          expect(variance).toBe(-10);
+
+      - name: "calculateVariancePercent() - zero variance"
+        test: |
+          const variance = calculateVariancePercent(100, 100);
+          expect(variance).toBe(0);
+
+      - name: "getVarianceType() - blocker threshold exceeded"
+        test: |
+          const type = getVarianceType(55, 20, 50);
+          expect(type).toBe('blocker');
+
+      - name: "getVarianceType() - warning threshold exceeded"
+        test: |
+          const type = getVarianceType(25, 20, 50);
+          expect(type).toBe('warning');
+
+      - name: "getVarianceType() - within normal range"
+        test: |
+          const type = getVarianceType(15, 20, 50);
+          expect(type).toBe('none');
+
+      - name: "getFormulationCosting() - creates default record if not exists"
+        test: |
+          const costing = await getFormulationCosting(123);
+          expect(costing.status).toBe('draft');
+          expect(costing.target_cost).toBeNull();
+
+      - name: "setTargetCost() - updates target cost"
+        test: |
+          const costing = await setTargetCost(123, 50.00, "Target set at G2");
+          expect(costing.target_cost).toBe(50.00);
+          expect(costing.notes).toBe("Target set at G2");
+
+      - name: "setTargetCost() - throws error if costing approved"
+        test: |
+          await expect(setTargetCost(123, 50.00)).rejects.toThrow('Cannot edit approved costing');
+
+      - name: "recalculateEstimatedCost() - calculates from formulation items"
+        test: |
+          const costing = await recalculateEstimatedCost(123);
+          expect(costing.estimated_cost).toBe(140.00); // Sum of items
+
+      - name: "recalculateEstimatedCost() - throws error if ingredient missing cost"
+        test: |
+          await expect(recalculateEstimatedCost(123)).rejects.toThrow('Missing cost data for ingredient: Flour');
+
+      - name: "submitCosting() - changes status to submitted"
+        test: |
+          const costing = await submitCosting(123, "Ready for review");
+          expect(costing.status).toBe('submitted');
+
+      - name: "submitCosting() - throws error if status not draft/rejected"
+        test: |
+          await expect(submitCosting(123)).rejects.toThrow('Cannot submit costing with status');
+
+      - name: "approveCosting() - sets approved_by and approved_at"
+        test: |
+          const costing = await approveCosting(123, "Approved for handoff");
+          expect(costing.status).toBe('approved');
+          expect(costing.approved_by).toBeTruthy();
+          expect(costing.approved_at).toBeTruthy();
+
+      - name: "approveCosting() - throws error if user lacks Finance role"
+        test: |
+          await expect(approveCosting(123)).rejects.toThrow('Finance role required');
+
+      - name: "rejectCosting() - appends rejection reason to notes"
+        test: |
+          const costing = await rejectCosting(123, "Target cost too low");
+          expect(costing.status).toBe('rejected');
+          expect(costing.notes).toContain("Target cost too low");
+
+      - name: "getCostingHistory() - returns all versions for project"
+        test: |
+          const history = await getCostingHistory(123);
+          expect(history.history.length).toBe(3); // 3 formulation versions
+          expect(history.history[0].formulation_number).toBe("v2.0");
+
+      - name: "getVarianceAlert() - returns blocker alert for variance > 50%"
+        test: |
+          const alert = await getVarianceAlert(55, { cost_variance_warning_pct: 20, cost_variance_blocker_pct: 50 });
+          expect(alert.type).toBe('blocker');
+          expect(alert.threshold_exceeded).toBe(true);
+
+      - name: "getVarianceAlert() - returns warning alert for variance 20-50%"
+        test: |
+          const alert = await getVarianceAlert(25, { cost_variance_warning_pct: 20, cost_variance_blocker_pct: 50 });
+          expect(alert.type).toBe('warning');
+          expect(alert.threshold_exceeded).toBe(true);
+
+      - name: "getVarianceAlert() - returns none for variance < 20%"
+        test: |
+          const alert = await getVarianceAlert(15, { cost_variance_warning_pct: 20, cost_variance_blocker_pct: 50 });
+          expect(alert.type).toBe('none');
+          expect(alert.threshold_exceeded).toBe(false);
+
+# Integration Tests
+integration_tests:
+  - endpoint: "PUT /api/npd/formulations/:id/costing/target"
+    description: "Set target cost for formulation"
+    tests:
+      - name: "AC-1.1: Set target cost successfully"
+        request:
+          method: "PUT"
+          path: "/api/npd/formulations/123/costing/target"
+          body: { target_cost: 50.00, notes: "Target set at G2" }
+          headers: { "Authorization": "Bearer {token}" }
+        expected_response:
+          status: 200
+          body:
+            target_cost: 50.00
+            notes: "Target set at G2"
+            status: "draft"
+
+      - name: "AC-1.2: Reject target cost = 0"
+        request:
+          method: "PUT"
+          path: "/api/npd/formulations/123/costing/target"
+          body: { target_cost: 0 }
+        expected_response:
+          status: 400
+          body: { error: "Target cost must be greater than 0" }
+
+      - name: "AC-1.3: Reject target cost < 0"
+        request:
+          method: "PUT"
+          path: "/api/npd/formulations/123/costing/target"
+          body: { target_cost: -10 }
+        expected_response:
+          status: 400
+          body: { error: "Target cost must be greater than 0" }
+
+      - name: "AC-1.4: Reject edit on approved costing"
+        setup: "Create costing with status = 'approved'"
+        request:
+          method: "PUT"
+          path: "/api/npd/formulations/123/costing/target"
+          body: { target_cost: 60.00 }
+        expected_response:
+          status: 409
+          body: { error: "Cannot edit approved costing" }
+
+  - endpoint: "GET /api/npd/formulations/:id/costing"
+    description: "Get costing data with breakdown"
+    tests:
+      - name: "AC-2.1: Get costing with breakdown"
+        request:
+          method: "GET"
+          path: "/api/npd/formulations/123/costing"
+        expected_response:
+          status: 200
+          body:
+            target_cost: 50.00
+            estimated_cost: 35.00
+            actual_cost: 37.50
+            variance_pct: 7.14
+            status: "approved"
+            breakdown:
+              items:
+                - { product_name: "Flour", quantity: 50, unit_cost: 2.00, total_cost: 100.00, percentage: 71.43 }
+                - { product_name: "Sugar", quantity: 30, unit_cost: 1.00, total_cost: 30.00, percentage: 21.43 }
+              total_cost: 140.00
+            variance_alert:
+              type: "none"
+              threshold_exceeded: false
+
+      - name: "AC-2.2: Create default costing if not exists"
+        setup: "Formulation exists but no costing record"
+        request:
+          method: "GET"
+          path: "/api/npd/formulations/123/costing"
+        expected_response:
+          status: 200
+          body:
+            status: "draft"
+            target_cost: null
+            estimated_cost: null
+            actual_cost: null
+            variance_pct: null
+
+  - endpoint: "POST /api/npd/formulations/:id/costing/recalculate"
+    description: "Recalculate estimated cost"
+    tests:
+      - name: "AC-3.1: Recalculate estimated cost successfully"
+        setup: "Formulation with 3 items (Flour $100, Sugar $30, Water $2)"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/recalculate"
+        expected_response:
+          status: 200
+          body:
+            estimated_cost: 132.00
+
+      - name: "AC-3.2: Throw error if ingredient missing cost_per_unit"
+        setup: "Formulation has item with product.cost_per_unit = NULL"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/recalculate"
+        expected_response:
+          status: 400
+          body: { error: "Missing cost data for ingredient: Flour" }
+
+  - endpoint: "POST /api/npd/formulations/:id/costing/submit"
+    description: "Submit costing for approval"
+    tests:
+      - name: "AC-7.1: Submit costing successfully (draft -> submitted)"
+        setup: "Costing with status = 'draft'"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/submit"
+          body: { notes: "Ready for Finance review" }
+        expected_response:
+          status: 200
+          body:
+            status: "submitted"
+            notes: "Ready for Finance review"
+
+      - name: "AC-7.2: Reject submit if status not draft/rejected"
+        setup: "Costing with status = 'approved'"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/submit"
+        expected_response:
+          status: 400
+          body: { error: "Cannot submit costing with status 'approved'" }
+
+  - endpoint: "POST /api/npd/formulations/:id/costing/approve"
+    description: "Approve costing (Finance role)"
+    tests:
+      - name: "AC-7.3: Approve costing successfully (submitted -> approved)"
+        setup: "Costing with status = 'submitted', user has Finance role"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/approve"
+          body: { notes: "Approved for handoff" }
+        expected_response:
+          status: 200
+          body:
+            status: "approved"
+            approved_by: "{current_user_id}"
+            approved_at: "{timestamp}"
+            notes: "Approved for handoff"
+
+      - name: "AC-7.4: Reject approve if user lacks Finance role"
+        setup: "User with R&D role"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/approve"
+        expected_response:
+          status: 403
+          body: { error: "Finance role required" }
+
+      - name: "AC-7.5: Reject approve if status not submitted"
+        setup: "Costing with status = 'draft'"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/approve"
+        expected_response:
+          status: 400
+          body: { error: "Costing status must be 'submitted' to approve" }
+
+  - endpoint: "POST /api/npd/formulations/:id/costing/reject"
+    description: "Reject costing (Finance role)"
+    tests:
+      - name: "AC-7.6: Reject costing successfully (submitted -> rejected)"
+        setup: "Costing with status = 'submitted', user has Finance role"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/reject"
+          body: { reason: "Target cost too low - revise to $60" }
+        expected_response:
+          status: 200
+          body:
+            status: "rejected"
+            notes: "Rejected: Target cost too low - revise to $60"
+
+      - name: "AC-7.7: Reject if reason missing"
+        request:
+          method: "POST"
+          path: "/api/npd/formulations/123/costing/reject"
+          body: { reason: "" }
+        expected_response:
+          status: 400
+          body: { error: "Rejection reason is required (min 5 characters)" }
+
+  - endpoint: "GET /api/npd/formulations/:id/costing/history"
+    description: "Get cost history for project"
+    tests:
+      - name: "AC-6.1: Get cost history for all versions"
+        setup: "Project NPD-001 with 3 formulation versions (v1.0, v1.1, v2.0)"
+        request:
+          method: "GET"
+          path: "/api/npd/formulations/123/costing/history"
+        expected_response:
+          status: 200
+          body:
+            history:
+              - { formulation_number: "v2.0", target_cost: 55.00, estimated_cost: 40.00, variance_pct: -27.27, status: "approved" }
+              - { formulation_number: "v1.1", target_cost: 50.00, estimated_cost: 35.00, variance_pct: -30.00, status: "approved" }
+              - { formulation_number: "v1.0", target_cost: 50.00, estimated_cost: 45.00, variance_pct: -10.00, status: "approved" }
+
+# Database Trigger Tests
+database_trigger_tests:
+  - trigger: "trg_auto_update_formulation_cost"
+    description: "Auto-update estimated_cost when formulation_items change"
+    tests:
+      - name: "AC-10.1: Auto-recalculate on item quantity change"
+        setup: |
+          INSERT INTO npd_formulation_items (formulation_id, product_id, quantity, uom)
+          VALUES (123, 'prod-001', 50, 'kg');
+          -- Assume product_id 'prod-001' has cost_per_unit = 2.00
+        action: |
+          UPDATE npd_formulation_items SET quantity = 60 WHERE formulation_id = 123 AND product_id = 'prod-001';
+        expected_result: |
+          SELECT estimated_cost FROM npd_costing WHERE formulation_id = 123;
+          -- Should be recalculated: 60 * 2.00 = 120.00 (assuming only one item)
+
+      - name: "AC-10.2: Auto-recalculate on item add"
+        setup: "Formulation with estimated_cost = 100.00"
+        action: |
+          INSERT INTO npd_formulation_items (formulation_id, product_id, quantity, uom)
+          VALUES (123, 'prod-002', 20, 'kg');
+          -- Assume product_id 'prod-002' has cost_per_unit = 1.50
+        expected_result: |
+          SELECT estimated_cost FROM npd_costing WHERE formulation_id = 123;
+          -- Should be: 100.00 + (20 * 1.50) = 130.00
+
+      - name: "AC-10.3: Auto-recalculate on item delete"
+        setup: "Formulation with 2 items, estimated_cost = 130.00"
+        action: |
+          DELETE FROM npd_formulation_items WHERE formulation_id = 123 AND product_id = 'prod-002';
+        expected_result: |
+          SELECT estimated_cost FROM npd_costing WHERE formulation_id = 123;
+          -- Should be: 130.00 - 30.00 = 100.00
+
+  - trigger: "trg_auto_calculate_cost_variance"
+    description: "Auto-calculate variance_pct when target/actual cost changes"
+    tests:
+      - name: "AC-4.1: Calculate variance on target_cost update"
+        setup: "Costing with actual_cost = 110.00"
+        action: |
+          UPDATE npd_costing SET target_cost = 100.00 WHERE id = 1;
+        expected_result: |
+          SELECT variance_pct FROM npd_costing WHERE id = 1;
+          -- Should be: ((110 - 100) / 100) * 100 = 10.00
+
+      - name: "AC-4.2: Calculate variance on actual_cost update"
+        setup: "Costing with target_cost = 100.00"
+        action: |
+          UPDATE npd_costing SET actual_cost = 130.00 WHERE id = 1;
+        expected_result: |
+          SELECT variance_pct FROM npd_costing WHERE id = 1;
+          -- Should be: ((130 - 100) / 100) * 100 = 30.00
+
+      - name: "AC-4.3: Favorable variance (actual < target)"
+        setup: "Costing with target_cost = 100.00"
+        action: |
+          UPDATE npd_costing SET actual_cost = 90.00 WHERE id = 1;
+        expected_result: |
+          SELECT variance_pct FROM npd_costing WHERE id = 1;
+          -- Should be: ((90 - 100) / 100) * 100 = -10.00
+
+# E2E Tests (Playwright)
+e2e_tests:
+  - flow: "Complete costing workflow"
+    description: "R&D sets target → Recalculates → Submits → Finance approves"
+    steps:
+      - step: "1. Navigate to formulation detail page"
+        action: "Click formulation 'NPD-001 v1.0' from list"
+        expected: "Formulation detail page loads with costing section"
+
+      - step: "2. Set target cost"
+        action: "Click [Set Target Cost] button, enter 50.00, click Save"
+        expected: "Target cost $50.00 displays in costing summary"
+
+      - step: "3. Recalculate estimated cost"
+        action: "Click [Recalculate Estimated Cost] button"
+        expected: "Estimated cost $35.00 displays (calculated from items)"
+
+      - step: "4. View cost breakdown"
+        action: "Click [View Breakdown] to expand table"
+        expected: "Breakdown table shows Flour $100 (71.4%), Sugar $30 (21.4%), Water $2 (1.4%)"
+
+      - step: "5. Submit for approval"
+        action: "Click [Submit for Approval] button"
+        expected: "Status changes to 'Submitted', toast 'Costing submitted for approval'"
+
+      - step: "6. Switch to Finance user"
+        action: "Logout R&D user, login as Finance user"
+        expected: "Finance dashboard loads"
+
+      - step: "7. Navigate to same formulation"
+        action: "Navigate to formulation 'NPD-001 v1.0'"
+        expected: "Costing section shows status 'Submitted', [Approve]/[Reject] buttons visible"
+
+      - step: "8. Approve costing"
+        action: "Click [Approve] button, enter notes 'Approved for handoff', click Confirm"
+        expected: "Status changes to 'Approved', approved_by = Finance user, toast 'Costing approved'"
+
+      - step: "9. Verify handoff enabled"
+        action: "Navigate to project detail, click [Handoff] button"
+        expected: "Handoff wizard validation passes for costing approval"
+
+  - flow: "Variance alert and handoff blocking"
+    description: "Actual cost exceeds blocker threshold, handoff blocked"
+    steps:
+      - step: "1. Set target cost $100"
+        action: "Set target cost to $100.00"
+        expected: "Target cost displays"
+
+      - step: "2. Record high actual cost from pilot WO"
+        setup: "Pilot WO completes with material cost $160 (60% variance)"
+        action: "System auto-updates actual_cost = $160 in npd_costing"
+        expected: "Actual cost $160 displays, variance +60% (red badge)"
+
+      - step: "3. View variance alert"
+        action: "Page loads costing section"
+        expected: "Red blocker alert displays: 'Cost variance exceeds 50% limit. Handoff blocked...'"
+
+      - step: "4. Attempt handoff"
+        action: "Navigate to project, click [Handoff] button"
+        expected: "Handoff wizard validation fails: 'Cost variance {60%} exceeds blocker threshold {50%}. Cannot proceed with handoff.'"
+
+      - step: "5. Reduce variance"
+        action: "Adjust target cost to $155 (variance now 3.2%)"
+        expected: "Variance badge changes to yellow (3.2%), blocker alert removed"
+
+      - step: "6. Retry handoff"
+        action: "Click [Handoff] button"
+        expected: "Handoff wizard validation passes"
+
+  - flow: "Cost history navigation"
+    description: "View cost history for all formulation versions"
+    steps:
+      - step: "1. Navigate to formulation v2.0"
+        action: "Click formulation 'NPD-001 v2.0' from list"
+        expected: "Formulation detail page loads"
+
+      - step: "2. Open cost history"
+        action: "Click [View Cost History] link in costing section"
+        expected: "Cost history modal opens with table"
+
+      - step: "3. Verify history data"
+        action: "View table rows"
+        expected: |
+          Table shows 3 rows:
+          - v2.0: Target $55, Estimated $40, Actual N/A, Variance N/A, Status: Draft
+          - v1.1: Target $50, Estimated $35, Actual $37.50, Variance +7.1%, Status: Approved
+          - v1.0: Target $50, Estimated $45, Actual $47, Variance -6%, Status: Approved
+
+      - step: "4. Sort by variance"
+        action: "Click 'Variance %' column header to sort DESC"
+        expected: "Rows reorder: v1.1 (+7.1%) at top"
+
+      - step: "5. Close modal"
+        action: "Click [X] or press ESC"
+        expected: "Modal closes, formulation detail page still visible"
+
+# Performance Tests
+performance_tests:
+  - test: "Cost calculation with 50 formulation items"
+    target: "<500ms"
+    method: "POST /api/npd/formulations/:id/costing/recalculate"
+    setup: "Formulation with 50 items"
+    measure: "Response time from request to response"
+    expected: "<500ms (p95)"
+
+  - test: "Cost breakdown table render"
+    target: "<300ms"
+    component: "CostBreakdownTable"
+    setup: "50 formulation items"
+    measure: "Time from data load to table render complete"
+    expected: "<300ms"
+
+  - test: "Costing section load"
+    target: "<500ms"
+    page: "/npd/formulations/:id"
+    measure: "Time from page load to costing section fully rendered"
+    expected: "<500ms (p95)"
+
+# Acceptance Criteria Mapping
+acceptance_criteria_mapping:
+  AC-1:
+    name: "Target Cost Entry"
+    tests:
+      - "integration_tests: PUT /api/npd/formulations/:id/costing/target (AC-1.1, 1.2, 1.3, 1.4)"
+      - "e2e_tests: Complete costing workflow (step 2)"
+
+  AC-2:
+    name: "Estimated Cost Calculation"
+    tests:
+      - "integration_tests: GET /api/npd/formulations/:id/costing (AC-2.1, 2.2)"
+      - "integration_tests: POST recalculate (AC-3.1, 3.2)"
+      - "unit_tests: recalculateEstimatedCost() method"
+      - "e2e_tests: Complete costing workflow (step 3)"
+
+  AC-3:
+    name: "Actual Cost Recording"
+    tests:
+      - "integration_tests: GET /api/npd/formulations/:id/costing (actual_cost field)"
+      - "e2e_tests: Variance alert flow (step 2)"
+
+  AC-4:
+    name: "Cost Variance Calculation"
+    tests:
+      - "unit_tests: calculateVariancePercent() method"
+      - "database_trigger_tests: trg_auto_calculate_cost_variance (AC-4.1, 4.2, 4.3)"
+      - "e2e_tests: Variance alert flow (step 2)"
+
+  AC-5:
+    name: "Variance Alerts"
+    tests:
+      - "unit_tests: getVarianceAlert() method"
+      - "e2e_tests: Variance alert flow (steps 3, 4)"
+
+  AC-6:
+    name: "Cost History Tracking"
+    tests:
+      - "integration_tests: GET /api/npd/formulations/:id/costing/history (AC-6.1)"
+      - "e2e_tests: Cost history navigation (all steps)"
+
+  AC-7:
+    name: "Finance Approval Workflow"
+    tests:
+      - "integration_tests: POST submit (AC-7.1, 7.2)"
+      - "integration_tests: POST approve (AC-7.3, 7.4, 7.5)"
+      - "integration_tests: POST reject (AC-7.6, 7.7)"
+      - "e2e_tests: Complete costing workflow (steps 5-9)"
+
+  AC-8:
+    name: "Costing Section Display"
+    tests:
+      - "e2e_tests: Complete costing workflow (visual validation)"
+      - "e2e_tests: Cost history navigation (step 2)"
+
+  AC-9:
+    name: "Permission Enforcement"
+    tests:
+      - "integration_tests: POST approve with non-Finance role (AC-7.4)"
+      - "unit_tests: Component permission checks"
+
+  AC-10:
+    name: "Auto-Recalculate on Formulation Change"
+    tests:
+      - "database_trigger_tests: trg_auto_update_formulation_cost (AC-10.1, 10.2, 10.3)"
+
+# Test Data
+test_data:
+  formulations:
+    - id: 123
+      npd_project_id: 1
+      formulation_number: "v1.0"
+      status: "draft"
+      total_qty: 100
+      uom: "kg"
+      items:
+        - { product_id: "prod-001", product_name: "Flour", quantity: 50, uom: "kg", cost_per_unit: 2.00 }
+        - { product_id: "prod-002", product_name: "Sugar", quantity: 30, uom: "kg", cost_per_unit: 1.00 }
+        - { product_id: "prod-003", product_name: "Water", quantity: 20, uom: "L", cost_per_unit: 0.10 }
+
+  costings:
+    - id: 1
+      formulation_id: 123
+      target_cost: 50.00
+      estimated_cost: 35.00
+      actual_cost: 37.50
+      variance_pct: 7.14
+      status: "approved"
+      approved_by: "user-finance-001"
+      approved_at: "2024-06-15T14:30:00Z"
+
+  npd_settings:
+    - org_id: "org-001"
+      cost_variance_warning_pct: 20
+      cost_variance_blocker_pct: 50
+      require_costing_approval: true
+
+# Coverage Report
+coverage_targets:
+  unit_tests:
+    target: ">80%"
+    critical_files:
+      - "formulation-costing-service.ts: >90%"
+      - "Helper functions: 100%"
+
+  integration_tests:
+    target: "100% of API endpoints"
+    endpoints:
+      - "PUT /api/npd/formulations/:id/costing/target: ✓"
+      - "GET /api/npd/formulations/:id/costing: ✓"
+      - "POST /api/npd/formulations/:id/costing/recalculate: ✓"
+      - "POST /api/npd/formulations/:id/costing/submit: ✓"
+      - "POST /api/npd/formulations/:id/costing/approve: ✓"
+      - "POST /api/npd/formulations/:id/costing/reject: ✓"
+      - "GET /api/npd/formulations/:id/costing/history: ✓"
+
+  e2e_tests:
+    target: "Critical user flows"
+    flows:
+      - "Complete costing workflow (R&D → Finance): ✓"
+      - "Variance alert and handoff blocking: ✓"
+      - "Cost history navigation: ✓"

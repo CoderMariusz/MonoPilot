@@ -1,0 +1,255 @@
+# Story 05.28 - Database Specification
+# Purpose: Database schema, queries, indexes, caching
+
+# Schema Extensions
+schema:
+  extensions:
+    warehouse_settings:
+      description: "Add expiry alert configuration columns"
+      columns:
+        - name: expiry_alert_enabled
+          type: BOOLEAN
+          default: true
+          description: "Enable/disable expiry email alerts"
+        - name: expiry_critical_days
+          type: INTEGER
+          default: 7
+          description: "Days threshold for red (critical) indicator"
+        - name: expiry_warning_days_orange
+          type: INTEGER
+          default: 14
+          description: "Days threshold for orange (warning) indicator"
+        - name: expiry_alert_email_threshold
+          type: INTEGER
+          default: 1
+          description: "Minimum items to trigger email alert"
+
+  tables:
+    expiry_alert_logs:
+      description: "Log of expiry alert notifications sent"
+      columns:
+        - name: id
+          type: UUID
+          primary_key: true
+          default: gen_random_uuid()
+        - name: org_id
+          type: UUID
+          not_null: true
+          references: organizations(id)
+          on_delete: CASCADE
+        - name: alert_type
+          type: VARCHAR(20)
+          not_null: true
+          comment: "daily_summary, urgent_expired, threshold_alert"
+        - name: expiring_count
+          type: INTEGER
+          not_null: true
+          default: 0
+        - name: expired_count
+          type: INTEGER
+          not_null: true
+          default: 0
+        - name: expiring_value
+          type: NUMERIC(15,2)
+          default: 0
+        - name: expired_value
+          type: NUMERIC(15,2)
+          default: 0
+        - name: email_sent_to
+          type: TEXT[]
+          comment: "Array of recipient email addresses"
+        - name: email_sent_at
+          type: TIMESTAMPTZ
+        - name: created_at
+          type: TIMESTAMPTZ
+          default: NOW()
+      indexes:
+        - name: idx_expiry_alert_logs_org
+          columns: [org_id]
+        - name: idx_expiry_alert_logs_date
+          columns: [created_at]
+      constraints:
+        - type: unique
+          name: expiry_alert_logs_org_date
+          columns: [org_id, created_at]
+
+  indexes:
+    idx_lp_expiry_query:
+      table: license_plates
+      columns: [org_id, status, expiry_date]
+      where: "status = 'available' AND expiry_date IS NOT NULL"
+      description: "Optimized index for expiry queries"
+
+# Database Queries
+queries:
+  expiring_lps:
+    description: "Get LPs expiring within warning period"
+    sql: |
+      SELECT
+        lp.id,
+        lp.lp_number,
+        lp.product_id,
+        p.name AS product_name,
+        p.sku AS product_sku,
+        lp.quantity,
+        lp.uom,
+        lp.expiry_date,
+        (lp.expiry_date - CURRENT_DATE) AS days_until_expiry,
+        CASE
+          WHEN (lp.expiry_date - CURRENT_DATE) <= $2 THEN 'critical'
+          WHEN (lp.expiry_date - CURRENT_DATE) <= $3 THEN 'warning'
+          ELSE 'caution'
+        END AS tier,
+        lp.location_id,
+        loc.code AS location_code,
+        lp.warehouse_id,
+        w.name AS warehouse_name,
+        p.unit_cost,
+        (lp.quantity * COALESCE(p.unit_cost, 0)) AS value_at_risk
+      FROM license_plates lp
+      JOIN products p ON p.id = lp.product_id
+      JOIN locations loc ON loc.id = lp.location_id
+      JOIN warehouses w ON w.id = lp.warehouse_id
+      WHERE lp.org_id = $1
+        AND lp.status = 'available'
+        AND lp.expiry_date IS NOT NULL
+        AND lp.expiry_date > CURRENT_DATE
+        AND lp.expiry_date <= (CURRENT_DATE + $4 * INTERVAL '1 day')
+      ORDER BY lp.expiry_date ASC
+      LIMIT $5 OFFSET $6
+    parameters:
+      - org_id: UUID
+      - critical_days: INTEGER (default 7)
+      - orange_days: INTEGER (default 14)
+      - warning_days: INTEGER (default 30)
+      - limit: INTEGER (default 50)
+      - offset: INTEGER (default 0)
+    performance:
+      target: "<300ms"
+      uses_index: idx_lp_expiry_query
+
+  expired_lps:
+    description: "Get LPs past expiry date"
+    sql: |
+      SELECT
+        lp.id,
+        lp.lp_number,
+        lp.product_id,
+        p.name AS product_name,
+        lp.quantity,
+        lp.uom,
+        lp.expiry_date,
+        (CURRENT_DATE - lp.expiry_date) AS days_expired,
+        lp.location_id,
+        loc.code AS location_code,
+        lp.warehouse_id,
+        w.name AS warehouse_name,
+        (lp.quantity * COALESCE(p.unit_cost, 0)) AS value_at_risk
+      FROM license_plates lp
+      JOIN products p ON p.id = lp.product_id
+      JOIN locations loc ON loc.id = lp.location_id
+      JOIN warehouses w ON w.id = lp.warehouse_id
+      WHERE lp.org_id = $1
+        AND lp.status = 'available'
+        AND lp.expiry_date IS NOT NULL
+        AND lp.expiry_date < CURRENT_DATE
+      ORDER BY lp.expiry_date ASC
+      LIMIT $2
+    parameters:
+      - org_id: UUID
+      - limit: INTEGER (default 50)
+    performance:
+      target: "<300ms"
+      uses_index: idx_lp_expiry_query
+
+  expiry_summary:
+    description: "Aggregate expiry statistics with tier breakdown"
+    sql: |
+      SELECT
+        COUNT(*) FILTER (WHERE expiry_date >= CURRENT_DATE) AS expiring_count,
+        COUNT(*) FILTER (WHERE expiry_date < CURRENT_DATE) AS expired_count,
+        COALESCE(SUM(quantity * COALESCE(unit_cost, 0)) FILTER (WHERE expiry_date >= CURRENT_DATE), 0) AS expiring_value,
+        COALESCE(SUM(quantity * COALESCE(unit_cost, 0)) FILTER (WHERE expiry_date < CURRENT_DATE), 0) AS expired_value,
+        COUNT(*) FILTER (WHERE expiry_date >= CURRENT_DATE AND (expiry_date - CURRENT_DATE) <= 7) AS critical_count,
+        COUNT(*) FILTER (WHERE expiry_date >= CURRENT_DATE AND (expiry_date - CURRENT_DATE) > 7 AND (expiry_date - CURRENT_DATE) <= 14) AS warning_count,
+        COUNT(*) FILTER (WHERE expiry_date >= CURRENT_DATE AND (expiry_date - CURRENT_DATE) > 14) AS caution_count
+      FROM license_plates lp
+      LEFT JOIN products p ON p.id = lp.product_id
+      WHERE lp.org_id = $1
+        AND lp.status = 'available'
+        AND lp.expiry_date IS NOT NULL
+        AND lp.expiry_date <= (CURRENT_DATE + $2 * INTERVAL '1 day')
+    parameters:
+      - org_id: UUID
+      - warning_days: INTEGER (default 30)
+    performance:
+      target: "<500ms for 100K+ LPs"
+
+  expiry_summary_by_warehouse:
+    description: "Aggregate expiry stats grouped by warehouse"
+    sql: |
+      SELECT
+        lp.warehouse_id,
+        w.name AS warehouse_name,
+        COUNT(*) FILTER (WHERE lp.expiry_date >= CURRENT_DATE) AS expiring_count,
+        COUNT(*) FILTER (WHERE lp.expiry_date < CURRENT_DATE) AS expired_count
+      FROM license_plates lp
+      JOIN warehouses w ON w.id = lp.warehouse_id
+      WHERE lp.org_id = $1
+        AND lp.status = 'available'
+        AND lp.expiry_date IS NOT NULL
+        AND lp.expiry_date <= (CURRENT_DATE + $2 * INTERVAL '1 day')
+      GROUP BY lp.warehouse_id, w.name
+      ORDER BY expiring_count DESC
+    parameters:
+      - org_id: UUID
+      - warning_days: INTEGER (default 30)
+
+# Caching Configuration
+caching:
+  provider: redis
+  keys:
+    expiring_list:
+      pattern: "warehouse:expiry:list:{org_id}"
+      ttl_seconds: 300
+      invalidate_on: ["lp_create", "lp_update_expiry", "lp_delete", "lp_status_change"]
+    expiry_summary:
+      pattern: "warehouse:expiry:summary:{org_id}"
+      ttl_seconds: 300
+      invalidate_on: ["lp_create", "lp_update_expiry", "lp_delete", "lp_status_change"]
+    expired_list:
+      pattern: "warehouse:expiry:expired:{org_id}"
+      ttl_seconds: 300
+      invalidate_on: ["lp_create", "lp_update_expiry", "lp_delete", "lp_status_change"]
+  invalidation_function: |
+    async function invalidateExpiryCache(orgId: string): Promise<void> {
+      await redis.del(`warehouse:expiry:list:${orgId}`);
+      await redis.del(`warehouse:expiry:summary:${orgId}`);
+      await redis.del(`warehouse:expiry:expired:${orgId}`);
+    }
+
+# RLS Policies
+rls:
+  expiry_alert_logs:
+    select: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    insert: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    note: "Alert logs visible only within org"
+
+# Migration
+migration:
+  number: "XXXX"
+  name: "add_expiry_alert_settings_and_logs"
+  up:
+    - "ALTER TABLE warehouse_settings ADD COLUMN IF NOT EXISTS expiry_alert_enabled BOOLEAN DEFAULT true"
+    - "ALTER TABLE warehouse_settings ADD COLUMN IF NOT EXISTS expiry_critical_days INTEGER DEFAULT 7"
+    - "ALTER TABLE warehouse_settings ADD COLUMN IF NOT EXISTS expiry_warning_days_orange INTEGER DEFAULT 14"
+    - "ALTER TABLE warehouse_settings ADD COLUMN IF NOT EXISTS expiry_alert_email_threshold INTEGER DEFAULT 1"
+    - "CREATE TABLE IF NOT EXISTS expiry_alert_logs (...)"
+    - "CREATE INDEX IF NOT EXISTS idx_lp_expiry_query ON license_plates(org_id, status, expiry_date) WHERE status = 'available' AND expiry_date IS NOT NULL"
+  down:
+    - "DROP INDEX IF EXISTS idx_lp_expiry_query"
+    - "DROP TABLE IF EXISTS expiry_alert_logs"
+    - "ALTER TABLE warehouse_settings DROP COLUMN IF EXISTS expiry_alert_enabled"
+    - "ALTER TABLE warehouse_settings DROP COLUMN IF EXISTS expiry_critical_days"
+    - "ALTER TABLE warehouse_settings DROP COLUMN IF EXISTS expiry_warning_days_orange"
+    - "ALTER TABLE warehouse_settings DROP COLUMN IF EXISTS expiry_alert_email_threshold"

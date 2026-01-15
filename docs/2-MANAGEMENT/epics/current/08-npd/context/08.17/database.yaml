@@ -1,0 +1,158 @@
+# Database Context: 08.17 - Finance Approval Workflow
+
+database:
+  tables_modified:
+    - name: "npd_costing"
+      new_columns:
+        - name: "status"
+          type: "VARCHAR(20)"
+          default: "'draft'"
+          check: "status IN ('draft', 'submitted', 'approved', 'rejected')"
+          description: "Costing approval status"
+        - name: "submitted_at"
+          type: "TIMESTAMPTZ"
+          nullable: true
+          description: "When submitted for approval"
+        - name: "submitted_by_id"
+          type: "UUID"
+          references: "auth.users(id)"
+          nullable: true
+          description: "User who submitted"
+        - name: "approved_at"
+          type: "TIMESTAMPTZ"
+          nullable: true
+          description: "When approved by Finance"
+        - name: "approved_by_id"
+          type: "UUID"
+          references: "auth.users(id)"
+          nullable: true
+          description: "Finance user who approved"
+        - name: "rejected_at"
+          type: "TIMESTAMPTZ"
+          nullable: true
+          description: "When rejected by Finance"
+        - name: "rejected_by_id"
+          type: "UUID"
+          references: "auth.users(id)"
+          nullable: true
+          description: "Finance user who rejected"
+        - name: "rejection_reason"
+          type: "TEXT"
+          nullable: true
+          description: "Reason for rejection (mandatory if rejected)"
+        - name: "auto_approved"
+          type: "BOOLEAN"
+          default: "false"
+          description: "True if auto-approved (variance < threshold)"
+      indexes:
+        - name: "idx_npd_costing_status"
+          columns: ["status"]
+          where: "status = 'submitted'"
+          description: "Index for pending approvals query"
+
+    - name: "npd_settings"
+      new_columns:
+        - name: "cost_variance_auto_approve_pct"
+          type: "NUMERIC(5, 2)"
+          default: "10.00"
+          check: "cost_variance_auto_approve_pct >= 0 AND cost_variance_auto_approve_pct <= 100"
+          description: "Auto-approve threshold (default 10%)"
+
+  rls_policies:
+    - table: "npd_costing"
+      policies:
+        - name: "costing_finance_select"
+          type: "SELECT"
+          role: "FINANCE"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND status IN ('submitted', 'approved', 'rejected')
+            AND EXISTS (
+              SELECT 1 FROM user_roles
+              WHERE user_id = auth.uid()
+              AND role = 'FINANCE'
+            )
+          description: "Finance can view submitted/approved/rejected costing"
+
+        - name: "costing_finance_update"
+          type: "UPDATE"
+          role: "FINANCE"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND status = 'submitted'
+            AND EXISTS (
+              SELECT 1 FROM user_roles
+              WHERE user_id = auth.uid()
+              AND role = 'FINANCE'
+            )
+          description: "Finance can update submitted costing (approve/reject)"
+
+        - name: "costing_npd_lead_submit"
+          type: "UPDATE"
+          role: "NPD_LEAD"
+          rule: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND status = 'draft'
+            AND EXISTS (
+              SELECT 1 FROM npd_projects p
+              WHERE p.id = npd_costing.project_id
+              AND p.owner_id = auth.uid()
+            )
+          description: "NPD Lead can submit draft costing"
+
+  queries:
+    - name: "pending_approvals_query"
+      type: "SELECT"
+      description: "Fetch all costing pending Finance approval"
+      sql: |
+        SELECT
+          c.id AS costing_id,
+          p.id AS project_id,
+          p.project_number,
+          p.name AS project_name,
+          f.formulation_number,
+          c.target_cost,
+          c.estimated_cost,
+          (c.estimated_cost - c.target_cost) AS variance,
+          ((c.estimated_cost - c.target_cost) / NULLIF(c.target_cost, 0)) * 100 AS variance_pct,
+          c.submitted_at,
+          u.id AS submitted_by_id,
+          u.name AS submitted_by_name
+        FROM npd_costing c
+        JOIN npd_formulations f ON c.formulation_id = f.id
+        JOIN npd_projects p ON f.project_id = p.id
+        LEFT JOIN users u ON c.submitted_by_id = u.id
+        WHERE c.org_id = $1
+        AND c.status = 'submitted'
+        ORDER BY c.submitted_at ASC
+
+    - name: "auto_approve_logic"
+      type: "SELECT + UPDATE"
+      description: "Check variance threshold and auto-approve if applicable"
+      sql: |
+        -- Get variance threshold
+        SELECT cost_variance_auto_approve_pct
+        FROM npd_settings
+        WHERE org_id = $1;
+
+        -- Calculate variance
+        SELECT
+          (estimated_cost - target_cost) AS variance,
+          ((estimated_cost - target_cost) / NULLIF(target_cost, 0)) * 100 AS variance_pct
+        FROM npd_costing
+        WHERE id = $2;
+
+        -- If ABS(variance_pct) < threshold, auto-approve
+        UPDATE npd_costing
+        SET status = 'approved',
+            approved_at = NOW(),
+            auto_approved = true
+        WHERE id = $2
+        AND ABS(variance_pct) < threshold;
+
+migration_file: "YYYYMMDDHHMMSS_add_costing_approval_workflow.sql"
+migration_notes:
+  - "Add approval fields to npd_costing table"
+  - "Add variance threshold to npd_settings (default 10%)"
+  - "Create RLS policies for Finance and NPD Lead roles"
+  - "Index on status for pending approvals query performance"

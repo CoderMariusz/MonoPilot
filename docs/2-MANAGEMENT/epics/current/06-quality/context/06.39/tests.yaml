@@ -1,0 +1,18 @@
+# Story 06.39 - Quality Analytics Tests
+
+unit_tests:
+  - calculateControlLimits - verify against manual SPC calculations
+  - calculateCpk - verify against Six Sigma formula
+  - getSPCChart - returns correct X-bar, R-chart data
+
+integration_tests:
+  - All 9 API endpoints return correct data
+
+e2e_tests:
+  - Analytics page loads all 7 charts
+  - Excel export downloads multi-sheet workbook
+  - Scheduled report email sent
+
+performance_tests:
+  - Analytics page load <2s
+  - Excel export <15s for 10,000 records

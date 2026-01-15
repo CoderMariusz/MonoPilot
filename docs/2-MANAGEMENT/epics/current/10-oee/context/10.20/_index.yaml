@@ -1,0 +1,80 @@
+# Story 10.20 - Export to BI Tools Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 3 (Integration)
+
+story:
+  id: "10.20"
+  name: "Export to BI Tools"
+  slug: "export-to-bi-tools"
+  epic: "10-oee"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      provides: ["oee_snapshots data"]
+    - story: "10.3"
+      name: "Downtime Event Tracking"
+      provides: ["downtime data"]
+    - story: "10.7"
+      name: "Shift Report Generation"
+      provides: ["shift reports data"]
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-028 - Export to BI Tools"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.20.export-to-bi-tools.md"
+
+deliverables:
+  - type: "view"
+    count: 1
+    description: "oee_data_mart view for BI"
+  - type: "api"
+    count: 4
+    description: "Export endpoints (CSV, JSON, XLSX)"
+  - type: "service"
+    count: 1
+    description: "Export format converters"
+  - type: "documentation"
+    count: 1
+    description: "Power BI connector guide"
+
+technical_notes:
+  - "Export formats: CSV, JSON, XLSX"
+  - "oee_data_mart view: denormalized for BI queries"
+  - "Power BI REST data connector compatible"
+  - "Tableau Web Data Connector compatible"
+  - "Max 100,000 rows per export"
+  - "Date range filtering on all exports"
+
+summary: |
+  Story 10.20 implements data export for external BI tools.
+
+  MVP SCOPE:
+  - CSV export for all OEE tables
+  - JSON export via REST API
+  - XLSX export (Excel format)
+  - Power BI connector configuration
+  - Tableau Web Data Connector
+  - oee_data_mart denormalized view
+  - API documentation for BI integrations
+
+  OUT OF SCOPE (Phase 4):
+  - Real-time streaming
+  - Custom BI connectors (Looker, QlikView)
+  - Data warehouse integration

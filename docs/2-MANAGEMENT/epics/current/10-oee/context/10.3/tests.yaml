@@ -1,0 +1,98 @@
+# Story 10.3 - Test Specification
+# Downtime Event Tracking
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/downtime-event-service.test.ts"
+    type: "unit"
+  - path: "supabase/tests/downtime_events_rls.test.sql"
+    type: "integration"
+  - path: "apps/frontend/app/api/oee/downtime/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/downtime-event-workflow.spec.ts"
+    type: "e2e"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "oee_downtime_events table created"
+    when: "event created with start_time, no end_time"
+    then: "duration_minutes calculated as NOW() - start_time dynamically"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "active downtime event (end_time=NULL)"
+    when: "PATCH /api/oee/downtime/:id/end"
+    then: "end_time set, duration_minutes recalculated, impact_severity updated"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "event duration = 3 minutes"
+    when: "impact_severity calculated"
+    then: "severity = 'minor'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "event duration = 12 minutes"
+    when: "impact_severity calculated"
+    then: "severity = 'moderate'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "event duration = 20 minutes"
+    when: "impact_severity calculated"
+    then: "severity = 'major'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "operator on /oee/downtime page"
+    when: "clicks [+ Log Downtime]"
+    then: "modal opens, selects machine, reason, clicks Create, event logged, appears in table"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "active downtime event for Mixer-01"
+    when: "supervisor clicks [End Downtime]"
+    then: "event ended, duration finalized, moves to completed events"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "GET /api/oee/downtime?active_only=true"
+    when: "endpoint queried"
+    then: "returns only events with end_time=NULL"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "creating downtime event without machine_id or line_id"
+    when: "validation runs"
+    then: "error: 'At least one of machine_id or line_id required'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "creating event with end_time < start_time"
+    when: "INSERT attempted"
+    then: "CHECK constraint violation: 'end_time must be >= start_time'"
+    test_type: "integration"
+    priority: "P0"
+
+definition_of_done:
+  - "oee_downtime_events table created with generated columns"
+  - "GET /api/oee/downtime returns filtered events"
+  - "POST creates event with automatic duration calculation"
+  - "PATCH /api/oee/downtime/:id/end sets end_time and finalizes duration"
+  - "Active events panel displays with live duration counter"
+  - "Events table shows severity badges with color coding"
+  - "RLS isolates events by org_id"
+  - "Unit tests >80% coverage"
+  - "E2E test covers log downtime + end downtime workflow"
+
+coverage:
+  unit: 80
+  integration: 80

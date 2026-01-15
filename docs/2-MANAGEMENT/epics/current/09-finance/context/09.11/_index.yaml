@@ -1,0 +1,99 @@
+story:
+  id: "09.11"
+  name: "Cost Rollup & Multi-Level BOM"
+  epic: "09-finance"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles"]
+    - story: "02.2"
+      provides: ["boms", "bom_items"]
+    - story: "02.4"
+      provides: ["bom_versioning"]
+    - story: "09.2"
+      provides: ["standard_costs"]
+    - story: "09.5"
+      provides: ["bom_costing", "cost_rollups"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.1.5", "FR-9.1.7"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.11.cost-rollup-multi-level.md"
+  patterns:
+    - "apps/frontend/lib/services/bom-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_add_multi_level_cost_rollup.sql"
+      type: "migration"
+  api:
+    - path: "apps/frontend/app/api/finance/bom-costs/[id]/multi-level/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/bom-costs/recalculate-all/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/bom-cost-service.ts"
+      note: "Extend existing from 09.5"
+  validation:
+    - path: "apps/frontend/lib/validation/finance.ts"
+      note: "Extend existing"
+
+database:
+  tables:
+    - name: "cost_rollups"
+      new_columns: ["parent_rollup_id", "bom_level", "is_sub_assembly", "sub_assembly_count"]
+      indexes: ["parent_rollup_id", "bom_level"]
+  functions:
+    - name: "calculate_multi_level_bom_cost"
+      type: "recursive"
+      parameters: ["p_org_id", "p_bom_id", "p_effective_date", "p_current_level"]
+    - name: "recalculate_all_bom_costs"
+      type: "batch"
+      parameters: ["p_org_id"]
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/bom-costs/:id/multi-level"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/bom-costs/recalculate-all"
+    auth: true
+    roles: ["admin", "finance_manager"]
+
+validation_rules:
+  bom_level: "integer >= 0, max 10"
+  parent_rollup_id: "must reference valid cost_rollup"
+  recursion_depth: "max 10 levels"
+  circular_bom: "detect and prevent"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  recursion: "bottom-up cost calculation"
+
+acceptance_checklist:
+  - "Multi-level cost calculation works (3+ levels)"
+  - "Sub-assembly costs aggregated bottom-up"
+  - "Circular BOM detection prevents infinite loops"
+  - "API returns nested cost breakdown"
+  - "Batch recalculation completes < 5s (100 BOMs)"
+  - "Performance: multi-level calc < 1s"
+  - "RLS enforces org isolation"
+  - "All tests pass (unit, integration, edge cases)"
+
+output_artifacts:
+  - "Migration: add multi-level columns to cost_rollups"
+  - "Function: calculate_multi_level_bom_cost() (recursive)"
+  - "Function: recalculate_all_bom_costs() (batch)"
+  - "API: GET multi-level breakdown"
+  - "API: POST batch recalculate"
+  - "Extended BOMCostService with 4 new methods"
+  - "Tests: Unit, integration, edge cases"

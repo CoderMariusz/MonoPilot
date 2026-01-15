@@ -1,0 +1,50 @@
+# Story 10.13 - Database Schema
+# Purpose: Report templates storage
+# Agent: BACKEND-DEV
+
+migrations:
+  - path: "supabase/migrations/XXX_create_report_templates.sql"
+    type: "migration"
+    description: "Create report_templates table"
+
+tables:
+  - name: "report_templates"
+    description: "Saved custom report configurations"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT" }
+      - { name: "metrics", type: "JSONB", constraints: "NOT NULL", comment: "Array of selected metrics" }
+      - { name: "dimensions", type: "JSONB", constraints: "NOT NULL", comment: "Array of dimensions" }
+      - { name: "filters", type: "JSONB", comment: "Filter configuration" }
+      - { name: "chart_type", type: "TEXT", constraints: "CHECK (chart_type IN ('line', 'bar', 'pie', 'table'))" }
+      - { name: "is_public", type: "BOOLEAN", constraints: "DEFAULT false", comment: "Shared with org" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_report_templates_org ON report_templates(org_id)"
+      - "idx_report_templates_user ON report_templates(created_by)"
+
+rls_policies:
+  - table: "report_templates"
+    name: "templates_select"
+    operation: "SELECT"
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (is_public = true OR created_by = auth.uid())"
+
+  - table: "report_templates"
+    name: "templates_insert"
+    operation: "INSERT"
+    with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - table: "report_templates"
+    name: "templates_update"
+    operation: "UPDATE"
+    using: "created_by = auth.uid()"
+
+  - table: "report_templates"
+    name: "templates_delete"
+    operation: "DELETE"
+    using: "created_by = auth.uid()"

@@ -1,0 +1,41 @@
+# Story 10.18 - Database Schema
+# Purpose: Uses existing tables, adds photo support
+# Agent: BACKEND-DEV
+
+# No new tables - uses existing oee_downtime_events
+# Extends with photo storage
+
+existing_tables:
+  - name: "oee_downtime_events"
+    columns_used:
+      - "machine_id"
+      - "reason_code"
+      - "start_time"
+      - "end_time"
+      - "duration_minutes"
+      - "notes"
+      - "photo_url"  # May need to add this column
+    purpose: "Store downtime events from mobile"
+
+  - name: "machines"
+    columns_used:
+      - "id"
+      - "code"
+      - "qr_code"  # Machine QR code for scanning
+    purpose: "Machine lookup from QR scan"
+
+# Migration to add photo support if needed
+migrations:
+  - path: "supabase/migrations/XXX_add_downtime_photo_url.sql"
+    type: "alter_table"
+    sql: |
+      ALTER TABLE oee_downtime_events
+      ADD COLUMN IF NOT EXISTS photo_url TEXT;
+    description: "Add photo URL column for mobile uploads"
+
+# Storage bucket for photos
+storage:
+  bucket: "downtime-photos"
+  path_pattern: "{org_id}/{machine_id}/{event_id}.jpg"
+  max_size_mb: 5
+  allowed_types: ["image/jpeg", "image/png"]

@@ -1,0 +1,83 @@
+# Story 06.27 - CoA Templates Database Schema
+
+tables:
+  coa_templates:
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID NOT NULL (FK organizations)
+      - template_number: TEXT UNIQUE (org_id, template_number)
+      - name: TEXT NOT NULL
+      - description: TEXT
+      - product_id: UUID (FK products) - nullable
+      - product_type: TEXT - nullable
+      - header_template: TEXT
+      - footer_template: TEXT
+      - logo_url: TEXT
+      - parameters_config: JSONB (array of parameter display settings)
+      - compliance_statements: TEXT[]
+      - layout_config: JSONB (font, page size, orientation)
+      - version: INTEGER DEFAULT 1
+      - is_active: BOOLEAN DEFAULT false
+      - status: TEXT (draft/pending_approval/approved/archived)
+      - approved_by: UUID (FK users)
+      - approved_at: TIMESTAMPTZ
+      - effective_date: DATE
+      - expiry_date: DATE
+      - created_at: TIMESTAMPTZ
+      - created_by: UUID
+      - updated_at: TIMESTAMPTZ
+
+    indexes:
+      - idx_coa_templates_org: (org_id)
+      - idx_coa_templates_org_status: (org_id, status)
+      - idx_coa_templates_product: (product_id) WHERE product_id IS NOT NULL
+      - idx_coa_templates_product_type: (org_id, product_type) WHERE product_type IS NOT NULL
+      - idx_coa_templates_active: (org_id, is_active) WHERE is_active = true
+
+    rls: true
+    policies:
+      - SELECT: org_id match
+      - INSERT: org_id match
+      - UPDATE: org_id match
+      - DELETE: org_id match AND status = 'draft'
+
+  coa_template_number_sequences:
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID UNIQUE (org_id, year)
+      - year: INTEGER
+      - current_value: BIGINT DEFAULT 0
+      - updated_at: TIMESTAMPTZ
+    rls: true
+
+  coa_template_versions:
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID
+      - template_id: UUID (FK coa_templates)
+      - version: INTEGER UNIQUE (template_id, version)
+      - template_snapshot: JSONB (full template data)
+      - change_summary: TEXT
+      - changed_by: UUID
+      - changed_at: TIMESTAMPTZ
+    rls: true
+
+functions:
+  generate_coa_template_number:
+    params: [p_org_id UUID]
+    returns: TEXT
+    description: "Generates COA-TPL-YYYY-NNNNN format"
+
+  enforce_single_active_template:
+    trigger: BEFORE UPDATE
+    table: coa_templates
+    condition: NEW.is_active = true
+    logic: "Deactivates other templates for same product/type"
+
+  create_template_version_snapshot:
+    trigger: AFTER UPDATE
+    table: coa_templates
+    condition: NEW.status = 'approved'
+    logic: "Creates version snapshot in coa_template_versions"
+
+migration_file: "YYYYMMDDHHMMSS_create_coa_templates.sql"

@@ -54,7 +54,7 @@ export async function listBomItems(
         id,
         code,
         name,
-        uom,
+        base_uom,
         product_type:product_types(code, name)
       )
     `)
@@ -191,14 +191,6 @@ export async function createBomItem(
     }
   }
 
-  // Validate line_ids if provided
-  if (input.line_ids && input.line_ids.length > 0) {
-    const isValid = await validateLineIds(bomId, input.line_ids)
-    if (!isValid) {
-      throw new Error('LINE_NOT_IN_BOM')
-    }
-  }
-
   // Insert item
   const { data: newItem, error: insertError } = await supabase
     .from('bom_items')
@@ -211,7 +203,6 @@ export async function createBomItem(
       uom: input.uom,
       scrap_percent: input.scrap_percent ?? 0,
       sequence: input.sequence ?? 1,
-      line_ids: input.line_ids || null,
       consume_whole_lp: input.consume_whole_lp ?? false,
       notes: input.notes || null
     })
@@ -221,7 +212,7 @@ export async function createBomItem(
         id,
         code,
         name,
-        uom,
+        base_uom,
         product_type:product_types(code, name)
       )
     `)
@@ -321,14 +312,6 @@ export async function updateBomItem(
     }
   }
 
-  // Validate line_ids if changing
-  if (input.line_ids !== undefined && input.line_ids !== null && input.line_ids.length > 0) {
-    const isValid = await validateLineIds(bomId, input.line_ids)
-    if (!isValid) {
-      throw new Error('LINE_NOT_IN_BOM')
-    }
-  }
-
   // Build update object
   const updateData: Record<string, unknown> = {}
   if (input.component_id !== undefined) updateData.product_id = input.component_id
@@ -338,7 +321,6 @@ export async function updateBomItem(
   if (input.uom !== undefined) updateData.uom = input.uom
   if (input.scrap_percent !== undefined) updateData.scrap_percent = input.scrap_percent
   if (input.sequence !== undefined) updateData.sequence = input.sequence
-  if (input.line_ids !== undefined) updateData.line_ids = input.line_ids
   if (input.consume_whole_lp !== undefined) updateData.consume_whole_lp = input.consume_whole_lp
   if (input.notes !== undefined) updateData.notes = input.notes
 
@@ -353,7 +335,7 @@ export async function updateBomItem(
         id,
         code,
         name,
-        uom,
+        base_uom,
         product_type:product_types(code, name)
       )
     `)

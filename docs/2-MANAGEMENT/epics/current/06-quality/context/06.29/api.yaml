@@ -1,0 +1,116 @@
+# Story 06.29 - CoA PDF Export API Endpoints
+
+endpoints:
+  - method: POST
+    path: /api/quality/coas/:id/generate-pdf
+    auth: required
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    description: "Generate PDF from approved CoA"
+    constraint: "status = 'approved' only"
+    logic:
+      - "Validate CoA is approved"
+      - "Render HTML from template + CoA data"
+      - "Convert HTML to PDF/A format"
+      - "Generate QR code with /verify/{token}"
+      - "Upload PDF to S3/Storage"
+      - "Upload QR code image to S3/Storage"
+      - "Update CoA: pdf_url, qr_code_url, verification_token, pdf_generated_at"
+    response:
+      pdf_url: string
+      qr_code_url: string
+      verification_token: string
+      generated_at: string
+    performance: "<5 seconds"
+
+  - method: POST
+    path: /api/quality/coas/:id/email
+    auth: required
+    description: "Email CoA PDF to customer"
+    body:
+      recipient_email: string (required, email validation)
+      recipient_name: string (optional)
+      message: string (optional, custom message)
+    validation: emailCoASchema
+    logic:
+      - "Validate PDF generated (pdf_url exists)"
+      - "Send email with PDF attachment"
+      - "Include verification link in email"
+      - "Create coa_email_deliveries record"
+    email_template:
+      subject: "Certificate of Analysis - {product} - {batch}"
+      body: |
+        Dear {recipient_name},
+
+        Attached is the Certificate of Analysis for:
+        Product: {product_name}
+        Batch: {batch_number}
+        CoA #: {coa_number}
+
+        Verification Link: {verification_url}
+
+        {custom_message}
+
+        Best regards,
+        {org_name} Quality Team
+
+  - method: GET
+    path: /api/quality/coas/:id/download
+    auth: required
+    description: "Download CoA PDF"
+    response_type: application/pdf
+    headers:
+      Content-Disposition: "attachment; filename=CoA-{number}.pdf"
+
+  - method: GET
+    path: /verify/:token
+    auth: none (public)
+    description: "Public verification page for QR code scan"
+    logic:
+      - "Lookup CoA by verification_token"
+      - "Return CoA data (read-only)"
+    response:
+      coa_number: string
+      product_name: string
+      batch_number: string
+      issue_date: string
+      status: "verified" | "invalid"
+      parameters: CoAParameter[] (read-only)
+    error:
+      - 404 if token not found or invalid
+
+validation_schemas:
+  emailCoASchema:
+    fields:
+      recipient_email: string (email format required)
+      recipient_name: string (max 200, optional)
+      message: string (max 2000, optional)
+
+service_layer:
+  file: lib/services/coa-pdf-service.ts
+  class: CoAPDFService
+  methods:
+    - generatePDF(coaId): {pdf_url, qr_code_url, verification_token}
+    - renderHTML(coa, parameters): string (HTML for PDF)
+    - convertToPDF(html): Buffer (PDF/A format)
+    - uploadToStorage(buffer, filename): string (CDN URL)
+    - generateQRCode(token): string (QR image URL)
+    - emailToCustomer(coaId, recipient, message?): void
+    - getVerificationData(token): VerificationData | null
+
+external_services:
+  - service: "Puppeteer/Playwright"
+    usage: "HTML to PDF conversion"
+    config: "PDF/A-1a format, embedded fonts"
+
+  - service: "qrcode library"
+    usage: "QR code generation"
+    config: "PNG format, 300x300px"
+
+  - service: "S3/Supabase Storage"
+    usage: "PDF and QR code storage"
+    bucket: "coa-pdfs"
+    retention: "10 years"
+
+  - service: "SendGrid/Resend"
+    usage: "Email delivery"
+    config: "Transactional email with PDF attachment"

@@ -1,0 +1,38 @@
+# Story 10.17 - Frontend Specification
+# Purpose: Bottleneck analysis visualization
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/oee/analytics/LineBalanceChart.tsx"
+    description: "Horizontal bar chart showing cycle times per operation"
+    features:
+      - "Each operation as bar (length = cycle time)"
+      - "Bottleneck highlighted in red"
+      - "Target cycle time line (dashed)"
+      - "Imbalance % annotation"
+
+  - path: "apps/frontend/components/oee/analytics/BottleneckCard.tsx"
+    description: "Summary card showing bottleneck operation"
+    displays:
+      - "Bottleneck: Labeling (90s)"
+      - "Line capacity: 40 units/hr"
+      - "Potential: +50% if improved"
+
+  - path: "apps/frontend/components/oee/analytics/CapacityImpactCalculator.tsx"
+    description: "What-if calculator for bottleneck improvement"
+    inputs:
+      - "New cycle time for bottleneck"
+    outputs:
+      - "New line capacity"
+      - "Throughput improvement %"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/analytics/bottlenecks/page.tsx"
+    route: "/oee/analytics/bottlenecks"
+    title: "Bottleneck Analysis"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-bottleneck.ts"
+    exports:
+      - "useBottleneckAnalysis"
+      - "useCapacityImpact"

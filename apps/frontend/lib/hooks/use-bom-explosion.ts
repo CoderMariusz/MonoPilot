@@ -50,7 +50,8 @@ async function fetchBOMExplosion(
  */
 export function buildExplosionTree(response: BomExplosionResponse): ExplosionTreeNode[] {
   const nodes: ExplosionTreeNode[] = []
-  const nodeMap = new Map<string, ExplosionTreeNode>()
+  const nodeMap = new Map<string, ExplosionTreeNode>() // item_id -> node
+  const componentToNodeMap = new Map<string, ExplosionTreeNode>() // component_id -> node (for parent lookup)
 
   // Process each level
   for (const level of response.levels) {
@@ -63,14 +64,18 @@ export function buildExplosionTree(response: BomExplosionResponse): ExplosionTre
       }
 
       nodeMap.set(item.item_id, node)
+      // Also map by component_id for parent lookup (path contains component_ids)
+      componentToNodeMap.set(item.component_id, node)
 
       // Find parent based on path
+      // Path contains component_ids (product_ids), so we need to find parent by component_id
       if (item.path.length > 1) {
         const parentPath = item.path.slice(0, -1)
-        const parentId = parentPath[parentPath.length - 1]
-        const parent = nodeMap.get(parentId)
+        const parentComponentId = parentPath[parentPath.length - 1]
+        // Look up parent by component_id, not item_id
+        const parent = componentToNodeMap.get(parentComponentId)
         if (parent) {
-          node.parent_id = parentId
+          node.parent_id = parent.item_id
           parent.children.push(node)
         } else {
           // No parent found, add to root

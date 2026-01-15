@@ -1,0 +1,52 @@
+story:
+  id: "09.3"
+  name: "Material Cost Tracking"
+  epic: "09-finance"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+
+dependencies:
+  required:
+    - story: "04.X"
+      provides: ["material_consumption", "work_orders"]
+    - story: "05.1"
+      provides: ["license_plates"]
+    - story: "09.1"
+      provides: ["valuation_method"]
+    - story: "09.2"
+      provides: ["standard_costs", "currencies"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.1.1", "FR-9.3.1"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.3.material-cost-tracking.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_material_consumption_costs.sql"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_inventory_cost_layers.sql"
+  api:
+    - path: "apps/frontend/app/api/finance/work-order-costs/[workOrderId]/material/route.ts"
+  services:
+    - path: "apps/frontend/lib/services/material-cost-service.ts"
+
+database:
+  tables:
+    - name: "material_consumption_costs"
+      columns: ["id", "consumption_id", "work_order_id", "product_id", "quantity", "unit_cost", "total_cost", "cost_method"]
+      rls: true
+    - name: "inventory_cost_layers"
+      columns: ["id", "product_id", "quantity_received", "quantity_remaining", "unit_cost", "receipt_date"]
+      rls: true
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/work-order-costs/:workOrderId/material"
+    roles: ["admin", "finance_manager", "cost_accountant"]
+
+acceptance_checklist:
+  - "FIFO cost calculation works"
+  - "Weighted average cost works"
+  - "Costs linked to work orders"
+  - "API returns material cost summary"

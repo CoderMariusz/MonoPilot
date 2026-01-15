@@ -1,0 +1,104 @@
+# Story 08.10 - Database Schema
+# Purpose: Risk management table, RLS policies, triggers
+# Agent: BACKEND-DEV
+
+migrations:
+  - path: "supabase/migrations/XXX_create_npd_risks_table.sql"
+    type: "migration"
+    description: "Create npd_risks table with RLS policies and triggers"
+
+tables:
+  - name: "npd_risks"
+    description: "NPD project risk register with likelihood/impact scoring"
+    columns:
+      - { name: "id", type: "SERIAL", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "npd_project_id", type: "INTEGER", constraints: "NOT NULL REFERENCES npd_projects(id) ON DELETE CASCADE" }
+      - { name: "risk_description", type: "TEXT", constraints: "NOT NULL CHECK (char_length(risk_description) >= 10)" }
+      - { name: "likelihood", type: "INTEGER", constraints: "NOT NULL CHECK (likelihood BETWEEN 1 AND 5)" }
+      - { name: "impact", type: "INTEGER", constraints: "NOT NULL CHECK (impact BETWEEN 1 AND 5)" }
+      - { name: "risk_score", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "mitigation_plan", type: "TEXT", constraints: "" }
+      - { name: "status", type: "VARCHAR(20)", constraints: "NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'mitigated', 'closed'))" }
+      - { name: "owner_id", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+
+    rls: true
+    rls_pattern: "org_id = auth org_id"
+
+    indexes:
+      - "idx_npd_risks_org_project ON npd_risks(org_id, npd_project_id)"
+      - "idx_npd_risks_project_score ON npd_risks(npd_project_id, risk_score DESC)"
+      - "idx_npd_risks_status ON npd_risks(npd_project_id, status)"
+      - "idx_npd_risks_owner ON npd_risks(owner_id) WHERE owner_id IS NOT NULL"
+
+    notes:
+      - "risk_score = likelihood × impact (auto-calculated by trigger)"
+      - "Severity: 20-25 = Critical, 12-19 = High, 6-11 = Medium, 1-5 = Low"
+      - "Status workflow: open → mitigated → closed"
+      - "owner_id nullable (can be unassigned)"
+
+# Triggers
+triggers:
+  - name: "calculate_risk_score"
+    function: "calculate_risk_score()"
+    timing: "BEFORE INSERT OR UPDATE OF likelihood, impact"
+    table: "npd_risks"
+    for_each: "ROW"
+    description: "Auto-calculate risk_score = likelihood × impact"
+    sql: |
+      CREATE OR REPLACE FUNCTION calculate_risk_score()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.risk_score := NEW.likelihood * NEW.impact;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  - name: "update_npd_risks_updated_at"
+    function: "update_updated_at_column()"
+    timing: "BEFORE UPDATE"
+    table: "npd_risks"
+    for_each: "ROW"
+    description: "Auto-update updated_at timestamp"
+
+# RLS Policies
+rls_policies:
+  npd_risks:
+    - name: "npd_risks_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can read own org risks"
+
+    - name: "npd_risks_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can create risks in own org"
+
+    - name: "npd_risks_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can update own org risks"
+
+    - name: "npd_risks_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          SELECT r.code FROM roles r
+          JOIN users u ON u.role_id = r.id
+          WHERE u.id = auth.uid()
+        ) IN ('SUPER_ADMIN', 'ADMIN', 'NPD_LEAD')
+      description: "Only admins and NPD Lead can delete risks"
+
+# Migration dependencies
+dependencies:
+  required_tables:
+    - "organizations (FK)"
+    - "npd_projects (FK)"
+    - "users (FK)"
+  required_functions:
+    - "update_updated_at_column() - standard timestamp updater"

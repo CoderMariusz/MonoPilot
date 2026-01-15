@@ -1,0 +1,66 @@
+# Story 10.16 - Database Schema
+# Purpose: MTBF/MTTR calculation views
+# Agent: BACKEND-DEV
+
+views:
+  - name: "machine_reliability_metrics"
+    description: "MTBF and MTTR by machine"
+    sql: |
+      CREATE OR REPLACE VIEW machine_reliability_metrics AS
+      WITH failure_events AS (
+        SELECT
+            org_id,
+            machine_id,
+            COUNT(*) as failure_count,
+            SUM(duration_minutes) as total_repair_time
+        FROM oee_downtime_events
+        WHERE is_breakdown = true
+          AND end_time IS NOT NULL
+        GROUP BY org_id, machine_id
+      ),
+      running_time AS (
+        SELECT
+            org_id,
+            machine_id,
+            SUM(actual_production_time) as total_running_minutes
+        FROM oee_snapshots
+        GROUP BY org_id, machine_id
+      )
+      SELECT
+          r.org_id,
+          r.machine_id,
+          m.name as machine_name,
+          r.total_running_minutes / 60.0 as running_hours,
+          COALESCE(f.failure_count, 0) as failures,
+          CASE WHEN f.failure_count > 0
+            THEN (r.total_running_minutes / 60.0) / f.failure_count
+            ELSE NULL
+          END as mtbf_hours,
+          CASE WHEN f.failure_count > 0
+            THEN f.total_repair_time / f.failure_count
+            ELSE NULL
+          END as mttr_minutes,
+          COALESCE(f.total_repair_time, 0) as total_repair_minutes
+      FROM running_time r
+      JOIN machines m ON r.machine_id = m.id
+      LEFT JOIN failure_events f ON r.org_id = f.org_id AND r.machine_id = f.machine_id;
+
+existing_tables:
+  - name: "oee_downtime_events"
+    columns_used:
+      - "machine_id"
+      - "duration_minutes"
+      - "is_breakdown"
+      - "end_time"
+  - name: "oee_snapshots"
+    columns_used:
+      - "actual_production_time"
+      - "machine_id"
+
+migrations: []
+
+indexes:
+  - table: "oee_downtime_events"
+    name: "idx_downtime_failures"
+    columns: ["org_id", "machine_id", "is_breakdown"]
+    where: "is_breakdown = true"

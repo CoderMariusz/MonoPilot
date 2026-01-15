@@ -1,0 +1,69 @@
+# Story 11.8 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.8"
+  name: "EDI ORDERS Inbound"
+  slug: "edi-orders-inbound"
+  epic: "11-integrations"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "backend"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products"]
+    - story: "11.1"
+      name: "Integrations Dashboard"
+      provides: ["EDI health status"]
+    - story: "11.3"
+      name: "Integration Logs"
+      provides: ["EDI event logging"]
+  blocks:
+    - story: "11.9"
+      name: "EDI INVOIC"
+    - story: "11.10"
+      name: "EDI DESADV"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-015"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.8.edi-orders-inbound.md"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "edi_config, edi_messages tables"
+  - type: "service"
+    count: 1
+    description: "edi-service.ts (EDIFACT parser)"
+  - type: "api"
+    count: 5
+    description: "Config, upload, process, inbox, message detail"
+  - type: "page"
+    count: 2
+    description: "EDI config, EDI inbox"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + RLS + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "EDIFACT D.96A parser (UN/EDIFACT standard)"
+  - "Validation engine (customer, products, dates, quantities)"
+  - "Auto-create sales order or work order"
+  - "Error handling with pending_review status"
+  - "MVP: Manual file upload (auto-polling in Phase 3)"

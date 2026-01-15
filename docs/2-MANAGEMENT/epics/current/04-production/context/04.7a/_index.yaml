@@ -1,0 +1,81 @@
+# Story 04.7a: Output Registration Desktop
+# Epic 04 - Production
+# Track D: Output Registration Core
+
+story:
+  id: "04.7a"
+  name: "Output Registration Desktop"
+  epic: "04-production"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 3
+
+dependencies:
+  required:
+    - story: "05.1"
+      provides:
+        - "license_plates table"
+        - "lp_number_sequences table"
+        - "generate_lp_number function"
+    - story: "05.2"
+      provides:
+        - "lp_genealogy table"
+        - "get_lp_forward_trace function"
+        - "get_lp_backward_trace function"
+    - story: "03.3"
+      provides:
+        - "work_orders table"
+        - "wo_materials table"
+    - story: "02.4"
+      provides:
+        - "bom_items table"
+        - "is_by_product column"
+        - "yield_percent column"
+
+functional_requirements:
+  - id: "FR-011"
+    name: "Output Registration Desktop"
+    description: "Desktop interface for registering production outputs with LP creation, genealogy linking, and WO progress updates"
+  - id: "FR-013"
+    name: "By-Product Registration"
+    description: "Register by-products defined in BOM with auto-calculation of expected quantities and shared genealogy"
+  - id: "FR-014"
+    name: "Yield Tracking"
+    description: "Calculate and display output yield, material yield, and operation yield with color-coded thresholds"
+  - id: "FR-015"
+    name: "Multiple Outputs per WO"
+    description: "Support multiple output registrations per work order with cumulative progress tracking"
+
+acceptance_criteria:
+  - id: "AC-011-01"
+    given: "User opens Register Output Modal with qty=500 and QA=Approved"
+    when: "User confirms registration"
+    then: "LP created with qty=500, qa_status=Approved, source=production, wo_id set"
+  - id: "AC-011-02"
+    given: "Product has shelf_life_days=30 and today is 2025-01-01"
+    when: "User opens Register Output Modal"
+    then: "Expiry date auto-calculated to 2025-01-31"
+  - id: "AC-011-04"
+    given: "require_qa_on_output=true and user submits without QA status"
+    when: "Form validation runs"
+    then: "Validation error 'QA status is required' displays"
+  - id: "AC-011-07"
+    given: "WO consumed LP-001 and LP-002 and output creates LP-003"
+    when: "Output registered successfully"
+    then: "lp_genealogy records created with child_lp_id=LP-003 for both parent LPs"
+  - id: "AC-014-01"
+    given: "planned_qty=1000 and actual output=950"
+    when: "Yield calculated"
+    then: "output_yield displays 95.0%"
+  - id: "AC-014-04"
+    given: "output_yield=95%"
+    when: "Yield summary renders"
+    then: "Yield indicator shows green color"
+  - id: "AC-015-01"
+    given: "planned_qty=1000 and first output=400"
+    when: "First output registered"
+    then: "WO.output_qty=400 and progress=40%"
+  - id: "AC-015-08"
+    given: "WO progress is 750/1000 kg"
+    when: "Output history page loads"
+    then: "Progress bar shows 75% filled"

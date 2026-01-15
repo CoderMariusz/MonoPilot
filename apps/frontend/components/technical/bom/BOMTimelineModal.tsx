@@ -75,7 +75,10 @@ export function BOMTimelineModal({
               <DialogTitle>BOM Version Timeline</DialogTitle>
             </div>
           </div>
-          <DialogDescription className="flex items-center gap-2">
+          <DialogDescription className="sr-only">
+            View version history for {displayCode} {displayName}
+          </DialogDescription>
+          <div className="text-sm text-muted-foreground flex items-center gap-2">
             <span className="font-mono font-medium">{displayCode}</span>
             <span>-</span>
             <span>{displayName}</span>
@@ -85,7 +88,7 @@ export function BOMTimelineModal({
                 {timeline.versions.length !== 1 ? 's' : ''}
               </Badge>
             )}
-          </DialogDescription>
+          </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4">

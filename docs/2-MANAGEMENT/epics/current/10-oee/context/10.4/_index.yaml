@@ -1,0 +1,86 @@
+# Story 10.4 - OEE Calculation Engine Context
+# Generated: 2025-01-15
+# Phase: 1A (Core OEE)
+
+story:
+  id: "10.4"
+  name: "OEE Calculation Engine"
+  slug: "oee-calculation-engine"
+  epic: "10-oee"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 5-6
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations"]
+    - story: "01.3"
+      provides: ["machines, ideal_cycle_time"]
+    - story: "01.5"
+      provides: ["production_lines"]
+    - story: "04.1"
+      provides: ["work_orders, planned_quantity"]
+    - story: "04.2"
+      provides: ["wo_operations, start/end times"]
+    - story: "04.5"
+      provides: ["output_registrations, good_quantity"]
+    - story: "10.1"
+      provides: ["Target values for comparison"]
+    - story: "10.3"
+      provides: ["Downtime data for availability"]
+  blocks:
+    - story: "10.5"
+      reason: "Dashboard consumes OEE snapshots"
+    - phase: "1B"
+      reason: "Alerts and trends depend on calculation engine"
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-001, 006, 007, 008 - OEE Calculation"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.4.oee-calculation-engine.md"
+
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "oee_snapshots, oee_daily_summary, oee_hourly_summary tables"
+  - type: "service"
+    count: 1
+    description: "oee-calculation-service.ts with calculation methods"
+  - type: "api"
+    count: 3
+    description: "GET calculate, GET snapshots, POST manual snapshot"
+  - type: "background-job"
+    count: 3
+    description: "Cron: snapshot creation (5min), daily summary, hourly summary"
+
+technical_notes:
+  - "OEE Formula: Availability × Performance × Quality"
+  - "Availability = (Production Time - Downtime) / Production Time"
+  - "Performance = (Total Pieces / Production Time) / Ideal Cycle Time"
+  - "Quality = Good Pieces / Total Pieces"
+  - "Generated column: oee_pct = (availability * performance * quality) / 10000"
+  - "Snapshot triggers: output registration, downtime end, WO complete, scheduled (5min)"
+  - "Calculation scopes: machine, line, shift, work order"
+  - "Aggregation: hourly summaries, daily summaries"
+
+business_rules:
+  - rule: "OEE Calculation Accuracy"
+    enforcement: "Formulas implemented per industry standard (SEMI E10)"
+  - rule: "Snapshot Creation Triggers"
+    enforcement: "Event-driven (output, downtime) + scheduled (cron every 5min)"
+  - rule: "Percentage Capping"
+    enforcement: "Performance can exceed 100% (running faster than ideal) per settings"
+  - rule: "Zero Division Protection"
+    enforcement: "NULL handling in formulas, log warnings for invalid data"

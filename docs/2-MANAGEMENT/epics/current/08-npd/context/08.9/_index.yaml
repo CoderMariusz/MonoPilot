@@ -1,0 +1,123 @@
+story:
+  id: "08.9"
+  name: "Formulation Compare & Clone"
+  epic: "08-npd"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 2-3
+
+dependencies:
+  required:
+    - story: "08.4"
+      provides: ["npd_formulations", "npd_formulation_items", "FormulationService"]
+    - story: "02.1"
+      provides: ["products", "ProductService"]
+    - story: "01.1"
+      provides: ["organizations", "users", "RLS"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/npd.md"
+  prd_sections: ["FR-NPD-15", "FR-NPD-16", "Section 3.6"]
+  story: "docs/2-MANAGEMENT/epics/current/08-npd/08.9.formulation-compare-clone.md"
+  architecture: "docs/1-BASELINE/architecture/modules/npd.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/08-npd/08.4.formulations-crud-versioning.md"
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/npd/formulations/compare/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/npd/formulations/[id]/clone/route.ts"
+      methods: ["POST"]
+
+  services:
+    - path: "apps/frontend/lib/services/formulation-service.ts"
+      note: "Extend with compareFormulations() and cloneFormulation() methods"
+
+  validation:
+    - path: "apps/frontend/lib/validation/npd/formulation-schemas.ts"
+      note: "Add cloneFormulationSchema, compareFormulationsQuerySchema"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/npd/formulations/compare/page.tsx"
+
+  components:
+    - path: "apps/frontend/components/npd/formulation/FormulationCompareView.tsx"
+    - path: "apps/frontend/components/npd/formulation/FormulationCompareHeader.tsx"
+    - path: "apps/frontend/components/npd/formulation/FormulationCompareSummary.tsx"
+    - path: "apps/frontend/components/npd/formulation/FormulationCompareTable.tsx"
+    - path: "apps/frontend/components/npd/formulation/FormulationCompareRow.tsx"
+    - path: "apps/frontend/components/npd/formulation/FormulationCompareCostCard.tsx"
+    - path: "apps/frontend/components/npd/formulation/CloneFormulationModal.tsx"
+    - path: "apps/frontend/components/npd/formulation/VersionSelectorModal.tsx"
+    - path: "apps/frontend/components/npd/formulation/DiffBadge.tsx"
+    - path: "apps/frontend/components/npd/formulation/ChangeIndicator.tsx"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/npd/formulations/compare?v1=:id1&v2=:id2"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "VIEWER"]
+    returns: "CompareFormulationsResponse"
+
+  - method: "POST"
+    path: "/api/npd/formulations/:id/clone"
+    auth: true
+    roles: ["NPD_LEAD", "R&D"]
+    returns: "CloneFormulationResponse"
+
+ux:
+  wireframes:
+    - id: "NPD-009"
+      path: "docs/0-DISCOVERY/wireframes/npd/NPD-009-formulation-compare.md"
+      components: ["FormulationCompareView", "DiffBadge", "ChangeIndicator"]
+    - id: "NPD-010"
+      path: "docs/0-DISCOVERY/wireframes/npd/NPD-010-clone-modal.md"
+      components: ["CloneFormulationModal", "VersionSelectorModal"]
+
+  patterns:
+    comparison: "Side-by-side diff view pattern"
+    diff_highlighting: "Green (added), Red (removed), Yellow (changed), White (unchanged)"
+    modal: "ShadCN Dialog pattern for clone"
+
+  states:
+    - "loading_comparison"
+    - "empty_comparison"
+    - "diff_displayed"
+    - "clone_modal_open"
+    - "cloning"
+    - "clone_success"
+    - "error"
+
+validation_rules:
+  formulation_number: "Must be format v\\d+\\.\\d+ (e.g., v1.0, v2.1)"
+  total_qty: "Must be greater than 0"
+  effective_to: "Must be after effective_from if both provided"
+  version_uniqueness: "Version must be unique within project"
+  project_match: "Both versions must be from same project for comparison"
+
+patterns:
+  rls: "ADR-013 - RLS enforces org isolation"
+  api: "REST with org_id filter from auth.uid()"
+  service: "class-based with static methods (FormulationService)"
+  validation: "zod schemas for request validation"
+  comparison: "Product_id as key for diff calculation"
+  clone: "INSERT...SELECT for efficient item copy"
+
+acceptance_checklist:
+  - "Comparison view loads within 500ms for 50 items each"
+  - "Diff highlighting displays correctly (green/red/yellow)"
+  - "Summary cards show accurate counts"
+  - "Cost difference displays if data available"
+  - "Clone creates new formulation with status 'draft'"
+  - "Clone sets parent_formulation_id for lineage"
+  - "Version uniqueness validation prevents duplicates"
+  - "Permission checks hide clone for VIEWER"
+
+output_artifacts:
+  - "GET /api/npd/formulations/compare endpoint"
+  - "POST /api/npd/formulations/:id/clone endpoint"
+  - "FormulationCompareView page with diff highlighting"
+  - "CloneFormulationModal with validation"
+  - "Unit tests: compareFormulations() and cloneFormulation()"
+  - "E2E tests: Full comparison and clone workflows"

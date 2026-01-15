@@ -1,0 +1,87 @@
+# Story 10.2 - Test Specification
+# Downtime Reason Codes & Categories
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/downtime-reason-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/lib/validation/__tests__/downtime-reason-validation.test.ts"
+    type: "unit"
+  - path: "supabase/tests/downtime_reasons_rls.test.sql"
+    type: "integration"
+  - path: "apps/frontend/app/api/oee/downtime/reasons/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/downtime-reasons-crud.spec.ts"
+    type: "e2e"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "oee_downtime_reasons table created"
+    when: "schema inspected"
+    then: "table has all columns with category CHECK constraint"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "creating reason code with duplicate code"
+    when: "POST /api/oee/downtime/reasons"
+    then: "400 error 'Code must be unique within organization'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "seed_default_downtime_reasons() called for new org"
+    when: "function executes"
+    then: "20+ default reason codes created across all categories"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "admin user"
+    when: "GET /api/oee/downtime/reasons?category=mechanical"
+    then: "returns only mechanical category reasons"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "reason codes page"
+    when: "user clicks Seed Defaults"
+    then: "default codes created, table refreshed, success toast"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "creating reason with is_planned=true"
+    when: "reason saved"
+    then: "appears in 'Planned Downtime' filter group"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "reason code in use by downtime events"
+    when: "DELETE /api/oee/downtime/reasons/:id"
+    then: "soft delete (is_active=false) instead of hard delete"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "User A from Org A, User B from Org B"
+    when: "both query reason codes"
+    then: "each sees only their org's codes (RLS isolation)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+definition_of_done:
+  - "oee_downtime_reasons table created with 9 category enum values"
+  - "seed_default_downtime_reasons() function creates 20+ default codes"
+  - "GET /api/oee/downtime/reasons returns filtered list"
+  - "POST creates reason code with unique org-scoped code constraint"
+  - "Reason codes page displays table with category grouping"
+  - "Category badges show correct color and icon per category"
+  - "RLS isolates reason codes by org_id"
+  - "Unit tests >80% coverage"
+  - "E2E test covers CRUD and seed workflow"
+
+coverage:
+  unit: 80
+  integration: 80

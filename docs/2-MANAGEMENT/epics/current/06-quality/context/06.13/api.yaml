@@ -1,0 +1,316 @@
+# Story 06.13 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/quality/ncrs"
+
+endpoints:
+  - method: "POST"
+    path: "/api/quality/ncrs/:id/transition"
+    description: "Execute NCR state transition"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/transition/route.ts"
+    auth: "required"
+    roles: ["varies by transition"]
+
+    request:
+      type: "TransitionNCRRequest"
+      schema:
+        transition_code: "string (required) - Code of transition to execute"
+        notes: "string (optional) - Transition notes (required for some transitions)"
+        confirmed: "boolean (optional) - Confirmation for confirmation_required transitions"
+
+    response:
+      status: 200
+      type: "TransitionNCRResponse"
+      schema:
+        ncr: "NCRReport"
+        transition:
+          code: "string"
+          from_state: "string"
+          to_state: "string"
+          transitioned_at: "string (ISO datetime)"
+          new_due_at: "string | null (ISO datetime)"
+          new_owner_id: "string | null (UUID)"
+          new_owner_name: "string | null"
+
+    errors:
+      - { status: 400, code: "INVALID_TRANSITION", message: "Invalid transition: no path from {from} to {to}" }
+      - { status: 400, code: "NOTES_REQUIRED", message: "Transition notes required (minimum {n} characters)" }
+      - { status: 400, code: "NOTES_TOO_SHORT", message: "Transition notes too short (minimum {n} characters)" }
+      - { status: 400, code: "CONFIRMATION_REQUIRED", message: "Confirmation required for this transition" }
+      - { status: 403, code: "PERMISSION_DENIED", message: "Permission denied: requires {role} role" }
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+      - { status: 404, code: "TRANSITION_NOT_FOUND", message: "Transition configuration not found" }
+
+  - method: "GET"
+    path: "/api/quality/ncrs/:id/workflow"
+    description: "Get NCR workflow history"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/workflow/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "NCRWorkflowResponse"
+      schema:
+        ncr_id: "string (UUID)"
+        ncr_number: "string"
+        current_state: "string"
+        state_entered_at: "string (ISO datetime)"
+        state_due_at: "string | null (ISO datetime)"
+        is_overdue: "boolean"
+        current_owner_id: "string | null (UUID)"
+        current_owner_name: "string | null"
+        history: "NCRStateHistoryEntry[]"
+
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+
+  - method: "GET"
+    path: "/api/quality/ncrs/:id/available-transitions"
+    description: "Get available transitions for current state"
+    file: "apps/frontend/app/api/quality/ncrs/[id]/available-transitions/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "AvailableTransitionsResponse"
+      schema:
+        current_state: "string"
+        transitions: "AvailableTransition[]"
+
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "NCR not found" }
+
+# Response Types
+types:
+  NCRStateHistoryEntry:
+    description: "Single entry in workflow history"
+    fields:
+      - "id: string (UUID)"
+      - "transition_code: string"
+      - "from_state: string"
+      - "to_state: string"
+      - "transitioned_by: string (UUID)"
+      - "transitioned_by_name: string"
+      - "transitioned_at: string (ISO datetime)"
+      - "transition_notes: string | null"
+      - "was_overdue: boolean"
+      - "time_in_state_hours: number | null"
+
+  AvailableTransition:
+    description: "A transition that can be executed from current state"
+    fields:
+      - "transition_code: string"
+      - "from_state: string"
+      - "to_state: string"
+      - "button_label: string"
+      - "button_variant: 'default' | 'primary' | 'destructive' | 'outline'"
+      - "requires_notes: boolean"
+      - "min_notes_length: number"
+      - "confirmation_required: boolean"
+      - "confirmation_message: string | null"
+      - "user_can_execute: boolean"
+      - "blocked_reason: string | null"
+      - "target_sla_hours: number | null"
+
+  TransitionResult:
+    description: "Result of transition execution"
+    fields:
+      - "success: boolean"
+      - "ncr: NCRReport"
+      - "historyEntry: NCRStateHistoryEntry"
+      - "error: string | null"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/ncr-workflow-service.ts"
+    description: "NCR Workflow state machine logic and operations"
+    exports:
+      - name: "NCRWorkflowService"
+        type: "class"
+        methods:
+          - name: "executeTransition"
+            params: ["ncrId: string", "transitionCode: string", "notes: string | null", "userId: string"]
+            returns: "Promise<TransitionResult>"
+            notes: ["Validates transition", "Executes state change", "Creates history record"]
+
+          - name: "getAvailableTransitions"
+            params: ["ncrId: string", "userId: string"]
+            returns: "Promise<AvailableTransition[]>"
+            notes: ["Filters by current state", "Checks user role permissions"]
+
+          - name: "getWorkflowHistory"
+            params: ["ncrId: string"]
+            returns: "Promise<NCRStateHistoryEntry[]>"
+            notes: ["Returns ordered by transitioned_at DESC"]
+
+          - name: "validateTransition"
+            params: ["ncr: NCRReport", "transition: StateTransition", "userId: string", "notes: string | null"]
+            returns: "Promise<ValidationResult>"
+            notes: ["Validates from_state", "Validates role", "Validates notes length"]
+
+          - name: "calculateDueDate"
+            params: ["slaHours: number | null"]
+            returns: "Date | null"
+            notes: ["Adds hours to current time", "Returns null if no SLA"]
+
+          - name: "resolveAutoAssign"
+            params: ["transition: StateTransition", "orgId: string"]
+            returns: "Promise<string | null>"
+            notes: ["Resolves auto_assign_role to user ID", "Falls back to auto_assign_user_id"]
+
+          - name: "isOverdue"
+            params: ["ncr: NCRReport"]
+            returns: "boolean"
+            notes: ["Compares state_due_at to now"]
+
+          - name: "queueTransitionNotification"
+            params: ["ncr: NCRReport", "transition: StateTransition", "actor: User"]
+            returns: "Promise<void>"
+            notes: ["Queues notification event for story 06.17"]
+
+          - name: "getTransitionConfig"
+            params: ["orgId: string", "transitionCode: string"]
+            returns: "Promise<StateTransition | null>"
+
+# Types
+types_file:
+  path: "apps/frontend/lib/types/ncr-workflow.ts"
+  description: "NCR Workflow TypeScript interfaces"
+  exports:
+    - name: "NCRWorkflowState"
+      type: "union"
+      values: ["draft", "open", "investigation", "root_cause", "corrective_action", "verification", "closed", "reopened"]
+
+    - name: "StateTransition"
+      fields:
+        - "id: string"
+        - "org_id: string"
+        - "transition_code: string"
+        - "from_state: NCRWorkflowState"
+        - "to_state: NCRWorkflowState"
+        - "allowed_roles: string[]"
+        - "requires_notes: boolean"
+        - "min_notes_length: number"
+        - "sla_hours: number | null"
+        - "auto_assign_role: string | null"
+        - "auto_assign_user_id: string | null"
+        - "notify_roles: string[] | null"
+        - "notify_users: string[] | null"
+        - "button_label: string"
+        - "button_variant: string"
+        - "confirmation_required: boolean"
+        - "confirmation_message: string | null"
+        - "is_active: boolean"
+        - "sequence: number"
+
+    - name: "NCRStateHistoryEntry"
+      fields:
+        - "id: string"
+        - "ncr_id: string"
+        - "transition_code: string"
+        - "from_state: NCRWorkflowState"
+        - "to_state: NCRWorkflowState"
+        - "transitioned_by: string"
+        - "transitioned_by_name: string"
+        - "transitioned_at: string"
+        - "transition_notes: string | null"
+        - "was_overdue: boolean"
+        - "time_in_state_hours: number | null"
+
+    - name: "AvailableTransition"
+      fields:
+        - "transition_code: string"
+        - "from_state: NCRWorkflowState"
+        - "to_state: NCRWorkflowState"
+        - "button_label: string"
+        - "button_variant: 'default' | 'primary' | 'destructive' | 'outline'"
+        - "requires_notes: boolean"
+        - "min_notes_length: number"
+        - "confirmation_required: boolean"
+        - "confirmation_message: string | null"
+        - "user_can_execute: boolean"
+        - "blocked_reason: string | null"
+        - "target_sla_hours: number | null"
+
+    - name: "TransitionNCRRequest"
+      fields:
+        - "transition_code: string"
+        - "notes?: string"
+        - "confirmed?: boolean"
+
+    - name: "NCRWorkflowResponse"
+      fields:
+        - "ncr_id: string"
+        - "ncr_number: string"
+        - "current_state: NCRWorkflowState"
+        - "state_entered_at: string"
+        - "state_due_at: string | null"
+        - "is_overdue: boolean"
+        - "current_owner_id: string | null"
+        - "current_owner_name: string | null"
+        - "history: NCRStateHistoryEntry[]"
+
+    - name: "ValidationResult"
+      fields:
+        - "valid: boolean"
+        - "errors: string[]"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/ncr-workflow.ts"
+    description: "Zod schemas for NCR workflow operations"
+    schemas:
+      - name: "transitionNCRSchema"
+        fields:
+          - "transition_code: string (required, non-empty)"
+          - "notes: string (optional)"
+          - "confirmed: boolean (optional)"
+
+      - name: "ncrWorkflowStateSchema"
+        type: "enum"
+        values: ["draft", "open", "investigation", "root_cause", "corrective_action", "verification", "closed", "reopened"]
+
+# Error Handling
+error_codes:
+  INVALID_TRANSITION:
+    status: 400
+    message: "Invalid transition: no valid path from {from_state} to {to_state}"
+    context: "Attempted transition not configured or from_state mismatch"
+
+  NOTES_REQUIRED:
+    status: 400
+    message: "Transition notes required (minimum {n} characters)"
+    context: "Transition requires notes but none provided"
+
+  NOTES_TOO_SHORT:
+    status: 400
+    message: "Transition notes too short (minimum {n} characters, got {actual})"
+    context: "Notes provided but below minimum length"
+
+  CONFIRMATION_REQUIRED:
+    status: 400
+    message: "Confirmation required for this transition"
+    context: "Transition has confirmation_required=true but confirmed=false"
+
+  PERMISSION_DENIED:
+    status: 403
+    message: "Permission denied: requires one of {allowed_roles} roles"
+    context: "User role not in transition allowed_roles array"
+
+  NOT_FOUND:
+    status: 404
+    message: "NCR not found"
+    context: "NCR ID does not exist or belongs to different org"
+
+  TRANSITION_NOT_FOUND:
+    status: 404
+    message: "Transition configuration not found: {transition_code}"
+    context: "Transition code not configured for org"
+
+  ALREADY_IN_STATE:
+    status: 400
+    message: "NCR is already in {state} state"
+    context: "Attempting transition to current state"

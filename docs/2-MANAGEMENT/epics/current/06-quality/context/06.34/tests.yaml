@@ -1,0 +1,7 @@
+# Story 06.34 - Test Specifications
+
+unit_tests:
+  - calculate quality score from inspection data
+  - calculate weighted overall score
+  - determine rating status (excellent/good/fair/poor)
+  - update approval status based on score

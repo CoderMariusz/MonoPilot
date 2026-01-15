@@ -1,0 +1,332 @@
+# Story 08.6 - API Context
+# NPD Gate Approvals & History - API Endpoints
+
+endpoints:
+  # Get approval history for project
+  - method: GET
+    path: "/api/npd/projects/:id/approvals"
+    auth: true
+    roles: ["NPD_LEAD", "R&D", "QA_MANAGER", "DIRECTOR", "ADMIN"]
+    description: "Get all approvals for a project (audit trail)"
+
+    request:
+      params:
+        - name: "id"
+          type: "integer"
+          required: true
+          description: "NPD project ID"
+      query:
+        - name: "gate"
+          type: "string"
+          required: false
+          description: "Filter by gate (G0, G1, G2, G3, G4)"
+        - name: "result"
+          type: "string"
+          required: false
+          description: "Filter by result (approved, rejected)"
+
+    response:
+      success:
+        status: 200
+        body: |
+          {
+            "success": true,
+            "data": [
+              {
+                "id": 123,
+                "project_id": 456,
+                "gate": "G0",
+                "target_gate": "G1",
+                "result": "approved",
+                "approved_by": {
+                  "id": "uuid-user-1",
+                  "name": "John Smith",
+                  "email": "john@company.com",
+                  "role": "NPD_LEAD"
+                },
+                "approved_at": "2024-01-05T11:45:00Z",
+                "notes": "Concept approved for feasibility study",
+                "e_signature": false,
+                "created_at": "2024-01-05T11:45:00Z"
+              }
+            ]
+          }
+
+      errors:
+        - status: 404
+          code: "PROJECT_NOT_FOUND"
+          message: "NPD project not found"
+        - status: 403
+          code: "FORBIDDEN"
+          message: "You do not have permission to view this project"
+
+    business_logic:
+      - "Join with auth.users to get approver details"
+      - "Filter by org_id via RLS"
+      - "Sort by approved_at DESC (newest first)"
+      - "Optional filters by gate or result"
+
+    performance:
+      - "Use idx_npd_approvals_project index"
+      - "Target: <300ms for 20 approvals"
+
+  # Approve gate transition
+  - method: POST
+    path: "/api/npd/projects/:id/gates/:gate/approve"
+    auth: true
+    roles: ["NPD_LEAD", "QA_MANAGER", "DIRECTOR"]  # Role validated per gate
+    description: "Approve gate transition"
+
+    request:
+      params:
+        - name: "id"
+          type: "integer"
+          required: true
+          description: "NPD project ID"
+        - name: "gate"
+          type: "string"
+          required: true
+          description: "Current gate (G0, G1, G2, G3, G4)"
+
+      body: |
+        {
+          "notes": "Approved for Q1 launch. Good market potential.",
+          "password": "user-password"  // optional, for e-signature
+        }
+
+    response:
+      success:
+        status: 200
+        body: |
+          {
+            "success": true,
+            "data": {
+              "project": {
+                "id": 456,
+                "project_number": "NPD-2024-001",
+                "current_gate": "G1",
+                "status": "feasibility"
+              },
+              "approval": {
+                "id": 124,
+                "gate": "G0",
+                "target_gate": "G1",
+                "result": "approved",
+                "approved_by": {...},
+                "approved_at": "2024-01-15T14:30:00Z",
+                "notes": "Approved for Q1 launch.",
+                "e_signature": true
+              }
+            },
+            "message": "Gate approved successfully"
+          }
+
+      errors:
+        - status: 404
+          code: "PROJECT_NOT_FOUND"
+          message: "NPD project not found"
+
+        - status: 403
+          code: "PERMISSION_DENIED"
+          message: "Only NPD Leads can approve this gate"
+
+        - status: 400
+          code: "CHECKLIST_INCOMPLETE"
+          message: "Cannot approve - 2 required checklist items incomplete"
+
+        - status: 409
+          code: "ALREADY_APPROVED"
+          message: "This gate has already been approved by John Smith"
+
+        - status: 400
+          code: "INVALID_PASSWORD"
+          message: "Invalid password - e-signature verification failed"
+
+        - status: 400
+          code: "INVALID_GATE_TRANSITION"
+          message: "Cannot approve G2 when project is at G0"
+
+    business_logic:
+      - "Validate user has permission for this gate (role matrix)"
+      - "Validate project.current_gate matches :gate param"
+      - "Validate all required checklist items complete"
+      - "If password provided, verify e-signature"
+      - "Check for existing approval (concurrent prevention)"
+      - "Start transaction:"
+      - "  - Update project.current_gate to target_gate"
+      - "  - Update project.status based on gate"
+      - "  - Insert npd_approvals record"
+      - "Commit transaction"
+      - "Send email notification to project owner"
+      - "Return updated project + approval record"
+
+    validation:
+      - "notes: max 1000 characters"
+      - "password: required if e_signature enabled in settings"
+
+    performance:
+      - "Transaction ensures atomicity"
+      - "Email sent async (don't block response)"
+      - "Target: <500ms response time"
+
+  # Reject gate transition
+  - method: POST
+    path: "/api/npd/projects/:id/gates/:gate/reject"
+    auth: true
+    roles: ["NPD_LEAD", "QA_MANAGER", "DIRECTOR"]  # Role validated per gate
+    description: "Reject gate transition"
+
+    request:
+      params:
+        - name: "id"
+          type: "integer"
+          required: true
+          description: "NPD project ID"
+        - name: "gate"
+          type: "string"
+          required: true
+          description: "Current gate (G0, G1, G2, G3, G4)"
+
+      body: |
+        {
+          "reason": "Cost analysis incomplete. Need revised formulation with target cost under $2.50/unit."
+        }
+
+    response:
+      success:
+        status: 200
+        body: |
+          {
+            "success": true,
+            "data": {
+              "project": {
+                "id": 456,
+                "project_number": "NPD-2024-001",
+                "current_gate": "G2",  // unchanged
+                "status": "business_case"  // unchanged
+              },
+              "approval": {
+                "id": 125,
+                "gate": "G2",
+                "target_gate": "G3",
+                "result": "rejected",
+                "approved_by": {...},
+                "approved_at": "2024-01-15T15:00:00Z",
+                "notes": "Cost analysis incomplete...",
+                "e_signature": false
+              }
+            },
+            "message": "Gate rejected"
+          }
+
+      errors:
+        - status: 404
+          code: "PROJECT_NOT_FOUND"
+          message: "NPD project not found"
+
+        - status: 403
+          code: "PERMISSION_DENIED"
+          message: "Only QA Managers can reject this gate"
+
+        - status: 400
+          code: "REASON_REQUIRED"
+          message: "Rejection reason is required"
+
+        - status: 400
+          code: "REASON_TOO_SHORT"
+          message: "Please provide a more detailed reason (min 10 characters)"
+
+        - status: 400
+          code: "REASON_TOO_LONG"
+          message: "Reason cannot exceed 1000 characters"
+
+    business_logic:
+      - "Validate user has permission for this gate (role matrix)"
+      - "Validate project.current_gate matches :gate param"
+      - "Validate reason (required, min 10 chars, max 1000)"
+      - "Start transaction:"
+      - "  - Insert npd_approvals record with result='rejected'"
+      - "  - Do NOT update project.current_gate (stays at current)"
+      - "  - Do NOT update project.status"
+      - "Commit transaction"
+      - "Send email notification to project owner with reason"
+      - "Return unchanged project + rejection record"
+
+    validation:
+      - "reason: required, min 10 chars, max 1000 chars"
+
+    performance:
+      - "Email sent async"
+      - "Target: <500ms response time"
+
+# Role-based approval matrix
+approval_permissions:
+  G0:
+    required_role: "NPD_LEAD"
+    target_gate: "G1"
+    target_status: "feasibility"
+
+  G1:
+    required_role: "NPD_LEAD"
+    target_gate: "G2"
+    target_status: "business_case"
+
+  G2:
+    required_role: "NPD_LEAD"
+    target_gate: "G3"
+    target_status: "development"
+
+  G3:
+    required_role: "QA_MANAGER"
+    target_gate: "G4"
+    target_status: "testing"
+
+  G4:
+    required_role: "DIRECTOR"
+    target_gate: "Launched"
+    target_status: "launched"
+
+# Error codes
+error_codes:
+  PROJECT_NOT_FOUND: "NPD project with given ID does not exist"
+  PERMISSION_DENIED: "User role not authorized to approve/reject this gate"
+  CHECKLIST_INCOMPLETE: "Required checklist items not complete"
+  ALREADY_APPROVED: "Gate transition already approved by another user"
+  INVALID_PASSWORD: "E-signature password verification failed"
+  INVALID_GATE_TRANSITION: "Gate parameter does not match project current gate"
+  REASON_REQUIRED: "Rejection reason is required"
+  REASON_TOO_SHORT: "Rejection reason must be at least 10 characters"
+  REASON_TOO_LONG: "Rejection reason cannot exceed 1000 characters"
+
+# Email notifications
+email_notifications:
+  approval:
+    to: "npd_projects.owner_id email"
+    subject: "NPD Project {{project_number}}: Gate {{gate}} approved"
+    body: |
+      Your NPD project "{{project_name}}" ({{project_number}}) has been approved to advance from Gate {{gate}} to Gate {{target_gate}}.
+
+      Approved by: {{approver_name}} ({{approver_role}})
+      Approval date: {{approved_at}}
+      Notes: {{notes}}
+
+      View project: {{project_url}}
+
+  rejection:
+    to: "npd_projects.owner_id email"
+    subject: "NPD Project {{project_number}}: Gate {{gate}} rejected"
+    body: |
+      Your NPD project "{{project_name}}" ({{project_number}}) gate transition has been rejected.
+
+      Rejected by: {{approver_name}} ({{approver_role}})
+      Rejection date: {{approved_at}}
+      Reason: {{notes}}
+
+      Please address the feedback and resubmit for approval.
+
+      View project: {{project_url}}
+
+# Rate limiting
+rate_limiting:
+  approve_reject: "10 requests per minute per user"
+  get_history: "60 requests per minute per user"

@@ -1,0 +1,49 @@
+# Story 10.14 - Database Schema
+# Purpose: Shift handover notes table
+# Agent: BACKEND-DEV
+
+migrations:
+  - path: "supabase/migrations/XXX_create_shift_handover_notes.sql"
+    type: "migration"
+
+tables:
+  - name: "shift_handover_notes"
+    description: "Notes passed between shifts"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "shift_report_id", type: "UUID", constraints: "REFERENCES shift_reports(id)" }
+      - { name: "from_shift_id", type: "UUID", constraints: "REFERENCES shifts(id)" }
+      - { name: "to_shift_id", type: "UUID", constraints: "REFERENCES shifts(id)" }
+      - { name: "note_type", type: "TEXT", constraints: "CHECK (note_type IN ('issue', 'action_item', 'information'))" }
+      - { name: "priority", type: "TEXT", constraints: "CHECK (priority IN ('low', 'normal', 'high', 'urgent'))" }
+      - { name: "subject", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "message", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "acknowledged_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "acknowledged_at", type: "TIMESTAMPTZ" }
+      - { name: "acknowledgment_notes", type: "TEXT" }
+    rls: true
+    indexes:
+      - "idx_handover_notes_org ON shift_handover_notes(org_id)"
+      - "idx_handover_notes_to_shift ON shift_handover_notes(to_shift_id)"
+      - "idx_handover_notes_unack ON shift_handover_notes(org_id, acknowledged_at) WHERE acknowledged_at IS NULL"
+
+rls_policies:
+  - table: "shift_handover_notes"
+    name: "handover_notes_select"
+    operation: "SELECT"
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - table: "shift_handover_notes"
+    name: "handover_notes_insert"
+    operation: "INSERT"
+    with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - table: "shift_handover_notes"
+    name: "handover_notes_update"
+    operation: "UPDATE"
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"

@@ -1,0 +1,460 @@
+# Epic 08 - NPD (New Product Development) Implementation Roadmap
+# Last Updated: 2026-01-15
+# Status: STORIES TO CREATE
+
+epic:
+  id: "08"
+  name: "NPD (New Product Development)"
+  module: "npd"
+  type: "premium_addon"
+  status: "planning"
+  completion_pct: 0
+  priority: "P2"
+  owner: "Product & Engineering Team"
+  pricing: "+$30/user/month"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary:
+  total_stories: 18
+  completed_stories: 0
+  remaining_stories: 18
+  phases: 3
+  estimated_days_total: 50-66
+  estimated_days_remaining: 50-66
+  target_completion: "2026-06-15"
+
+# =============================================================================
+# PHASES
+# =============================================================================
+
+phases:
+  - phase_id: "1"
+    name: "MVP Core"
+    status: "stories_to_create"
+    timeline: "Weeks 1-6"
+    stories: 8
+    estimated_days: 22-28
+    target_start: "2026-02-01"
+    target_completion: "2026-03-15"
+    stories_list:
+      - "08.1"
+      - "08.2"
+      - "08.3"
+      - "08.4"
+      - "08.5"
+      - "08.6"
+      - "08.7"
+      - "08.8"
+    deliverables:
+      - "npd_projects table with Stage-Gate workflow"
+      - "npd_formulations table with versioning"
+      - "Kanban dashboard (drag-drop gates)"
+      - "Gate checklists with approval workflow"
+      - "Auto-allergen aggregation from ingredients"
+      - "Target/estimated costing with variance"
+      - "Compliance doc upload with categorization"
+
+  - phase_id: "2"
+    name: "Advanced Features"
+    status: "stories_to_create"
+    timeline: "Weeks 7-12"
+    stories: 7
+    estimated_days: 20-26
+    target_start: "2026-03-16"
+    target_completion: "2026-05-15"
+    stories_list:
+      - "08.9"
+      - "08.10"
+      - "08.11"
+      - "08.12"
+      - "08.13"
+      - "08.14"
+      - "08.15"
+    deliverables:
+      - "Formulation version comparison (side-by-side diff)"
+      - "Risk register with likelihood × impact scoring"
+      - "Handoff wizard (8-step validation)"
+      - "Formulation → BOM conversion (transactional)"
+      - "Pilot WO auto-creation"
+      - "Standalone export (PDF/Excel recipe cards)"
+      - "Event log with retry mechanism"
+      - "Notifications (gate approvals, cost variance, handoff)"
+
+  - phase_id: "3"
+    name: "Enterprise Features"
+    status: "stories_to_create"
+    timeline: "Weeks 13-15"
+    stories: 3
+    estimated_days: 8-12
+    target_start: "2026-05-16"
+    target_completion: "2026-06-15"
+    stories_list:
+      - "08.16"
+      - "08.17"
+      - "08.18"
+    deliverables:
+      - "Timeline view (Gantt-style with overdue highlighting)"
+      - "CSV export (projects, formulations, costing)"
+      - "Finance approval workflow for costing"
+      - "RLS policies per NPD role"
+      - "Audit trail for formulation changes"
+
+# =============================================================================
+# STORIES
+# =============================================================================
+
+stories:
+  # Phase 1 - MVP Core
+  - id: "08.1"
+    name: "NPD Settings & Module Config"
+    phase: "1"
+    type: "backend"
+    complexity: "S"
+    estimate_days: 1-2
+    fr_ids: ["NPD-FR-01"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["01.1"]
+
+  - id: "08.2"
+    name: "NPD Projects CRUD & Kanban"
+    phase: "1"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 4-5
+    fr_ids: ["NPD-FR-01", "NPD-FR-02", "NPD-FR-04", "NPD-FR-05"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.1"]
+
+  - id: "08.3"
+    name: "Stage-Gate Workflow"
+    phase: "1"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 5-6
+    fr_ids: ["NPD-FR-03", "NPD-FR-17", "NPD-FR-18", "NPD-FR-19", "NPD-FR-20", "NPD-FR-21"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.2"]
+
+  - id: "08.4"
+    name: "Formulations CRUD & Versioning"
+    phase: "1"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 5-6
+    fr_ids: ["NPD-FR-08", "NPD-FR-09", "NPD-FR-11", "NPD-FR-12", "NPD-FR-13", "NPD-FR-14"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.2", "02.1"]
+
+  - id: "08.5"
+    name: "Allergen Aggregation & Display"
+    phase: "1"
+    type: "backend + frontend"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-10", "NPD-FR-30", "NPD-FR-61"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.4", "01.12"]
+
+  - id: "08.6"
+    name: "Gate Approvals & History"
+    phase: "1"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["NPD-FR-21", "NPD-FR-22"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.3"]
+
+  - id: "08.7"
+    name: "Formulation Costing"
+    phase: "1"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-23", "NPD-FR-24", "NPD-FR-25", "NPD-FR-26", "NPD-FR-27"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.4"]
+
+  - id: "08.8"
+    name: "Compliance Documents Upload"
+    phase: "1"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-31", "NPD-FR-32", "NPD-FR-33", "NPD-FR-34", "NPD-FR-35"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.2"]
+
+  # Phase 2 - Advanced Features
+  - id: "08.9"
+    name: "Formulation Compare & Clone"
+    phase: "2"
+    type: "frontend"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["NPD-FR-15", "NPD-FR-16"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.4"]
+
+  - id: "08.10"
+    name: "Risk Management"
+    phase: "2"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-48", "NPD-FR-49", "NPD-FR-50", "NPD-FR-51", "NPD-FR-52"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.2"]
+
+  - id: "08.11"
+    name: "Handoff Wizard"
+    phase: "2"
+    type: "fullstack"
+    complexity: "L"
+    estimate_days: 5-6
+    fr_ids: ["NPD-FR-37", "NPD-FR-38", "NPD-FR-39", "NPD-FR-40", "NPD-FR-43", "NPD-FR-44", "NPD-FR-45", "NPD-FR-46"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.2", "08.4", "08.7", "08.8"]
+
+  - id: "08.12"
+    name: "Handoff: Formulation → BOM"
+    phase: "2"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-41", "NPD-FR-58", "NPD-FR-59"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.11", "02.4"]
+
+  - id: "08.13"
+    name: "Handoff: Pilot WO Creation"
+    phase: "2"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-42", "NPD-FR-57", "NPD-FR-60"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.12", "03.10"]
+
+  - id: "08.14"
+    name: "NPD-Only Mode & Export"
+    phase: "2"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 2-3
+    fr_ids: ["NPD-FR-47"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.4"]
+
+  - id: "08.15"
+    name: "Event Sourcing & Notifications"
+    phase: "2"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-53", "NPD-FR-54", "NPD-FR-55", "NPD-FR-56", "NPD-FR-70", "NPD-FR-71", "NPD-FR-72", "NPD-FR-73", "NPD-FR-74"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.2", "08.3", "08.7"]
+
+  # Phase 3 - Enterprise Features
+  - id: "08.16"
+    name: "Timeline View & Reporting"
+    phase: "3"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-06", "NPD-FR-07", "NPD-FR-28", "NPD-FR-36"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.2", "08.7"]
+
+  - id: "08.17"
+    name: "Finance Approval Workflow"
+    phase: "3"
+    type: "fullstack"
+    complexity: "M"
+    estimate_days: 3-4
+    fr_ids: ["NPD-FR-29", "NPD-FR-66", "NPD-FR-71", "NPD-FR-72"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["08.7", "08.6"]
+
+  - id: "08.18"
+    name: "Access Control & Audit Trail"
+    phase: "3"
+    type: "backend"
+    complexity: "M"
+    estimate_days: 3-5
+    fr_ids: ["NPD-FR-63", "NPD-FR-64", "NPD-FR-65", "NPD-FR-66", "NPD-FR-67", "NPD-FR-68", "NPD-FR-69"]
+    status: "to_create"
+    completion_pct: 0
+    dependencies: ["01.1", "08.2", "08.4"]
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+
+dependencies:
+  cross_epic:
+    - epic: "01"
+      stories: ["01.1"]
+      provides: "organizations, users, roles, RLS"
+      status: "ready"
+
+    - epic: "01"
+      stories: ["01.12"]
+      provides: "allergens table"
+      status: "ready"
+
+    - epic: "02"
+      stories: ["02.1"]
+      provides: "products table"
+      status: "ready"
+
+    - epic: "02"
+      stories: ["02.4"]
+      provides: "boms table"
+      status: "ready"
+
+    - epic: "03"
+      stories: ["03.10"]
+      provides: "work_orders table"
+      status: "ready"
+
+  within_epic:
+    - story: "08.1"
+      blocks: ["08.2"]
+
+    - story: "08.2"
+      blocks: ["08.3", "08.4", "08.8", "08.10", "08.11", "08.15", "08.16"]
+
+    - story: "08.3"
+      blocks: ["08.6", "08.15"]
+
+    - story: "08.4"
+      blocks: ["08.5", "08.7", "08.9", "08.11", "08.14"]
+
+    - story: "08.6"
+      blocks: ["08.17"]
+
+    - story: "08.7"
+      blocks: ["08.11", "08.15", "08.16", "08.17"]
+
+    - story: "08.11"
+      blocks: ["08.12"]
+
+    - story: "08.12"
+      blocks: ["08.13"]
+
+# =============================================================================
+# METRICS & SUCCESS CRITERIA
+# =============================================================================
+
+success_metrics:
+  phase_1:
+    - metric: "NPD project creation"
+      target: "<300ms"
+      status: "pending"
+
+    - metric: "Kanban dashboard load"
+      target: "<500ms for 50 projects"
+      status: "pending"
+
+    - metric: "Allergen aggregation"
+      target: "<200ms"
+      status: "pending"
+
+    - metric: "Gate advancement validation"
+      target: "<1s"
+      status: "pending"
+
+  phase_2:
+    - metric: "Handoff validation"
+      target: "<2s"
+      status: "pending"
+
+    - metric: "Handoff execution"
+      target: "<5s (Product + BOM + WO)"
+      status: "pending"
+
+    - metric: "Formulation comparison"
+      target: "<500ms"
+      status: "pending"
+
+  phase_3:
+    - metric: "Timeline view load"
+      target: "<500ms for 100 projects"
+      status: "pending"
+
+    - metric: "CSV export"
+      target: "<3s for 200 projects"
+      status: "pending"
+
+    - metric: "Finance approval"
+      target: "<1s"
+      status: "pending"
+
+# =============================================================================
+# RISKS
+# =============================================================================
+
+risks:
+  - risk: "Handoff complexity (transactional multi-table)"
+    impact: "HIGH"
+    likelihood: "MEDIUM"
+    mitigation: "Transactional handoff service, comprehensive rollback"
+    owner: "BACKEND-DEV"
+
+  - risk: "Allergen aggregation accuracy"
+    impact: "HIGH"
+    likelihood: "LOW"
+    mitigation: "Reuse Epic 01 allergen table, comprehensive tests"
+    owner: "BACKEND-DEV"
+
+  - risk: "NPD-only mode adoption"
+    impact: "MEDIUM"
+    likelihood: "MEDIUM"
+    mitigation: "Clear export templates, user feedback loop"
+    owner: "PRODUCT"
+
+  - risk: "Finance approval bottleneck"
+    impact: "MEDIUM"
+    likelihood: "MEDIUM"
+    mitigation: "Variance thresholds, auto-approve if < threshold"
+    owner: "PRODUCT + BACKEND-DEV"
+
+  - risk: "Event sourcing performance"
+    impact: "MEDIUM"
+    likelihood: "LOW"
+    mitigation: "Async processing, event batching"
+    owner: "DEVOPS"
+
+# =============================================================================
+# METADATA
+# =============================================================================
+
+metadata:
+  created: "2026-01-15"
+  last_updated: "2026-01-15"
+  version: "1.0"
+  author: "ORCHESTRATOR"
+  status: "active"
+  next_review: "2026-01-22"

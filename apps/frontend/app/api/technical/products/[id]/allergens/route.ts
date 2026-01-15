@@ -1,121 +1,125 @@
-/**
- * API Route: /api/technical/products/[id]/allergens
- * Story 2.4: Product Allergens - Manage allergen assignments
- */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { allergenAssignmentSchema } from '@/lib/validation/product-schemas'
-import { ZodError } from 'zod'
 
-type RouteContext = {
-  params: Promise<{ id: string }>
+/**
+ * Product Allergens API Routes
+ * Story: 2.4 Product Allergens
+ *
+ * GET /api/technical/products/:id/allergens - Get product allergens
+ * PUT /api/technical/products/:id/allergens - Update product allergens
+ */
+
+interface AllergenData {
+  id: string
+  code: string
+  name: string
 }
 
-// GET /api/technical/products/[id]/allergens - Get product allergens
-export async function GET(req: NextRequest, context: RouteContext) {
+// GET - Fetch product allergens
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id: productId } = await params
     const supabase = await createServerSupabase()
-    const { id } = await context.params
 
     // Check authentication
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession()
 
     if (authError || !session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    // Get current user to get org_id
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('org_id')
-      .eq('id', session.user.id)
-      .single()
-
-    if (userError || !currentUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
-    const orgId = currentUser.org_id
 
     // Verify product exists
-    const { data: product } = await supabase
+    const { data: product, error: productError } = await supabase
       .from('products')
-      .select('id')
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
+      .select('id, org_id')
+      .eq('id', productId)
       .single()
 
-    if (!product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      )
+    if (productError || !product) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Fetch product allergens with details
+    // Fetch product allergens with allergen details
     const { data: productAllergens, error: allergensError } = await supabase
       .from('product_allergens')
       .select(`
         allergen_id,
         relation_type,
-        allergens (id, code, name_en)
+        allergen:allergens!allergen_id (
+          id,
+          code,
+          name_en
+        )
       `)
-      .eq('product_id', id)
-      .eq('org_id', orgId)
+      .eq('product_id', productId)
 
     if (allergensError) {
       console.error('Error fetching product allergens:', allergensError)
-      return NextResponse.json(
-        { error: 'Failed to fetch allergens', details: allergensError.message },
-        { status: 500 }
-      )
+      throw new Error(`Failed to fetch allergens: ${allergensError.message}`)
     }
 
-    const allergens = {
-      contains: productAllergens
-        ?.filter((pa: any) => pa.relation_type === 'contains')
-        .map((pa: any) => pa.allergens) || [],
-      may_contain: productAllergens
-        ?.filter((pa: any) => pa.relation_type === 'may_contain')
-        .map((pa: any) => pa.allergens) || []
-    }
+    // Group by relation_type
+    const contains: AllergenData[] = []
+    const may_contain: AllergenData[] = []
 
-    return NextResponse.json({ allergens })
+    ;(productAllergens || []).forEach((pa) => {
+      const allergen = pa.allergen as unknown as { id: string; code: string; name_en: string } | null
+      if (!allergen) return
 
+      const allergenData: AllergenData = {
+        id: allergen.id,
+        code: allergen.code,
+        name: allergen.name_en,
+      }
+
+      if (pa.relation_type === 'contains') {
+        contains.push(allergenData)
+      } else if (pa.relation_type === 'may_contain') {
+        may_contain.push(allergenData)
+      }
+    })
+
+    return NextResponse.json({
+      allergens: {
+        contains,
+        may_contain,
+      },
+    })
   } catch (error) {
-    console.error('Unexpected error in GET /api/technical/products/[id]/allergens:', error)
+    console.error('Error in GET /api/technical/products/[id]/allergens:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }
 }
 
-// PUT /api/technical/products/[id]/allergens - Update product allergens
-export async function PUT(req: NextRequest, context: RouteContext) {
+// PUT - Update product allergens (replace all)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id: productId } = await params
     const supabase = await createServerSupabase()
-    const { id } = await context.params
 
     // Check authentication
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession()
 
     if (authError || !session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current user to get org_id
+    // Get current user
     const { data: currentUser, error: userError } = await supabase
       .from('users')
       .select('org_id')
@@ -123,135 +127,117 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       .single()
 
     if (userError || !currentUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const orgId = currentUser.org_id
-
-    // Verify product exists
-    const { data: product } = await supabase
+    // Verify product exists and belongs to user's org
+    const { data: product, error: productError } = await supabase
       .from('products')
-      .select('id')
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
+      .select('id, org_id')
+      .eq('id', productId)
       .single()
 
-    if (!product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      )
+    if (productError || !product) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Parse and validate request body
-    const body = await req.json()
-    const validated = allergenAssignmentSchema.parse(body)
+    if (product.org_id !== currentUser.org_id) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
 
-    // Verify all allergen IDs exist and belong to the org
-    const allAllergenIds = [...validated.contains, ...validated.may_contain]
+    // Parse request body
+    const body = await request.json()
+    const { contains = [], may_contain = [] } = body as {
+      contains: string[]
+      may_contain: string[]
+    }
+
+    // Validate allergen IDs exist
+    const allAllergenIds = [...new Set([...contains, ...may_contain])]
 
     if (allAllergenIds.length > 0) {
-      const { data: allergens, error: allergenError } = await supabase
+      const { data: validAllergens, error: validError } = await supabase
         .from('allergens')
         .select('id')
-        .eq('org_id', orgId)
         .in('id', allAllergenIds)
 
-      if (allergenError || !allergens || allergens.length !== allAllergenIds.length) {
+      if (validError) {
+        throw new Error(`Failed to validate allergens: ${validError.message}`)
+      }
+
+      const validIds = new Set((validAllergens || []).map((a) => a.id))
+      const invalidIds = allAllergenIds.filter((id) => !validIds.has(id))
+
+      if (invalidIds.length > 0) {
         return NextResponse.json(
-          { error: 'One or more allergens not found' },
+          { error: `Invalid allergen IDs: ${invalidIds.join(', ')}` },
           { status: 400 }
         )
       }
     }
 
-    // Delete existing allergen assignments
+    // Delete existing product allergens
     const { error: deleteError } = await supabase
       .from('product_allergens')
       .delete()
-      .eq('product_id', id)
-      .eq('org_id', orgId)
+      .eq('product_id', productId)
 
     if (deleteError) {
-      console.error('Error deleting existing allergens:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete existing allergens', details: deleteError.message },
-        { status: 500 }
-      )
+      console.error('Error deleting product allergens:', deleteError)
+      throw new Error(`Failed to update allergens: ${deleteError.message}`)
     }
 
-    // Insert new allergen assignments
-    const newAssignments = [
-      ...validated.contains.map(allergenId => ({
-        product_id: id,
+    // Insert new allergens if any
+    const allergensToInsert: Array<{
+      product_id: string
+      allergen_id: string
+      relation_type: 'contains' | 'may_contain'
+      org_id: string
+      source: 'manual'
+      created_by: string
+    }> = []
+
+    contains.forEach((allergenId) => {
+      allergensToInsert.push({
+        product_id: productId,
         allergen_id: allergenId,
         relation_type: 'contains',
-        org_id: orgId,
-        created_by: session.user.id
-      })),
-      ...validated.may_contain.map(allergenId => ({
-        product_id: id,
+        org_id: currentUser.org_id,
+        source: 'manual',
+        created_by: session.user.id,
+      })
+    })
+
+    may_contain.forEach((allergenId) => {
+      allergensToInsert.push({
+        product_id: productId,
         allergen_id: allergenId,
         relation_type: 'may_contain',
-        org_id: orgId,
-        created_by: session.user.id
-      }))
-    ]
+        org_id: currentUser.org_id,
+        source: 'manual',
+        created_by: session.user.id,
+      })
+    })
 
-    if (newAssignments.length > 0) {
+    if (allergensToInsert.length > 0) {
       const { error: insertError } = await supabase
         .from('product_allergens')
-        .insert(newAssignments)
+        .insert(allergensToInsert)
 
       if (insertError) {
-        console.error('Error inserting allergens:', insertError)
-        return NextResponse.json(
-          { error: 'Failed to insert allergens', details: insertError.message },
-          { status: 500 }
-        )
+        console.error('Error inserting product allergens:', insertError)
+        throw new Error(`Failed to save allergens: ${insertError.message}`)
       }
-    }
-
-    // Fetch updated allergens with details
-    const { data: updatedAllergens } = await supabase
-      .from('product_allergens')
-      .select(`
-        allergen_id,
-        relation_type,
-        allergens (id, code, name_en)
-      `)
-      .eq('product_id', id)
-      .eq('org_id', orgId)
-
-    const allergens = {
-      contains: updatedAllergens
-        ?.filter((pa: any) => pa.relation_type === 'contains')
-        .map((pa: any) => pa.allergens) || [],
-      may_contain: updatedAllergens
-        ?.filter((pa: any) => pa.relation_type === 'may_contain')
-        .map((pa: any) => pa.allergens) || []
     }
 
     return NextResponse.json({
       success: true,
-      allergens
+      message: `Updated allergens: ${contains.length} contains, ${may_contain.length} may contain`,
     })
-
   } catch (error) {
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request body', details: error.errors },
-        { status: 400 }
-      )
-    }
-
-    console.error('Unexpected error in PUT /api/technical/products/[id]/allergens:', error)
+    console.error('Error in PUT /api/technical/products/[id]/allergens:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }

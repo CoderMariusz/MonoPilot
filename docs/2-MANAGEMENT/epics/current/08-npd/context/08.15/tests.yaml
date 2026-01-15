@@ -1,0 +1,62 @@
+# Story 08.15 - Test Specifications
+# Purpose: Event sourcing and notification tests
+# Agent: TEST-WRITER, QA-AGENT
+# SEE: markdown lines 780-844
+
+test_files:
+  unit:
+    - "lib/services/npd-event-service.test.ts"
+    - "lib/services/npd-notification-service.test.ts"
+  integration:
+    - "app/api/npd/events/route.test.ts"
+    - "app/api/npd/events/[id]/retry/route.test.ts"
+    - "app/api/notifications/route.test.ts"
+  e2e:
+    - "e2e/npd-notifications.spec.ts"
+
+key_tests:
+  event_logging:
+    - "Gate advanced → event logged with type NPD.GateAdvanced"
+    - "Formulation locked → event logged with type NPD.FormulationLocked"
+    - "Costing submitted → event logged with type NPD.CostingSubmitted"
+    - "Handoff completed → event logged with type NPD.HandoffCompleted"
+
+  event_retry:
+    - "Failed event retries after 1 minute (retry_count = 1)"
+    - "Failed event retries after 2 minutes (retry_count = 2)"
+    - "Max retries (3) reached → no more retries"
+    - "Admin manual retry → retry_count reset to 0"
+
+  admin_event_log:
+    - "Admin lists all events"
+    - "Filter events by status"
+    - "Filter events by type"
+    - "Non-admin access denied (403)"
+
+  notifications:
+    - "Gate approval required → NPD Lead notified (email + in-app)"
+    - "Costing approval required → Finance notified"
+    - "Cost variance alert → NPD Lead + Finance notified"
+    - "Missing compliance docs → Regulatory notified"
+    - "Handoff completed → Production notified"
+
+  notification_center:
+    - "User views notification center (unread badge count)"
+    - "Click notification → marks as read + navigates to link"
+    - "Mark all as read → all notifications.is_read = true"
+
+  preferences:
+    - "User sets notification preferences (email/in-app toggles)"
+    - "Notifications respect user preferences"
+    - "Default preferences: all enabled"
+
+  email_delivery:
+    - "Email sent via Supabase Edge Function"
+    - "Email send failure → retry mechanism"
+
+  performance:
+    - "Event creation < 100ms"
+    - "Notification send < 500ms for 10 users"
+    - "Event retry worker < 5 seconds for 50 events"
+
+coverage_target: ">= 80%"

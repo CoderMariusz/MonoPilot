@@ -1,0 +1,259 @@
+# Story 08.10 - Frontend Specification
+# Purpose: Risk management UI components
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/npd/projects/[id]/page.tsx"
+    description: "NPD project detail page with Risks tab"
+    modifications:
+      - "Add Risks tab to project detail tabbed interface"
+      - "Load risk list when Risks tab selected"
+      - "Show risk summary cards (total, critical, high)"
+
+# Components
+components:
+  - path: "apps/frontend/components/npd/risk/RiskRegisterTable.tsx"
+    description: "Main risk list table with sorting and filtering"
+    props:
+      - { name: "projectId", type: "number", required: true }
+      - { name: "onEdit", type: "(risk: Risk) => void", required: true }
+      - { name: "onDelete", type: "(id: number) => void", required: true }
+    features:
+      - "ShadCN DataTable with sorting"
+      - "Columns: Description, Likelihood, Impact, Score, Status, Owner, Actions"
+      - "Default sort: risk_score DESC"
+      - "Color-coded risk score badges"
+      - "Pagination (20 per page)"
+      - "Loading skeleton"
+      - "Empty state"
+
+  - path: "apps/frontend/components/npd/risk/RiskFilters.tsx"
+    description: "Filter panel for risk list"
+    props:
+      - { name: "onFilterChange", type: "(filters: RiskFilters) => void", required: true }
+    features:
+      - "Status filter dropdown (All, Open, Mitigated, Closed)"
+      - "Owner filter dropdown (All, Unassigned, specific users)"
+      - "Score threshold slider (≥12 High, ≥20 Critical)"
+      - "Clear filters button"
+
+  - path: "apps/frontend/components/npd/risk/RiskScoreBadge.tsx"
+    description: "Color-coded risk score badge"
+    props:
+      - { name: "score", type: "number", required: true }
+    features:
+      - "Score 20-25: Red badge (Critical)"
+      - "Score 12-19: Orange badge (High)"
+      - "Score 6-11: Yellow badge (Medium)"
+      - "Score 1-5: Green badge (Low)"
+
+  - path: "apps/frontend/components/npd/risk/RiskStatusBadge.tsx"
+    description: "Status badge (Open/Mitigated/Closed)"
+    props:
+      - { name: "status", type: "'open' | 'mitigated' | 'closed'", required: true }
+    features:
+      - "Open: Blue badge"
+      - "Mitigated: Yellow badge"
+      - "Closed: Gray badge"
+
+  - path: "apps/frontend/components/npd/risk/RiskSeverityBadge.tsx"
+    description: "Severity label badge"
+    props:
+      - { name: "severity", type: "'critical' | 'high' | 'medium' | 'low'", required: true }
+
+  - path: "apps/frontend/components/npd/risk/RiskLikelihoodSelect.tsx"
+    description: "Likelihood dropdown (1-5)"
+    props:
+      - { name: "value", type: "1 | 2 | 3 | 4 | 5", required: true }
+      - { name: "onChange", type: "(value: number) => void", required: true }
+    features:
+      - "Options: 1=Very Low, 2=Low, 3=Medium, 4=High, 5=Very High"
+
+  - path: "apps/frontend/components/npd/risk/RiskImpactSelect.tsx"
+    description: "Impact dropdown (1-5)"
+    props:
+      - { name: "value", type: "1 | 2 | 3 | 4 | 5", required: true }
+      - { name: "onChange", type: "(value: number) => void", required: true }
+    features:
+      - "Options: 1=Very Low, 2=Low, 3=Medium, 4=High, 5=Very High"
+
+  - path: "apps/frontend/components/npd/risk/CreateRiskModal.tsx"
+    description: "Modal for creating new risk"
+    props:
+      - { name: "projectId", type: "number", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+      - { name: "onSuccess", type: "() => void", required: true }
+    features:
+      - "Form fields: description, likelihood, impact, mitigation, status, owner"
+      - "Risk score auto-calculated display (read-only)"
+      - "Live score update when likelihood/impact change"
+      - "Form validation (Zod)"
+      - "Submit: POST /api/npd/risks"
+      - "Success toast + modal close + refresh list"
+
+  - path: "apps/frontend/components/npd/risk/EditRiskModal.tsx"
+    description: "Modal for editing existing risk"
+    props:
+      - { name: "risk", type: "Risk | null", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+      - { name: "onSuccess", type: "() => void", required: true }
+    features:
+      - "Pre-populate form with current risk values"
+      - "Same validation as CreateRiskModal"
+      - "Submit: PUT /api/npd/risks/:id"
+
+  - path: "apps/frontend/components/npd/risk/RiskDetailModal.tsx"
+    description: "Modal showing full risk details"
+    props:
+      - { name: "risk", type: "Risk | null", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+      - { name: "onEdit", type: "() => void", required: true }
+      - { name: "onDelete", type: "() => void", required: true }
+    features:
+      - "Display all risk fields (read-only)"
+      - "Large risk score badge with severity"
+      - "Owner avatar + name"
+      - "Audit trail (created by, created at, updated)"
+      - "Action buttons: Edit, Delete, Close"
+
+  - path: "apps/frontend/components/npd/risk/DeleteRiskDialog.tsx"
+    description: "Confirmation dialog for deleting risk"
+    props:
+      - { name: "risk", type: "Risk | null", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+      - { name: "onConfirm", type: "() => void", required: true }
+    features:
+      - "Warning message: 'This action cannot be undone'"
+      - "Cancel and Delete buttons"
+      - "Submit: DELETE /api/npd/risks/:id"
+
+  - path: "apps/frontend/components/npd/risk/RiskMatrix.tsx"
+    description: "5×5 risk matrix visualization"
+    props:
+      - { name: "projectId", type: "number", required: true }
+    features:
+      - "5×5 grid (likelihood × impact)"
+      - "Y-axis: Impact (1-5, bottom to top)"
+      - "X-axis: Likelihood (1-5, left to right)"
+      - "Cell background color by severity"
+      - "Cell click shows risks in that cell"
+      - "Legend showing color meanings"
+
+  - path: "apps/frontend/components/npd/risk/RiskMatrixCell.tsx"
+    description: "Individual matrix cell component"
+    props:
+      - { name: "likelihood", type: "1-5", required: true }
+      - { name: "impact", type: "1-5", required: true }
+      - { name: "count", type: "number", required: true }
+      - { name: "severity", type: "string", required: true }
+      - { name: "risks", type: "Risk[]", required: true }
+      - { name: "onClick", type: "() => void", required: true }
+    features:
+      - "Background color by severity"
+      - "Badge showing risk count"
+      - "Hover tooltip with risk names"
+      - "Click opens cell detail"
+
+  - path: "apps/frontend/components/npd/risk/RiskMatrixLegend.tsx"
+    description: "Legend for risk matrix colors"
+    features:
+      - "Red: Critical (20-25)"
+      - "Orange: High (12-19)"
+      - "Yellow: Medium (6-11)"
+      - "Green: Low (1-5)"
+
+  - path: "apps/frontend/components/npd/risk/RiskSummaryCards.tsx"
+    description: "Summary stat cards for risk dashboard"
+    props:
+      - { name: "summary", type: "RiskSummary", required: true }
+    features:
+      - "Total risks count"
+      - "Critical risks count (red)"
+      - "High risks count (orange)"
+      - "Open risks count"
+
+  - path: "apps/frontend/components/npd/risk/RiskOwnerSelector.tsx"
+    description: "User selector for risk owner"
+    props:
+      - { name: "value", type: "string | null", required: true }
+      - { name: "onChange", type: "(value: string | null) => void", required: true }
+    features:
+      - "Dropdown showing users with NPD_LEAD or R&D roles"
+      - "Unassigned option (null)"
+      - "Search/filter by name"
+
+# UX Patterns
+ux_patterns:
+  table: "ShadCN DataTable with sorting, filtering, pagination"
+  modal: "ShadCN Dialog for create/edit/detail/delete"
+  form: "React Hook Form + Zod validation"
+  toast: "ShadCN Sonner for success/error messages"
+  badge: "ShadCN Badge with color variants"
+  select: "ShadCN Select component"
+
+# State Management
+state:
+  - name: "risks"
+    type: "Risk[]"
+    description: "List of risks for current project"
+  - name: "filters"
+    type: "RiskFilters"
+    description: "Active filters (status, owner, min_score)"
+  - name: "sortBy"
+    type: "string"
+    description: "Current sort column"
+  - name: "sortOrder"
+    type: "'asc' | 'desc'"
+    description: "Current sort direction"
+  - name: "selectedRisk"
+    type: "Risk | null"
+    description: "Risk selected for edit/detail/delete"
+  - name: "createModalOpen"
+    type: "boolean"
+  - name: "editModalOpen"
+    type: "boolean"
+  - name: "detailModalOpen"
+    type: "boolean"
+  - name: "deleteDialogOpen"
+    type: "boolean"
+  - name: "matrixModalOpen"
+    type: "boolean"
+
+# Hooks
+hooks:
+  - name: "useRisks"
+    path: "lib/hooks/use-risks.ts"
+    description: "Fetch risks with filtering and sorting"
+    returns:
+      - { name: "risks", type: "Risk[]" }
+      - { name: "loading", type: "boolean" }
+      - { name: "error", type: "Error | null" }
+      - { name: "refetch", type: "() => void" }
+
+  - name: "useRiskMatrix"
+    path: "lib/hooks/use-risk-matrix.ts"
+    description: "Fetch risk matrix data"
+    returns:
+      - { name: "matrix", type: "RiskMatrixCell[][]" }
+      - { name: "loading", type: "boolean" }
+      - { name: "error", type: "Error | null" }
+
+# Accessibility
+accessibility:
+  - "Keyboard navigation for table and modals"
+  - "ARIA labels on all interactive elements"
+  - "Focus management in modals"
+  - "Screen reader announcements for risk score changes"
+  - "Color-blind safe palette for risk severity"
+
+# Performance
+performance:
+  - "Virtualized table for 100+ risks (if needed)"
+  - "Debounced filter inputs (300ms)"
+  - "Optimistic updates for edit/delete"
+  - "Lazy load risk matrix modal"

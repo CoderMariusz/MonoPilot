@@ -1,0 +1,85 @@
+# Story 08.18 - Access Control & Audit Trail Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview
+# Phase: 3 (Enterprise Features)
+
+story:
+  id: "08.18"
+  name: "Access Control & Audit Trail"
+  slug: "access-control-audit-trail"
+  epic: "08-npd"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-5
+  type: "backend"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Audit log table, RLS policies, triggers
+  - api.yaml         # 1 endpoint (audit trail query)
+  - frontend.yaml    # Audit trail table, filters
+  - tests.yaml       # Unit, integration, E2E tests
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["org context", "RLS pattern", "user_roles table"]
+    - story: "08.2"
+      provides: ["npd_projects table"]
+    - story: "08.4"
+      provides: ["npd_formulations table"]
+    - story: "08.7"
+      provides: ["npd_costing table"]
+    - story: "08.8"
+      provides: ["npd_compliance_documents table"]
+
+  provides_to:
+    - story: "All NPD stories"
+      provides: "RLS policies enforce access control across all NPD features"
+    - story: "08.16"
+      provides: "Audit trail data for compliance reports"
+
+deliverables:
+  - type: "database"
+    count: 1
+    description: "Audit log table, RLS policies (6 roles), triggers (6 tables)"
+  - type: "api"
+    count: 1
+    description: "GET /api/npd/audit-trail (with filters)"
+  - type: "service"
+    count: 1
+    description: "NPDAuditService with 2 methods"
+  - type: "components"
+    count: 4
+    description: "Audit trail table, filters, entry modal, export button"
+  - type: "page"
+    count: 1
+    description: "/npd/audit-trail"
+  - type: "test"
+    count: 3
+    description: "Unit (service), Integration (RLS + triggers), E2E (audit workflow)"
+
+technical_notes:
+  - "RLS policies: 6 NPD roles (NPD_LEAD, R&D, REGULATORY, FINANCE, PRODUCTION, ADMIN)"
+  - "Audit log: Immutable (database rules prevent update/delete)"
+  - "Triggers: Automatic logging on INSERT/UPDATE/DELETE for 6 NPD tables"
+  - "Audit captures: who, when, what changed, old/new values (JSONB)"
+  - "Changed fields: Array of field names for UPDATE operations"
+  - "Admin/Quality Director can view all audit logs, users can view own entries"
+
+business_rules:
+  - rule: "Immutable Audit Log"
+    description: "Audit log entries cannot be updated or deleted (enforced by database rules)"
+  - rule: "Automatic Logging"
+    description: "All CUD operations on NPD tables automatically logged via triggers"
+  - rule: "Role-Based Access"
+    description: "RLS policies enforce role-based permissions at database level"
+  - rule: "Org Isolation"
+    description: "All RLS policies enforce org_id match"
+  - rule: "Locked Formulations"
+    description: "R&D cannot edit formulations with status = 'locked' or 'approved'"
+
+summary: |
+  Story 08.18 implements comprehensive access control via RLS policies for 6 NPD roles and immutable audit trail logging for all formulation changes, gate transitions, and approvals. Database triggers automatically capture who changed what, when, with full old/new value snapshots for compliance and traceability.

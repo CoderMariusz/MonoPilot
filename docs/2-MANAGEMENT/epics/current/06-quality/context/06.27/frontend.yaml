@@ -1,0 +1,149 @@
+# Story 06.27 - CoA Templates Frontend
+
+pages:
+  - path: /quality/coa-templates
+    file: app/(authenticated)/quality/coa-templates/page.tsx
+    description: "Templates list with filters"
+    components:
+      - CoATemplateDataTable
+      - CoATemplateFilters
+
+  - path: /quality/coa-templates/new
+    file: app/(authenticated)/quality/coa-templates/new/page.tsx
+    description: "Create new template"
+    components:
+      - CoATemplateBuilder
+
+  - path: /quality/coa-templates/[id]
+    file: app/(authenticated)/quality/coa-templates/[id]/page.tsx
+    description: "Template detail/edit"
+    components:
+      - CoATemplateDetail
+      - CoATemplateBuilder (edit mode)
+
+components:
+  CoATemplateDataTable:
+    file: components/quality/coa/CoATemplateDataTable.tsx
+    description: "ShadCN DataTable with templates"
+    columns:
+      - Template #
+      - Name
+      - Product/Type
+      - Version
+      - Status (badge)
+      - Active (checkmark)
+      - Created
+      - Actions
+
+  CoATemplateBuilder:
+    file: components/quality/coa/CoATemplateBuilder.tsx
+    description: "Template builder form"
+    sections:
+      - Basic info (name, product/type)
+      - Header editor
+      - Footer editor
+      - Logo uploader
+      - Parameter selector
+      - Compliance statements
+      - Layout settings
+      - Preview
+
+  TemplateHeaderEditor:
+    file: components/quality/coa/TemplateHeaderEditor.tsx
+    description: "Rich text editor for header"
+
+  TemplateFooterEditor:
+    file: components/quality/coa/TemplateFooterEditor.tsx
+    description: "Rich text editor for footer"
+
+  TemplateParameterSelector:
+    file: components/quality/coa/TemplateParameterSelector.tsx
+    description: "Modal to select parameters from specs"
+    features:
+      - Multi-select from quality_spec_parameters
+      - Display settings per parameter
+      - Drag-to-reorder
+
+  TemplateParameterList:
+    file: components/quality/coa/TemplateParameterList.tsx
+    description: "List of selected parameters with reorder"
+
+  TemplateComplianceEditor:
+    file: components/quality/coa/TemplateComplianceEditor.tsx
+    description: "Add/edit compliance statements"
+    features:
+      - Add from library
+      - Custom text
+      - Reorder
+
+  TemplateLayoutSettings:
+    file: components/quality/coa/TemplateLayoutSettings.tsx
+    description: "Layout config panel"
+    settings:
+      - Font family/size
+      - Page size/orientation
+      - Show/hide sections
+
+  TemplateLogoUploader:
+    file: components/quality/coa/TemplateLogoUploader.tsx
+    description: "Logo upload with preview"
+    validation:
+      - PNG/JPEG/SVG only
+      - Max 2MB
+
+  TemplatePreview:
+    file: components/quality/coa/TemplatePreview.tsx
+    description: "Live preview of template"
+    features:
+      - Sample data toggle
+      - Full layout rendering
+
+  TemplateVersionHistory:
+    file: components/quality/coa/TemplateVersionHistory.tsx
+    description: "Version history list"
+    columns:
+      - Version
+      - Status
+      - Approved By
+      - Approved At
+      - Changes
+
+  CoATemplateStatusBadge:
+    file: components/quality/coa/CoATemplateStatusBadge.tsx
+    colors:
+      draft: yellow
+      pending_approval: blue
+      approved: green
+      archived: gray
+
+  ApproveTemplateModal:
+    file: components/quality/coa/ApproveTemplateModal.tsx
+    description: "Approval modal with notes"
+
+  DuplicateTemplateModal:
+    file: components/quality/coa/DuplicateTemplateModal.tsx
+    description: "Duplicate with new name"
+
+ux_patterns:
+  list:
+    - ShadCN DataTable with filters
+    - Search by name or template number
+    - Status badges
+    - Active indicator (checkmark icon)
+
+  builder:
+    - Multi-step form or tabbed interface
+    - Live preview on right panel
+    - Save draft frequently
+    - Submit for approval when complete
+
+  approval:
+    - Review template in read-only mode
+    - Approve/Reject with notes
+    - Email notification to creator
+
+states:
+  - loading: "Shimmer skeleton for list/detail"
+  - empty: "No templates created. [+ New Template] CTA"
+  - error: "Error loading templates. [Retry]"
+  - success: "Toast on create/update/approve"

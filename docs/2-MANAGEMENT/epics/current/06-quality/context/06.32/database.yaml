@@ -1,0 +1,17 @@
+# Story 06.32 - Database Schema
+
+tables:
+  - name: "capa_actions"
+    columns:
+      - id, org_id, capa_id
+      - action_type (immediate/long_term)
+      - description, responsible_person_id, due_date
+      - status (pending/in_progress/completed/cancelled)
+      - completed_at, completed_by
+      - evidence_url, evidence_notes
+      - sequence
+      - created_at, created_by, updated_at
+    indexes:
+      - idx_capa_actions_capa
+      - idx_capa_actions_responsible
+      - idx_capa_actions_due_date

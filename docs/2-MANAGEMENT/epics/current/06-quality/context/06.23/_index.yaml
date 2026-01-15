@@ -1,0 +1,82 @@
+# Story 06.23 - CCP Monitoring Desktop Context
+# Generated: 2025-01-15
+
+story:
+  id: "06.23"
+  name: "CCP Monitoring Desktop"
+  slug: "ccp-monitoring-desktop"
+  epic: "06-quality"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["org_id, RLS, users"]
+    - story: "04.1"
+      provides: ["work_orders table"]
+    - story: "04.2"
+      provides: ["wo_operations table"]
+    - story: "05.1"
+      provides: ["license_plates table"]
+    - story: "06.21"
+      provides: ["haccp_plans table"]
+    - story: "06.22"
+      provides: ["haccp_ccp table, critical limits"]
+
+  blocks:
+    - story: "06.24"
+      reason: "Desktop monitoring patterns reused for scanner"
+    - story: "06.25"
+      reason: "Monitoring records feed deviation handling"
+    - story: "06.26"
+      reason: "Monitoring triggers deviation alerts"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/quality.md"
+  prd_sections: ["FR-QA-014"]
+  story: "docs/2-MANAGEMENT/epics/current/06-quality/06.23.ccp-monitoring-desktop.md"
+  adrs: ["ADR-013"]
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "haccp_ccp_monitoring table + triggers + RLS"
+  - type: "service"
+    count: 1
+    description: "ccp-monitoring-service.ts"
+  - type: "api"
+    count: 7
+    description: "GET/POST monitoring, verify, due, history"
+  - type: "components"
+    count: 12
+    description: "Form, Queue, History, Deviation Modal, Badges"
+  - type: "page"
+    count: 3
+    description: "monitoring form, queue, history"
+
+technical_notes:
+  - "Monitoring records immutable after 5min (auto-lock)"
+  - "Corrective action mandatory if result='fail'"
+  - "Real-time validation: value vs CCP critical limits"
+  - "Result: pass/fail/marginal (5% tolerance for marginal)"
+  - "CCP snapshot: critical limits copied at time of monitoring"
+  - "No DELETE allowed (audit trail protection)"
+  - "Deviation alert triggered on fail (<30s)"
+  - "Verified records permanently locked"
+
+summary: |
+  Story 06.23 implements desktop CCP monitoring data entry with real-time validation
+  and deviation detection. Operators record CCP values, system validates against
+  critical limits, and triggers alerts if out-of-spec.

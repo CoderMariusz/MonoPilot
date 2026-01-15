@@ -1,0 +1,84 @@
+# Story 11.15 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.15"
+  name: "EDI Advanced (ORDRSP/RECADV)"
+  slug: "edi-advanced-ordrsp-recadv"
+  epic: "11-integrations"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations"]
+    - story: "03.1"
+      name: "Sales Orders CRUD"
+      provides: ["sales_orders table"]
+      status: "planned"
+    - story: "03.3"
+      name: "Purchase Orders"
+      provides: ["purchase_orders table"]
+      status: "ready"
+    - story: "05.11"
+      name: "GRN from PO"
+      provides: ["grns table"]
+      status: "ready"
+    - story: "11.3"
+      name: "Integration Logs"
+      provides: ["integration_logs table"]
+      status: "ready"
+    - story: "11.8"
+      name: "EDI ORDERS Inbound"
+      provides: ["edi_messages table, parser patterns"]
+      status: "ready"
+    - story: "11.9"
+      name: "EDI INVOIC Outbound"
+      provides: ["EDI sender patterns"]
+      status: "ready"
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-025", "FR-INT-026"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.15.edi-advanced-ordrsp-recadv.md"
+  patterns:
+    - "docs/2-MANAGEMENT/epics/current/11-integrations/11.8.edi-orders-inbound.md"
+    - "docs/2-MANAGEMENT/epics/current/11-integrations/11.9.edi-invoic-outbound.md"
+
+# High-level deliverables
+deliverables:
+  - type: "service"
+    count: 2
+    description: "edi-advanced-service.ts, van-api-client.ts"
+  - type: "api"
+    count: 4
+    description: "POST /edi/send/ordrsp, POST /edi/process/:id, GET /edi/inbox, GET /edi/outbox"
+  - type: "cron"
+    count: 1
+    description: "VAN inbox polling (every 5 min)"
+  - type: "frontend"
+    count: 4
+    description: "EDI outbox/inbox UI, process RECADV dialog, message detail modals"
+  - type: "test"
+    count: 6
+    description: "Unit (ORDRSP gen, RECADV parse) + integration + E2E"
+
+# Technical notes
+technical_notes:
+  - "EDIFACT ORDRSP: Order Response (confirm/reject/partial)"
+  - "EDIFACT RECADV: Receiving Advice from supplier"
+  - "VAN API integration (Seeburger, TrueCommerce)"
+  - "Auto-create GRN from RECADV (optional setting)"
+  - "Duplicate detection by delivery note #"
+  - "Retry queue for VAN send failures"

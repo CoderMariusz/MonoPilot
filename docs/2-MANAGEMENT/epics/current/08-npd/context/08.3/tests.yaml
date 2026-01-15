@@ -1,0 +1,632 @@
+# Tests Context - Story 08.3: Stage-Gate Workflow
+
+unit_tests:
+  service_layer:
+    file: "apps/frontend/lib/services/npd-gate-workflow-service.test.ts"
+    framework: "vitest"
+    coverage_target: ">80%"
+
+    test_suites:
+      - suite: "advanceGate"
+        tests:
+          - name: "advances from G0 to G1"
+            setup:
+              - "Mock project with current_gate = 'G0'"
+              - "Mock all G0 checklist items complete"
+              - "Mock user with NPD_LEAD role"
+            assertions:
+              - "project.current_gate updated to 'G1'"
+              - "project.gate_entered_at updated"
+              - "npd_gate_transitions record created"
+              - "transition.from_gate = 'G0'"
+              - "transition.to_gate = 'G1'"
+
+          - name: "rejects advance with incomplete required items"
+            setup:
+              - "Mock project with current_gate = 'G1'"
+              - "Mock 2/3 required G1 items complete"
+            assertions:
+              - "Throws error 'Cannot advance: 1 required checklist item incomplete'"
+              - "project.current_gate remains 'G1'"
+
+          - name: "requires Director approval for G3+"
+            setup:
+              - "Mock project with current_gate = 'G2'"
+              - "Mock user with NPD_LEAD role (not Director)"
+              - "Mock all G2 checklist complete"
+            assertions:
+              - "Throws error 'G3 requires Director approval'"
+
+          - name: "creates transition history record"
+            setup:
+              - "Mock successful gate advance"
+            assertions:
+              - "npd_gate_transitions record inserted"
+              - "transition.transitioned_by = current user"
+              - "transition.checklist_completion_pct = 100.00"
+              - "transition.blocking_items = 0"
+
+          - name: "updates gate_entered_at timestamp"
+            setup:
+              - "Mock gate advance at specific time"
+            assertions:
+              - "project.gate_entered_at equals transition time"
+
+      - suite: "moveBack"
+        tests:
+          - name: "moves project back to previous gate"
+            setup:
+              - "Mock project with current_gate = 'G3'"
+              - "Mock user with DIRECTOR role"
+              - "Provide justification (50+ chars)"
+            assertions:
+              - "project.current_gate updated to 'G2'"
+              - "project.move_back_count incremented"
+              - "project.last_moved_back_at updated"
+              - "project.move_back_reason stored"
+
+          - name: "requires justification (min 50 chars)"
+            setup:
+              - "Mock project with current_gate = 'G3'"
+              - "Provide justification < 50 chars"
+            assertions:
+              - "Throws error 'Move back reason required (minimum 50 characters)'"
+
+          - name: "increments move_back_count"
+            setup:
+              - "Mock project with move_back_count = 2"
+              - "Execute move back"
+            assertions:
+              - "project.move_back_count = 3"
+
+          - name: "only Director can move back from G3+"
+            setup:
+              - "Mock project with current_gate = 'G4'"
+              - "Mock user with NPD_LEAD role"
+            assertions:
+              - "Throws error 'Only Director can move back from G3+'"
+
+      - suite: "getChecklist"
+        tests:
+          - name: "returns checklist for current gate"
+            setup:
+              - "Mock project with current_gate = 'G2'"
+              - "Mock 5 G2 checklist items"
+            assertions:
+              - "Returns 5 checklist items"
+              - "All items have gate = 'G2'"
+
+          - name: "includes completion status per item"
+            setup:
+              - "Mock 3 items complete, 2 incomplete"
+            assertions:
+              - "3 items have is_completed = true"
+              - "2 items have is_completed = false"
+              - "Completed items have completed_by, completed_at"
+
+          - name: "calculates summary statistics"
+            setup:
+              - "Mock 5 items (4 required, 1 optional)"
+              - "Mock 3 required complete, 1 optional complete"
+            assertions:
+              - "summary.total_items = 5"
+              - "summary.required_items = 4"
+              - "summary.completed_items = 4"
+              - "summary.required_completed = 3"
+              - "summary.required_completion_pct = 75.00"
+              - "summary.can_advance = false"
+
+          - name: "identifies blocking items"
+            setup:
+              - "Mock 2 required items incomplete"
+            assertions:
+              - "summary.blocking_items contains 2 item descriptions"
+
+      - suite: "completeChecklistItem"
+        tests:
+          - name: "marks item complete"
+            setup:
+              - "Mock checklist item incomplete"
+              - "Provide completion notes"
+            assertions:
+              - "item.is_completed = true"
+              - "item.completed_by = current user"
+              - "item.completed_at set to now()"
+              - "item.completion_notes stored"
+
+          - name: "stores completion notes"
+            setup:
+              - "Provide notes 'Formulation approved by QA team'"
+            assertions:
+              - "completion.completion_notes = 'Formulation approved by QA team'"
+
+          - name: "stores attachment URL"
+            setup:
+              - "Provide attachment_url 'npd-docs/project-123/haccp-plan.pdf'"
+            assertions:
+              - "completion.attachment_url = 'npd-docs/project-123/haccp-plan.pdf'"
+
+      - suite: "validateAdvance"
+        tests:
+          - name: "allows advance when all required complete"
+            setup:
+              - "Mock all required items complete"
+              - "Mock user with required role"
+            assertions:
+              - "result.can_advance = true"
+              - "result.blocking_reasons = []"
+
+          - name: "blocks advance with incomplete required items"
+            setup:
+              - "Mock 1 required item incomplete"
+            assertions:
+              - "result.can_advance = false"
+              - "result.blocking_reasons includes item description"
+
+          - name: "checks user role for G3+"
+            setup:
+              - "Mock project in G2 (advancing to G3)"
+              - "Mock user with NPD_LEAD role (not Director)"
+            assertions:
+              - "result.can_advance = false"
+              - "result.blocking_reasons includes 'Requires Director approval'"
+
+          - name: "returns blocking reasons"
+            setup:
+              - "Mock 2 incomplete items + role issue"
+            assertions:
+              - "result.blocking_reasons.length = 3"
+
+      - suite: "getNextGate"
+        tests:
+          - name: "returns G1 for G0"
+            assertions:
+              - "getNextGate('G0') = 'G1'"
+
+          - name: "returns G2 for G1"
+            assertions:
+              - "getNextGate('G1') = 'G2'"
+
+          - name: "returns launched for G4"
+            assertions:
+              - "getNextGate('G4') = 'launched'"
+
+          - name: "returns null for launched"
+            assertions:
+              - "getNextGate('launched') = null"
+
+integration_tests:
+  api_endpoints:
+    file: "apps/frontend/app/api/npd/projects/gate-workflow.test.ts"
+    framework: "vitest + supertest"
+
+    test_suites:
+      - endpoint: "POST /api/npd/projects/:id/advance-gate"
+        tests:
+          - name: "advances gate with valid checklist"
+            setup:
+              - "Create test project in G0"
+              - "Complete all G0 checklist items"
+              - "Authenticate as NPD_LEAD"
+            request:
+              method: "POST"
+              body:
+                notes: "Ready to proceed to feasibility"
+            assertions:
+              - "Response 200 OK"
+              - "project.current_gate = 'G1'"
+              - "transition.from_gate = 'G0'"
+              - "transition.to_gate = 'G1'"
+
+          - name: "returns 400 for incomplete checklist"
+            setup:
+              - "Create test project in G1"
+              - "Leave 1 required item incomplete"
+            request:
+              method: "POST"
+              body:
+                notes: "Attempting advance"
+            assertions:
+              - "Response 400 Bad Request"
+              - "error.message includes 'required checklist item incomplete'"
+
+          - name: "returns 403 for unauthorized role"
+            setup:
+              - "Create test project in G2"
+              - "Complete all G2 checklist items"
+              - "Authenticate as R&D (not Director)"
+            request:
+              method: "POST"
+              body:
+                approval_notes: "Attempting G3 advance without Director role"
+            assertions:
+              - "Response 403 Forbidden"
+              - "error.message includes 'G3 requires Director approval'"
+
+          - name: "creates transition history record"
+            setup:
+              - "Successful gate advance"
+            assertions:
+              - "npd_gate_transitions record exists"
+              - "transition.transitioned_by = authenticated user"
+              - "transition.checklist_completion_pct = 100.00"
+
+          - name: "returns 404 for other org project"
+            setup:
+              - "Create project in Org A"
+              - "Authenticate as user in Org B"
+            request:
+              method: "POST"
+            assertions:
+              - "Response 404 Not Found"
+
+      - endpoint: "POST /api/npd/projects/:id/move-back"
+        tests:
+          - name: "moves back with justification"
+            setup:
+              - "Create test project in G3"
+              - "Authenticate as DIRECTOR"
+            request:
+              method: "POST"
+              body:
+                target_gate: "G2"
+                justification: "Business case needs revision based on new market research findings and competitor analysis"
+            assertions:
+              - "Response 200 OK"
+              - "project.current_gate = 'G2'"
+              - "project.move_back_count = 1"
+              - "project.move_back_reason stored"
+
+          - name: "returns 400 without justification"
+            setup:
+              - "Create test project in G3"
+            request:
+              method: "POST"
+              body:
+                target_gate: "G2"
+                justification: "Too short"
+            assertions:
+              - "Response 400 Bad Request"
+              - "error.message includes 'minimum 50 characters'"
+
+      - endpoint: "GET /api/npd/projects/:id/checklist"
+        tests:
+          - name: "returns current gate checklist"
+            setup:
+              - "Create test project in G2"
+              - "Seed default G2 checklist (5 items)"
+            request:
+              method: "GET"
+            assertions:
+              - "Response 200 OK"
+              - "items.length = 5"
+              - "current_gate = 'G2'"
+
+          - name: "includes completion summary"
+            setup:
+              - "Create project with 3/5 items complete"
+            request:
+              method: "GET"
+            assertions:
+              - "summary.completed_items = 3"
+              - "summary.total_items = 5"
+              - "summary.completion_pct = 60.00"
+
+          - name: "filters by active items only"
+            setup:
+              - "Create checklist with 1 inactive item"
+            request:
+              method: "GET"
+            assertions:
+              - "items do not include inactive item"
+
+      - endpoint: "POST /api/npd/projects/:id/checklist/:itemId/complete"
+        tests:
+          - name: "marks item complete"
+            setup:
+              - "Create test project with checklist"
+              - "Select incomplete item"
+            request:
+              method: "POST"
+              body:
+                notes: "Business case approved by Finance"
+                attachment_url: "npd-docs/project-123/business-case.pdf"
+            assertions:
+              - "Response 200 OK"
+              - "item.is_completed = true"
+              - "item.completed_by = authenticated user"
+              - "item.completion_notes stored"
+              - "item.attachment_url stored"
+
+          - name: "stores attachment URL"
+            setup:
+              - "Provide valid Supabase Storage path"
+            assertions:
+              - "attachment_url persisted in database"
+
+          - name: "updates completion percentage"
+            setup:
+              - "Complete item that increases % from 80% to 100%"
+            assertions:
+              - "GET /checklist returns 100% completion"
+
+      - endpoint: "GET /api/npd/projects/:id/gate-history"
+        tests:
+          - name: "returns transition history"
+            setup:
+              - "Create project that advanced G0 -> G1 -> G2"
+            request:
+              method: "GET"
+            assertions:
+              - "Response 200 OK"
+              - "history.length = 2"
+              - "history[0].to_gate = 'G2' (newest first)"
+              - "history[1].to_gate = 'G1'"
+
+          - name: "orders by transitioned_at DESC"
+            setup:
+              - "Create multiple transitions"
+            assertions:
+              - "history ordered newest to oldest"
+
+          - name: "includes approval metadata"
+            setup:
+              - "Create G3 advance with Director approval"
+            request:
+              method: "GET"
+            assertions:
+              - "history[0].requires_approval = true"
+              - "history[0].approved_by exists"
+              - "history[0].approval_notes exists"
+
+e2e_tests:
+  workflows:
+    file: "apps/frontend/e2e/npd-gate-workflow.spec.ts"
+    framework: "playwright"
+
+    test_suites:
+      - workflow: "complete gate progression (G0 -> Launched)"
+        steps:
+          - step: "Login as NPD Lead"
+            actions:
+              - "Navigate to /login"
+              - "Enter credentials"
+              - "Click [Login]"
+
+          - step: "Create NPD project"
+            actions:
+              - "Navigate to /npd/projects"
+              - "Click [Create Project]"
+              - "Fill form (project name, description)"
+              - "Submit"
+            assertions:
+              - "Project created with current_gate = 'G0'"
+
+          - step: "Complete G0 checklist"
+            actions:
+              - "Navigate to project detail"
+              - "Expand G0 checklist"
+              - "Mark all 3 items complete"
+            assertions:
+              - "Checklist shows 100% complete"
+
+          - step: "Advance to G1"
+            actions:
+              - "Click [Advance to G1]"
+              - "Enter notes in modal"
+              - "Click [Advance to G1]"
+            assertions:
+              - "Modal closes"
+              - "Timeline shows G1 as current"
+              - "Success toast appears"
+
+          - step: "Complete G1 checklist"
+            actions:
+              - "Mark all 4 G1 items complete"
+            assertions:
+              - "Can advance to G2"
+
+          - step: "Advance to G2"
+            actions:
+              - "Click [Advance to G2]"
+              - "Submit modal"
+            assertions:
+              - "Current gate = 'G2'"
+
+          - step: "Switch to Director user"
+            actions:
+              - "Logout"
+              - "Login as Director"
+              - "Navigate to same project"
+
+          - step: "Complete G2 checklist"
+            actions:
+              - "Mark all 5 G2 items complete"
+
+          - step: "Advance to G3 (requires approval)"
+            actions:
+              - "Click [Advance to G3]"
+              - "Enter approval notes (50+ chars)"
+              - "Submit modal"
+            assertions:
+              - "Current gate = 'G3'"
+              - "Transition history shows approval"
+
+          - step: "Complete G3 and G4"
+            actions:
+              - "Complete all G3 items"
+              - "Advance to G4"
+              - "Complete all G4 items"
+              - "Advance to Launched"
+            assertions:
+              - "Current gate = 'launched'"
+              - "Timeline shows all gates complete"
+
+      - workflow: "move back (G3 -> G2)"
+        steps:
+          - step: "Login as Director"
+            actions:
+              - "Authenticate"
+
+          - step: "Open project in G3"
+            actions:
+              - "Navigate to project in G3"
+
+          - step: "Click Move Back button"
+            actions:
+              - "Click [Move Back]"
+            assertions:
+              - "Move back modal opens"
+
+          - step: "Fill justification"
+            actions:
+              - "Select target gate: G2"
+              - "Enter justification (50+ chars)"
+              - "Check confirmation checkbox"
+
+          - step: "Submit move back"
+            actions:
+              - "Click [Move Back] button"
+            assertions:
+              - "Modal closes"
+              - "Current gate = 'G2'"
+              - "Timeline shows G3 no longer current"
+              - "Success toast appears"
+
+          - step: "Verify history"
+            actions:
+              - "Navigate to gate history page"
+            assertions:
+              - "History shows move_back transition"
+              - "Justification visible"
+
+      - workflow: "checklist blocking prevents advance"
+        steps:
+          - step: "Login as NPD Lead"
+            actions:
+              - "Authenticate"
+
+          - step: "Open project in G1"
+            actions:
+              - "Navigate to project"
+
+          - step: "Complete only 2 of 3 required items"
+            actions:
+              - "Mark 2 required items complete"
+              - "Leave 1 required item incomplete"
+
+          - step: "Attempt to advance"
+            actions:
+              - "Click [Advance to G2]"
+            assertions:
+              - "Modal opens"
+              - "Validation warning shown"
+              - "[Advance] button disabled"
+              - "Blocking item listed"
+
+          - step: "Complete blocking item"
+            actions:
+              - "Close modal"
+              - "Mark remaining item complete"
+              - "Click [Advance to G2]"
+            assertions:
+              - "No validation warnings"
+              - "[Advance] button enabled"
+              - "Can submit successfully"
+
+      - workflow: "Director approval for G3+"
+        steps:
+          - step: "Login as NPD Lead"
+            actions:
+              - "Authenticate as NPD_LEAD"
+
+          - step: "Attempt G3 advance"
+            actions:
+              - "Open project in G2"
+              - "Complete all G2 items"
+              - "Click [Advance to G3]"
+            assertions:
+              - "Modal shows 'Requires Director approval' warning"
+              - "Approval notes field required"
+
+          - step: "Submit without approval notes"
+            actions:
+              - "Leave approval notes empty"
+              - "Click [Advance]"
+            assertions:
+              - "Validation error shown"
+              - "Cannot submit"
+
+          - step: "Switch to Director"
+            actions:
+              - "Logout"
+              - "Login as DIRECTOR"
+              - "Navigate to project"
+
+          - step: "Advance with approval"
+            actions:
+              - "Click [Advance to G3]"
+              - "Enter approval notes (50+ chars)"
+              - "Submit"
+            assertions:
+              - "Advance succeeds"
+              - "Transition history shows approved_by = Director"
+
+accessibility_tests:
+  - name: "Modal keyboard navigation"
+    assertions:
+      - "Can open modal with Enter key"
+      - "Can tab through form fields"
+      - "Can submit with Enter key"
+      - "Can cancel with Escape key"
+      - "Focus returns to trigger button on close"
+
+  - name: "Checklist keyboard navigation"
+    assertions:
+      - "Can navigate items with Tab"
+      - "Can toggle checkbox with Space"
+      - "Can activate [Mark Complete] with Enter"
+
+  - name: "Screen reader announcements"
+    assertions:
+      - "Gate advance announced"
+      - "Checklist completion announced"
+      - "Validation errors announced"
+
+performance_tests:
+  - name: "Checklist loading time"
+    target: "<300ms"
+    assertions:
+      - "GET /checklist responds in <300ms"
+      - "Component renders in <100ms"
+
+  - name: "Gate advance response time"
+    target: "<500ms"
+    assertions:
+      - "POST /advance-gate responds in <500ms"
+      - "UI updates in <200ms"
+
+  - name: "Gate history loading"
+    target: "<400ms"
+    assertions:
+      - "GET /gate-history responds in <400ms for 20 transitions"
+
+test_data:
+  fixtures:
+    - file: "fixtures/npd-projects.json"
+      description: "Sample NPD projects in various gates"
+
+    - file: "fixtures/gate-checklists.json"
+      description: "Default checklists for all gates"
+
+    - file: "fixtures/gate-transitions.json"
+      description: "Sample transition history"
+
+  seed_scripts:
+    - script: "seed-npd-test-data.ts"
+      description: "Seeds test database with NPD projects and checklists"
+
+coverage_targets:
+  unit_tests: ">80%"
+  integration_tests: ">70%"
+  e2e_tests: "Critical workflows covered"

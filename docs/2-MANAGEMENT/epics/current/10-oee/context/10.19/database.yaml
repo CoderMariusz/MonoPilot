@@ -1,0 +1,36 @@
+# Story 10.19 - Database Schema
+# Purpose: OEE benchmarks and baseline tracking
+# Agent: BACKEND-DEV
+
+tables:
+  - name: "oee_benchmarks"
+    description: "Industry benchmark reference data"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "industry", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "category", type: "TEXT" }
+      - { name: "benchmark_type", type: "TEXT", constraints: "CHECK (benchmark_type IN ('typical', 'world_class', 'minimum'))" }
+      - { name: "oee_pct", type: "DECIMAL(5,2)" }
+      - { name: "availability_pct", type: "DECIMAL(5,2)" }
+      - { name: "performance_pct", type: "DECIMAL(5,2)" }
+      - { name: "quality_pct", type: "DECIMAL(5,2)" }
+      - { name: "source", type: "TEXT" }
+    seed_data:
+      - { industry: "Food & Beverage", category: "General", benchmark_type: "typical", oee_pct: 75.0 }
+      - { industry: "Food & Beverage", category: "General", benchmark_type: "world_class", oee_pct: 85.0 }
+
+  - name: "oee_baselines"
+    description: "Organization OEE baselines for improvement tracking"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "baseline_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "oee_baseline", type: "DECIMAL(5,2)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+
+migrations:
+  - path: "supabase/migrations/XXX_create_oee_benchmarks.sql"
+  - path: "supabase/migrations/XXX_create_oee_baselines.sql"

@@ -1,0 +1,226 @@
+tables:
+  npd_formulations:
+    usage: "Read for comparison, insert for clone"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "npd_project_id"
+      - "formulation_number"
+      - "status"
+      - "effective_from"
+      - "effective_to"
+      - "parent_formulation_id"
+      - "total_qty"
+      - "uom"
+      - "notes"
+      - "created_at"
+      - "created_by"
+
+    operations:
+      - type: "SELECT"
+        description: "Fetch formulations for comparison"
+        query: |
+          SELECT f.*,
+                 p.project_number,
+                 p.project_name,
+                 u.name as created_by_name
+          FROM npd_formulations f
+          JOIN npd_projects p ON f.npd_project_id = p.id
+          JOIN users u ON f.created_by = u.id
+          WHERE f.id IN (:v1, :v2)
+            AND f.org_id = :org_id
+
+      - type: "INSERT"
+        description: "Create cloned formulation"
+        query: |
+          INSERT INTO npd_formulations (
+            org_id,
+            npd_project_id,
+            formulation_number,
+            status,
+            effective_from,
+            effective_to,
+            parent_formulation_id,
+            total_qty,
+            uom,
+            notes,
+            created_by
+          )
+          SELECT
+            org_id,
+            npd_project_id,
+            :new_formulation_number,
+            'draft',
+            :effective_from,
+            :effective_to,
+            :source_id,
+            :total_qty,
+            :uom,
+            :notes,
+            :user_id
+          FROM npd_formulations
+          WHERE id = :source_id
+          RETURNING *
+
+  npd_formulation_items:
+    usage: "Read for comparison, copy for clone"
+    columns_used:
+      - "id"
+      - "formulation_id"
+      - "product_id"
+      - "quantity"
+      - "uom"
+      - "percentage"
+      - "notes"
+
+    operations:
+      - type: "SELECT"
+        description: "Fetch items for comparison"
+        query: |
+          SELECT fi.*,
+                 p.product_code,
+                 p.product_name
+          FROM npd_formulation_items fi
+          JOIN products p ON fi.product_id = p.id
+          WHERE fi.formulation_id IN (:v1, :v2)
+          ORDER BY p.product_name
+
+      - type: "INSERT"
+        description: "Copy items to cloned formulation"
+        query: |
+          INSERT INTO npd_formulation_items (
+            formulation_id,
+            product_id,
+            quantity,
+            uom,
+            notes
+          )
+          SELECT
+            :new_formulation_id,
+            product_id,
+            quantity,
+            uom,
+            notes
+          FROM npd_formulation_items
+          WHERE formulation_id = :source_id
+
+  npd_costing:
+    usage: "Read for cost comparison (optional)"
+    columns_used:
+      - "formulation_id"
+      - "estimated_cost"
+      - "actual_cost"
+
+    operations:
+      - type: "SELECT"
+        description: "Fetch costing for comparison (if available)"
+        query: |
+          SELECT formulation_id, estimated_cost, actual_cost
+          FROM npd_costing
+          WHERE formulation_id IN (:v1, :v2)
+
+  products:
+    usage: "Join for product details in items"
+    columns_used:
+      - "id"
+      - "product_code"
+      - "product_name"
+
+triggers:
+  auto_calculate_percentage:
+    table: "npd_formulation_items"
+    timing: "BEFORE INSERT OR UPDATE"
+    description: "Auto-calculates percentage when items copied to cloned formulation"
+    sql: |
+      CREATE OR REPLACE FUNCTION auto_calculate_formulation_item_percentage()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        v_total_qty DECIMAL(15,4);
+      BEGIN
+        SELECT total_qty INTO v_total_qty
+        FROM npd_formulations
+        WHERE id = NEW.formulation_id;
+
+        IF v_total_qty > 0 THEN
+          NEW.percentage := (NEW.quantity / v_total_qty) * 100;
+        ELSE
+          NEW.percentage := 0;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+indexes:
+  required:
+    - name: "idx_npd_formulations_project"
+      table: "npd_formulations"
+      columns: ["npd_project_id"]
+      reason: "Fast comparison validation (same project check)"
+
+    - name: "idx_npd_formulation_items_formulation"
+      table: "npd_formulation_items"
+      columns: ["formulation_id"]
+      reason: "Fast item fetch for comparison"
+
+    - name: "idx_npd_formulations_version"
+      table: "npd_formulations"
+      columns: ["npd_project_id", "formulation_number"]
+      unique: true
+      reason: "Enforce version uniqueness per project"
+
+constraints:
+  unique:
+    - table: "npd_formulations"
+      columns: ["npd_project_id", "formulation_number"]
+      purpose: "Prevent duplicate version numbers within project"
+
+  foreign_keys:
+    - table: "npd_formulations"
+      column: "parent_formulation_id"
+      references: "npd_formulations(id)"
+      purpose: "Track lineage (clone source)"
+
+    - table: "npd_formulation_items"
+      column: "formulation_id"
+      references: "npd_formulations(id)"
+      on_delete: "CASCADE"
+      purpose: "Delete items when formulation deleted"
+
+    - table: "npd_formulation_items"
+      column: "product_id"
+      references: "products(id)"
+      purpose: "Link to product catalog"
+
+rls_policies:
+  npd_formulations:
+    select: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    insert: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    update: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    delete: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  npd_formulation_items:
+    select: |
+      EXISTS (
+        SELECT 1 FROM npd_formulations f
+        WHERE f.id = npd_formulation_items.formulation_id
+          AND f.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    insert: |
+      EXISTS (
+        SELECT 1 FROM npd_formulations f
+        WHERE f.id = npd_formulation_items.formulation_id
+          AND f.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+
+migration_notes:
+  - "No new migrations required - uses existing 08.4 schema"
+  - "Ensure parent_formulation_id FK exists (from 08.4)"
+  - "Ensure auto_calculate_percentage trigger exists (from 08.4)"
+  - "Verify unique constraint on (npd_project_id, formulation_number)"
+
+performance_notes:
+  - "Comparison: Use JOIN to fetch both formulations + items in single query"
+  - "Clone: Use INSERT...SELECT for efficient bulk item copy"
+  - "Diff calculation: Perform in application layer (JavaScript/TypeScript)"
+  - "Expected load: <500ms for 100 total items across both versions"

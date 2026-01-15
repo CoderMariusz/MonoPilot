@@ -1,0 +1,101 @@
+# Story 08.6 - Index File (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "08.6"
+  name: "Gate Approvals & History"
+  slug: "gate-approvals-history"
+  epic: "08-npd"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 2.5
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, types, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "auth patterns"]
+    - story: "01.10"
+      name: "Roles CRUD"
+      provides: ["role-based permissions", "user roles"]
+    - story: "08.1"
+      name: "NPD Projects CRUD"
+      provides: ["npd_projects table", "gate workflow", "project service"]
+    - story: "08.3"
+      name: "Gate Checklists"
+      provides: ["npd_gate_checklists table", "checklist validation"]
+  soft:
+    - story: "03.5b"
+      name: "PO Approval Workflow"
+      provides: ["approval pattern reference"]
+  blocked_by: []
+  blocks:
+    - story: "08.7"
+      name: "Handoff Wizard"
+      reason: "Handoff requires G4 approval before execution"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["FR-NPD-19", "FR-NPD-21", "FR-NPD-22", "Section 4 - Gate Checklists"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/npd.md"
+    sections: ["npd_approvals table"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.6.gate-approvals-history.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-008-po-approval-modal.md"
+      relevance: "UX pattern for approval modal (adapt for NPD gates)"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for npd_approvals"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/context/03.5a/"
+      relevance: "Approval workflow YAML context structure"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Create npd_approvals table with RLS"
+  - type: "api"
+    count: 3
+    description: "GET /api/npd/projects/:id/approvals, POST .../approve, POST .../reject"
+  - type: "service"
+    count: 1
+    description: "npd-approval-service.ts"
+  - type: "validation"
+    count: 1
+    description: "npd-approval-schema.ts (Zod)"
+  - type: "component"
+    count: 4
+    description: "GateApprovalModal, ApprovalHistoryTimeline, ESignatureModal, GateApprovalButton"
+  - type: "test"
+    count: 4
+    description: "Unit + API + component + permission tests"
+
+# Technical notes
+technical_notes:
+  - "Role-based approval matrix: G0-G2=NPD_LEAD, G3=QA_MANAGER, G4=DIRECTOR"
+  - "Approval requires all required checklist items complete"
+  - "Rejection reason required (min 10 chars, max 1000 chars)"
+  - "E-signature optional via password confirmation"
+  - "Email notification to project owner on approve/reject"
+  - "Concurrent approval prevention (first approval wins)"
+  - "Audit trail in npd_approvals table (immutable)"
+  - "Gate transition updates project.current_gate and project.status"
+  - "Approval history timeline sorted DESC (newest first)"
+  - "Similar UX pattern to PO approval modal (PLAN-008)"

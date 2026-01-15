@@ -922,7 +922,7 @@ export async function compareBOMVersions(
         org_id,
         items:bom_items (
           id,
-          component_id,
+          product_id,
           quantity,
           uom,
           sequence,
@@ -953,7 +953,7 @@ export async function compareBOMVersions(
         org_id,
         items:bom_items (
           id,
-          component_id,
+          product_id,
           quantity,
           uom,
           sequence,
@@ -1157,7 +1157,7 @@ export async function explodeBOM(
     .from('bom_items')
     .select(`
       id,
-      component_id,
+      product_id,
       quantity,
       uom,
       sequence,
@@ -1243,7 +1243,9 @@ export async function explodeBOM(
       let subBomItems: any[] = []
       let subBomOutputQty = 1
 
-      if (componentType === 'wip' || componentType === 'semi_finished') {
+      // Normalize component type to lowercase for comparison
+      const componentTypeLower = componentType.toLowerCase()
+      if (componentTypeLower === 'wip' || componentTypeLower === 'semi_finished') {
         const subBom = await getSubBOM(item.product_id)
         if (subBom) {
           hasSubBom = true
@@ -1254,7 +1256,7 @@ export async function explodeBOM(
             .from('bom_items')
             .select(`
               id,
-              component_id,
+              product_id,
               quantity,
               uom,
               sequence,
@@ -1294,8 +1296,9 @@ export async function explodeBOM(
       levelExplosionItems.push(explosionItem)
       totalItems++
 
-      // Add raw materials to summary
-      if (componentType === 'raw' || (!hasSubBom && componentType !== 'wip' && componentType !== 'semi_finished')) {
+      // Add raw materials to summary (use normalized type)
+      if (componentTypeLower === 'raw' || componentTypeLower === 'rm' || componentTypeLower === 'ing' ||
+          (!hasSubBom && componentTypeLower !== 'wip' && componentTypeLower !== 'semi_finished')) {
         const existing = rawMaterialsMap.get(item.product_id)
         if (existing) {
           existing.total_qty += cumulativeQty
@@ -1376,7 +1379,7 @@ export async function applyBOMScaling(
       org_id,
       items:bom_items (
         id,
-        component_id,
+        product_id,
         quantity,
         uom,
         is_output,
@@ -1512,12 +1515,10 @@ export async function getBOMYield(bomId: string): Promise<BomYieldResponse> {
       org_id,
       items:bom_items (
         id,
-        component_id,
         quantity,
         uom,
         scrap_percent,
-        is_output,
-        is_by_product
+        is_output
       )
     `)
     .eq('id', bomId)
@@ -1533,16 +1534,16 @@ export async function getBOMYield(bomId: string): Promise<BomYieldResponse> {
   // Calculate input total (non-output items with scrap)
   let inputTotalKg = 0
   for (const item of items) {
-    if (!item.is_output && !item.is_by_product) {
+    if (!item.is_output) {
       const scrapMultiplier = 1 + (item.scrap_percent || 0) / 100
       inputTotalKg += item.quantity * scrapMultiplier
     }
   }
 
-  // Calculate output total (output and by-product items)
+  // Calculate output total (output items are by-products)
   let outputQtyKg = bom.output_qty
   for (const item of items) {
-    if (item.is_by_product) {
+    if (item.is_output) {
       outputQtyKg += item.quantity
     }
   }

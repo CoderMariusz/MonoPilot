@@ -1,0 +1,80 @@
+# Story 10.13 - Custom Report Builder Context (Entry Point)
+# Generated: 2025-01-15
+# Phase: 2 (Advanced Analytics)
+
+story:
+  id: "10.13"
+  name: "Custom Report Builder"
+  slug: "custom-report-builder"
+  epic: "10-oee"
+  phase: "2"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "fullstack"
+  state: "ready"
+  priority: "P1"
+
+context_files:
+  - _index.yaml
+  - database.yaml
+  - api.yaml
+  - frontend.yaml
+  - tests.yaml
+
+dependencies:
+  required:
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      provides: ["oee_snapshots data", "OEE metrics"]
+    - story: "10.3"
+      name: "Downtime Event Tracking"
+      provides: ["downtime data for reports"]
+
+  blocked_by: []
+  blocks: []
+
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-019 - Custom Report Builder"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.13.custom-report-builder.md"
+
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "report_templates table"
+  - type: "api"
+    count: 4
+    description: "CRUD for templates + report generation"
+  - type: "components"
+    count: 6
+    description: "Report builder UI, preview, template library"
+  - type: "page"
+    count: 2
+    description: "/oee/reports/builder, /oee/reports/templates"
+
+technical_notes:
+  - "Drag-and-drop interface for metric/dimension selection"
+  - "Metrics: OEE, availability, downtime, output, energy"
+  - "Dimensions: Machine, Line, Shift, Product, Date"
+  - "Chart types: Line, Bar, Pie, Table"
+  - "Save templates for reuse"
+  - "Scheduled generation out of scope (Phase 3)"
+
+summary: |
+  Story 10.13 implements custom report builder for OEE analytics.
+
+  MVP SCOPE:
+  - Report builder UI with drag-and-drop
+  - Metric and dimension selection
+  - Filter configuration (date range, machines, products)
+  - Chart type selection
+  - Report preview
+  - Save report templates
+  - Template library page
+
+  OUT OF SCOPE (Phase 3):
+  - Scheduled report generation
+  - Email distribution
+  - Custom formulas

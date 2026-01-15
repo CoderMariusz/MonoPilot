@@ -1,0 +1,80 @@
+# Story 06.38 - Audit Trail Reports Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: FDA 21 CFR Part 11 compliant audit trail
+# Phase: 4 (Analytics & Reporting)
+
+story:
+  id: "06.38"
+  name: "Audit Trail Reports"
+  slug: "audit-trail-reports"
+  epic: "06-quality"
+  phase: "4"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P0"
+
+context_files:
+  - _index.yaml      # This file
+  - database.yaml    # quality_audit_log table (immutable)
+  - api.yaml         # 3 endpoints (list, detail, export)
+  - frontend.yaml    # Audit trail list, detail, diff component
+  - tests.yaml       # Immutability enforcement tests
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["org context", "users table"]
+    - story: "06.5"
+      provides: ["Inspection audit logs"]
+    - story: "06.9"
+      provides: ["NCR audit logs"]
+
+  blocks:
+    - story: "06.39"
+      reason: "Analytics can analyze audit trail data (user activity)"
+
+deliverables:
+  - type: "database"
+    count: 1
+    description: "quality_audit_log table (INSERT-only, immutable)"
+  - type: "trigger"
+    count: 2
+    description: "prevent_audit_log_update, prevent_audit_log_delete triggers"
+  - type: "function"
+    count: 2
+    description: "create_audit_log_entry(), archive_old_audit_logs()"
+  - type: "api"
+    count: 3
+    description: "List, detail, export (CSV/PDF)"
+  - type: "service"
+    count: 1
+    description: "AuditTrailService with 8 methods"
+  - type: "components"
+    count: 8
+    description: "DataTable, filters, detail modal, diff component, export buttons"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, E2E, immutability tests"
+
+technical_notes:
+  - "Audit log immutability: RLS policies allow SELECT/INSERT only, triggers prevent UPDATE/DELETE"
+  - "User denormalization: user_name, user_email, user_role stored in audit log (survives user deletion)"
+  - "Full-text search: PostgreSQL tsvector on change_reason + notes"
+  - "Retention: Default 2 years, configurable up to 10 years"
+  - "Archive: archived_at timestamp set, not deleted (audit trail permanence)"
+  - "Diff: JSON diff with HTML formatting for old/new value comparison"
+
+business_rules:
+  - rule: "Immutability"
+    description: "No UPDATE or DELETE allowed on quality_audit_log (enforced by RLS + triggers)"
+  - rule: "Change Reason Required"
+    description: "For critical fields (quality status, NCR severity), change_reason required"
+  - rule: "User Denormalization"
+    description: "User data denormalized for audit trail permanence"
+  - rule: "Archive Not Delete"
+    description: "Old logs archived (archived_at), never deleted"
+
+summary: |
+  Story 06.38 implements immutable audit trail query, reporting, and export for FDA 21 CFR Part 11 compliance. quality_audit_log table records all changes to quality entities (inspections, NCRs, CAPAs, specifications) with who, what, when, why traceability. Audit trail supports query by entity, user, action, date range, full-text search, and export to CSV/PDF.

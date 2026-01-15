@@ -1,0 +1,319 @@
+frontend:
+  ux:
+    wireframes:
+      - id: "NPD-007"
+        path: "docs/3-ARCHITECTURE/ux/wireframes/NPD-007-formulation-editor.md"
+        relevance: "Allergen panel integration within formulation editor - right sidebar section"
+        components: ["FormulationAllergenPanel", "FormulationAllergenBadge", "AllergenList"]
+    patterns:
+      panel: "ShadCN Card in right sidebar"
+      badge: "Color-coded allergen count badge"
+      list: "Vertical list with icons and localized names"
+    states:
+      - "loading: Skeleton loader with 2-3 rows"
+      - "empty: 'No allergens detected in this formulation'"
+      - "error: Error message with retry button"
+      - "success: List of allergens with icons"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/npd/formulations/[id]/page.tsx"
+      modification: true
+      from_story: "08.4"
+      changes:
+        - "Add FormulationAllergenPanel component to formulation detail page"
+        - "Position panel in right sidebar or below formulation items table"
+
+      layout: |
+        Page Layout:
+        +------------------------------------------------+
+        | Header: Formulation F-001 v1                   |
+        +------------------------------------------------+
+        | Main Content                | Right Sidebar    |
+        |                             |                  |
+        | Formulation Items Table     | Allergen Panel   |
+        | (from Story 08.4)           | +--------------+ |
+        |                             | | Allergen     | |
+        |                             | | Declaration  | |
+        |                             | |              | |
+        |                             | | [Badge: 3]   | |
+        |                             | |              | |
+        |                             | | A01 - Gluten | |
+        |                             | | A03 - Eggs   | |
+        |                             | | A07 - Milk   | |
+        |                             | +--------------+ |
+        +------------------------------------------------+
+
+  components:
+    - name: "FormulationAllergenPanel"
+      path: "apps/frontend/components/npd/allergens/FormulationAllergenPanel.tsx"
+
+      purpose: "Display allergen declaration for a formulation"
+
+      props: |
+        interface FormulationAllergenPanelProps {
+          formulationId: string;
+          lang?: string;
+          showBadge?: boolean;
+        }
+
+      state:
+        - "allergens: Allergen[] | null"
+        - "loading: boolean"
+        - "error: string | null"
+
+      hooks:
+        - "useEffect(() => fetchAllergens(), [formulationId])"
+        - "useState for allergens, loading, error"
+
+      data_fetching: |
+        const fetchAllergens = async () => {
+          setLoading(true);
+          try {
+            const res = await fetch(`/api/npd/formulations/${formulationId}/allergens?lang=${lang}`);
+            if (!res.ok) throw new Error('Failed to fetch allergens');
+            const data = await res.json();
+            setAllergens(data.allergens);
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+      render_states:
+        loading: |
+          <Card>
+            <CardHeader>
+              <CardTitle>Allergen Declaration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-6 w-3/4 mt-2" />
+            </CardContent>
+          </Card>
+
+        error: |
+          <Card>
+            <CardHeader>
+              <CardTitle>Allergen Declaration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <Button onClick={fetchAllergens} className="mt-2">Retry</Button>
+            </CardContent>
+          </Card>
+
+        empty: |
+          <Card>
+            <CardHeader>
+              <CardTitle>Allergen Declaration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Info className="h-5 w-5" />
+                <p>No allergens detected in this formulation</p>
+              </div>
+            </CardContent>
+          </Card>
+
+        success: |
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Allergen Declaration</CardTitle>
+              {showBadge && <FormulationAllergenBadge count={allergens.length} />}
+            </CardHeader>
+            <CardContent>
+              <AllergenList allergens={allergens} lang={lang} showIcon={true} />
+            </CardContent>
+          </Card>
+
+      styling:
+        - "Use ShadCN Card component"
+        - "Header with title and optional badge"
+        - "Content area with allergen list or empty state"
+        - "Loading skeleton with 2-3 rows"
+
+      performance:
+        - "Debounce refresh if formulation items change rapidly"
+        - "Cache allergens in component state (no re-fetch on re-render)"
+
+    - name: "FormulationAllergenBadge"
+      path: "apps/frontend/components/npd/allergens/FormulationAllergenBadge.tsx"
+
+      purpose: "Display allergen count with color coding"
+
+      props: |
+        interface FormulationAllergenBadgeProps {
+          count: number;
+          size?: 'sm' | 'md' | 'lg';
+        }
+
+      implementation: |
+        export function FormulationAllergenBadge({ count, size = 'md' }: FormulationAllergenBadgeProps) {
+          const variant = count === 0 ? 'success' : count <= 5 ? 'warning' : 'destructive';
+          const label = count === 0 ? 'No Allergens' : `${count} Allergen${count > 1 ? 's' : ''}`;
+
+          return (
+            <Badge variant={variant} className={sizeClasses[size]}>
+              {label}
+            </Badge>
+          );
+        }
+
+      color_rules:
+        - "0 allergens: variant='success' (green)"
+        - "1-5 allergens: variant='warning' (yellow)"
+        - ">5 allergens: variant='destructive' (orange/red)"
+
+      styling:
+        - "Use ShadCN Badge component"
+        - "Size variants: sm (text-xs), md (text-sm), lg (text-base)"
+
+    - name: "AllergenList"
+      path: "apps/frontend/components/npd/allergens/AllergenList.tsx"
+
+      purpose: "Render list of allergens with icons and localized names"
+
+      props: |
+        interface AllergenListProps {
+          allergens: Allergen[];
+          lang?: string;
+          showIcon?: boolean;
+          showCode?: boolean;
+        }
+
+      implementation: |
+        export function AllergenList({ allergens, lang = 'en', showIcon = true, showCode = true }: AllergenListProps) {
+          return (
+            <ul className="space-y-2">
+              {allergens.map((allergen) => (
+                <li key={allergen.id} className="flex items-center gap-2">
+                  {showIcon && <AllergenIcon iconUrl={allergen.icon_url} code={allergen.code} size="sm" />}
+                  <span>
+                    {showCode && <span className="font-medium">{allergen.code}</span>}
+                    {showCode && ' - '}
+                    {getAllergenName(allergen, lang)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+      helper_function: |
+        function getAllergenName(allergen: Allergen, lang: string): string {
+          switch (lang) {
+            case 'pl': return allergen.name_pl;
+            case 'de': return allergen.name_de || allergen.name_en;
+            case 'fr': return allergen.name_fr || allergen.name_en;
+            default: return allergen.name_en;
+          }
+        }
+
+      reuse:
+        component: "AllergenIcon"
+        from: "Epic 01 - components/settings/allergens/AllergenIcon.tsx"
+        import: "import { AllergenIcon } from '@/components/settings/allergens/AllergenIcon';"
+
+      styling:
+        - "Vertical list with 0.5rem gap"
+        - "Each item: icon + code + name"
+        - "Use Flexbox for alignment"
+
+  reused_components:
+    - name: "AllergenIcon"
+      from: "Epic 01 - components/settings/allergens/AllergenIcon.tsx"
+      path: "apps/frontend/components/settings/allergens/AllergenIcon.tsx"
+
+      props: |
+        interface AllergenIconProps {
+          iconUrl: string | null;
+          code: string;
+          size?: 'sm' | 'md' | 'lg';  // 16px, 24px, 48px
+          className?: string;
+        }
+
+      usage: "Display allergen icons in AllergenList component"
+
+      fallback: "Warning triangle icon if iconUrl is null"
+
+  ui_libraries:
+    - "ShadCN UI: Card, Badge, Alert, Skeleton, Button"
+    - "Lucide Icons: AlertCircle, Info"
+
+  styling:
+    framework: "TailwindCSS"
+    patterns:
+      - "Card-based layout for panel"
+      - "Badge for allergen count"
+      - "Skeleton loaders for loading state"
+      - "Alert component for errors"
+
+  accessibility:
+    - "Allergen icons have alt text"
+    - "Badge has aria-label with count"
+    - "Loading state has aria-live region"
+    - "Error messages are announced"
+
+  auto_refresh:
+    trigger: "When formulation items change (add/remove/update)"
+    mechanism: |
+      Option 1: WebSocket/Supabase Realtime (Phase 2)
+      Option 2: Polling every 30s (Phase 1)
+      Option 3: Manual refresh button (Phase 1 MVP)
+
+    phase_1_implementation: "Manual refresh via re-render when formulation page reloads"
+
+  performance:
+    - "Component renders within 100ms"
+    - "Allergen fetch completes within 300ms"
+    - "Debounce rapid refreshes (300ms)"
+
+  testing:
+    unit_tests:
+      - "FormulationAllergenPanel renders loading state"
+      - "FormulationAllergenPanel renders error state"
+      - "FormulationAllergenPanel renders empty state"
+      - "FormulationAllergenPanel renders allergen list"
+      - "FormulationAllergenBadge shows correct color for count"
+      - "AllergenList renders allergens with icons"
+      - "getAllergenName returns correct language"
+
+    integration_tests:
+      - "Panel fetches allergens from API"
+      - "Panel handles 404 error gracefully"
+      - "Panel handles 403 error gracefully"
+
+    e2e_tests:
+      - "Navigate to formulation detail -> see allergen panel"
+      - "Formulation with 3 allergens -> shows 3 allergens"
+      - "Empty formulation -> shows 'No allergens detected'"
+      - "Badge shows correct count and color"
+      - "Icons display or fallback shown"
+      - "Language change updates allergen names"
+
+files_to_modify:
+  - path: "apps/frontend/app/(authenticated)/npd/formulations/[id]/page.tsx"
+    changes:
+      - "Import FormulationAllergenPanel"
+      - "Add panel to right sidebar or below items table"
+      - "Pass formulationId and user lang preference"
+
+files_to_create:
+  - "apps/frontend/components/npd/allergens/FormulationAllergenPanel.tsx"
+  - "apps/frontend/components/npd/allergens/FormulationAllergenBadge.tsx"
+  - "apps/frontend/components/npd/allergens/AllergenList.tsx"
+
+dependencies:
+  components:
+    - "AllergenIcon (Epic 01)"
+    - "Card, Badge, Alert, Skeleton, Button (ShadCN)"
+
+  api:
+    - "GET /api/npd/formulations/:id/allergens"
+
+  types:
+    - "Allergen (from allergen-schema.ts)"

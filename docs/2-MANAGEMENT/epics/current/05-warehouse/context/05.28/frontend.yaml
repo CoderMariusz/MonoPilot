@@ -1,0 +1,347 @@
+# Story 05.28 - Frontend Specification
+# Purpose: Components, pages, wireframes, UI patterns
+
+# Pages
+pages:
+  warehouse_dashboard_extension:
+    path: "app/(authenticated)/warehouse/page.tsx"
+    description: "Add expiry widgets to existing dashboard"
+    integration_points:
+      - "Add ExpiryAlertWidget to dashboard grid"
+      - "Add ExpiredInventoryPanel to alerts section"
+      - "Add ExpiryAlertSummary to KPI section"
+
+  expiry_full_list:
+    path: "app/(authenticated)/warehouse/expiring/page.tsx"
+    description: "Full page view of expiring inventory"
+    layout:
+      - header: "Expiring Inventory - {count} items"
+      - filters: "Tier, Warehouse, Product dropdowns"
+      - data_table: "Full list with sorting and pagination"
+      - actions: "Export CSV button"
+
+  expiry_settings:
+    path: "app/(authenticated)/warehouse/settings/expiry/page.tsx"
+    description: "Expiry alert configuration"
+    integration: "Tab within warehouse settings page"
+
+# Components
+components:
+  - name: ExpiryAlertWidget
+    path: "components/warehouse/expiry/ExpiryAlertWidget.tsx"
+    description: "Dashboard widget showing expiring items"
+    props:
+      - name: expiringItems
+        type: "ExpiringLP[]"
+        required: true
+      - name: expiredCount
+        type: number
+        required: true
+      - name: isLoading
+        type: boolean
+        default: false
+      - name: onViewAll
+        type: "() => void"
+        required: true
+      - name: onItemClick
+        type: "(lpId: string) => void"
+        required: true
+    layout: |
+      +------------------------------------------+
+      | Expiring Soon                    [28]    |
+      +------------------------------------------+
+      | [RED]  LP00000123 - Milk Powder          |
+      |        Expires in 3 days                 |
+      |------------------------------------------+
+      | [ORG]  LP00000456 - Yogurt Base          |
+      |        Expires in 10 days                |
+      |------------------------------------------+
+      | [YEL]  LP00000789 - Cream Cheese         |
+      |        Expires in 22 days                |
+      |------------------------------------------+
+      |          View All (28) ->                |
+      +------------------------------------------+
+
+  - name: ExpiryBadge
+    path: "components/warehouse/expiry/ExpiryBadge.tsx"
+    description: "Color-coded expiry indicator badge"
+    props:
+      - name: daysRemaining
+        type: number
+        required: true
+      - name: size
+        type: "'sm' | 'md' | 'lg'"
+        default: "'md'"
+      - name: showDays
+        type: boolean
+        default: true
+    styles:
+      critical:
+        days: "<= 7"
+        bg: "bg-red-100"
+        text: "text-red-800"
+        border: "border-red-300"
+      warning:
+        days: "8-14"
+        bg: "bg-orange-100"
+        text: "text-orange-800"
+        border: "border-orange-300"
+      caution:
+        days: "15-30"
+        bg: "bg-yellow-100"
+        text: "text-yellow-800"
+        border: "border-yellow-300"
+      expired:
+        days: "< 0"
+        bg: "bg-red-500"
+        text: "text-white"
+        border: "none"
+    variants:
+      - "7d" (compact)
+      - "Expires in 7 days" (full)
+      - "Expired" (past date)
+      - "Expires today" (day 0)
+
+  - name: ExpiryAlertPanel
+    path: "components/warehouse/expiry/ExpiryAlertPanel.tsx"
+    description: "Expanded panel with full expiring items list"
+    props:
+      - name: items
+        type: "ExpiringLP[]"
+        required: true
+      - name: title
+        type: string
+        default: "'Expiring Soon'"
+      - name: onItemClick
+        type: "(lpId: string) => void"
+        required: true
+      - name: showPagination
+        type: boolean
+        default: true
+    features:
+      - Virtualized list for performance
+      - Sorting by expiry date, product, warehouse
+      - Filter by tier
+      - Click to navigate to LP detail
+
+  - name: ExpiredInventoryPanel
+    path: "components/warehouse/expiry/ExpiredInventoryPanel.tsx"
+    description: "Panel showing expired items with value at risk"
+    props:
+      - name: items
+        type: "ExpiredLP[]"
+        required: true
+      - name: totalValue
+        type: number
+        required: true
+      - name: onItemClick
+        type: "(lpId: string) => void"
+        required: true
+      - name: onViewAll
+        type: "() => void"
+        required: true
+      - name: onExport
+        type: "() => void"
+        required: true
+    layout: |
+      +------------------------------------------+
+      | [!] Expired Inventory            [5]     |
+      +------------------------------------------+
+      | LP00000111 - Fresh Cream                 |
+      | Expired 2 days ago | Qty: 50 kg | $250   |
+      |------------------------------------------+
+      | LP00000222 - Butter                      |
+      | Expired 5 days ago | Qty: 30 kg | $180   |
+      |------------------------------------------+
+      | Total Value at Risk: $1,250              |
+      | [View All] [Export CSV]                  |
+      +------------------------------------------+
+
+  - name: ExpirySettingsForm
+    path: "components/warehouse/expiry/ExpirySettingsForm.tsx"
+    description: "Form for configuring expiry thresholds"
+    props:
+      - name: settings
+        type: ExpirySettings
+        required: true
+      - name: onSave
+        type: "(settings: ExpirySettings) => Promise<void>"
+        required: true
+      - name: isLoading
+        type: boolean
+        default: false
+    fields:
+      - name: expiry_warning_days
+        type: number
+        label: "Warning Period (days)"
+        description: "LPs expiring within this period appear in alerts"
+        validation: "1-365"
+      - name: expiry_critical_days
+        type: number
+        label: "Critical Days (Red)"
+        description: "Days threshold for red indicator"
+        validation: "1-30"
+      - name: expiry_warning_days_orange
+        type: number
+        label: "Warning Days (Orange)"
+        description: "Days threshold for orange indicator"
+        validation: "1-60"
+      - name: expiry_alert_enabled
+        type: boolean
+        label: "Enable Email Alerts"
+        description: "Send daily email notifications"
+      - name: expiry_alert_email_threshold
+        type: number
+        label: "Email Threshold"
+        description: "Minimum items to trigger email"
+        validation: "0-100"
+
+  - name: ExpiryExportButton
+    path: "components/warehouse/expiry/ExpiryExportButton.tsx"
+    description: "Button to export expiring items to CSV"
+    props:
+      - name: tier
+        type: "'critical' | 'warning' | 'caution' | 'all'"
+        default: "'all'"
+      - name: warehouseId
+        type: string
+        required: false
+      - name: includeExpired
+        type: boolean
+        default: false
+    behavior:
+      - Show loading spinner during export
+      - Trigger download on completion
+      - Show error toast on failure
+
+  - name: ExpiryAlertSummary
+    path: "components/warehouse/expiry/ExpiryAlertSummary.tsx"
+    description: "Summary cards showing expiry counts and values"
+    props:
+      - name: summary
+        type: ExpirySummary
+        required: true
+      - name: isLoading
+        type: boolean
+        default: false
+    layout: |
+      +------------+  +------------+  +------------+
+      | Expiring   |  | Expired    |  | Value at   |
+      |    28      |  |    5       |  | Risk       |
+      | items      |  | items      |  | $1,250     |
+      +------------+  +------------+  +------------+
+
+      By Tier:
+      [RED] Critical: 8  [ORG] Warning: 12  [YEL] Caution: 8
+
+  - name: ExpiryAlertDetailModal
+    path: "components/warehouse/expiry/ExpiryAlertDetailModal.tsx"
+    description: "Quick view modal for LP expiry details"
+    props:
+      - name: lpId
+        type: string
+        required: true
+      - name: isOpen
+        type: boolean
+        required: true
+      - name: onClose
+        type: "() => void"
+        required: true
+      - name: onNavigateToLP
+        type: "() => void"
+        required: true
+    content:
+      - LP number and product name
+      - Expiry date with days remaining
+      - Quantity and UoM
+      - Location and warehouse
+      - Value at risk
+      - "View Full Details" button
+
+# Hooks
+hooks:
+  - name: useExpiryAlerts
+    path: "lib/hooks/useExpiryAlerts.ts"
+    description: "Fetch and manage expiry alert data"
+    returns:
+      - expiringItems: ExpiringLP[]
+      - expiredItems: ExpiredLP[]
+      - summary: ExpirySummary
+      - isLoading: boolean
+      - error: Error | null
+      - refetch: () => Promise<void>
+
+  - name: useExpirySettings
+    path: "lib/hooks/useExpirySettings.ts"
+    description: "Fetch and update expiry settings"
+    returns:
+      - settings: ExpirySettings
+      - isLoading: boolean
+      - updateSettings: (settings: Partial<ExpirySettings>) => Promise<void>
+
+# State Management
+state:
+  expiry_alert_store:
+    description: "Zustand store for expiry alert state"
+    state:
+      - expiringItems: ExpiringLP[]
+      - expiredItems: ExpiredLP[]
+      - summary: ExpirySummary | null
+      - selectedTier: ExpiryTier | null
+      - selectedWarehouse: string | null
+    actions:
+      - setExpiringItems
+      - setExpiredItems
+      - setSummary
+      - setSelectedTier
+      - setSelectedWarehouse
+      - clearFilters
+
+# API Integration
+api_calls:
+  - hook: useExpiryAlerts
+    endpoint: /api/warehouse/inventory/expiring
+    method: GET
+    cache: "SWR with 5 min revalidation"
+
+  - hook: useExpiryAlerts
+    endpoint: /api/warehouse/inventory/expiring/summary
+    method: GET
+    cache: "SWR with 5 min revalidation"
+
+  - hook: useExpirySettings
+    endpoint: /api/warehouse/settings/expiry
+    method: GET
+    cache: "SWR"
+
+  - hook: useExpirySettings
+    endpoint: /api/warehouse/settings/expiry
+    method: PUT
+    mutation: true
+
+# Navigation
+navigation:
+  routes:
+    - from: "Dashboard expiring widget"
+      to: "/warehouse/expiring"
+      action: "View All click"
+    - from: "Expiring item row"
+      to: "/warehouse/license-plates/{id}"
+      action: "Item click"
+    - from: "Warehouse settings"
+      to: "/warehouse/settings/expiry"
+      action: "Expiry tab click"
+
+# Responsive Design
+responsive:
+  mobile:
+    - Stack KPI cards vertically
+    - Full-width expiry widget
+    - Simplified badge (compact format)
+    - Touch-friendly list items (44px min height)
+  tablet:
+    - 2-column KPI grid
+    - Side-by-side widgets
+  desktop:
+    - 4-column KPI grid
+    - Multi-panel dashboard layout

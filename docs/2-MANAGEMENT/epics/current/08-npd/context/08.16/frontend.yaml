@@ -1,0 +1,204 @@
+# Frontend Context: 08.16 - Timeline View & Reporting
+# Timeline Gantt chart, export buttons, filters
+
+pages:
+  - path: "/npd/timeline"
+    name: "NPDTimelinePage"
+    description: "Timeline view page with Gantt chart"
+    components:
+      - "TimelineView (container)"
+      - "TimelineFilters"
+      - "TimelineExportButtons"
+
+components:
+  - name: "TimelineView"
+    path: "components/npd/timeline/TimelineView.tsx"
+    type: "container"
+    description: "Timeline Gantt chart container"
+    props:
+      - name: "projects"
+        type: "TimelineProject[]"
+        required: true
+      - name: "filters"
+        type: "TimelineFilters"
+        required: true
+      - name: "onFilterChange"
+        type: "(filters: TimelineFilters) => void"
+        required: true
+    state:
+      - "zoomLevel: 'month' | 'quarter' | 'year'"
+      - "selectedProjectId: number | null"
+    libraries:
+      - "react-gantt-chart OR vis-timeline OR custom canvas"
+    notes:
+      - "Render horizontal bars from created_at to target_launch_date"
+      - "Color bars by status (idea=gray, feasibility=blue, development=yellow, validation=orange, launched=green)"
+      - "Red border for overdue projects"
+      - "Tooltip on hover shows project details"
+      - "Click bar navigates to /npd/projects/:id"
+
+  - name: "TimelineBar"
+    path: "components/npd/timeline/TimelineBar.tsx"
+    type: "presentational"
+    description: "Individual project bar on timeline"
+    props:
+      - name: "project"
+        type: "TimelineProject"
+        required: true
+      - name: "onClick"
+        type: "(projectId: number) => void"
+        required: true
+    styling:
+      - "Background color by status (CSS classes)"
+      - "Red border if is_overdue"
+      - "Hover effect (opacity 0.8)"
+
+  - name: "TimelineFilters"
+    path: "components/npd/timeline/TimelineFilters.tsx"
+    type: "form"
+    description: "Filter controls for timeline"
+    props:
+      - name: "filters"
+        type: "TimelineFilters"
+        required: true
+      - name: "onChange"
+        type: "(filters: TimelineFilters) => void"
+        required: true
+    fields:
+      - name: "gate"
+        type: "select"
+        options: ["All", "G1", "G2", "G3", "G4", "G5"]
+      - name: "category"
+        type: "select"
+        options: ["All", "Beverage", "Snack", "Bakery", "Dairy", "Other"]
+      - name: "owner"
+        type: "select"
+        options: "Dynamic from users"
+      - name: "status"
+        type: "select"
+        options: ["All", "idea", "feasibility", "development", "validation", "launched"]
+    notes:
+      - "Filter chips shown above timeline"
+      - "Clear all filters button"
+
+  - name: "TimelineZoomControls"
+    path: "components/npd/timeline/TimelineZoomControls.tsx"
+    type: "controls"
+    description: "Zoom controls (month/quarter/year)"
+    props:
+      - name: "zoomLevel"
+        type: "'month' | 'quarter' | 'year'"
+        required: true
+      - name: "onZoomChange"
+        type: "(level: 'month' | 'quarter' | 'year') => void"
+        required: true
+    ui:
+      - "Button group: [Month] [Quarter] [Year]"
+      - "Active button highlighted"
+
+  - name: "TimelineExportButtons"
+    path: "components/npd/timeline/TimelineExportButtons.tsx"
+    type: "controls"
+    description: "Export buttons (CSV, PDF)"
+    props:
+      - name: "filters"
+        type: "TimelineFilters"
+        required: true
+    actions:
+      - name: "Export Projects CSV"
+        endpoint: "GET /api/npd/export/projects"
+        filename: "NPD-Projects-{date}.csv"
+      - name: "Export Cost History CSV"
+        endpoint: "GET /api/npd/export/cost-history"
+        filename: "NPD-Cost-History-{date}.csv"
+        modal: "Select project (optional) before export"
+      - name: "Export Compliance Checklist PDF"
+        endpoint: "POST /api/npd/export/compliance-checklist"
+        filename: "NPD-{project_number}-Compliance-Checklist-{date}.pdf"
+        modal: "Select project before export"
+
+  - name: "TimelineTooltip"
+    path: "components/npd/timeline/TimelineTooltip.tsx"
+    type: "presentational"
+    description: "Tooltip shown on timeline bar hover"
+    props:
+      - name: "project"
+        type: "TimelineProject"
+        required: true
+    content:
+      - "Project: {project_number} {name}"
+      - "Status: {status}"
+      - "Gate: {current_gate}"
+      - "Owner: {owner_name}"
+      - "Created: {created_at}"
+      - "Target Launch: {target_launch_date}"
+      - "Duration: {duration_days} days"
+      - "Days Remaining: {days_remaining}"
+
+  - name: "TimelineEmptyState"
+    path: "components/npd/timeline/TimelineEmptyState.tsx"
+    type: "presentational"
+    description: "Empty state when no projects"
+    content:
+      - "No NPD projects yet. Create your first project to see the timeline."
+      - "[Create First Project] button"
+    or:
+      - "No projects match selected filters. Try adjusting your filters."
+      - "[Clear Filters] button"
+
+  - name: "TimelineLegend"
+    path: "components/npd/timeline/TimelineLegend.tsx"
+    type: "presentational"
+    description: "Status color legend"
+    content:
+      - "Idea: Gray square"
+      - "Feasibility: Blue square"
+      - "Development: Yellow square"
+      - "Validation: Orange square"
+      - "Launched: Green square"
+      - "Overdue: Red border"
+
+  - name: "ComplianceChecklistPDFModal"
+    path: "components/npd/timeline/ComplianceChecklistPDFModal.tsx"
+    type: "modal"
+    description: "Select project for PDF export"
+    props:
+      - name: "isOpen"
+        type: "boolean"
+        required: true
+      - name: "onClose"
+        type: "() => void"
+        required: true
+      - name: "onExport"
+        type: "(projectId: number) => void"
+        required: true
+    content:
+      - "Select Project dropdown"
+      - "[Cancel] [Export PDF] buttons"
+
+state_management:
+  - "Timeline filters stored in URL params (gate, category, owner, status)"
+  - "Zoom level stored in session storage"
+  - "Project data fetched on mount and filter change"
+
+responsive_design:
+  mobile:
+    - "Timeline switches to list view (< 768px)"
+    - "Each project as card (name, status badge, dates, duration)"
+    - "Filters collapse into dropdown"
+    - "Export buttons stacked vertically"
+  tablet:
+    - "Timeline horizontal scroll (768px - 1024px)"
+    - "Filters remain expanded"
+  desktop:
+    - "Full Gantt chart (> 1024px)"
+
+performance:
+  - "Virtual scrolling for >50 projects"
+  - "Debounce filter changes (300ms)"
+  - "Lazy load chart library (code splitting)"
+
+accessibility:
+  - "Keyboard navigation (arrow keys to navigate bars)"
+  - "ARIA labels on bars, filters, buttons"
+  - "Screen reader announces timeline range"

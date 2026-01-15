@@ -1,0 +1,272 @@
+# Story 04.7d - Frontend Specification
+# Purpose: Components for multiple outputs tracking
+# Agent: FRONTEND-DEV (UI focus)
+
+# Page (existing - no new page)
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/page.tsx"
+    description: "Output Registration page - already exists"
+    changes:
+      - "Add OutputProgressCard component in WO summary section"
+      - "Enhance OutputHistoryTable with pagination and filters"
+      - "Add OutputsSummary component"
+      - "Real-time progress updates after output registration"
+    existing: true
+
+# Components
+components:
+  - path: "apps/frontend/components/production/outputs/OutputProgressCard.tsx"
+    description: "Progress card showing output vs planned"
+    type: "card"
+    props:
+      - name: "progress"
+        type: "WOProgressResponse"
+        required: true
+    sections:
+      - name: "Quantities"
+        description: "Planned, output, remaining"
+        elements:
+          - "Planned: {planned_qty} {uom}"
+          - "Output: {output_qty} {uom}"
+          - "Remaining: {remaining_qty} {uom}"
+      - name: "Progress Bar"
+        description: "Visual progress indicator"
+        elements:
+          - "Progress bar filled to progress_percent"
+          - "Percentage label"
+          - "Color: green >= 100%, blue < 100%"
+      - name: "Status"
+        description: "Completion status"
+        elements:
+          - "Auto-complete enabled badge"
+          - "WO status badge"
+    wireframe_ref: "PROD-004-part2 - WO Summary Header (lines 296-307)"
+
+  - path: "apps/frontend/components/production/outputs/OutputHistoryTable.tsx"
+    description: "Table showing all outputs for WO"
+    type: "table"
+    props:
+      - name: "woId"
+        type: "string"
+        required: true
+      - name: "outputs"
+        type: "OutputItem[]"
+        required: true
+      - name: "pagination"
+        type: "Pagination"
+        required: true
+      - name: "onPageChange"
+        type: "(page: number) => void"
+        required: true
+      - name: "onFilterChange"
+        type: "(filters: OutputQueryOptions) => void"
+        required: true
+      - name: "onViewLP"
+        type: "(lpId: string) => void"
+        required: true
+      - name: "onPrintLabel"
+        type: "(lpId: string) => void"
+        required: true
+    columns:
+      - "LP Number (link to LP detail)"
+      - "Quantity with UoM"
+      - "Batch Number"
+      - "QA Status (badge)"
+      - "Location (path)"
+      - "Expiry Date"
+      - "Created At (relative + absolute)"
+      - "Created By"
+      - "Actions (View, Label)"
+    filters:
+      - "QA Status dropdown (All, Approved, Pending, Rejected)"
+      - "Location dropdown"
+      - "Sort dropdown (Created, Qty, LP Number)"
+    wireframe_ref: "PROD-004-part2 - Output History Table (lines 323-335)"
+
+  - path: "apps/frontend/components/production/outputs/OutputsSummary.tsx"
+    description: "Summary card with aggregate statistics"
+    type: "card"
+    props:
+      - name: "summary"
+        type: "OutputsSummary"
+        required: true
+      - name: "uom"
+        type: "string"
+        required: true
+    sections:
+      - name: "Total"
+        elements:
+          - "Total: {total_outputs} outputs | {total_qty} {uom}"
+      - name: "By QA Status"
+        elements:
+          - "Approved: {approved_count} | {approved_qty} {uom}"
+          - "Pending: {pending_count} | {pending_qty} {uom}"
+          - "Rejected: {rejected_count} | {rejected_qty} {uom}"
+
+# Services (frontend hooks)
+services:
+  - path: "apps/frontend/lib/hooks/use-wo-outputs.ts"
+    description: "React hook for WO outputs management"
+    exports:
+      - name: "useWOOutputs"
+        type: "hook"
+        params:
+          - "woId: string"
+          - "options?: OutputQueryOptions"
+        returns:
+          - "outputs: OutputItem[]"
+          - "summary: OutputsSummary"
+          - "pagination: Pagination"
+          - "isLoading: boolean"
+          - "error: string | null"
+          - "refetch: () => void"
+          - "setFilters: (filters: OutputQueryOptions) => void"
+
+  - path: "apps/frontend/lib/hooks/use-wo-progress.ts"
+    description: "React hook for WO progress tracking"
+    exports:
+      - name: "useWOProgress"
+        type: "hook"
+        params:
+          - "woId: string"
+        returns:
+          - "progress: WOProgressResponse | null"
+          - "isLoading: boolean"
+          - "refetch: () => void"
+
+# UI Patterns
+ui_patterns:
+  progress_bar:
+    pattern: |
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span>Progress</span>
+          <span className={progress_percent >= 100 ? 'text-green-600' : ''}>
+            {progress_percent.toFixed(1)}%
+          </span>
+        </div>
+        <Progress
+          value={Math.min(progress_percent, 100)}
+          className={progress_percent >= 100 ? 'bg-green-100' : ''}
+        />
+        {progress_percent > 100 && (
+          <p className="text-xs text-green-600">
+            Over-production: {(progress_percent - 100).toFixed(1)}% above planned
+          </p>
+        )}
+      </div>
+
+  output_row:
+    pattern: |
+      <TableRow>
+        <TableCell>
+          <Button variant="link" onClick={() => onViewLP(output.lp_id)}>
+            {output.lp_number}
+          </Button>
+        </TableCell>
+        <TableCell>{output.quantity} {output.uom}</TableCell>
+        <TableCell>{output.batch_number}</TableCell>
+        <TableCell>
+          <Badge variant={qaStatusVariant[output.qa_status]}>
+            {output.qa_status}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground">
+          {output.location_name}
+        </TableCell>
+        <TableCell>
+          {output.expiry_date && formatDate(output.expiry_date)}
+        </TableCell>
+        <TableCell>
+          <span title={formatDateTime(output.created_at)}>
+            {formatRelativeTime(output.created_at)}
+          </span>
+        </TableCell>
+        <TableCell>{output.created_by_name}</TableCell>
+        <TableCell>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={() => onViewLP(output.lp_id)}>
+              View
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onPrintLabel(output.lp_id)}>
+              Label
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+
+  pagination_controls:
+    pattern: |
+      <div className="flex items-center justify-between border-t pt-4">
+        <p className="text-sm text-muted-foreground">
+          Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, total)} of {total} outputs
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 1}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= pages}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
+# States
+states:
+  - name: "loading"
+    description: "Fetching outputs"
+    ui: "Skeleton table rows"
+  - name: "empty"
+    description: "No outputs registered yet"
+    ui: "Message: No outputs registered yet. Click 'Register Output' to start."
+  - name: "in_progress"
+    description: "Some outputs, not complete"
+    ui: "Table with data, progress bar < 100%"
+  - name: "complete"
+    description: "Output >= planned"
+    ui: "Progress bar green, completion message"
+  - name: "over_production"
+    description: "Output > planned"
+    ui: "Progress bar green with >100% indicator"
+
+# Accessibility
+accessibility:
+  touch_targets:
+    - "Table action buttons: 48x48dp"
+    - "Pagination buttons: 48x48dp"
+    - "Filter dropdowns: 48dp height"
+  screen_reader:
+    - "Progress bar: aria-valuenow, aria-valuemin, aria-valuemax, aria-label"
+    - "Table: proper th/td structure"
+    - "Pagination: aria-label on buttons"
+  keyboard:
+    - "Tab through table rows and actions"
+    - "Enter to activate buttons"
+    - "Arrow keys for dropdown navigation"
+
+# Real-time Updates
+realtime:
+  - "After output registration, refetch outputs and progress"
+  - "Show toast with updated progress"
+  - "If auto-complete triggered, show WO completed notification"
+
+# Toast Notifications
+toasts:
+  - type: "info"
+    message: "Progress updated"
+    description: "{progress_percent}% complete ({output_qty}/{planned_qty} {uom})"
+    duration: 3000
+  - type: "success"
+    message: "Work order completed"
+    description: "Output target reached. WO {wo_number} marked as completed."
+    duration: 5000

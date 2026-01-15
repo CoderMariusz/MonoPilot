@@ -1,0 +1,138 @@
+# Story 06.30 - HACCP Verification Records API Endpoints
+
+endpoints:
+  - method: GET
+    path: /api/quality/haccp-verifications
+    auth: required
+    description: "List verifications with filters"
+    query_params:
+      haccp_plan_id: UUID
+      verification_type: "calibration|record_review|plan_review|audit"
+      status: string
+      result: "pass|fail|partial"
+      overdue: boolean (filter for next_date < today)
+      date_from: date
+      date_to: date
+      sort_by: "verification_number|verification_date|next_verification_date"
+      sort_order: "asc|desc"
+      page: number
+      limit: number
+
+  - method: GET
+    path: /api/quality/haccp-verifications/:id
+    auth: required
+    description: "Get verification detail"
+    response:
+      verification: HACCPVerification
+      haccp_plan: {name, version, product}
+      approval_history: [{step, approved_by, approved_at, signature}]
+
+  - method: POST
+    path: /api/quality/haccp-verifications
+    auth: required
+    roles: [QA_INSPECTOR, QA_MANAGER]
+    description: "Create verification record"
+    body:
+      haccp_plan_id: UUID
+      verification_type: string
+      verification_date: date
+      frequency: "monthly|quarterly|annually|as_needed"
+      checklist_items: ChecklistItem[] (array of {item, checked, notes})
+      result: "pass|fail|partial"
+      findings: string (optional)
+      recommendations: string (optional)
+      corrective_actions_required: boolean
+      corrective_action_notes: string (optional)
+    validation: createVerificationSchema
+
+  - method: PUT
+    path: /api/quality/haccp-verifications/:id
+    auth: required
+    description: "Update draft verification"
+    constraint: "status = 'draft' only"
+
+  - method: DELETE
+    path: /api/quality/haccp-verifications/:id
+    auth: required
+    description: "Delete draft verification"
+    constraint: "status = 'draft' only"
+
+  - method: POST
+    path: /api/quality/haccp-verifications/:id/approve-qa
+    auth: required
+    roles: [QA_MANAGER]
+    description: "QA Manager approval (first level)"
+    body:
+      password: string (e-signature)
+    logic:
+      - "Verify password"
+      - "Set qa_manager_approved_by, qa_manager_approved_at, qa_manager_signature"
+      - "Change status to 'pending_director_approval'"
+      - "Notify Quality Director"
+
+  - method: POST
+    path: /api/quality/haccp-verifications/:id/approve-director
+    auth: required
+    roles: [QUALITY_DIRECTOR]
+    description: "Quality Director approval (final)"
+    body:
+      password: string (e-signature)
+    logic:
+      - "Verify password"
+      - "Set director_approved_by, director_approved_at, director_signature"
+      - "Change status to 'approved'"
+      - "Trigger calculates next_verification_date"
+      - "Set is_locked = true"
+
+  - method: POST
+    path: /api/quality/haccp-verifications/:id/reject
+    auth: required
+    roles: [QA_MANAGER, QUALITY_DIRECTOR]
+    description: "Reject verification back to draft"
+    body:
+      rejection_reason: string
+
+  - method: GET
+    path: /api/quality/haccp-verifications/overdue
+    auth: required
+    description: "Get overdue verifications"
+    response:
+      verifications: HACCPVerification[]
+      count: number
+
+validation_schemas:
+  createVerificationSchema:
+    fields:
+      haccp_plan_id: UUID (required)
+      verification_type: enum (required)
+      verification_date: date (required)
+      frequency: enum (required)
+      checklist_items: array (required, min 1 item)
+      result: enum (required)
+      findings: string (max 2000, required if result = 'fail' or 'partial')
+      recommendations: string (max 2000, optional)
+      corrective_actions_required: boolean
+      corrective_action_notes: string (max 1000, required if corrective_actions_required = true)
+
+  checklistItemSchema:
+    fields:
+      item: string (max 500, required)
+      checked: boolean (required)
+      notes: string (max 500, optional)
+
+service_layer:
+  file: lib/services/haccp-verification-service.ts
+  class: HACCPVerificationService
+  methods:
+    - list(params): PaginatedResult<HACCPVerification>
+    - getById(id): HACCPVerification | null
+    - create(input): HACCPVerification
+    - update(id, input): HACCPVerification
+    - submitForApproval(id): HACCPVerification
+    - approveQA(id, password, userId): HACCPVerification
+    - approveDirector(id, password, userId): HACCPVerification
+    - reject(id, reason): HACCPVerification
+    - delete(id): void
+    - getOverdue(): HACCPVerification[]
+    - generateVerificationNumber(): string
+    - getDefaultChecklist(verificationType): ChecklistItem[]

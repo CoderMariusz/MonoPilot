@@ -1,0 +1,159 @@
+# Story 04.7a: Output Registration Desktop - Database Schema
+# Uses existing tables from dependencies, defines required columns and RLS
+
+tables:
+  - name: "license_plates"
+    description: "Stores production output LPs created during registration"
+    columns:
+      - name: "id"
+        type: "uuid"
+        nullable: false
+        default: "gen_random_uuid()"
+      - name: "org_id"
+        type: "uuid"
+        nullable: false
+      - name: "lp_number"
+        type: "text"
+        nullable: false
+      - name: "product_id"
+        type: "uuid"
+        nullable: false
+      - name: "quantity"
+        type: "numeric(15,4)"
+        nullable: false
+      - name: "uom"
+        type: "text"
+        nullable: false
+      - name: "location_id"
+        type: "uuid"
+        nullable: true
+      - name: "warehouse_id"
+        type: "uuid"
+        nullable: true
+      - name: "status"
+        type: "text"
+        nullable: false
+        default: "'available'"
+      - name: "qa_status"
+        type: "text"
+        nullable: true
+      - name: "batch_number"
+        type: "text"
+        nullable: true
+      - name: "expiry_date"
+        type: "date"
+        nullable: true
+      - name: "source"
+        type: "text"
+        nullable: false
+        default: "'production'"
+      - name: "wo_id"
+        type: "uuid"
+        nullable: true
+      - name: "notes"
+        type: "text"
+        nullable: true
+      - name: "created_by"
+        type: "uuid"
+        nullable: false
+      - name: "created_at"
+        type: "timestamptz"
+        nullable: false
+        default: "now()"
+    constraints:
+      - type: "primary_key"
+        columns: ["id"]
+      - type: "unique"
+        columns: ["org_id", "lp_number"]
+      - type: "foreign_key"
+        columns: ["org_id"]
+        references: "organizations(id)"
+      - type: "foreign_key"
+        columns: ["product_id"]
+        references: "products(id)"
+      - type: "foreign_key"
+        columns: ["wo_id"]
+        references: "work_orders(id)"
+      - type: "check"
+        expression: "quantity > 0"
+    indexes:
+      - columns: ["org_id", "status"]
+      - columns: ["org_id", "product_id"]
+      - columns: ["wo_id"]
+      - columns: ["org_id", "batch_number"]
+
+  - name: "lp_genealogy"
+    description: "Tracks parent-child relationships between LPs for traceability"
+    columns:
+      - name: "id"
+        type: "uuid"
+        nullable: false
+        default: "gen_random_uuid()"
+      - name: "org_id"
+        type: "uuid"
+        nullable: false
+      - name: "parent_lp_id"
+        type: "uuid"
+        nullable: false
+      - name: "child_lp_id"
+        type: "uuid"
+        nullable: false
+      - name: "operation_type"
+        type: "text"
+        nullable: false
+      - name: "quantity"
+        type: "numeric(15,4)"
+        nullable: true
+      - name: "wo_id"
+        type: "uuid"
+        nullable: true
+      - name: "operation_date"
+        type: "timestamptz"
+        nullable: false
+        default: "now()"
+      - name: "is_reversed"
+        type: "boolean"
+        nullable: false
+        default: "false"
+    constraints:
+      - type: "primary_key"
+        columns: ["id"]
+      - type: "foreign_key"
+        columns: ["parent_lp_id"]
+        references: "license_plates(id)"
+      - type: "foreign_key"
+        columns: ["child_lp_id"]
+        references: "license_plates(id)"
+    indexes:
+      - columns: ["org_id"]
+      - columns: ["parent_lp_id"]
+      - columns: ["child_lp_id"]
+      - columns: ["wo_id"]
+
+rls_policies:
+  - name: "license_plates_org_isolation"
+    table: "license_plates"
+    operation: "ALL"
+    using_expression: "org_id = auth.jwt() ->> 'org_id'"
+
+  - name: "lp_genealogy_org_isolation"
+    table: "lp_genealogy"
+    operation: "ALL"
+    using_expression: "org_id = auth.jwt() ->> 'org_id'"
+
+functions:
+  - name: "calculate_output_yield"
+    description: "Calculate output yield percentage for a work order"
+    parameters:
+      - name: "p_wo_id"
+        type: "uuid"
+    returns: "numeric"
+    logic: "SELECT ROUND((SUM(lp.quantity) / wo.planned_qty) * 100, 1) FROM license_plates lp JOIN work_orders wo ON wo.id = p_wo_id WHERE lp.wo_id = p_wo_id AND lp.source = 'production'"
+
+  - name: "get_wo_output_summary"
+    description: "Get output summary statistics for a work order"
+    parameters:
+      - name: "p_wo_id"
+        type: "uuid"
+    returns: "jsonb"
+    logic: "Returns total_outputs, total_qty, approved_count, pending_count, rejected_count grouped by qa_status"

@@ -1,0 +1,198 @@
+# Story 04.6b - Frontend Components (Scanner Mobile)
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/scanner/consume/page.tsx"
+    route: "/scanner/consume"
+    description: "Scanner consumption flow (6 steps)"
+    layout: "scanner-mobile"
+    viewport: "320px-480px width"
+
+components:
+  - name: "ScannerLayout"
+    path: "apps/frontend/components/scanner/ScannerLayout.tsx"
+    description: "Mobile-first scanner layout with header and progress"
+    props:
+      title: "string"
+      step: "number"
+      totalSteps: "number"
+      onBack: "() => void"
+    features:
+      - "56dp header with back button"
+      - "Step progress indicator (Step X of 6)"
+      - "Full height container"
+      - "Bottom action bar (64dp)"
+
+  - name: "ScanInput"
+    path: "apps/frontend/components/scanner/ScanInput.tsx"
+    description: "Barcode scan input with manual entry fallback"
+    props:
+      placeholder: "string"
+      onScan: "(barcode: string) => void"
+      autoFocus: "boolean"
+    features:
+      - "48dp height input field"
+      - "24px monospace font"
+      - "Camera scan button"
+      - "Auto-focus on mount"
+      - "Hardware scanner input support"
+      - "Enter key triggers scan"
+
+  - name: "NumberPad"
+    path: "apps/frontend/components/scanner/NumberPad.tsx"
+    description: "Large touch target number pad with decimal support"
+    props:
+      value: "string"
+      onChange: "(value: string) => void"
+      disabled: "boolean"
+      maxDecimals: "number"
+    layout: |
+      [7] [8] [9] [backspace]
+      [4] [5] [6] [C]
+      [1] [2] [3] [.]
+      [0]     [00]
+    specs:
+      key_size: "64x64dp"
+      spacing: "8dp"
+      background: "Slate-700"
+      text: "White, 24px bold"
+      disabled_opacity: "50%"
+
+  - name: "FullConsumptionButton"
+    path: "apps/frontend/components/scanner/FullConsumptionButton.tsx"
+    description: "Quick action button for full LP consumption"
+    props:
+      lpQty: "number"
+      uom: "string"
+      onClick: "() => void"
+      disabled: "boolean"
+    specs:
+      height: "64dp"
+      background: "Green-600"
+      text: "White, 18px bold"
+      icon: "checkmark"
+
+  - name: "ScannerFeedback"
+    path: "apps/frontend/components/scanner/ScannerFeedback.tsx"
+    description: "Visual + audio + vibration feedback component"
+    props:
+      type: "success | error | loading"
+      message: "string"
+      duration: "number"
+    visual:
+      success:
+        icon: "green check (96dp)"
+        color: "Green-500"
+        animation: "scale-in 300ms"
+      error:
+        icon: "red X (68dp)"
+        color: "Red-500"
+        animation: "shake 300ms"
+      loading:
+        icon: "spinner (32dp)"
+        color: "Cyan-500"
+        animation: "rotate continuous"
+
+  - name: "MaterialsList"
+    path: "apps/frontend/components/scanner/MaterialsList.tsx"
+    description: "Required materials list for scanner view"
+    props:
+      materials: "WOMaterial[]"
+      activeMaterialId: "string | null"
+    features:
+      - "64dp height per item"
+      - "Progress bar per material"
+      - "'Full LP Required' badge (Yellow background)"
+      - "Active item highlight (Cyan-900 background)"
+      - "Scrollable list"
+
+  - name: "ConsumptionReview"
+    path: "apps/frontend/components/scanner/ConsumptionReview.tsx"
+    description: "Review screen before confirmation"
+    props:
+      material: "WOMaterial"
+      lp: "LP"
+      consumeQty: "number"
+      isFullLP: "boolean"
+    content:
+      - "Material name"
+      - "LP number"
+      - "Quantity to consume"
+      - "LP remaining after"
+      - "LP details (batch, expiry, location)"
+      - "Impact summary (progress change)"
+
+  - name: "ScannerStepIndicator"
+    path: "apps/frontend/components/scanner/ScannerStepIndicator.tsx"
+    description: "Step progress indicator (Step X of 6)"
+    props:
+      currentStep: "number"
+      totalSteps: "number"
+
+wireframe_refs:
+  - id: "PROD-005"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-005-scanner-consume-material.md"
+    sections:
+      - "Step 1: Scan WO Barcode"
+      - "Step 2: Scan LP Barcode"
+      - "Step 3: Enter Quantity"
+      - "Step 4: Review Consumption"
+      - "Step 5: Confirm (Processing)"
+      - "Step 6: Next Material or Done"
+
+states:
+  scanning:
+    description: "Waiting for barcode input"
+    visual: "Barcode icon (68dp), scan input focused"
+  loading:
+    description: "Processing barcode or API call"
+    visual: "Spinner, loading text"
+  success:
+    description: "Valid scan or successful consumption"
+    visual: "Green check, success sound, vibration"
+    duration: "1-2 seconds"
+  error:
+    description: "Invalid scan or API error"
+    visual: "Red X with shake, error sound"
+    recovery: "[Scan Again] [Manual Entry]"
+  offline:
+    description: "Network unavailable"
+    visual: "Yellow warning, queue message"
+    action: "Save to offline queue, sync later"
+
+hooks:
+  - name: "useScannerFlow"
+    path: "apps/frontend/lib/hooks/use-scanner-flow.ts"
+    description: "State machine for 6-step scanner flow"
+    states:
+      - "scan_wo"
+      - "scan_lp"
+      - "enter_qty"
+      - "review"
+      - "confirm"
+      - "next"
+
+  - name: "useScannerFeedback"
+    path: "apps/frontend/lib/hooks/use-scanner-feedback.ts"
+    description: "Audio/vibration feedback hook"
+
+  - name: "useBarcodeScan"
+    path: "apps/frontend/lib/hooks/use-barcode-scan.ts"
+    description: "Hardware barcode scanner integration"
+
+accessibility:
+  touch_targets: "48x48dp minimum (actual 64dp for number pad)"
+  font_size: "18px minimum, 24px for inputs"
+  contrast: "4.5:1 WCAG AA"
+  audio: "Success/error beeps"
+  vibration: "200ms success, 100ms error"
+  keyboard: "Tab order, Enter to submit"
+
+device_support:
+  industrial:
+    - "Zebra TC52/57"
+    - "Honeywell CT60/CK65"
+  consumer:
+    - "iPhone (Safari)"
+    - "Android (Chrome)"
+  ring_scanners:
+    - "Bluetooth HID devices"

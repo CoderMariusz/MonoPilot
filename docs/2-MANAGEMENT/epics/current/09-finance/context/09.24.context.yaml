@@ -1,0 +1,141 @@
+story:
+  id: "09.24"
+  name: "Cost Dashboard & Trends"
+  epic: "09-finance"
+  phase: "3"
+  complexity: "L"
+  estimate_days: 4-5
+  type: "frontend"
+
+dependencies:
+  required:
+    - story: "09.6"
+      provides: ["work_order_costs"]
+    - story: "09.13"
+      provides: ["material_variance"]
+    - story: "09.14"
+      provides: ["labor_variance"]
+  optional:
+    - story: "09.22"
+      provides: ["budget_data"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.6.5", "FR-9.6.6", "FR-9.6.7", "FR-9.6.8"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.24.cost-dashboard-trends.md"
+  patterns:
+    - "apps/frontend/components/quality/dashboard/QualityDashboard.tsx"
+    - "apps/frontend/components/finance/reports/CostTrendChart.tsx"
+
+files_to_create:
+  database: []
+  api:
+    - path: "apps/frontend/app/api/finance/dashboard/kpis/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/dashboard/cost-trends/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/dashboard/cost-breakdown/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/dashboard/top-contributors/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/reports/custom/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/reports/custom/save/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/dashboard/layout/route.ts"
+      methods: ["GET", "PATCH"]
+  services:
+    - path: "apps/frontend/lib/services/cost-dashboard-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/cost-dashboard.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/dashboard/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/trends/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/reports/custom/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/dashboard/FinanceDashboard.tsx"
+    - path: "apps/frontend/components/finance/dashboard/CostKPICards.tsx"
+    - path: "apps/frontend/components/finance/dashboard/CostTrendChart.tsx"
+    - path: "apps/frontend/components/finance/dashboard/CostBreakdownChart.tsx"
+    - path: "apps/frontend/components/finance/dashboard/TopCostContributorsTable.tsx"
+    - path: "apps/frontend/components/finance/dashboard/CustomReportBuilder.tsx"
+    - path: "apps/frontend/components/finance/dashboard/DashboardLayoutEditor.tsx"
+    - path: "apps/frontend/components/finance/dashboard/WidgetLibrary.tsx"
+    - path: "apps/frontend/lib/hooks/use-cost-dashboard.ts"
+
+database:
+  tables: []
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/dashboard/kpis"
+    auth: true
+    roles: ["viewer", "finance_manager", "cfo", "production_manager"]
+  - method: "GET"
+    path: "/api/finance/dashboard/cost-trends"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+  - method: "POST"
+    path: "/api/finance/reports/custom"
+    auth: true
+    roles: ["finance_manager", "cost_accountant"]
+
+ux:
+  wireframes:
+    - id: "FIN-024"
+      description: "Cost Dashboard"
+      components:
+        - "6 KPI summary cards"
+        - "Cost trend line/area chart"
+        - "Cost breakdown pie/donut chart"
+        - "Top contributors table"
+        - "Custom report builder interface"
+  patterns:
+    dashboard: "Grid layout with draggable widgets"
+    charts: "Recharts (line, area, pie, bar)"
+    table: "ShadCN DataTable"
+    builder: "Multi-select filters with preview"
+
+validation_rules:
+  kpi_refresh: "Auto-refresh every 5 minutes"
+  chart_performance: "Render within 1 second"
+  custom_report_dimensions: "Max 3 dimensions"
+  dashboard_layout: "Save per user preference"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+  charts: "Recharts library"
+  state: "React Query for caching"
+
+acceptance_checklist:
+  - "Cost dashboard page loads < 2 seconds"
+  - "6 KPI cards display with trends"
+  - "Cost trend chart renders correctly"
+  - "Cost breakdown pie chart works"
+  - "Top cost contributors table displays"
+  - "Custom report builder functional"
+  - "Dashboard layout customization works"
+  - "Dashboard widgets drag-and-drop works"
+  - "Saved reports appear in library"
+  - "Export to Excel/CSV works"
+  - "Dashboard responsive on mobile"
+  - "All tests pass (unit, integration, E2E)"
+
+output_artifacts:
+  - "API: 7 dashboard endpoints"
+  - "Service: CostDashboardService"
+  - "Hook: use-cost-dashboard"
+  - "Component: FinanceDashboard"
+  - "Component: CostKPICards"
+  - "Component: CostTrendChart"
+  - "Component: CostBreakdownChart"
+  - "Component: TopCostContributorsTable"
+  - "Component: CustomReportBuilder"
+  - "Component: DashboardLayoutEditor"
+  - "Page: Finance dashboard"
+  - "Page: Cost trends analysis"
+  - "Page: Custom report builder"
+  - "Tests: Unit, integration, E2E"

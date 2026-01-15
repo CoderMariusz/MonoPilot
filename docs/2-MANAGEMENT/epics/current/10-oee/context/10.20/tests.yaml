@@ -1,0 +1,48 @@
+# Story 10.20 - Test Specification
+# Purpose: Export functionality tests
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "user on /oee/export"
+    when: "selects OEE Snapshots, CSV, Last 30 days, clicks Export"
+    then: "CSV file downloads with correct columns and 2,880 rows (30 days x 96 snapshots)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "Power BI Desktop"
+    when: "user enters API endpoint with API key"
+    then: "Power BI loads OEE data successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "data mart export for 90 days"
+    when: "querying oee_data_mart view"
+    then: "response time < 5 seconds"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-04"
+    given: "export request exceeding 100,000 rows"
+    when: "API called without limit"
+    then: "returns error: 'Export limit exceeded'"
+    test_type: "integration"
+    priority: "P0"
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/export-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/export/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-export.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "CSV export downloads correctly"
+  - "JSON export valid format"
+  - "XLSX export with formatting"
+  - "Power BI connects successfully"
+  - "Data mart view performant (< 5s for 90 days)"
+  - "API documentation complete"

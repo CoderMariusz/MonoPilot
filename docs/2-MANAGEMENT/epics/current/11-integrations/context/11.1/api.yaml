@@ -1,0 +1,176 @@
+# Story 11.1 - API Context
+# Endpoints, request/response types, validation, error handling
+
+endpoints:
+  - method: GET
+    path: "/api/integrations/dashboard"
+    description: "Get dashboard summary with health status, activity, errors"
+    auth: true
+    roles: ["ADMIN", "IT_MANAGER"]
+    query_params:
+      - name: "refresh"
+        type: "boolean"
+        required: false
+        default: false
+        description: "Force refresh health status"
+
+    response_success:
+      status: 200
+      body:
+        health_status:
+          type: "object"
+          properties:
+            comarch:
+              type: "IntegrationHealth"
+              description: "Comarch Optima health status"
+            edi:
+              type: "IntegrationHealth"
+              description: "EDI health status"
+            api_keys:
+              type: "IntegrationHealth"
+              description: "API Keys health status"
+            webhooks:
+              type: "IntegrationHealth"
+              description: "Webhooks health status"
+        recent_activity:
+          type: "array<IntegrationEvent>"
+          description: "Last 20 integration events"
+        error_summary:
+          type: "object"
+          properties:
+            failed_count_24h: "number"
+            pending_retries: "number"
+            dead_letter_queue_count: "number"
+        success_rate_24h:
+          type: "number"
+          description: "Overall success rate (0-100%)"
+
+    response_error:
+      - status: 403
+        description: "User does not have ADMIN or IT_MANAGER role"
+        body:
+          error: "Insufficient permissions"
+      - status: 500
+        description: "Database query failed"
+        body:
+          error: "Failed to load dashboard data"
+
+    performance:
+      target: "< 1s"
+      database_queries: "≤ 5"
+
+  - method: GET
+    path: "/api/integrations/health"
+    description: "Health check endpoint for all integrations"
+    auth: true
+    roles: ["ADMIN", "IT_MANAGER"]
+
+    response_success:
+      status: 200
+      body:
+        overall_status:
+          type: "string"
+          enum: ["healthy", "degraded", "down"]
+          description: "Overall integration health"
+        integrations:
+          type: "object"
+          properties:
+            comarch:
+              type: "object"
+              properties:
+                status: "string"
+                message: "string (optional)"
+            edi:
+              type: "object"
+              properties:
+                status: "string"
+                message: "string (optional)"
+            api_keys:
+              type: "object"
+              properties:
+                status: "string"
+                active_count: "number"
+            webhooks:
+              type: "object"
+              properties:
+                status: "string"
+                active_count: "number"
+        timestamp:
+          type: "string"
+          format: "ISO 8601"
+          description: "Health check timestamp"
+
+    response_error:
+      - status: 403
+        description: "Insufficient permissions"
+      - status: 500
+        description: "Health check failed"
+
+    performance:
+      target: "< 500ms"
+      database_queries: "≤ 3"
+
+types:
+  IntegrationHealth:
+    properties:
+      status:
+        type: "string"
+        enum: ["connected", "disconnected", "error", "not_configured"]
+      last_sync_at:
+        type: "string | null"
+        format: "ISO 8601"
+      last_error_at:
+        type: "string | null"
+        format: "ISO 8601"
+      last_error_message:
+        type: "string | null"
+      success_count_24h:
+        type: "number"
+      error_count_24h:
+        type: "number"
+      metadata:
+        type: "object"
+        description: "Integration-specific data"
+
+  IntegrationEvent:
+    properties:
+      id: "string (UUID)"
+      timestamp: "string (ISO 8601)"
+      integration_type: "string"
+      event_type: "string"
+      status:
+        type: "string"
+        enum: ["success", "warning", "error"]
+      message: "string"
+      error_message: "string | null"
+
+validation:
+  dashboardQuerySchema:
+    library: "zod"
+    schema: |
+      z.object({
+        refresh: z.boolean().default(false),
+      })
+
+error_handling:
+  - scenario: "User not admin"
+    response: "403 Forbidden"
+    log_level: "WARN"
+  - scenario: "Database timeout"
+    response: "500 Internal Server Error"
+    log_level: "ERROR"
+    retry: false
+  - scenario: "Integration health stale (> 5 min)"
+    response: "200 OK with stale data + warning flag"
+    log_level: "INFO"
+    action: "Trigger background refresh"
+
+caching:
+  strategy: "None (real-time dashboard)"
+  ttl: "N/A"
+  invalidation: "Auto-refresh every 30s on frontend"
+
+rate_limiting:
+  tier: "standard"
+  limit: "60 requests/minute per user"
+  scope: "user_id"

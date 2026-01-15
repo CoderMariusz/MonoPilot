@@ -1,0 +1,7 @@
+# Story 06.35 - Test Specifications
+
+unit_tests:
+  - schedule supplier audit
+  - complete audit with checklist scores
+  - calculate overall score (average of 3 checklists)
+  - auto-calculate next audit date based on result

@@ -1,0 +1,83 @@
+# Story 11.1 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "11.1"
+  name: "Integrations Settings & Dashboard"
+  slug: "integrations-settings-dashboard"
+  epic: "11-integrations"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, functions
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Pages, components, hooks
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles"]
+  blocked_by: []
+  blocks:
+    - story: "11.2"
+      name: "API Keys Management"
+    - story: "11.3"
+      name: "Integration Logs"
+    - story: "11.4"
+      name: "Webhooks Configuration"
+    - story: "11.5"
+      name: "Data Export"
+    - story: "11.6"
+      name: "Supplier Portal"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/integrations.md"
+    sections: ["FR-INT-001"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/11-integrations/11.1.integrations-settings-dashboard.md"
+  patterns:
+    - path: "apps/frontend/app/(authenticated)/settings/page.tsx"
+      relevance: "Dashboard pattern example"
+    - path: "apps/frontend/components/dashboard/DashboardCard.tsx"
+      relevance: "Status card component pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "integration_health table + refresh function"
+  - type: "service"
+    count: 1
+    description: "integration-dashboard-service.ts"
+  - type: "api"
+    count: 2
+    description: "GET /api/integrations/dashboard, GET /api/integrations/health"
+  - type: "page"
+    count: 1
+    description: "/integrations/dashboard"
+  - type: "component"
+    count: 8
+    description: "Dashboard, health cards, activity feed, nav"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + RLS + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Foundation story for Epic 11 - establishes navigation shell"
+  - "Auto-refresh every 30s, pause when tab inactive"
+  - "Health status calculated from integration_logs last 24h"
+  - "Admin-only access (ADMIN or IT_MANAGER roles)"
+  - "RLS on integration_health table"

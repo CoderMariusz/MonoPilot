@@ -1,0 +1,291 @@
+# Story 06.22 - CCP Definition - Database Context
+# Generated: 2025-01-15
+
+tables:
+  haccp_ccp:
+    description: "Critical Control Points defined within HACCP plans"
+    columns:
+      # Identity
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+      - name: "org_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES organizations(id)"
+
+      # HACCP Plan Reference
+      - name: "haccp_plan_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES haccp_plans(id) ON DELETE CASCADE"
+
+      # CCP Identification
+      - name: "ccp_number"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., 'CCP-1', 'CCP-2'"
+      - name: "ccp_name"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., 'Receiving Temperature', 'Cooking Temperature'"
+
+      # Hazard Classification
+      - name: "hazard_type"
+        type: "TEXT"
+        constraints: "NOT NULL CHECK (hazard_type IN ('biological', 'chemical', 'physical'))"
+      - name: "hazard_description"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., 'Pathogen survival (Salmonella)'"
+
+      # Control Measure
+      - name: "control_measure"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., 'Monitor refrigerator temp'"
+
+      # Critical Limits
+      - name: "critical_limit_min"
+        type: "NUMERIC"
+        constraints: "NULL"
+      - name: "critical_limit_max"
+        type: "NUMERIC"
+        constraints: "NULL"
+      - name: "unit_of_measure"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., '°C', 'pH', 'ppm'"
+      - name: "target_value"
+        type: "NUMERIC"
+        constraints: "NULL"
+        description: "Optional target (e.g., 2°C for 0-4°C range)"
+
+      # Monitoring
+      - name: "monitoring_frequency"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., 'Every receipt', 'Hourly'"
+      - name: "monitoring_method"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., 'Infrared thermometer'"
+
+      # Routing Integration
+      - name: "routing_id"
+        type: "UUID"
+        constraints: "REFERENCES routings(id)"
+      - name: "routing_operation_id"
+        type: "UUID"
+        constraints: "REFERENCES routing_operations(id)"
+
+      # Corrective Action
+      - name: "corrective_action_std"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Standard corrective action if out of limit"
+
+      # Verification
+      - name: "verification_method"
+        type: "TEXT"
+        constraints: "NULL"
+      - name: "verification_frequency"
+        type: "TEXT"
+        constraints: "NULL"
+
+      # Responsibility
+      - name: "responsible_role"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "e.g., 'Receiving Operator'"
+      - name: "responsible_user_id"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+
+      # Versioning
+      - name: "version"
+        type: "INTEGER"
+        constraints: "NOT NULL DEFAULT 1"
+      - name: "effective_date"
+        type: "DATE"
+        constraints: "NOT NULL DEFAULT CURRENT_DATE"
+      - name: "expiry_date"
+        type: "DATE"
+        constraints: "NULL"
+
+      # Status
+      - name: "status"
+        type: "TEXT"
+        constraints: "NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'inactive', 'superseded'))"
+
+      # Approval
+      - name: "approved_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+      - name: "approved_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+
+      # Decision Tree
+      - name: "decision_tree_answers"
+        type: "JSONB"
+        constraints: "NULL"
+        description: "Store Q1-Q7 HACCP decision tree answers"
+
+      # Audit
+      - name: "created_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+      - name: "created_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+      - name: "updated_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+
+    constraints:
+      - type: "UNIQUE"
+        columns: ["org_id", "haccp_plan_id", "ccp_number"]
+        name: "uq_ccp_number"
+      - type: "CHECK"
+        expression: "critical_limit_min IS NULL OR critical_limit_max IS NULL OR critical_limit_min < critical_limit_max"
+        name: "chk_critical_limits"
+
+    indexes:
+      - name: "idx_haccp_ccp_org"
+        columns: ["org_id"]
+        type: "BTREE"
+      - name: "idx_haccp_ccp_plan"
+        columns: ["haccp_plan_id"]
+        type: "BTREE"
+      - name: "idx_haccp_ccp_status"
+        columns: ["org_id", "status"]
+        type: "BTREE"
+      - name: "idx_haccp_ccp_routing"
+        columns: ["routing_id"]
+        type: "BTREE"
+        where: "routing_id IS NOT NULL"
+      - name: "idx_haccp_ccp_operation"
+        columns: ["routing_operation_id"]
+        type: "BTREE"
+        where: "routing_operation_id IS NOT NULL"
+      - name: "idx_haccp_ccp_hazard"
+        columns: ["org_id", "hazard_type"]
+        type: "BTREE"
+      - name: "idx_haccp_ccp_effective"
+        columns: ["org_id", "effective_date", "expiry_date"]
+        type: "BTREE"
+        where: "status = 'active'"
+
+    rls:
+      enabled: true
+      policies:
+        - name: "ccp_select"
+          command: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_insert"
+          command: "INSERT"
+          with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_update"
+          command: "UPDATE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "ccp_delete"
+          command: "DELETE"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND status = 'draft'"
+
+triggers:
+  - name: "update_haccp_ccp_updated_at"
+    table: "haccp_ccp"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    function: "update_updated_at_column()"
+
+  - name: "trigger_validate_ccp_activation"
+    table: "haccp_ccp"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    function: "validate_ccp_before_activation()"
+
+functions:
+  - name: "validate_ccp_before_activation"
+    returns: "TRIGGER"
+    language: "plpgsql"
+    description: "Validate CCP has all required fields before activation"
+    logic: |
+      -- Only validate on activation (draft -> active)
+      IF NEW.status = 'active' AND (OLD.status IS NULL OR OLD.status = 'draft') THEN
+        -- Require critical limits
+        IF NEW.critical_limit_min IS NULL AND NEW.critical_limit_max IS NULL THEN
+          RAISE EXCEPTION 'CCP activation requires at least one critical limit (min or max)';
+        END IF;
+
+        -- Require routing link
+        IF NEW.routing_id IS NULL THEN
+          RAISE EXCEPTION 'CCP activation requires routing link';
+        END IF;
+
+        -- Require approval
+        IF NEW.approved_by IS NULL THEN
+          RAISE EXCEPTION 'CCP activation requires approval by QA Manager';
+        END IF;
+      END IF;
+
+      RETURN NEW;
+
+migration_file: "YYYYMMDDHHMMSS_create_haccp_ccp.sql"
+migration_order: "After haccp_plans table (story 06.21)"
+
+# Sample Data
+sample_data:
+  - ccp_number: "CCP-1"
+    ccp_name: "Receiving Temperature"
+    hazard_type: "biological"
+    hazard_description: "Pathogen survival (Salmonella, Listeria)"
+    control_measure: "Monitor refrigerator temperature on receipt"
+    critical_limit_min: 0
+    critical_limit_max: 4
+    unit_of_measure: "°C"
+    target_value: 2
+    monitoring_frequency: "Every receipt"
+    monitoring_method: "Infrared thermometer"
+    corrective_action_std: "Reject shipment if temp >4°C; notify supplier"
+    responsible_role: "Receiving Operator"
+    status: "active"
+
+  - ccp_number: "CCP-2"
+    ccp_name: "Cooking Temperature"
+    hazard_type: "biological"
+    hazard_description: "Pathogen survival (Salmonella in poultry)"
+    control_measure: "Monitor core temperature during cooking"
+    critical_limit_min: 75
+    critical_limit_max: null
+    unit_of_measure: "°C"
+    target_value: 80
+    monitoring_frequency: "Every batch"
+    monitoring_method: "Probe thermometer (calibrated)"
+    corrective_action_std: "Continue cooking until 75°C reached; discard if overcooked"
+    responsible_role: "Production Operator"
+    status: "active"
+
+  - ccp_number: "CCP-3"
+    ccp_name: "Metal Detection"
+    hazard_type: "physical"
+    hazard_description: "Metal contamination from equipment"
+    control_measure: "Metal detector scan at end of line"
+    critical_limit_min: null
+    critical_limit_max: 2.5
+    unit_of_measure: "mm"
+    monitoring_frequency: "Continuous (every unit)"
+    monitoring_method: "Metal detector (1.5mm Fe, 2.5mm Non-Fe)"
+    corrective_action_std: "Quarantine batch; investigate source; re-inspect"
+    responsible_role: "Packing Operator"
+    status: "active"
+
+# Performance Notes
+performance:
+  - "Index on (org_id, haccp_plan_id) for fast plan CCP lookup"
+  - "Index on routing_operation_id for fast operation CCP retrieval"
+  - "Partial index on active CCPs for effective_date queries"
+  - "Expected query patterns: list by plan, list by routing, get active CCPs"
+  - "Typical org has 5-20 CCPs per HACCP plan"

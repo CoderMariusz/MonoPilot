@@ -1,0 +1,108 @@
+# Story 06.28 - CoA Generation Engine Database Schema
+
+tables:
+  certificates_of_analysis:
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID NOT NULL
+      - coa_number: TEXT UNIQUE (org_id, coa_number)
+      - batch_id: UUID (FK work_orders)
+      - batch_number: TEXT NOT NULL
+      - product_id: UUID NOT NULL (FK products)
+      - template_id: UUID (FK coa_templates)
+      - spec_id: UUID (FK quality_specifications)
+      - inspection_id: UUID (FK quality_inspections)
+      - manufactured_date: DATE NOT NULL
+      - expiry_date: DATE
+      - lot_number: TEXT
+      - quantity: DECIMAL(12,3)
+      - unit: TEXT
+      - issue_date: DATE DEFAULT CURRENT_DATE
+      - issued_by: UUID (FK users)
+      - status: TEXT (draft/pending_approval/approved/void)
+      - approved_by: UUID (FK users)
+      - approved_at: TIMESTAMPTZ
+      - approval_signature: TEXT (encrypted)
+      - approval_meaning: TEXT (FDA 21 CFR Part 11)
+      - document_url: TEXT
+      - compliance_statements: TEXT[] (snapshot from template)
+      - header_text: TEXT (snapshot from template)
+      - footer_text: TEXT (snapshot from template)
+      - logo_url: TEXT (snapshot from template)
+      - is_locked: BOOLEAN DEFAULT false
+      - void_reason: TEXT
+      - voided_by: UUID
+      - voided_at: TIMESTAMPTZ
+      - created_at: TIMESTAMPTZ
+      - created_by: UUID
+      - updated_at: TIMESTAMPTZ
+
+    indexes:
+      - idx_coas_org: (org_id)
+      - idx_coas_org_status: (org_id, status)
+      - idx_coas_batch: (batch_id)
+      - idx_coas_product: (product_id)
+      - idx_coas_issue_date: (org_id, issue_date)
+      - idx_coas_approved: (org_id, approved_at) WHERE approved_at IS NOT NULL
+
+    rls: true
+    policies:
+      - SELECT: org_id match
+      - INSERT: org_id match
+      - UPDATE: org_id match AND is_locked = false
+      - DELETE: org_id match AND status = 'draft'
+
+  coa_parameters:
+    description: "Test results snapshot for CoA"
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID
+      - coa_id: UUID (FK certificates_of_analysis ON DELETE CASCADE)
+      - parameter_name: TEXT NOT NULL
+      - parameter_type: TEXT
+      - specification: TEXT
+      - min_value: DECIMAL(12,3)
+      - max_value: DECIMAL(12,3)
+      - target_value: DECIMAL(12,3)
+      - unit: TEXT
+      - result_value: DECIMAL(12,3)
+      - result_text: TEXT
+      - test_method: TEXT
+      - pass_fail: TEXT (pass/fail/n/a)
+      - display_order: INTEGER DEFAULT 0
+      - created_at: TIMESTAMPTZ
+
+    indexes:
+      - idx_coa_params_coa: (coa_id)
+      - idx_coa_params_org: (org_id)
+
+    rls: true
+
+  coa_number_sequences:
+    columns:
+      - id: UUID PRIMARY KEY
+      - org_id: UUID UNIQUE (org_id, year)
+      - year: INTEGER
+      - current_value: BIGINT DEFAULT 0
+      - updated_at: TIMESTAMPTZ
+    rls: true
+
+functions:
+  generate_coa_number:
+    params: [p_org_id UUID]
+    returns: TEXT
+    description: "Generates COA-YYYY-NNNNN format"
+
+  lock_coa_on_approval:
+    trigger: BEFORE UPDATE
+    table: certificates_of_analysis
+    condition: NEW.status = 'approved'
+    logic: "Sets is_locked = true when approved"
+
+  prevent_locked_coa_update:
+    trigger: BEFORE UPDATE
+    table: certificates_of_analysis
+    condition: OLD.is_locked = true
+    logic: "Prevents updates to locked CoAs (except void)"
+
+migration_file: "YYYYMMDDHHMMSS_create_certificates_of_analysis.sql"

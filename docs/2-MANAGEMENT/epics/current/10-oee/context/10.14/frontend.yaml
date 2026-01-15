@@ -1,0 +1,48 @@
+# Story 10.14 - Frontend Specification
+# Purpose: Handover notes UI components
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/oee/handover/HandoverNotesList.tsx"
+    description: "List of incoming/outgoing handover notes"
+    features:
+      - "Tabs: Incoming / Outgoing"
+      - "Filter by priority"
+      - "Unacknowledged badge"
+
+  - path: "apps/frontend/components/oee/handover/CreateNoteModal.tsx"
+    description: "Create new handover note"
+    form_fields:
+      - { name: "note_type", type: "select" }
+      - { name: "priority", type: "select" }
+      - { name: "subject", type: "text" }
+      - { name: "message", type: "textarea" }
+      - { name: "machine_id", type: "select (optional)" }
+
+  - path: "apps/frontend/components/oee/handover/AcknowledgeNoteModal.tsx"
+    description: "Acknowledge note with optional response"
+
+  - path: "apps/frontend/components/oee/handover/HandoverNoteCard.tsx"
+    description: "Individual note card display"
+    displays:
+      - "Type badge (Issue/Action/Info)"
+      - "Priority indicator"
+      - "Subject and message"
+      - "Acknowledge button"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/handover/page.tsx"
+    route: "/oee/handover"
+    title: "Shift Handover"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-handover-notes.ts"
+    exports:
+      - "useHandoverNotes"
+      - "useCreateNote"
+      - "useAcknowledgeNote"
+
+ux:
+  states:
+    - loading: "Skeleton note cards"
+    - empty: "No handover notes for this shift"

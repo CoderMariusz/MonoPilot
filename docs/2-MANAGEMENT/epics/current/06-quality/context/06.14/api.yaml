@@ -1,0 +1,590 @@
+# Story 06.14 - API Context
+# Generated: 2026-01-15
+# Purpose: API endpoints, request/response schemas, error handling
+
+base_path: "/api/quality/ncrs/:id/root-cause"
+
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
+
+endpoints:
+  # ---------------------------------------------------------------------------
+  # GET /api/quality/ncrs/:id/root-cause - Get root cause analysis
+  # ---------------------------------------------------------------------------
+  - method: GET
+    path: /api/quality/ncrs/:id/root-cause
+    description: "Get root cause analysis with factors and evidence"
+    auth: required
+    roles: ["*"]
+
+    response:
+      success:
+        status: 200
+        schema:
+          root_cause:
+            type: NCRRootCause | null
+          factors:
+            type: NCRRootCauseFactor[]
+          evidence:
+            type: NCREvidence[]
+      errors:
+        - status: 404
+          code: NCR_NOT_FOUND
+          message: "NCR not found"
+        - status: 403
+          code: NCR_NOT_IN_ROOT_CAUSE_STATE
+          message: "NCR must be in root_cause state"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/ncrs/:id/root-cause - Create/Update root cause
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/ncrs/:id/root-cause
+    description: "Create or update root cause analysis"
+    auth: required
+    roles: ["QA_INSPECTOR", "QA_MANAGER", "ADMIN"]
+
+    request:
+      schema:
+        # 5-Why
+        why_1: string (optional)
+        why_1_answer: string (optional)
+        why_2: string (optional)
+        why_2_answer: string (optional)
+        why_3: string (optional)
+        why_3_answer: string (optional)
+        why_4: string (optional)
+        why_4_answer: string (optional)
+        why_5: string (optional)
+        why_5_answer: string (optional)
+        why_levels_used: number (1-5)
+        # Statement
+        root_cause_statement: string (min 20 chars for submit)
+        root_cause_summary: string (optional)
+        # Classification
+        classification: enum (systemic/random/procedural/human_error/equipment/material/environmental/unknown)
+        is_recurring: boolean
+        recurrence_count: number (if is_recurring=true)
+        related_ncr_ids: string[] (UUIDs)
+        # Impact
+        impact_cost: number (optional)
+        impact_customer: enum (none/minor/moderate/major/critical)
+        impact_customer_notes: string (optional)
+        impact_regulatory: enum (none/notification_required/audit_finding/violation/recall_potential)
+        impact_regulatory_notes: string (optional)
+        impact_production: enum (none/minor_delay/significant_delay/batch_loss/line_shutdown)
+        impact_production_notes: string (optional)
+
+    response:
+      success:
+        status: 200
+        schema:
+          root_cause: NCRRootCause
+      errors:
+        - status: 400
+          code: VALIDATION_ERROR
+          message: "Invalid input data"
+        - status: 403
+          code: ALREADY_APPROVED
+          message: "Cannot modify approved root cause"
+        - status: 404
+          code: NCR_NOT_FOUND
+          message: "NCR not found"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/ncrs/:id/root-cause/factors - Add Fishbone factor
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/ncrs/:id/root-cause/factors
+    description: "Add factor to Fishbone diagram"
+    auth: required
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    request:
+      schema:
+        root_cause_id: string (UUID)
+        category: enum (man/machine/material/method/measurement/mother_nature)
+        factor_description: string (required, min 10 chars)
+        is_contributing: boolean (default true)
+        is_primary: boolean (default false)
+        evidence_notes: string (optional)
+        sequence: number (default 0)
+
+    response:
+      success:
+        status: 201
+        schema:
+          factor: NCRRootCauseFactor
+      errors:
+        - status: 400
+          code: PRIMARY_FACTOR_EXISTS
+          message: "Only one primary factor allowed"
+        - status: 403
+          code: ROOT_CAUSE_APPROVED
+          message: "Cannot modify approved root cause"
+
+  # ---------------------------------------------------------------------------
+  # PUT /api/quality/ncrs/:id/root-cause/factors/:factorId - Update factor
+  # ---------------------------------------------------------------------------
+  - method: PUT
+    path: /api/quality/ncrs/:id/root-cause/factors/:factorId
+    description: "Update Fishbone factor"
+    auth: required
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    request:
+      schema:
+        factor_description: string (optional)
+        is_contributing: boolean (optional)
+        is_primary: boolean (optional)
+        evidence_notes: string (optional)
+        sequence: number (optional)
+
+    response:
+      success:
+        status: 200
+        schema:
+          factor: NCRRootCauseFactor
+      errors:
+        - status: 400
+          code: PRIMARY_FACTOR_EXISTS
+          message: "Another factor is already primary"
+        - status: 404
+          code: FACTOR_NOT_FOUND
+          message: "Factor not found"
+
+  # ---------------------------------------------------------------------------
+  # DELETE /api/quality/ncrs/:id/root-cause/factors/:factorId - Delete factor
+  # ---------------------------------------------------------------------------
+  - method: DELETE
+    path: /api/quality/ncrs/:id/root-cause/factors/:factorId
+    description: "Delete Fishbone factor"
+    auth: required
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    response:
+      success:
+        status: 204
+      errors:
+        - status: 403
+          code: ROOT_CAUSE_APPROVED
+          message: "Cannot modify approved root cause"
+        - status: 404
+          code: FACTOR_NOT_FOUND
+          message: "Factor not found"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/ncrs/:id/root-cause/submit - Submit for approval
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/ncrs/:id/root-cause/submit
+    description: "Submit root cause analysis for QA Manager approval"
+    auth: required
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    response:
+      success:
+        status: 200
+        schema:
+          root_cause: NCRRootCause (status=submitted)
+      errors:
+        - status: 400
+          code: INCOMPLETE_ANALYSIS
+          message: "Analysis incomplete: {missing_fields}"
+        - status: 400
+          code: NO_PRIMARY_FACTOR
+          message: "At least one primary factor required"
+        - status: 403
+          code: ALREADY_SUBMITTED
+          message: "Analysis already submitted"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/ncrs/:id/root-cause/approve - Approve (QA Manager)
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/ncrs/:id/root-cause/approve
+    description: "Approve root cause analysis and transition NCR to corrective_action"
+    auth: required
+    roles: ["QA_MANAGER", "ADMIN"]
+
+    request:
+      schema:
+        approval_notes: string (optional)
+
+    response:
+      success:
+        status: 200
+        schema:
+          root_cause: NCRRootCause (status=approved)
+          ncr: NCRReport (status=corrective_action)
+      errors:
+        - status: 400
+          code: NOT_SUBMITTED
+          message: "Root cause must be submitted first"
+        - status: 403
+          code: ALREADY_APPROVED
+          message: "Root cause already approved"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/ncrs/:id/root-cause/reject - Reject (QA Manager)
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/ncrs/:id/root-cause/reject
+    description: "Reject root cause analysis"
+    auth: required
+    roles: ["QA_MANAGER", "ADMIN"]
+
+    request:
+      schema:
+        rejection_reason: string (required, min 20 chars)
+
+    response:
+      success:
+        status: 200
+        schema:
+          root_cause: NCRRootCause (status=rejected)
+      errors:
+        - status: 400
+          code: REJECTION_REASON_REQUIRED
+          message: "Rejection reason required (min 20 characters)"
+        - status: 400
+          code: NOT_SUBMITTED
+          message: "Can only reject submitted analyses"
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/ncrs/:id/root-cause/revision - Request revision
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/ncrs/:id/root-cause/revision
+    description: "Request revision (return to draft for edits)"
+    auth: required
+    roles: ["QA_MANAGER"]
+
+    request:
+      schema:
+        revision_notes: string (required, min 20 chars)
+
+    response:
+      success:
+        status: 200
+        schema:
+          root_cause: NCRRootCause (status=revision_required)
+
+  # ---------------------------------------------------------------------------
+  # POST /api/quality/ncrs/:id/root-cause/attachments - Upload evidence
+  # ---------------------------------------------------------------------------
+  - method: POST
+    path: /api/quality/ncrs/:id/root-cause/attachments
+    description: "Upload evidence file to Supabase Storage"
+    auth: required
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+    content_type: multipart/form-data
+
+    request:
+      schema:
+        file: File (max 25MB)
+        description: string (optional)
+        attachment_type: enum (photo/document/video/test_result/coa/inspection_record/other)
+        is_primary_evidence: boolean (default false)
+
+    response:
+      success:
+        status: 201
+        schema:
+          attachment: NCREvidence
+      errors:
+        - status: 400
+          code: FILE_TOO_LARGE
+          message: "File exceeds 25MB limit"
+        - status: 400
+          code: INVALID_FILE_TYPE
+          message: "File type not allowed"
+        - status: 403
+          code: ROOT_CAUSE_APPROVED
+          message: "Cannot upload evidence to approved analysis"
+
+  # ---------------------------------------------------------------------------
+  # DELETE /api/quality/ncrs/:id/root-cause/attachments/:attachmentId - Delete evidence
+  # ---------------------------------------------------------------------------
+  - method: DELETE
+    path: /api/quality/ncrs/:id/root-cause/attachments/:attachmentId
+    description: "Delete evidence file"
+    auth: required
+    roles: ["QA_INSPECTOR", "QA_MANAGER"]
+
+    response:
+      success:
+        status: 204
+      errors:
+        - status: 403
+          code: ROOT_CAUSE_APPROVED
+          message: "Cannot delete evidence from approved analysis"
+        - status: 404
+          code: ATTACHMENT_NOT_FOUND
+          message: "Attachment not found"
+
+  # ---------------------------------------------------------------------------
+  # GET /api/quality/ncrs/:id/root-cause/attachments/:attachmentId/download
+  # ---------------------------------------------------------------------------
+  - method: GET
+    path: /api/quality/ncrs/:id/root-cause/attachments/:attachmentId/download
+    description: "Get signed download URL for evidence file"
+    auth: required
+    roles: ["*"]
+
+    response:
+      success:
+        status: 200
+        schema:
+          download_url: string (signed URL, 60s expiry)
+          file_name: string
+          file_size: number
+      errors:
+        - status: 404
+          code: ATTACHMENT_NOT_FOUND
+          message: "Attachment not found"
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+types:
+  NCRRootCause:
+    fields:
+      - id: string
+      - org_id: string
+      - ncr_id: string
+      - why_1..why_5: string | null
+      - why_1_answer..why_5_answer: string | null
+      - why_levels_used: number (0-5)
+      - root_cause_statement: string | null
+      - root_cause_summary: string | null
+      - classification: enum
+      - is_recurring: boolean
+      - recurrence_count: number
+      - related_ncr_ids: string[]
+      - impact_cost: number | null
+      - impact_customer: enum | null
+      - impact_customer_notes: string | null
+      - impact_regulatory: enum | null
+      - impact_regulatory_notes: string | null
+      - impact_production: enum | null
+      - impact_production_notes: string | null
+      - status: enum (draft/submitted/approved/rejected/revision_required)
+      - submitted_at: string | null
+      - submitted_by: string | null
+      - approved_at: string | null
+      - approved_by: string | null
+      - approval_notes: string | null
+      - rejection_reason: string | null
+      - investigator_id: string | null
+      - investigation_started: string | null
+      - investigation_completed: string | null
+      - created_at: string
+      - updated_at: string
+
+  NCRRootCauseFactor:
+    fields:
+      - id: string
+      - org_id: string
+      - root_cause_id: string
+      - category: enum (man/machine/material/method/measurement/mother_nature)
+      - factor_description: string
+      - is_contributing: boolean
+      - is_primary: boolean
+      - evidence_notes: string | null
+      - sequence: number
+      - created_at: string
+      - updated_at: string
+
+  NCREvidence:
+    fields:
+      - id: string
+      - org_id: string
+      - ncr_id: string
+      - root_cause_id: string | null
+      - file_name: string
+      - file_type: string
+      - file_size: number
+      - file_path: string
+      - storage_bucket: string
+      - description: string | null
+      - attachment_type: enum
+      - is_primary_evidence: boolean
+      - uploaded_at: string
+      - uploaded_by: string
+
+# =============================================================================
+# VALIDATION SCHEMAS (ZOD)
+# =============================================================================
+
+validation:
+  - name: createRootCauseSchema
+    file: lib/validation/ncr-root-cause.ts
+    definition: |
+      z.object({
+        why_1: z.string().optional(),
+        why_1_answer: z.string().optional(),
+        why_2: z.string().optional(),
+        why_2_answer: z.string().optional(),
+        why_3: z.string().optional(),
+        why_3_answer: z.string().optional(),
+        why_4: z.string().optional(),
+        why_4_answer: z.string().optional(),
+        why_5: z.string().optional(),
+        why_5_answer: z.string().optional(),
+        why_levels_used: z.number().int().min(0).max(5),
+        root_cause_statement: z.string().min(20).optional(),
+        root_cause_summary: z.string().optional(),
+        classification: z.enum(['systemic', 'random', 'procedural', 'human_error', 'equipment', 'material', 'environmental', 'unknown']),
+        is_recurring: z.boolean().default(false),
+        recurrence_count: z.number().int().min(0).optional(),
+        related_ncr_ids: z.array(z.string().uuid()).optional(),
+        impact_cost: z.number().optional(),
+        impact_customer: z.enum(['none', 'minor', 'moderate', 'major', 'critical']).optional(),
+        impact_customer_notes: z.string().optional(),
+        impact_regulatory: z.enum(['none', 'notification_required', 'audit_finding', 'violation', 'recall_potential']).optional(),
+        impact_regulatory_notes: z.string().optional(),
+        impact_production: z.enum(['none', 'minor_delay', 'significant_delay', 'batch_loss', 'line_shutdown']).optional(),
+        impact_production_notes: z.string().optional(),
+      })
+
+  - name: addFactorSchema
+    definition: |
+      z.object({
+        root_cause_id: z.string().uuid(),
+        category: z.enum(['man', 'machine', 'material', 'method', 'measurement', 'mother_nature']),
+        factor_description: z.string().min(10),
+        is_contributing: z.boolean().default(true),
+        is_primary: z.boolean().default(false),
+        evidence_notes: z.string().optional(),
+        sequence: z.number().int().default(0),
+      })
+
+  - name: approveRootCauseSchema
+    definition: |
+      z.object({
+        approval_notes: z.string().optional(),
+      })
+
+  - name: rejectRootCauseSchema
+    definition: |
+      z.object({
+        rejection_reason: z.string().min(20),
+      })
+
+  - name: uploadEvidenceSchema
+    definition: |
+      z.object({
+        file: z.instanceof(File).refine((file) => file.size <= 26214400, 'Max file size 25MB'),
+        description: z.string().optional(),
+        attachment_type: z.enum(['photo', 'document', 'video', 'test_result', 'coa', 'inspection_record', 'other']),
+        is_primary_evidence: z.boolean().default(false),
+      })
+
+# =============================================================================
+# SERVICE INTERFACE
+# =============================================================================
+
+service:
+  name: NCRRootCauseService
+  path: lib/services/ncr-root-cause-service.ts
+  methods:
+    # CRUD
+    - name: getRootCause
+      params: [ncrId: string]
+      returns: Promise<{ root_cause, factors, evidence }>
+
+    - name: createOrUpdateRootCause
+      params: [ncrId: string, data: CreateRootCauseInput]
+      returns: Promise<NCRRootCause>
+
+    # Factors
+    - name: addFactor
+      params: [rootCauseId: string, data: AddFactorInput]
+      returns: Promise<NCRRootCauseFactor>
+
+    - name: updateFactor
+      params: [factorId: string, data: Partial<AddFactorInput>]
+      returns: Promise<NCRRootCauseFactor>
+
+    - name: deleteFactor
+      params: [factorId: string]
+      returns: Promise<void>
+
+    # Workflow
+    - name: submit
+      params: [ncrId: string]
+      returns: Promise<NCRRootCause>
+
+    - name: approve
+      params: [ncrId: string, approvalNotes: string | null]
+      returns: Promise<{ root_cause, ncr }>
+
+    - name: reject
+      params: [ncrId: string, rejectionReason: string]
+      returns: Promise<NCRRootCause>
+
+    - name: requestRevision
+      params: [ncrId: string, revisionNotes: string]
+      returns: Promise<NCRRootCause>
+
+    # Evidence
+    - name: uploadEvidence
+      params: [ncrId: string, file: File, metadata: EvidenceMetadata]
+      returns: Promise<NCREvidence>
+
+    - name: deleteEvidence
+      params: [attachmentId: string]
+      returns: Promise<void>
+
+    - name: getDownloadUrl
+      params: [attachmentId: string]
+      returns: Promise<string>
+
+    # Validation
+    - name: validateSubmission
+      params: [rootCause: NCRRootCause, factors: NCRRootCauseFactor[]]
+      returns: { valid: boolean, errors: string[] }
+
+# =============================================================================
+# ERROR CODES
+# =============================================================================
+
+error_codes:
+  NCR_NOT_FOUND:
+    status: 404
+    message: "NCR not found or not accessible"
+
+  NCR_NOT_IN_ROOT_CAUSE_STATE:
+    status: 403
+    message: "NCR must be in root_cause workflow state"
+
+  ALREADY_APPROVED:
+    status: 403
+    message: "Cannot modify approved root cause analysis"
+
+  PRIMARY_FACTOR_EXISTS:
+    status: 400
+    message: "Only one primary factor allowed per analysis"
+
+  INCOMPLETE_ANALYSIS:
+    status: 400
+    message: "Analysis incomplete: {details}"
+
+  NO_PRIMARY_FACTOR:
+    status: 400
+    message: "At least one primary factor required"
+
+  NOT_SUBMITTED:
+    status: 400
+    message: "Root cause must be submitted before approval/rejection"
+
+  FILE_TOO_LARGE:
+    status: 400
+    message: "File exceeds 25MB limit"
+
+  INVALID_FILE_TYPE:
+    status: 400
+    message: "File type not allowed"

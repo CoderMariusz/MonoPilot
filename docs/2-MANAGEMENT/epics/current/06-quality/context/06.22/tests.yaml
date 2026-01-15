@@ -1,0 +1,443 @@
+# Story 06.22 - CCP Definition - Tests Context
+# Generated: 2025-01-15
+
+test_coverage:
+  target: ">80%"
+  focus_areas:
+    - "CCP creation and validation"
+    - "Activation validation logic"
+    - "Versioning workflow"
+    - "Critical limits validation"
+    - "Decision tree evaluation"
+
+unit_tests:
+  file: "lib/services/haccp-ccp-service.test.ts"
+  framework: "Vitest"
+  coverage_target: ">80%"
+  test_suites:
+    - suite: "create"
+      tests:
+        - name: "creates CCP with correct fields"
+          assertions:
+            - "CCP created with all provided fields"
+            - "org_id inherited from auth context"
+            - "status = 'draft' by default"
+            - "version = 1"
+        - name: "validates CCP number format"
+          assertions:
+            - "Rejects invalid formats (not CCP-N)"
+            - "Accepts valid format (CCP-1, CCP-99)"
+        - name: "enforces CCP number uniqueness per HACCP plan"
+          assertions:
+            - "Rejects duplicate CCP-1 in same plan"
+            - "Allows CCP-1 in different plan"
+        - name: "validates critical limits min < max"
+          assertions:
+            - "Rejects when min >= max"
+            - "Allows when min < max"
+            - "Allows when only one limit set"
+        - name: "creates with draft status"
+          assertions:
+            - "status = 'draft'"
+            - "approved_by = NULL"
+            - "effective_date = NULL"
+
+    - suite: "activate"
+      tests:
+        - name: "activates CCP with all required fields"
+          assertions:
+            - "status changes to 'active'"
+            - "effective_date set if not provided"
+            - "approved_by populated"
+            - "approved_at set to now"
+        - name: "blocks activation without critical limits"
+          assertions:
+            - "Throws error if both min and max NULL"
+            - "Error message: 'at least one critical limit required'"
+        - name: "blocks activation without routing link"
+          assertions:
+            - "Throws error if routing_id NULL"
+            - "Error message: 'routing link required'"
+        - name: "blocks activation without QA Manager approval"
+          assertions:
+            - "Throws error if approved_by NULL"
+            - "Error message: 'QA Manager approval required'"
+        - name: "sets effective_date to today if not provided"
+          assertions:
+            - "effective_date = CURRENT_DATE when not provided"
+
+    - suite: "createVersion"
+      tests:
+        - name: "creates new draft version from active CCP"
+          assertions:
+            - "New CCP created with version = old_version + 1"
+            - "New CCP status = 'draft'"
+            - "All fields copied from active CCP"
+            - "effective_date = NULL (set on activation)"
+        - name: "increments version number"
+          assertions:
+            - "v1 -> v2 -> v3 etc."
+        - name: "copies all fields from previous version"
+          assertions:
+            - "All CCP attributes same except version, status, dates"
+        - name: "new version starts as draft"
+          assertions:
+            - "status = 'draft'"
+            - "approved_by = NULL"
+
+    - suite: "evaluateDecisionTree"
+      tests:
+        - name: "identifies CCP when Q2=Yes"
+          input:
+            Q2: true
+          assertions:
+            - "isCCP = true"
+            - "reason includes 'step eliminates hazard'"
+        - name: "identifies CCP when Q3=Yes and Q4=No"
+          input:
+            Q3: true
+            Q4: false
+          assertions:
+            - "isCCP = true"
+            - "reason includes 'no subsequent control'"
+        - name: "identifies NOT CCP when answers indicate control point"
+          input:
+            Q1: true
+            Q2: false
+            Q3: false
+          assertions:
+            - "isCCP = false"
+            - "recommendation = 'control point (CP)'"
+        - name: "returns recommendation message"
+          assertions:
+            - "recommendation field populated"
+            - "reason field populated"
+
+    - suite: "canActivate"
+      tests:
+        - name: "validates all activation requirements"
+          assertions:
+            - "Returns canActivate = true when all requirements met"
+            - "Returns missingFields array when requirements missing"
+            - "Returns warnings array for optional fields"
+
+integration_tests:
+  file: "app/api/quality/haccp/ccp/route.test.ts"
+  framework: "Vitest + Supertest"
+  test_suites:
+    - suite: "POST /api/quality/haccp/ccp"
+      tests:
+        - name: "creates CCP with valid data"
+          request:
+            method: "POST"
+            body: "Valid CreateCCPRequest"
+          assertions:
+            - "Returns 201 Created"
+            - "Response contains created CCP"
+            - "CCP.status = 'draft'"
+        - name: "returns 400 for invalid CCP number format"
+          request:
+            body: "{ ccp_number: 'INVALID' }"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error message: 'CCP number must be format CCP-N'"
+        - name: "returns 409 for duplicate CCP number in same plan"
+          setup: "CCP-1 already exists in plan"
+          request:
+            body: "{ ccp_number: 'CCP-1', haccp_plan_id: 'same-plan-id' }"
+          assertions:
+            - "Returns 409 Conflict"
+            - "Error message: 'CCP number already exists'"
+        - name: "allows same CCP number across different plans"
+          setup: "CCP-1 exists in plan A"
+          request:
+            body: "{ ccp_number: 'CCP-1', haccp_plan_id: 'plan-b-id' }"
+          assertions:
+            - "Returns 201 Created"
+        - name: "enforces org_id from auth"
+          request:
+            body: "{ org_id: 'different-org' }"
+          assertions:
+            - "org_id overridden with auth.org_id"
+            - "Cannot create CCP for different org"
+
+    - suite: "POST /api/quality/haccp/ccp/:id/activate"
+      tests:
+        - name: "activates CCP with all requirements met"
+          setup: "Draft CCP with critical limits, routing link, approval"
+          request:
+            method: "POST"
+            path: "/api/quality/haccp/ccp/:id/activate"
+          assertions:
+            - "Returns 200 OK"
+            - "CCP.status = 'active'"
+            - "CCP.effective_date set"
+        - name: "returns 400 without critical limits"
+          setup: "Draft CCP without critical limits"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error message includes 'critical limits required'"
+        - name: "returns 403 for non-QA Manager"
+          setup: "User with QA_INSPECTOR role"
+          assertions:
+            - "Returns 403 Forbidden"
+            - "Error message: 'QA Manager role required'"
+
+    - suite: "PUT /api/quality/haccp/ccp/:id"
+      tests:
+        - name: "updates draft CCP"
+          setup: "Draft CCP exists"
+          request:
+            method: "PUT"
+            body: "{ ccp_name: 'Updated Name' }"
+          assertions:
+            - "Returns 200 OK"
+            - "CCP.ccp_name updated"
+        - name: "returns 400 when editing active CCP"
+          setup: "Active CCP exists"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error message: 'Cannot edit active CCP. Create new version.'"
+
+    - suite: "DELETE /api/quality/haccp/ccp/:id"
+      tests:
+        - name: "deletes draft CCP"
+          setup: "Draft CCP exists"
+          request:
+            method: "DELETE"
+          assertions:
+            - "Returns 204 No Content"
+            - "CCP no longer exists"
+        - name: "returns 400 when deleting active CCP"
+          setup: "Active CCP exists"
+          assertions:
+            - "Returns 400 Bad Request"
+            - "Error message: 'Cannot delete active CCP'"
+
+    - suite: "RLS Enforcement"
+      tests:
+        - name: "org isolation on CCP list"
+          setup: "User A from Org A, User B from Org B"
+          request:
+            method: "GET"
+            auth: "User A"
+          assertions:
+            - "Returns only Org A CCPs"
+            - "Does not return Org B CCPs"
+        - name: "returns 404 for cross-org CCP access"
+          setup: "CCP belongs to Org B"
+          request:
+            method: "GET"
+            path: "/api/quality/haccp/ccp/:id"
+            auth: "User A (Org A)"
+          assertions:
+            - "Returns 404 Not Found (not 403)"
+
+e2e_tests:
+  file: "tests/e2e/quality/ccp-definition.spec.ts"
+  framework: "Playwright"
+  test_suites:
+    - suite: "CCP Definition Workflow"
+      tests:
+        - name: "complete workflow: decision tree -> create -> edit -> activate"
+          steps:
+            - "Navigate to /quality/haccp/ccp"
+            - "Click [+ New CCP]"
+            - "Click [Use Decision Tree]"
+            - "Answer 7 questions (result: is CCP)"
+            - "Complete Step 1: Basic Info"
+            - "Complete Step 2: Critical Limits (0-4°C)"
+            - "Complete Step 3: Monitoring (Every receipt, Thermometer)"
+            - "Complete Step 4: Routing Link (select routing + operation)"
+            - "Review and click [Create]"
+            - "Verify toast: 'CCP created successfully'"
+            - "Verify CCP appears in list with status 'draft'"
+            - "Click CCP to view detail"
+            - "Click [Edit]"
+            - "Update critical_limit_max to 5"
+            - "Save changes"
+            - "Get QA Manager approval (mock)"
+            - "Click [Activate]"
+            - "Confirm activation"
+            - "Verify status = 'active'"
+            - "Verify effective_date = today"
+          assertions:
+            - "CCP list shows new CCP"
+            - "CCP detail shows all fields correctly"
+            - "Status badge shows 'active'"
+            - "Effective date displayed"
+
+        - name: "create new version from active CCP"
+          steps:
+            - "Navigate to active CCP detail"
+            - "Click [Create New Version]"
+            - "Confirm version creation"
+            - "Verify new draft CCP-1 v2 created"
+            - "Edit critical limits in v2"
+            - "Activate v2"
+            - "Verify v1 status = 'superseded'"
+            - "Verify v1 expiry_date = today"
+            - "Verify v2 status = 'active'"
+          assertions:
+            - "Version history shows v1 (superseded) and v2 (active)"
+            - "v2 effective_date = today"
+
+        - name: "cannot activate without critical limits"
+          steps:
+            - "Create CCP without critical limits"
+            - "Attempt to activate"
+            - "Verify error message displayed"
+            - "Verify activation blocked"
+          assertions:
+            - "Error: 'Critical limits required'"
+            - "Status remains 'draft'"
+
+        - name: "decision tree determines NOT a CCP"
+          steps:
+            - "Start decision tree wizard"
+            - "Answer questions indicating control point (not CCP)"
+            - "Verify result: 'This is NOT a CCP'"
+            - "Verify recommendation: 'Create control point instead'"
+          assertions:
+            - "Decision tree result correct"
+            - "Option to continue or cancel"
+
+    - suite: "CCP Filters and Search"
+      tests:
+        - name: "filter CCPs by status"
+          steps:
+            - "Navigate to CCP list"
+            - "Select status filter: 'active'"
+            - "Verify only active CCPs shown"
+          assertions:
+            - "Filter applied to table"
+            - "URL updated with filter state"
+
+        - name: "search CCPs by name"
+          steps:
+            - "Enter 'Temperature' in search"
+            - "Wait 300ms (debounce)"
+            - "Verify matching CCPs shown"
+          assertions:
+            - "Search filters results"
+            - "Debounce working"
+
+    - suite: "CCP Permissions"
+      tests:
+        - name: "QA Inspector can create draft but not activate"
+          steps:
+            - "Login as QA Inspector"
+            - "Create CCP (saved as draft)"
+            - "Attempt to activate"
+            - "Verify error: 'QA Manager role required'"
+          assertions:
+            - "Draft CCP created successfully"
+            - "Activation blocked for non-QA Manager"
+
+        - name: "QA Manager can activate CCPs"
+          steps:
+            - "Login as QA Manager"
+            - "Create CCP with all requirements"
+            - "Click [Activate]"
+            - "Verify activation succeeds"
+          assertions:
+            - "CCP status = 'active'"
+            - "approved_by = QA Manager user"
+
+# Acceptance Criteria Coverage
+ac_coverage:
+  - id: "AC-1"
+    name: "CCP Table Creation"
+    tests:
+      - "Migration test (manual verification)"
+  - id: "AC-2"
+    name: "CCP Creation - Basic"
+    tests:
+      - "integration_tests: POST /api/quality/haccp/ccp (creates with valid data)"
+      - "integration_tests: returns 409 for duplicate"
+  - id: "AC-3"
+    name: "CCP Creation - Critical Limits Validation"
+    tests:
+      - "unit_tests: validates critical limits min < max"
+      - "integration_tests: returns 400 for invalid limits"
+  - id: "AC-4"
+    name: "CCP Decision Tree Wizard"
+    tests:
+      - "unit_tests: evaluateDecisionTree (all scenarios)"
+      - "e2e_tests: decision tree workflow"
+  - id: "AC-5"
+    name: "Link CCP to Routing Operation"
+    tests:
+      - "integration_tests: POST with routing_id"
+      - "e2e_tests: routing link in wizard Step 4"
+  - id: "AC-6"
+    name: "CCP Activation"
+    tests:
+      - "unit_tests: activate with all requirements"
+      - "integration_tests: POST /activate endpoint"
+      - "e2e_tests: activation workflow"
+  - id: "AC-7"
+    name: "CCP Deactivation"
+    tests:
+      - "integration_tests: POST /deactivate endpoint"
+      - "e2e_tests: deactivation with reason"
+  - id: "AC-8"
+    name: "CCP Versioning"
+    tests:
+      - "unit_tests: createVersion method"
+      - "e2e_tests: create new version workflow"
+  - id: "AC-9"
+    name: "CCP List Page"
+    tests:
+      - "e2e_tests: CCP list displays correctly"
+      - "e2e_tests: filters and search work"
+  - id: "AC-10"
+    name: "CCP Detail Page"
+    tests:
+      - "e2e_tests: CCP detail shows all fields"
+  - id: "AC-11"
+    name: "CCP Edit"
+    tests:
+      - "integration_tests: PUT endpoint (draft only)"
+      - "e2e_tests: edit draft CCP"
+  - id: "AC-12"
+    name: "Permission Enforcement"
+    tests:
+      - "e2e_tests: QA Inspector permissions"
+      - "e2e_tests: QA Manager permissions"
+  - id: "AC-13"
+    name: "Audit Trail"
+    tests:
+      - "integration_tests: audit log created on state changes"
+  - id: "AC-14"
+    name: "RLS Policy Enforcement"
+    tests:
+      - "integration_tests: org isolation tests"
+  - id: "AC-15"
+    name: "Performance Requirements"
+    tests:
+      - "integration_tests: response time < 500ms (measured)"
+
+# Performance Tests
+performance_tests:
+  - scenario: "CCP list with 100 CCPs"
+    target: "<500ms"
+    test: "Load /api/quality/haccp/ccp with 100 records"
+  - scenario: "CCP detail with version history (10 versions)"
+    target: "<500ms"
+    test: "Load /api/quality/haccp/ccp/:id with 10 versions"
+  - scenario: "CCP creation"
+    target: "<300ms"
+    test: "POST /api/quality/haccp/ccp"
+
+# Security Tests
+security_tests:
+  - test: "SQL Injection in CCP search"
+    input: "search='; DROP TABLE haccp_ccp; --"
+    expected: "Input sanitized, no SQL executed"
+  - test: "XSS in CCP name"
+    input: "ccp_name='<script>alert(1)</script>'"
+    expected: "HTML escaped on display"
+  - test: "Cross-org data access"
+    scenario: "User A tries to access Org B CCP"
+    expected: "404 Not Found (RLS blocks)"

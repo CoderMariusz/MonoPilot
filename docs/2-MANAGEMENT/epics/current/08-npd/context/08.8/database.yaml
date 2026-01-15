@@ -1,0 +1,248 @@
+# Database Context for Story 08.8 - Compliance Documents Upload
+
+migration_file: "supabase/migrations/YYYYMMDDHHMMSS_create_npd_compliance_docs.sql"
+
+tables:
+  npd_compliance_docs:
+    description: "Stores compliance documents for NPD projects (HACCP, labels, CoA, SDS)"
+
+    columns:
+      # Identity
+      - name: "id"
+        type: "UUID"
+        constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        description: "Unique document ID"
+
+      - name: "org_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE"
+        description: "Organization owning the document"
+
+      - name: "npd_project_id"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES npd_projects(id) ON DELETE CASCADE"
+        description: "Parent NPD project"
+
+      # Document Type
+      - name: "doc_type"
+        type: "TEXT"
+        constraints: "NOT NULL CHECK (doc_type IN ('haccp_plan', 'label_proof', 'nutritional_info', 'allergen_declaration', 'coa', 'sds', 'trial_report', 'sensory_eval', 'shelf_life', 'other'))"
+        description: "Document category/type"
+
+      # File Metadata
+      - name: "file_name"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Original filename"
+
+      - name: "file_size_bytes"
+        type: "BIGINT"
+        constraints: "NOT NULL"
+        description: "File size in bytes"
+
+      - name: "mime_type"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "MIME type (application/pdf, image/png, etc.)"
+
+      - name: "storage_path"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Supabase Storage path: {org_id}/{project_id}/{doc_type}/{uuid}_{filename}"
+
+      # Optional Fields
+      - name: "version"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "Document version (e.g., v1.2)"
+
+      - name: "description"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "Document description"
+
+      - name: "notes"
+        type: "TEXT"
+        constraints: "NULL"
+        description: "Additional notes"
+
+      # Audit Trail
+      - name: "uploaded_by"
+        type: "UUID"
+        constraints: "NOT NULL REFERENCES users(id)"
+        description: "User who uploaded the document"
+
+      - name: "uploaded_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+        description: "When document was uploaded"
+
+      - name: "updated_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NOT NULL DEFAULT now()"
+        description: "Last update timestamp"
+
+      # Soft Delete
+      - name: "deleted_at"
+        type: "TIMESTAMPTZ"
+        constraints: "NULL"
+        description: "When document was soft deleted (NULL = active)"
+
+      - name: "deleted_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+        description: "User who deleted the document"
+
+    indexes:
+      - name: "idx_npd_docs_org"
+        columns: ["org_id"]
+        description: "Org filtering for RLS"
+
+      - name: "idx_npd_docs_project"
+        columns: ["npd_project_id"]
+        where: "deleted_at IS NULL"
+        description: "Active documents per project"
+
+      - name: "idx_npd_docs_type"
+        columns: ["npd_project_id", "doc_type"]
+        where: "deleted_at IS NULL"
+        description: "Filter by document type"
+
+      - name: "idx_npd_docs_uploaded"
+        columns: ["uploaded_at DESC"]
+        description: "Sort by upload date"
+
+    rls_policies:
+      - name: "npd_docs_select"
+        operation: "SELECT"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND deleted_at IS NULL"
+        description: "Users can view active documents in their org"
+
+      - name: "npd_docs_insert"
+        operation: "INSERT"
+        check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        description: "Users can upload documents to their org's projects"
+
+      - name: "npd_docs_update"
+        operation: "UPDATE"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        description: "Users can update documents in their org"
+
+      - name: "npd_docs_delete"
+        operation: "UPDATE"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND deleted_at IS NULL"
+        description: "Soft delete only (no hard delete policy)"
+
+    triggers:
+      - name: "update_npd_compliance_docs_updated_at"
+        event: "BEFORE UPDATE"
+        function: "update_updated_at_column()"
+        description: "Auto-update updated_at timestamp"
+
+functions:
+  check_required_documents:
+    description: "Validates required documents for current gate"
+    signature: "check_required_documents(p_project_id UUID) RETURNS JSONB"
+
+    logic: |
+      1. Get current_gate from npd_projects WHERE id = p_project_id
+      2. If current_gate = 'G4':
+         - Check if HACCP plan exists (doc_type = 'haccp_plan' AND deleted_at IS NULL)
+         - If missing, return { "is_valid": false, "missing": ["HACCP Plan"] }
+      3. Return { "is_valid": true, "missing": [] }
+
+    returns:
+      is_valid: "boolean - true if all required docs present"
+      missing: "string[] - array of missing document type names"
+
+    example_usage: |
+      SELECT check_required_documents('proj-uuid-123');
+      -- Returns: {"is_valid": false, "missing": ["HACCP Plan"]}
+
+storage_configuration:
+  bucket: "npd-compliance-docs"
+  public: false
+  file_size_limit: 52428800 # 50 MB
+  allowed_mime_types:
+    - "application/pdf"
+    - "application/vnd.openxmlformats-officedocument.wordprocessingml.document" # DOCX
+    - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" # XLSX
+    - "image/png"
+    - "image/jpeg"
+    - "image/jpg"
+
+  path_structure: "{org_id}/{project_id}/{doc_type}/{uuid}_{filename}"
+
+  examples:
+    - org: "abc123-org"
+      project: "proj456"
+      doc_type: "haccp_plan"
+      filename: "HACCP_Plan_v1.2.pdf"
+      path: "abc123-org/proj456/haccp_plan/e7f8a9b0-1234-5678-90ab-cdef12345678_HACCP_Plan_v1.2.pdf"
+
+required_documents_by_gate:
+  G0:
+    required: []
+    description: "Idea stage - no documents required"
+
+  G1:
+    required: []
+    description: "Feasibility stage - no documents required"
+
+  G2:
+    required: []
+    description: "Business case - no documents required"
+
+  G3:
+    required: []
+    description: "Development - documents optional"
+
+  G4:
+    required:
+      - doc_type: "haccp_plan"
+        label: "HACCP Plan"
+        description: "HACCP plan required before handoff to production"
+    description: "Testing stage - HACCP plan mandatory for handoff"
+
+  Launched:
+    required:
+      - doc_type: "haccp_plan"
+        label: "HACCP Plan"
+        description: "HACCP plan must exist"
+    description: "Launched - all required docs must be present"
+
+data_retention:
+  soft_delete: "Documents never hard deleted, only soft deleted with deleted_at timestamp"
+  audit_trail: "uploaded_by, uploaded_at, deleted_by tracked for compliance"
+  storage_retention: "Files retained in Supabase Storage even after soft delete (for audit purposes)"
+
+performance_targets:
+  list_query: "< 500ms for 50 documents with pagination"
+  upload: "< 15 seconds for 10 MB file"
+  download_url_generation: "< 200ms"
+  thumbnail_generation: "< 2 seconds"
+
+sample_queries:
+  list_active_documents: |
+    SELECT *
+    FROM npd_compliance_docs
+    WHERE npd_project_id = 'proj-uuid'
+      AND deleted_at IS NULL
+    ORDER BY uploaded_at DESC;
+
+  count_by_type: |
+    SELECT doc_type, COUNT(*) as count
+    FROM npd_compliance_docs
+    WHERE npd_project_id = 'proj-uuid'
+      AND deleted_at IS NULL
+    GROUP BY doc_type;
+
+  soft_delete_document: |
+    UPDATE npd_compliance_docs
+    SET deleted_at = now(),
+        deleted_by = 'user-uuid'
+    WHERE id = 'doc-uuid'
+      AND deleted_at IS NULL;
+
+  validate_required_docs: |
+    SELECT check_required_documents('proj-uuid');

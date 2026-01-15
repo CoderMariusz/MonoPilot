@@ -1,0 +1,16 @@
+# Story 06.36 - Database Schema
+
+tables:
+  - name: "supplier_audit_findings"
+    columns:
+      - id, org_id, audit_id
+      - finding_number
+      - category (documentation/process/equipment/personnel)
+      - severity (critical/major/minor/observation)
+      - finding, requirement_reference
+      - corrective_action_required
+      - supplier_response, evidence_url
+      - due_date, closed_date
+      - status (open/pending_response/pending_verification/closed/cancelled)
+      - verified_by, verified_at, verification_notes
+      - created_at, created_by, updated_at

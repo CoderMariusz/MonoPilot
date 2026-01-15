@@ -1,0 +1,96 @@
+# Story 10.4 - Test Specification
+# OEE Calculation Engine
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/oee-calculation-service.test.ts"
+    type: "unit"
+  - path: "supabase/tests/oee_snapshots_rls.test.sql"
+    type: "integration"
+  - path: "apps/frontend/app/api/oee/__tests__/calculation-api.test.ts"
+    type: "integration"
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "planned_production_time = 480min, total_downtime = 55min"
+    when: "calculateAvailability()"
+    then: "availability_pct = (425 / 480) × 100 = 88.54%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "ideal_cycle_time = 2 units/min, actual_production_time = 425min, total_pieces = 800"
+    when: "calculatePerformance()"
+    then: "performance_pct = (800 / (425 × 2)) × 100 = 94.12%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "total_pieces = 800, good_pieces = 780"
+    when: "calculateQuality()"
+    then: "quality_pct = (780 / 800) × 100 = 97.5%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "availability = 88.54%, performance = 94.12%, quality = 97.5%"
+    when: "calculateOEE()"
+    then: "oee_pct = (88.54 × 94.12 × 97.5) / 10000 = 81.25%"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "WO-2451 running on Mixer-01"
+    when: "operator registers output (50 good, 2 scrap)"
+    then: "OEE snapshot auto-created, quality_pct recalculated"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "cron job runs every 5 minutes"
+    when: "job executes"
+    then: "snapshots created for all active WOs"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "GET /api/oee/calculate?machine_id={uuid}&start=2025-01-15T06:00&end=2025-01-15T14:00"
+    when: "endpoint processes"
+    then: "response includes oee_pct, availability_pct, performance_pct, quality_pct within 2s"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "100,000 snapshots in database"
+    when: "querying snapshots for machine + date range"
+    then: "response time < 500ms (index optimization)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-09"
+    given: "total_pieces = 0 (no production yet)"
+    when: "calculateQuality()"
+    then: "quality_pct = 100% (default, no defects detected)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "planned_production_time = 0"
+    when: "calculateAvailability()"
+    then: "availability_pct = NULL or 0%, log warning"
+    test_type: "unit"
+    priority: "P0"
+
+definition_of_done:
+  - "oee_snapshots table with generated oee_pct column"
+  - "oee_daily_summary and oee_hourly_summary tables created"
+  - "calculateAvailability(), calculatePerformance(), calculateQuality() implemented"
+  - "GET /api/oee/calculate returns metrics < 2s"
+  - "Snapshots auto-created on output registration"
+  - "Cron job creates snapshots every 5 min for active WOs"
+  - "Daily/hourly aggregation jobs populate summary tables"
+  - "Unit tests >90% coverage (calculation formulas)"
+  - "Performance test: 100K snapshots query < 500ms"
+
+coverage:
+  unit: 90
+  integration: 80

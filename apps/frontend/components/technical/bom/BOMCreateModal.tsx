@@ -14,6 +14,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { bomKeys } from '@/lib/hooks/use-boms'
 import {
   Dialog,
   DialogContent,
@@ -94,14 +96,53 @@ interface BOMItemLocal {
   notes: string
 }
 
+interface BOMData {
+  id: string
+  product_id: string
+  product?: Product
+  version: number
+  status: string
+  effective_from: string
+  effective_to: string | null
+  output_qty: number
+  output_uom: string
+  yield_percent?: number
+  notes: string | null
+  routing_id: string | null
+  units_per_box: number | null
+  boxes_per_pallet: number | null
+  items?: Array<{
+    id: string
+    product_id: string
+    component?: Product
+    quantity: number
+    uom: string
+    scrap_percent: number
+    sequence: number
+    operation_seq: number
+    is_output: boolean
+    consume_whole_lp: boolean
+    notes: string | null
+  }>
+}
+
 interface BOMCreateModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
+  editBomId?: string | null
+  initialData?: BOMData | null
 }
 
-export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModalProps) {
+export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initialData }: BOMCreateModalProps) {
+  const isEditMode = !!editBomId
   const { toast } = useToast()
+  const queryClient = useQueryClient()
+
+  // Debug: log when modal open state changes
+  useEffect(() => {
+    console.log('BOMCreateModal open state changed:', open)
+  }, [open])
 
   // ==================== BOM HEADER STATE ====================
   const [productId, setProductId] = useState('')
@@ -151,9 +192,10 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
           if (response.ok) {
             const data = await response.json()
             const rawProducts = data.data || data.products || []
-            const productList = rawProducts.map((p: Product) => ({
+            const productList = rawProducts.map((p: any) => ({
               ...p,
-              type: p.product_type?.code || p.type || 'unknown'
+              type: p.product_type?.code || p.type || 'unknown',
+              uom: p.base_uom || p.uom || 'kg' // Map base_uom to uom for consistency
             }))
             setAllProducts(productList)
             // FG and WIP only for main product selector
@@ -169,8 +211,9 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
   }, [open])
 
   // ==================== GET NEXT VERSION ====================
+  // Skip in edit mode - version is already set from initialData
   useEffect(() => {
-    if (productId) {
+    if (productId && !isEditMode) {
       const fetchNextVersion = async () => {
         try {
           const response = await fetch(`/api/technical/boms?product_id=${productId}&limit=1&sortBy=version&sortOrder=desc`)
@@ -188,11 +231,12 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
       }
       fetchNextVersion()
     }
-  }, [productId])
+  }, [productId, isEditMode])
 
-  // Reset form when modal closes
+  // Reset form when modal closes OR populate when opening in edit mode
   useEffect(() => {
     if (!open) {
+      // Reset form when closing
       setProductId('')
       setStatus('draft')
       setEffectiveFrom(new Date().toISOString().split('T')[0])
@@ -209,8 +253,40 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
       setActiveTab('header')
       setShowItemForm(false)
       setEditingItemId(null)
+    } else if (isEditMode && initialData) {
+      // Populate form with existing BOM data
+      setProductId(initialData.product_id)
+      setStatus(initialData.status)
+      setEffectiveFrom(initialData.effective_from?.split('T')[0] || '')
+      setEffectiveTo(initialData.effective_to?.split('T')[0] || '')
+      setOutputQty(initialData.output_qty?.toString() || '1')
+      setOutputUom(initialData.output_uom || 'kg')
+      setYieldPercent(initialData.yield_percent?.toString() || '100')
+      setNotes(initialData.notes || '')
+      setRoutingId(initialData.routing_id || '')
+      setUnitsPerBox(initialData.units_per_box?.toString() || '')
+      setBoxesPerPallet(initialData.boxes_per_pallet?.toString() || '')
+      setVersion(initialData.version)
+
+      // Populate items
+      if (initialData.items && initialData.items.length > 0) {
+        const mappedItems: BOMItemLocal[] = initialData.items.map(item => ({
+          id: item.id,
+          component_id: item.product_id,
+          component: item.component,
+          quantity: item.quantity,
+          uom: item.uom,
+          scrap_percent: item.scrap_percent || 0,
+          sequence: item.sequence,
+          operation_seq: item.operation_seq || 1,
+          is_output: item.is_output || false,
+          consume_whole_lp: item.consume_whole_lp || false,
+          notes: item.notes || '',
+        }))
+        setItems(mappedItems)
+      }
     }
-  }, [open])
+  }, [open, isEditMode, initialData])
 
   // ==================== ITEM HANDLERS ====================
   const componentProducts = allProducts.filter(p =>
@@ -316,8 +392,8 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
       return
     }
 
-    const inputItems = items.filter(i => !i.is_output)
-    if (inputItems.length === 0) {
+    const inputItemsForValidation = items.filter(i => !i.is_output)
+    if (inputItemsForValidation.length === 0) {
       toast({ title: 'Error', description: 'Add at least one component', variant: 'destructive' })
       setActiveTab('items')
       return
@@ -352,28 +428,47 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
         })),
       }
 
-      const response = await fetch('/api/technical/boms/with-items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+      let response: Response
+      if (isEditMode && editBomId) {
+        // Update existing BOM
+        response = await fetch(`/api/technical/boms/${editBomId}/with-items`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      } else {
+        // Create new BOM
+        response = await fetch('/api/technical/boms/with-items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      }
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || error.message || 'Failed to create BOM')
+        throw new Error(error.error || error.message || `Failed to ${isEditMode ? 'update' : 'create'} BOM`)
       }
 
       const data = await response.json()
       toast({
         title: 'Success',
-        description: `BOM v${data.bom.version} created with ${items.length} items`,
+        description: isEditMode
+          ? `BOM v${data.bom.version} updated`
+          : `BOM v${data.bom.version} created with ${items.length} items`,
       })
+
+      // Invalidate React Query cache to refresh timeline and lists
+      queryClient.invalidateQueries({ queryKey: bomKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: bomKeys.timeline(productId) })
+      queryClient.invalidateQueries({ queryKey: bomKeys.nextVersion(productId) })
+
       onOpenChange(false)
       onSuccess?.()
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create BOM',
+        description: error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} BOM`,
         variant: 'destructive',
       })
     } finally {
@@ -391,10 +486,12 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Create New BOM
+            {isEditMode ? `Edit BOM v${version}` : 'Create New BOM'}
           </DialogTitle>
           <DialogDescription>
-            Define the recipe for your product. All fields are saved together.
+            {isEditMode
+              ? 'Modify the BOM recipe. All changes are saved together.'
+              : 'Define the recipe for your product. All fields are saved together.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -422,8 +519,8 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Product *</Label>
-                  <Select value={productId} onValueChange={setProductId}>
-                    <SelectTrigger className={!productId ? 'text-gray-400' : ''}>
+                  <Select value={productId} onValueChange={setProductId} disabled={isEditMode}>
+                    <SelectTrigger className={cn(!productId ? 'text-gray-400' : '', isEditMode && 'bg-gray-50')}>
                       <SelectValue placeholder="Select finished product..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -438,10 +535,13 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                       ))}
                     </SelectContent>
                   </Select>
+                  {isEditMode && (
+                    <p className="text-xs text-muted-foreground">Product cannot be changed in edit mode</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Version</Label>
-                  <Input value={`v${version} (auto)`} disabled className="bg-gray-50" />
+                  <Input value={isEditMode ? `v${version}` : `v${version} (auto)`} disabled className="bg-gray-50" />
                 </div>
                 <div className="space-y-2">
                   <Label>Status *</Label>
@@ -863,7 +963,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess }: BOMCreateModal
                 disabled={saving || !productId || inputItems.length === 0}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving...' : 'Save BOM'}
+                {saving ? 'Saving...' : isEditMode ? 'Update BOM' : 'Save BOM'}
               </Button>
             </div>
           </div>

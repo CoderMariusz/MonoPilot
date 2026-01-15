@@ -1,0 +1,67 @@
+# Story 10.5 - Database Schema
+# Real-Time Machine Dashboard
+
+# No new tables - reads from existing:
+# - oee_snapshots (from story 10.4)
+# - machines (from Epic 01)
+# - production_lines (from Epic 01)
+# - work_orders (from Epic 04)
+# - oee_downtime_events (from story 10.3)
+# - performance_targets (from story 10.1)
+
+views:
+  - name: "v_machine_oee_current"
+    description: "Real-time view of latest OEE snapshot per machine"
+    definition: |
+      SELECT DISTINCT ON (machine_id)
+        machine_id,
+        oee_pct,
+        availability_pct,
+        performance_pct,
+        quality_pct,
+        snapshot_time,
+        work_order_id
+      FROM oee_snapshots
+      WHERE machine_id IS NOT NULL
+      ORDER BY machine_id, snapshot_time DESC
+
+  - name: "v_machine_status"
+    description: "Current machine status with active WO and downtime"
+    definition: |
+      SELECT
+        m.id AS machine_id,
+        m.name,
+        m.line_id,
+        wo.id AS active_wo_id,
+        wo.wo_number,
+        wo.status AS wo_status,
+        d.id AS active_downtime_id,
+        d.reason_code_id,
+        d.duration_minutes AS downtime_duration,
+        CASE
+          WHEN d.id IS NOT NULL THEN 'down'
+          WHEN wo.id IS NOT NULL AND wo.status = 'in_progress' THEN 'running'
+          ELSE 'idle'
+        END AS machine_status
+      FROM machines m
+      LEFT JOIN work_orders wo ON wo.machine_id = m.id AND wo.status = 'in_progress'
+      LEFT JOIN oee_downtime_events d ON d.machine_id = m.id AND d.end_time IS NULL
+      WHERE m.is_active = true
+
+functions:
+  - name: "get_machine_oee_realtime"
+    params: ["p_machine_id UUID"]
+    returns: "TABLE (oee_pct DECIMAL, availability_pct DECIMAL, performance_pct DECIMAL, quality_pct DECIMAL, status TEXT)"
+    description: "Get real-time OEE and status for machine (optimized for dashboard)"
+
+indexes:
+  - "Additional index on oee_snapshots(machine_id, snapshot_time DESC) for v_machine_oee_current performance"
+
+business_rules:
+  - rule: "Machine Status Logic"
+    description: "down (active downtime) > running (active WO) > idle"
+    enforcement: "View v_machine_status CASE statement"
+
+  - rule: "Real-time Updates"
+    description: "Dashboard refreshes every 30s, snapshots created every 5min"
+    enforcement: "Frontend polling + cron job"

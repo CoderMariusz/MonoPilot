@@ -126,7 +126,7 @@ export function BOMsDataTable({
     }
   }, [debouncedSearch])
 
-  // Handle row click
+  // Handle row click - navigate to detail page
   const handleRowClick = (bom: BOMWithProduct) => {
     router.push(`/technical/boms/${bom.id}`)
   }
@@ -141,6 +141,7 @@ export function BOMsDataTable({
 
   // Handle create click - open modal instead of navigating
   const handleCreateClick = () => {
+    console.log('Create BOM clicked, opening modal...')
     setCreateModalOpen(true)
   }
 
@@ -257,7 +258,7 @@ export function BOMsDataTable({
 
       {/* Create Button */}
       {canCreate && (
-        <Button onClick={handleCreateClick}>
+        <Button type="button" onClick={handleCreateClick}>
           <Plus className="h-4 w-4 mr-2" />
           Create BOM
         </Button>
@@ -268,97 +269,125 @@ export function BOMsDataTable({
   // Loading State
   if (loading) {
     return (
-      <div className="space-y-4">
-        <FiltersSection />
-        <div
-          role="status"
-          aria-busy="true"
-          aria-live="polite"
-          className="rounded-md border"
-        >
-          <div className="p-8 text-center">
-            <div className="flex items-center justify-center gap-2 text-slate-600">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Loading BOMs...</span>
-            </div>
-            <div className="mt-4 space-y-2">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
+      <>
+        <div className="space-y-4">
+          <FiltersSection />
+          <div
+            role="status"
+            aria-busy="true"
+            aria-live="polite"
+            className="rounded-md border"
+          >
+            <div className="p-8 text-center">
+              <div className="flex items-center justify-center gap-2 text-slate-600">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Loading BOMs...</span>
+              </div>
+              <div className="mt-4 space-y-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+
+        {/* Create BOM Modal */}
+        <BOMCreateModal
+          open={createModalOpen}
+          onOpenChange={setCreateModalOpen}
+          onSuccess={handleCreateSuccess}
+        />
+      </>
     )
   }
 
   // Error State
   if (error) {
     return (
-      <div className="space-y-4">
-        <FiltersSection />
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="rounded-md border border-red-200 bg-red-50 p-8"
-        >
-          <div className="flex flex-col items-center justify-center gap-4 text-center">
-            <AlertCircle className="w-12 h-12 text-red-400" aria-hidden="true" />
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">
-                Failed to Load BOMs
-              </h2>
-              <p className="mt-2 text-slate-600">
-                Unable to retrieve BOM list. Please check your connection.
-              </p>
-              <p className="mt-2 font-mono text-sm text-red-600">
-                Error: {error.message}
-              </p>
+      <>
+        <div className="space-y-4">
+          <FiltersSection />
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="rounded-md border border-red-200 bg-red-50 p-8"
+          >
+            <div className="flex flex-col items-center justify-center gap-4 text-center">
+              <AlertCircle className="w-12 h-12 text-red-400" aria-hidden="true" />
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Failed to Load BOMs
+                </h2>
+                <p className="mt-2 text-slate-600">
+                  Unable to retrieve BOM list. Please check your connection.
+                </p>
+                <p className="mt-2 font-mono text-sm text-red-600">
+                  Error: {error.message}
+                </p>
+              </div>
+              <Button onClick={onRefresh} aria-label="Retry loading BOMs">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
             </div>
-            <Button onClick={onRefresh} aria-label="Retry loading BOMs">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Retry
-            </Button>
           </div>
         </div>
-      </div>
+
+        {/* Create BOM Modal */}
+        <BOMCreateModal
+          open={createModalOpen}
+          onOpenChange={setCreateModalOpen}
+          onSuccess={handleCreateSuccess}
+        />
+      </>
     )
   }
 
   // Empty State
   if (boms.length === 0) {
     return (
-      <div className="space-y-4">
-        <FiltersSection />
-        <div className="rounded-md border bg-slate-50 p-12">
-          <div className="flex flex-col items-center justify-center gap-4 text-center">
-            <FileText className="w-24 h-24 text-slate-300" aria-hidden="true" />
-            <div>
-              <h2 className="text-2xl font-semibold text-slate-900">
-                {filters.search || filters.status || filters.effective_date
-                  ? 'No BOMs Match Your Filters'
-                  : 'No BOMs Found'}
-              </h2>
-              <p className="mt-2 max-w-md text-slate-600">
-                {filters.search || filters.status || filters.effective_date
-                  ? 'Try adjusting your search or filters to find BOMs.'
-                  : 'Bills of Materials define the ingredients and components needed to produce your products.'}
-              </p>
+      <>
+        <div className="space-y-4">
+          <FiltersSection />
+          <div className="rounded-md border bg-slate-50 p-12">
+            <div className="flex flex-col items-center justify-center gap-4 text-center">
+              <FileText className="w-24 h-24 text-slate-300" aria-hidden="true" />
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">
+                  {filters.search || filters.status || filters.effective_date
+                    ? 'No BOMs Match Your Filters'
+                    : 'No BOMs Found'}
+                </h2>
+                <p className="mt-2 max-w-md text-slate-600">
+                  {filters.search || filters.status || filters.effective_date
+                    ? 'Try adjusting your search or filters to find BOMs.'
+                    : 'Bills of Materials define the ingredients and components needed to produce your products.'}
+                </p>
+              </div>
+              {canCreate && !filters.search && !filters.status && !filters.effective_date && (
+                <Button
+                  type="button"
+                  onClick={handleCreateClick}
+                  size="lg"
+                  className="mt-2"
+                  aria-label="Create your first BOM"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First BOM
+                </Button>
+              )}
             </div>
-            {canCreate && !filters.search && !filters.status && !filters.effective_date && (
-              <Button
-                onClick={handleCreateClick}
-                size="lg"
-                className="mt-2"
-                aria-label="Create your first BOM"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First BOM
-              </Button>
-            )}
           </div>
         </div>
-      </div>
+
+        {/* Create BOM Modal */}
+        <BOMCreateModal
+          open={createModalOpen}
+          onOpenChange={setCreateModalOpen}
+          onSuccess={handleCreateSuccess}
+        />
+      </>
     )
   }
 

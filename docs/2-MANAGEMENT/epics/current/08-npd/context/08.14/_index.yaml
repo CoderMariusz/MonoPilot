@@ -1,0 +1,139 @@
+# Story 08.14 - NPD-Only Mode & Export Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (Export & Standalone Mode)
+
+story:
+  id: "08.14"
+  name: "NPD-Only Mode & Export"
+  slug: "npd-only-mode-export"
+  epic: "08-npd"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "fullstack"
+  state: "ready"
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - api.yaml         # Export endpoints (PDF, Excel)
+  - frontend.yaml    # Export buttons, NPD-only mode UI
+  - tests.yaml       # Acceptance criteria, export validation
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["organizations, users tables"]
+    - story: "08.2"
+      name: "NPD Projects CRUD"
+      provides: ["npd_projects table"]
+    - story: "08.4"
+      name: "Formulations CRUD"
+      provides: ["npd_formulations table", "formulation items"]
+
+  soft:
+    - story: "08.5"
+      name: "Allergen Aggregation"
+      provides: ["Allergen data for PDF/Excel export"]
+      impact: "Allergens section omitted from export (graceful degradation)"
+    - story: "08.7"
+      name: "Formulation Costing"
+      provides: ["Costing summary for export"]
+      impact: "Costing section omitted from export"
+    - story: "08.8"
+      name: "Compliance Documents"
+      provides: ["Compliance status for PDF"]
+      impact: "Compliance section omitted from export"
+
+  blocked_by: []
+
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["FR-NPD-47", "Section 8.3 - Dual Mode"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.14.npd-only-mode-export.md"
+
+# High-level deliverables
+deliverables:
+  - type: "service"
+    count: 1
+    description: "NPDExportService.exportToPDF(), .exportToExcel()"
+  - type: "api"
+    count: 2
+    description: "GET /export/pdf, GET /export/excel"
+  - type: "frontend"
+    count: 2
+    description: "Export buttons, NPD-only mode toggle"
+  - type: "test"
+    count: 3
+    description: "Unit, Integration, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "NPD-only mode toggle: npd_settings.npd_only_mode (boolean)"
+  - "PDF library: pdfkit (Node.js PDF generation)"
+  - "Excel library: exceljs (XLSX generation)"
+  - "PDF format: A4 portrait, recipe card layout"
+  - "Excel format: Multi-sheet workbook (Info, Ingredients, Allergens, Costing)"
+  - "Download endpoint: Content-Disposition: attachment"
+  - "Formulation must be locked before export (validation)"
+  - "Export audit logging: audit_log with action='export_pdf/excel'"
+  - "Graceful degradation: Omit sections if dependencies unavailable"
+  - "Performance: PDF < 2s, Excel < 3s for 50-100 items"
+
+# Business Rules
+business_rules:
+  - rule: "Formulation Must Be Locked"
+    description: "Only locked formulations can be exported"
+    enforcement: "API validation checks formulation.status = 'locked'"
+  - rule: "NPD-Only Mode Disables Handoff"
+    description: "When npd_only_mode = true, handoff wizard is hidden"
+    enforcement: "Frontend conditional rendering based on setting"
+  - rule: "Export Audit Trail"
+    description: "All exports must be logged for IP protection"
+    enforcement: "Audit log entry created on every export (user_id, timestamp)"
+  - rule: "Org Isolation on Export"
+    description: "Users can only export formulations from their org"
+    enforcement: "RLS policy enforces org_id filter"
+  - rule: "Permission Required"
+    description: "Only NPD_LEAD and R&D roles can export"
+    enforcement: "API permission check before export"
+
+# Context Summary
+summary: |
+  Story 08.14 enables standalone NPD usage without production integration,
+  unlocking R&D consultancy and food startup customer segments.
+
+  MVP SCOPE (This Story):
+  - NPD-only mode toggle in npd_settings
+  - Export formulation to PDF (recipe card format)
+  - Export formulation to Excel (ingredient list + sheets)
+  - PDF includes: Project info, ingredients, allergens, costing, compliance
+  - Excel includes: 4 sheets (Info, Ingredients, Allergens, Costing)
+  - Download endpoints with proper Content-Type and Content-Disposition
+  - Export audit logging (who, when, what)
+  - Export buttons on formulation detail (NPD-only mode)
+  - Graceful degradation if allergens/costing unavailable
+
+  DEFERRED (Phase 2/3):
+  - Multi-formulation batch export
+  - Custom PDF templates with org branding
+  - Email export directly to client
+  - Export history dashboard
+  - PDF watermarking (confidential)
+
+  KEY INTEGRATION POINTS:
+  - Alternative to handoff wizard (08.11) for standalone mode
+  - Uses allergen data from 08.5 (if available)
+  - Uses costing data from 08.7 (if available)
+  - Uses compliance status from 08.8 (if available)
+  - Enables new customer segment: R&D consultancies, food startups
+  - Export becomes deliverable for external co-packers

@@ -1,0 +1,69 @@
+# Story 10.4 - API Specification
+# OEE Calculation Engine
+
+endpoints:
+  - method: "GET"
+    path: "/api/oee/calculate"
+    description: "Calculate OEE for time period and scope"
+    auth: "required"
+    query_params:
+      machine_id: "UUID (optional)"
+      line_id: "UUID (optional)"
+      shift_id: "UUID (optional)"
+      start: "ISO 8601 timestamp"
+      end: "ISO 8601 timestamp"
+    response:
+      status: 200
+      schema:
+        oee_pct: "number"
+        availability_pct: "number"
+        performance_pct: "number"
+        quality_pct: "number"
+        total_pieces: "number"
+        good_pieces: "number"
+        downtime_minutes: "number"
+
+  - method: "GET"
+    path: "/api/oee/snapshots"
+    description: "List OEE snapshots with filtering"
+    auth: "required"
+    query_params:
+      machine_id: "UUID (optional)"
+      line_id: "UUID (optional)"
+      start_time: "ISO 8601 (optional)"
+      end_time: "ISO 8601 (optional)"
+      limit: "number (default: 20)"
+    response:
+      status: 200
+
+  - method: "POST"
+    path: "/api/oee/snapshots"
+    description: "Create manual OEE snapshot"
+    auth: "required"
+    roles: ["supervisor", "production_manager", "admin"]
+    request:
+      body:
+        machine_id: "UUID (required)"
+        work_order_id: "UUID (optional)"
+        calculation_method: "string (default: 'manual')"
+    response:
+      status: 201
+
+services:
+  - path: "apps/frontend/lib/services/oee-calculation-service.ts"
+    description: "OEE calculation engine"
+    methods:
+      - { name: "calculate", params: ["params"], returns: "Promise<OEESnapshot>", description: "Calculate OEE for period" }
+      - { name: "createSnapshot", params: ["params"], returns: "Promise<OEESnapshot>", description: "Create snapshot" }
+      - { name: "calculateAvailability", params: ["plannedTime", "downtime"], returns: "number" }
+      - { name: "calculatePerformance", params: ["actualTime", "idealCycleTime", "totalPieces"], returns: "number" }
+      - { name: "calculateQuality", params: ["totalPieces", "goodPieces"], returns: "number" }
+      - { name: "calculateOEE", params: ["availability", "performance", "quality"], returns: "number" }
+      - { name: "generateDailySummary", params: ["orgId", "date"], returns: "Promise<void>" }
+      - { name: "generateHourlySummary", params: ["orgId", "hour"], returns: "Promise<void>" }
+      - { name: "triggerSnapshotFromEvent", params: ["event"], returns: "Promise<void>" }
+
+types:
+  - "OEESnapshot"
+  - "OEECalculationParams"
+  - "OEEMetrics"

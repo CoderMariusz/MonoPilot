@@ -1,0 +1,267 @@
+# Story 10.1 - Frontend Specification
+# Purpose: Components, pages, hooks, types, UX wireframes
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/oee-target.ts"
+    content: |
+      export type TargetType = 'organization' | 'line' | 'machine';
+
+      export interface PerformanceTarget {
+        id: string;
+        org_id: string;
+        target_type: TargetType;
+        reference_id?: string;
+        reference_name?: string;
+
+        oee_target: number;
+        availability_target?: number;
+        performance_target?: number;
+        quality_target?: number;
+
+        warning_threshold: number;
+        critical_threshold: number;
+
+        effective_date: string;
+        expiry_date?: string;
+        is_active: boolean;
+        notes?: string;
+
+        created_at: string;
+        created_by: string;
+        updated_at: string;
+        updated_by?: string;
+      }
+
+      export interface CreateTargetInput {
+        target_type: TargetType;
+        reference_id?: string;
+        oee_target: number;
+        availability_target?: number;
+        performance_target?: number;
+        quality_target?: number;
+        warning_threshold?: number;
+        critical_threshold?: number;
+        effective_date?: string;
+        expiry_date?: string;
+        notes?: string;
+      }
+
+      export interface UpdateTargetInput {
+        oee_target?: number;
+        availability_target?: number;
+        performance_target?: number;
+        quality_target?: number;
+        warning_threshold?: number;
+        critical_threshold?: number;
+        expiry_date?: string;
+        is_active?: boolean;
+        notes?: string;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/oee/settings/OEESettingsForm.tsx"
+    description: "OEE module enable/disable settings form"
+    props:
+      - { name: "initialSettings", type: "OEESettings", required: true }
+      - { name: "onSave", type: "(settings: OEESettings) => Promise<void>", required: true }
+    features:
+      - "Toggle for oee_enabled"
+      - "Snapshot interval slider (1-60 minutes)"
+      - "Default target percentage input"
+      - "Auto-fail on critical toggle"
+      - "Form validation with Zod"
+      - "Save/Cancel buttons"
+
+  - path: "apps/frontend/components/oee/settings/TargetsDataTable.tsx"
+    description: "DataTable for performance targets list"
+    props:
+      - { name: "onEdit", type: "(target: PerformanceTarget) => void", required: true }
+      - { name: "onDelete", type: "(id: string) => void", required: true }
+    columns:
+      - { id: "scope", header: "Scope", render: "TargetScopeBadge" }
+      - { id: "reference", header: "Reference", render: "reference_name or 'All'" }
+      - { id: "oee_target", header: "OEE Target", format: "percentage" }
+      - { id: "availability_target", header: "Availability", format: "percentage" }
+      - { id: "performance_target", header: "Performance", format: "percentage" }
+      - { id: "quality_target", header: "Quality", format: "percentage" }
+      - { id: "effective_date", header: "Effective", format: "date range" }
+      - { id: "status", header: "Status", render: "TargetStatusBadge" }
+      - { id: "actions", header: "Actions", render: "Edit/Delete buttons" }
+    features:
+      - "Sorting by all columns"
+      - "Filtering by scope type"
+      - "Pagination (20 per page)"
+      - "Mobile responsive"
+
+  - path: "apps/frontend/components/oee/settings/TargetFormModal.tsx"
+    description: "Create/Edit target modal with form validation"
+    props:
+      - { name: "mode", type: "'create' | 'edit'", required: true }
+      - { name: "initialData", type: "PerformanceTarget | undefined", required: false }
+      - { name: "onSave", type: "(data: CreateTargetInput | UpdateTargetInput) => Promise<void>", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onOpenChange", type: "(open: boolean) => void", required: true }
+    form_fields:
+      - { name: "target_type", type: "select", options: ["Organization", "Line", "Machine"], required: true }
+      - { name: "reference_id", type: "select", dynamic: "based on target_type", required: "if line/machine" }
+      - { name: "oee_target", type: "number", min: 0, max: 100, default: 85, required: true }
+      - { name: "availability_target", type: "number", min: 0, max: 100, default: 90, required: false }
+      - { name: "performance_target", type: "number", min: 0, max: 100, default: 95, required: false }
+      - { name: "quality_target", type: "number", min: 0, max: 100, default: 100, required: false }
+      - { name: "warning_threshold", type: "number", min: 0, max: 100, default: 85, required: true }
+      - { name: "critical_threshold", type: "number", min: 0, max: 100, default: 75, required: true }
+      - { name: "effective_date", type: "date", default: "today", required: true }
+      - { name: "expiry_date", type: "date", required: false }
+      - { name: "notes", type: "textarea", maxlength: 1000, required: false }
+    validation:
+      - "critical_threshold <= warning_threshold"
+      - "expiry_date >= effective_date"
+      - "Organization type requires reference_id = null"
+      - "Line/Machine type requires valid reference_id"
+
+  - path: "apps/frontend/components/oee/settings/TargetScopeBadge.tsx"
+    description: "Badge showing target scope (org/line/machine)"
+    props:
+      - { name: "type", type: "TargetType", required: true }
+    variants:
+      - { type: "organization", color: "blue", icon: "Building" }
+      - { type: "line", color: "green", icon: "Factory" }
+      - { type: "machine", color: "purple", icon: "Settings" }
+
+  - path: "apps/frontend/components/oee/settings/TargetStatusBadge.tsx"
+    description: "Badge showing target active/inactive status"
+    props:
+      - { name: "isActive", type: "boolean", required: true }
+      - { name: "expiryDate", type: "string | undefined", required: false }
+    variants:
+      - { isActive: true, color: "green", text: "Active" }
+      - { isActive: false, color: "gray", text: "Inactive" }
+
+  - path: "apps/frontend/components/oee/settings/TargetMetricsDisplay.tsx"
+    description: "Display target metrics in card/grid format"
+    props:
+      - { name: "target", type: "PerformanceTarget", required: true }
+      - { name: "layout", type: "'horizontal' | 'vertical'", default: "horizontal" }
+    displays:
+      - "OEE target with visual gauge"
+      - "Availability/Performance/Quality in grid"
+      - "Warning/Critical thresholds with color coding"
+
+  - path: "apps/frontend/components/oee/settings/ThresholdSlider.tsx"
+    description: "Dual-handle slider for warning/critical thresholds"
+    props:
+      - { name: "warningValue", type: "number", required: true }
+      - { name: "criticalValue", type: "number", required: true }
+      - { name: "onWarningChange", type: "(value: number) => void", required: true }
+      - { name: "onCriticalChange", type: "(value: number) => void", required: true }
+    features:
+      - "Visual markers for warning (yellow) and critical (red) zones"
+      - "Constraint: critical <= warning"
+      - "Percentage labels"
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/oee/settings/page.tsx"
+    route: "/oee/settings"
+    title: "OEE Settings"
+    description: "OEE module configuration page"
+    sections:
+      - name: "Module Settings"
+        component: "OEESettingsForm"
+        description: "Enable/disable OEE, configure defaults"
+      - name: "Performance Targets"
+        component: "Link to /oee/settings/targets"
+        description: "Manage performance targets"
+    permissions: ["admin", "production_manager"]
+
+  - path: "apps/frontend/app/(authenticated)/oee/settings/targets/page.tsx"
+    route: "/oee/settings/targets"
+    title: "Performance Targets"
+    description: "Manage OEE performance targets"
+    components:
+      - "TargetsDataTable"
+      - "TargetFormModal (create/edit)"
+    actions:
+      - { label: "+ New Target", onClick: "openCreateModal()", role: ["admin", "production_manager"] }
+      - { label: "Export CSV", onClick: "exportTargets()", role: ["*"] }
+    permissions: ["*"] # View all, edit limited to admin/production_manager
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-oee-targets.ts"
+    description: "React Query hooks for OEE targets"
+    exports:
+      - name: "useOEETargets"
+        type: "query"
+        params: ["filters?: TargetsListParams"]
+        returns: "UseQueryResult<TargetsListResponse>"
+        queryKey: "['oee-targets', filters]"
+
+      - name: "useOEETarget"
+        type: "query"
+        params: ["id: string"]
+        returns: "UseQueryResult<PerformanceTarget>"
+        queryKey: "['oee-target', id]"
+
+      - name: "useCreateTarget"
+        type: "mutation"
+        returns: "UseMutationResult<PerformanceTarget, Error, CreateTargetInput>"
+        invalidates: "['oee-targets']"
+
+      - name: "useUpdateTarget"
+        type: "mutation"
+        returns: "UseMutationResult<PerformanceTarget, Error, { id: string; data: UpdateTargetInput }>"
+        invalidates: "['oee-targets', 'oee-target']"
+
+      - name: "useDeleteTarget"
+        type: "mutation"
+        returns: "UseMutationResult<void, Error, string>"
+        invalidates: "['oee-targets']"
+
+      - name: "useResolveTarget"
+        type: "query"
+        params: ["type: 'machine' | 'line'", "id: string"]
+        returns: "UseQueryResult<ResolveTargetResponse>"
+        queryKey: "['oee-target-resolve', type, id]"
+
+# UX Wireframes
+ux:
+  wireframes:
+    - id: "OEE-SETTINGS-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/OEE-SETTINGS-001.md"
+      title: "OEE Settings Page"
+      components: ["OEESettingsForm", "Link to targets"]
+
+    - id: "OEE-TARGETS-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/OEE-TARGETS-001.md"
+      title: "Targets List & CRUD"
+      components: ["TargetsDataTable", "TargetFormModal"]
+
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering, pagination"
+    modal: "ShadCN Dialog with form validation"
+    form: "React Hook Form + Zod validation"
+    toast: "ShadCN Toast for success/error feedback"
+
+  states:
+    - loading: "Skeleton loader for table rows"
+    - empty: "Empty state: 'No targets configured. Create your first target.'"
+    - error: "Error toast + retry button"
+    - success: "Success toast on create/update/delete"
+
+  accessibility:
+    - "Form labels properly associated"
+    - "Error messages announced to screen readers"
+    - "Keyboard navigation for table and modals"
+    - "ARIA labels for icon-only buttons"
+    - "Color + text for status badges (not color alone)"
+
+# Integration Points
+integration:
+  - description: "Settings page accessible from main navigation /oee"
+  - description: "Targets used by story 10.4 (OEE Calculation) for comparisons"
+  - description: "Targets used by story 10.5 (Dashboard) for color coding"
+  - description: "Targets used by Phase 1B alerts for threshold checks"

@@ -1,0 +1,83 @@
+# Story 08.16 - Timeline View & Reporting Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview
+# Phase: 3 (Enterprise Features)
+
+story:
+  id: "08.16"
+  name: "Timeline View & Reporting"
+  slug: "timeline-view-reporting"
+  epic: "08-npd"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+  state: "ready"
+  priority: "P2"
+
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Optional timeline view
+  - api.yaml         # 4 endpoints (timeline, 3 exports)
+  - frontend.yaml    # Timeline Gantt, export buttons
+  - tests.yaml       # Unit, integration, E2E tests
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["org context", "RLS pattern"]
+    - story: "08.2"
+      provides: ["npd_projects table with dates"]
+    - story: "08.3"
+      provides: ["Gate status and transitions"]
+    - story: "08.7"
+      provides: ["Cost history data"]
+    - story: "08.8"
+      provides: ["Compliance docs for checklist"]
+
+  soft:
+    - story: "02.1"
+      provides: ["Product names for exports"]
+
+deliverables:
+  - type: "database"
+    count: 1
+    description: "Optional timeline view (performance optimization)"
+  - type: "api"
+    count: 4
+    description: "Timeline data, CSV projects, CSV cost history, PDF compliance checklist"
+  - type: "service"
+    count: 1
+    description: "NPDTimelineService with 6 methods"
+  - type: "components"
+    count: 9
+    description: "Timeline Gantt, bars, filters, zoom, export buttons, tooltip, empty state"
+  - type: "page"
+    count: 1
+    description: "/npd/timeline"
+  - type: "test"
+    count: 3
+    description: "Unit (service), Integration (API), E2E (timeline + exports)"
+
+technical_notes:
+  - "Timeline: react-gantt-chart or vis-timeline library (or custom canvas)"
+  - "CSV: Native JavaScript generation (no library)"
+  - "PDF: Puppeteer server-side (preferred) or jsPDF client-side"
+  - "Color coding: idea=gray, feasibility=blue, development=yellow, validation=orange, launched=green"
+  - "Overdue: target_launch_date < today AND status NOT IN ('launched', 'cancelled')"
+  - "Default view: Quarter view (3 months)"
+
+business_rules:
+  - rule: "Timeline Scope"
+    description: "Only active projects (status != 'cancelled') shown on timeline"
+  - rule: "Overdue Definition"
+    description: "target_launch_date < today AND status NOT IN ('launched', 'cancelled')"
+  - rule: "Export Filters"
+    description: "CSV exports respect active filters (gate, category, owner, status)"
+  - rule: "PDF Permissions"
+    description: "Any user with NPD access can export compliance checklist (read-only)"
+  - rule: "Mobile Fallback"
+    description: "Timeline switches to list view on mobile (< 768px width)"
+
+summary: |
+  Story 08.16 implements Timeline View (Gantt-style) showing all NPD projects with horizontal bars from created_at to target_launch_date, color-coded by status with overdue highlighting. Includes comprehensive export functionality: CSV project lists, CSV cost history across formulation versions, and PDF compliance checklist reports for regulatory submissions.

@@ -1,0 +1,65 @@
+# Story 10.20 - Database Schema
+# Purpose: Data mart view for BI tools
+# Agent: BACKEND-DEV
+
+views:
+  - name: "oee_data_mart"
+    description: "Denormalized view optimized for BI tool queries"
+    sql: |
+      CREATE OR REPLACE VIEW oee_data_mart AS
+      SELECT
+          s.id as snapshot_id,
+          s.snapshot_time,
+          s.org_id,
+          m.id as machine_id,
+          m.name as machine_name,
+          m.code as machine_code,
+          l.id as line_id,
+          l.name as line_name,
+          sh.id as shift_id,
+          sh.name as shift_name,
+          wo.id as work_order_id,
+          wo.wo_number,
+          p.name as product_name,
+          s.oee_pct,
+          s.availability_pct,
+          s.performance_pct,
+          s.quality_pct,
+          s.total_pieces,
+          s.good_pieces,
+          s.rejected_pieces,
+          s.planned_production_time,
+          s.actual_production_time,
+          COALESCE(dt.total_downtime, 0) as downtime_minutes,
+          COALESCE(dt.planned_downtime, 0) as planned_downtime_minutes,
+          COALESCE(dt.unplanned_downtime, 0) as unplanned_downtime_minutes
+      FROM oee_snapshots s
+      LEFT JOIN machines m ON s.machine_id = m.id
+      LEFT JOIN production_lines l ON s.line_id = l.id
+      LEFT JOIN shifts sh ON s.shift_id = sh.id
+      LEFT JOIN work_orders wo ON s.work_order_id = wo.id
+      LEFT JOIN products p ON wo.product_id = p.id
+      LEFT JOIN LATERAL (
+          SELECT
+              SUM(duration_minutes) as total_downtime,
+              SUM(CASE WHEN is_planned THEN duration_minutes ELSE 0 END) as planned_downtime,
+              SUM(CASE WHEN NOT is_planned THEN duration_minutes ELSE 0 END) as unplanned_downtime
+          FROM oee_downtime_events de
+          WHERE de.machine_id = s.machine_id
+            AND de.start_time >= s.snapshot_time - INTERVAL '5 minutes'
+            AND de.start_time < s.snapshot_time
+      ) dt ON true;
+    rls_note: "RLS inherited from oee_snapshots"
+
+grants:
+  - "GRANT SELECT ON oee_data_mart TO authenticated;"
+
+indexes:
+  - table: "oee_snapshots"
+    name: "idx_snapshots_export"
+    columns: ["org_id", "snapshot_time"]
+    description: "Optimizes date range export queries"
+
+performance:
+  - "Data mart query should complete < 5 seconds for 90 days"
+  - "Consider materialized view for very high-volume orgs"

@@ -1,0 +1,144 @@
+# Story 08.12 - Handoff: Formulation → BOM Context (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (Handoff Integration)
+
+story:
+  id: "08.12"
+  name: "Handoff: Formulation → BOM"
+  slug: "handoff-formulation-to-bom"
+  epic: "08-npd"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Schema changes for npd linkage in products/boms
+  - api.yaml         # Endpoints for BOM creation from formulation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["organizations, users tables", "RLS pattern"]
+    - story: "02.2"
+      name: "BOMs CRUD"
+      provides: ["boms table", "bom_items table", "BOM service"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product service"]
+    - story: "08.2"
+      name: "NPD Projects CRUD"
+      provides: ["npd_projects table"]
+    - story: "08.4"
+      name: "Formulations CRUD"
+      provides: ["npd_formulations table", "npd_formulation_items table"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "08.13"
+      name: "Handoff: Pilot WO Creation"
+      reason: "Pilot WO requires BOM created from formulation"
+    - story: "08.11"
+      name: "Handoff Wizard"
+      reason: "Wizard uses BOM creation service"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/npd.md"
+    sections: ["FR-NPD-41", "FR-NPD-58", "FR-NPD-59", "Section 8 - Handoff Wizard"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/npd.md"
+    sections: ["Handoff Architecture", "BOM Generation"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/08-npd/08.12.handoff-formulation-to-bom.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern for org isolation"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Add npd linkage columns to products and boms tables"
+  - type: "service"
+    count: 1
+    description: "NPDHandoffService.createBOMFromFormulation()"
+  - type: "api"
+    count: 1
+    description: "POST /api/npd/projects/:id/handoff/create-bom"
+  - type: "validation"
+    count: 1
+    description: "createBOMFromFormulationSchema (Zod)"
+  - type: "test"
+    count: 3
+    description: "Unit, Integration, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "1:1 mapping: formulation_items → bom_items (same qty, uom, percentage)"
+  - "BOM number format: BOM-{PRODUCT_CODE}-v{VERSION} (auto-incremented)"
+  - "Formulation must be locked before conversion (status validation)"
+  - "Product creation OR update existing product with new BOM version"
+  - "Traceability: BOM.npd_formulation_id, Product.npd_project_id"
+  - "Transactional execution with rollback on failure"
+  - "Batch insert for bom_items (performance optimization)"
+  - "Effective date validation: effective_to >= effective_from"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+
+# Business Rules
+business_rules:
+  - rule: "Formulation Must Be Locked"
+    description: "Only locked formulations can be converted to BOM"
+    enforcement: "API validation checks formulation.status = 'locked'"
+  - rule: "Product Code Uniqueness"
+    description: "Product code must be unique within organization"
+    enforcement: "Database UNIQUE constraint on (org_id, product_code)"
+  - rule: "BOM-Product Linkage"
+    description: "BOM must belong to specified product"
+    enforcement: "BOM.product_id references Products.id"
+  - rule: "1:1 Item Mapping"
+    description: "Each formulation_item creates exactly one bom_item"
+    enforcement: "Batch INSERT with 1:1 SELECT from formulation_items"
+  - rule: "NPD Traceability"
+    description: "All NPD-originated BOMs and Products must link back to source"
+    enforcement: "npd_formulation_id, npd_project_id, source='npd' fields"
+  - rule: "Transactional Integrity"
+    description: "Product + BOM + Items created in single transaction"
+    enforcement: "BEGIN/COMMIT/ROLLBACK with database client transaction"
+
+# Context Summary
+summary: |
+  Story 08.12 implements the core handoff mechanism: converting NPD formulations
+  to production BOMs with full traceability.
+
+  MVP SCOPE (This Story):
+  - Create Product (new) OR update Product (existing) with NPD linkage
+  - Create BOM from formulation with auto-generated BOM number
+  - Copy formulation_items to bom_items 1:1 (batch insert)
+  - Set traceability fields: npd_formulation_id, npd_project_id, source='npd'
+  - Validate: formulation locked, product code unique, effective dates
+  - Transactional execution with rollback on any failure
+  - Permission enforcement: NPD_LEAD role required
+
+  DEFERRED (Phase 2/3):
+  - Allergen transfer (08.5 integration)
+  - Multi-formulation handoff (batch conversion)
+  - BOM item type override (input vs output)
+  - Custom BOM approval workflow
+
+  KEY INTEGRATION POINTS:
+  - Provides BOM for pilot WO creation (08.13)
+  - Used by handoff wizard (08.11)
+  - Traceability back to NPD project for audit trail
+  - Links to costing module (08.7) for cost tracking
+  - Foundation for production execution (Epic 04)

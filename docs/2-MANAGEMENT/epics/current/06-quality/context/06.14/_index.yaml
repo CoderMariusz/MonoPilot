@@ -1,0 +1,188 @@
+# Story 06.14 - Index File (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.14"
+  name: "NCR Root Cause Analysis"
+  slug: "ncr-root-cause-analysis"
+  epic: "06-quality"
+  phase: "2B"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "fullstack"
+  state: "ready"
+  priority: "P0 (MVP)"
+  food_safety_critical: true
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data, migrations
+  - api.yaml         # Endpoints, auth, request/response schemas
+  - frontend.yaml    # Components, pages, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table lookup"]
+    - story: "06.9"
+      name: "Basic NCR Creation"
+      provides: ["ncr_reports table", "NCR base structure"]
+    - story: "06.13"
+      name: "NCR Workflow"
+      provides: ["NCR status='root_cause' state", "workflow transitions"]
+  soft_dependencies:
+    - story: "01.x"
+      name: "File Storage"
+      provides: ["Supabase Storage for evidence uploads"]
+  blocked_by:
+    - story: "06.13"
+      name: "NCR Workflow"
+      reason: "NCR must be in root_cause status to perform analysis"
+  blocks:
+    - story: "06.15"
+      name: "NCR Corrective Action"
+      reason: "Requires approved root cause before corrective action planning"
+    - story: "06.16"
+      name: "NCR Verification & Close"
+      reason: "Root cause reference for verification"
+    - story: "06.31"
+      name: "CAPA Creation"
+      reason: "Systemic root causes trigger CAPA creation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-009", "NCR Workflow (8.2)", "Root Cause Analysis"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["ncr_root_causes table", "NCR Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.14.ncr-root-cause-analysis.md"
+  wireframes: []
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for root cause tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "ncr_root_causes + ncr_root_cause_factors + ncr_evidence_attachments tables"
+  - type: "service"
+    count: 1
+    description: "ncr-root-cause-service.ts with analysis, factors, evidence, approval"
+  - type: "api"
+    count: 10
+    description: "CRUD, submit, approve, reject, revision, evidence endpoints"
+  - type: "validation"
+    count: 8
+    description: "Zod schemas for root cause, factors, evidence, approval operations"
+  - type: "pages"
+    count: 1
+    description: "Root cause tab on NCR detail page"
+  - type: "components"
+    count: 20
+    description: "5-Why wizard, Fishbone diagram, impact form, evidence upload, approval panel"
+  - type: "test"
+    count: 3
+    description: "Unit tests (service), Integration tests (API), E2E tests (workflow)"
+
+# Technical notes
+technical_notes:
+  - "5-Why analysis: up to 5 iterative questions with progressive disclosure"
+  - "Fishbone (Ishikawa) diagram: 6 M categories (Man, Machine, Material, Method, Measurement, Mother Nature)"
+  - "Classification types: systemic, random, procedural, human_error, equipment, material, environmental, unknown"
+  - "Impact assessment: cost, customer, regulatory, production impacts"
+  - "Evidence attachments: photos, documents, videos - max 25MB, Supabase Storage"
+  - "Approval workflow: draft -> submitted -> approved/rejected/revision_required"
+  - "QA Manager approval required before NCR can proceed to corrective_action"
+  - "Single primary factor allowed in Fishbone (marked in red)"
+  - "Root cause immutable after approval"
+  - "RLS: org_id isolation enforced at database and API level"
+  - "Audit trail: All analysis, submission, approval actions logged"
+  - "FDA 21 CFR Part 11: Evidence retention 10+ years"
+
+# Acceptance Criteria Summary (high-level)
+acceptance_summary:
+  - "ncr_root_causes table with 5-Why, classification, impact fields"
+  - "ncr_root_cause_factors table for Fishbone categories"
+  - "ncr_evidence_attachments table for file uploads"
+  - "5-Why wizard with iterative questioning (1-5 levels)"
+  - "Fishbone diagram interactive builder with 6 categories"
+  - "Single primary factor marking in Fishbone"
+  - "Root cause classification selector"
+  - "Impact assessment form (cost, customer, regulatory, production)"
+  - "Evidence upload with categorization"
+  - "Submit root cause for approval"
+  - "QA Manager approval/reject/revision workflow"
+  - "NCR status transition on approval (-> corrective_action)"
+  - "Cannot edit approved root cause"
+  - "Permission enforcement (Investigator analyze, QA Manager approve)"
+  - "RLS policy enforcement for multi-tenancy"
+  - "Audit trail for all actions"
+
+# UI Components Summary
+ui_components:
+  - "RootCauseTab: Main container for root cause analysis section"
+  - "FiveWhyWizard: Step-by-step 5-Why analysis component"
+  - "FiveWhyStep: Single why level with question and answer"
+  - "FiveWhySummary: Summary view of completed 5-Why"
+  - "FishboneDiagram: Interactive SVG Fishbone visualization"
+  - "FishboneCategory: Single category bone with factors"
+  - "FishboneFactor: Factor item on bone (blue/red/gray)"
+  - "AddFactorModal: Add/edit Fishbone factor form"
+  - "ClassificationSelector: Dropdown for root cause type"
+  - "RecurringIssueToggle: Toggle for recurring issues"
+  - "RelatedNCRSelector: Multi-select for related NCRs"
+  - "ImpactAssessmentForm: Four impact categories form"
+  - "ImpactBadge: Visual badge for impact severity"
+  - "EvidenceUploader: Drag-and-drop file upload"
+  - "EvidenceGallery: Grid of uploaded evidence"
+  - "EvidenceCard: Single evidence item with thumbnail"
+  - "RootCauseSummaryCard: Summary on NCR detail page"
+  - "ApprovalPanel: QA Manager approval actions"
+  - "ApproveDialog: Approval confirmation"
+  - "RejectDialog: Rejection with reason"
+
+# Database Tables
+database_summary:
+  ncr_root_causes:
+    - "id, org_id, ncr_id (unique 1:1)"
+    - "why_1..why_5, why_1_answer..why_5_answer (5-Why)"
+    - "why_levels_used (1-5)"
+    - "root_cause_statement, root_cause_summary"
+    - "classification (systemic/random/procedural/etc.)"
+    - "is_recurring, recurrence_count, related_ncr_ids"
+    - "impact_cost, impact_customer, impact_regulatory, impact_production"
+    - "status (draft/submitted/approved/rejected/revision_required)"
+    - "submitted_at/by, approved_at/by, rejection_reason"
+    - "investigator_id, investigation_started/completed"
+  ncr_root_cause_factors:
+    - "id, org_id, root_cause_id"
+    - "category (man/machine/material/method/measurement/mother_nature)"
+    - "factor_description, is_contributing, is_primary"
+    - "evidence_notes, sequence"
+  ncr_evidence_attachments:
+    - "id, org_id, ncr_id, root_cause_id"
+    - "file_name, file_type, file_size, file_path, storage_bucket"
+    - "description, attachment_type, is_primary_evidence"
+    - "uploaded_at, uploaded_by"
+
+# API Endpoints
+api_summary:
+  - "GET /api/quality/ncrs/:id/root-cause - Get analysis with factors and attachments"
+  - "POST /api/quality/ncrs/:id/root-cause - Create/update analysis"
+  - "PUT /api/quality/ncrs/:id/root-cause/:causeId - Update existing analysis"
+  - "POST /api/quality/ncrs/:id/root-cause/submit - Submit for approval"
+  - "POST /api/quality/ncrs/:id/root-cause/approve - Approve (QA Manager)"
+  - "POST /api/quality/ncrs/:id/root-cause/reject - Reject (QA Manager)"
+  - "POST /api/quality/ncrs/:id/root-cause/revision - Request revision"
+  - "POST /api/quality/ncrs/:id/root-cause/attachments - Upload evidence"
+  - "DELETE /api/quality/ncrs/:id/root-cause/attachments/:id - Delete evidence"
+  - "GET /api/quality/ncrs/:id/root-cause/attachments/:id/download - Get download URL"

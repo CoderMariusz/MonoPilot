@@ -49,7 +49,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { BOMFormModal } from '@/components/technical/BOMFormModal'
+import { BOMCreateModal } from '@/components/technical/bom/BOMCreateModal'
 import { BOMCloneModal } from '@/components/technical/BOMCloneModal'
 import { BOMCompareModal } from '@/components/technical/BOMCompareModal'
 import { BOMItemFormModal } from '@/components/technical/BOMItemFormModal'
@@ -184,6 +184,8 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
   const handleEditSuccess = () => {
     setShowEditModal(false)
     fetchBOM()
+    fetchItems()
+    fetchAllergens()
   }
 
   const handleCloneSuccess = () => {
@@ -542,9 +544,51 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
       </Tabs>
 
       {/* Modals */}
-      {showEditModal && (
-        <BOMFormModal bom={bom} onClose={() => setShowEditModal(false)} onSuccess={handleEditSuccess} />
-      )}
+      <BOMCreateModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        onSuccess={handleEditSuccess}
+        editBomId={id}
+        initialData={{
+          id: bom.id,
+          product_id: bom.product_id,
+          product: bom.product ? {
+            id: bom.product.id,
+            code: bom.product.code,
+            name: bom.product.name,
+            uom: bom.product.uom || 'kg',
+          } : undefined,
+          version: bom.version,
+          status: bom.status,
+          effective_from: typeof bom.effective_from === 'string' ? bom.effective_from : (bom.effective_from as Date)?.toISOString() || '',
+          effective_to: bom.effective_to ? (typeof bom.effective_to === 'string' ? bom.effective_to : (bom.effective_to as Date)?.toISOString()) : null,
+          output_qty: bom.output_qty,
+          output_uom: bom.output_uom,
+          yield_percent: bom.yield_percent,
+          notes: bom.notes,
+          routing_id: bom.routing_id || null,
+          units_per_box: bom.units_per_box,
+          boxes_per_pallet: bom.boxes_per_pallet,
+          items: items.map(item => ({
+            id: item.id,
+            product_id: item.component_id,
+            component: item.component ? {
+              id: item.component.id,
+              code: item.component.code,
+              name: item.component.name,
+              uom: item.component.uom || 'kg',
+            } : undefined,
+            quantity: item.quantity,
+            uom: item.uom,
+            scrap_percent: item.scrap_percent,
+            sequence: item.sequence,
+            operation_seq: item.operation_seq,
+            is_output: item.is_output,
+            consume_whole_lp: item.consume_whole_lp,
+            notes: item.notes,
+          }))
+        }}
+      />
 
       {showCloneModal && (
         <BOMCloneModal bomId={id} version={bom.version} onClose={() => setShowCloneModal(false)} onSuccess={handleCloneSuccess} />

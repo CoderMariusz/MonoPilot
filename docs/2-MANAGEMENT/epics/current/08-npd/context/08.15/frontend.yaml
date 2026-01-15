@@ -1,0 +1,59 @@
+# Story 08.15 - Frontend Specification
+# Purpose: Notification center and event log UI
+# Agent: FRONTEND-DEV
+# SEE: markdown lines 777-812
+
+components:
+  - path: "components/layout/NotificationBell.tsx"
+    description: "Notification bell icon with badge count"
+    props:
+      - { name: "unreadCount", type: "number" }
+    features:
+      - "Bell icon in header"
+      - "Badge showing unread count"
+      - "Click opens notification panel"
+
+  - path: "components/layout/NotificationPanel.tsx"
+    description: "Notification center dropdown panel"
+    features:
+      - "List of recent notifications (20)"
+      - "Unread/read styling"
+      - "Click notification → mark as read + navigate to link"
+      - "Mark all as read button"
+      - "View all notifications link"
+
+  - path: "components/settings/NotificationPreferences.tsx"
+    description: "User notification preferences form"
+    location: "Profile > Notification Preferences"
+    features:
+      - "Toggle per notification type (email + in-app)"
+      - "Notification types: Gate approvals, Costing approvals, Cost variance, Compliance docs, Handoff"
+      - "Save preferences to user_notification_preferences table"
+
+  - path: "app/(authenticated)/admin/npd-events/page.tsx"
+    description: "Admin event log page"
+    features:
+      - "Event list table with filtering (status, type)"
+      - "Columns: Event type, Entity, Status, Retry count, Created, Processed"
+      - "Actions: Retry (for failed events)"
+      - "Pagination"
+
+# Real-time Updates
+realtime:
+  use: "Supabase Realtime subscriptions"
+  channel: "notifications:{userId}"
+  event: "INSERT on notifications table"
+  action: "Increment badge count, show toast notification"
+
+# Notification Types
+notification_triggers:
+  - type: "gate_approval_required"
+    recipients: "NPD Lead"
+  - type: "costing_approval_required"
+    recipients: "All Finance users"
+  - type: "cost_variance_alert"
+    recipients: "NPD Lead + Finance"
+  - type: "missing_compliance_docs"
+    recipients: "All Regulatory users"
+  - type: "handoff_completed"
+    recipients: "All Production Manager users"

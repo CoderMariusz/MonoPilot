@@ -163,7 +163,6 @@ export async function POST(
         uom: validatedData.uom,
         scrap_percent: validatedData.scrap_percent ?? 0,
         sequence: validatedData.sequence ?? 1,
-        line_ids: validatedData.line_ids || null,
         consume_whole_lp: validatedData.consume_whole_lp ?? false,
         notes: validatedData.notes || null
       })
@@ -173,7 +172,7 @@ export async function POST(
           id,
           code,
           name,
-          uom,
+          base_uom,
           product_type:product_types(code, name)
         )
       `)

@@ -1,0 +1,246 @@
+# Story 06.17 - Index File (Entry Point)
+# Generated: 2026-01-15
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.17"
+  name: "Quality Alerts & Notifications"
+  slug: "quality-alerts-notifications"
+  epic: "06-quality"
+  phase: "2B"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend"
+  state: "ready"
+  priority: "P0"
+  food_safety_critical: true
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data, migrations
+  - api.yaml         # Endpoints, auth, request/response schemas
+  - frontend.yaml    # Components, pages, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "users table", "roles table"]
+    - story: "06.1"
+      name: "Quality Status Types"
+      provides: ["Quality status events for alerts"]
+    - story: "06.2"
+      name: "Quality Holds CRUD"
+      provides: ["Hold events for alerts (aging, release)"]
+    - story: "06.5"
+      name: "Incoming Inspection"
+      provides: ["Inspection events (failed, due)"]
+    - story: "06.9"
+      name: "Basic NCR Creation"
+      provides: ["NCR events (critical severity)"]
+  soft_dependencies:
+    - story: "01.15"
+      name: "Session Management"
+      provides: ["User session for WebSocket connection"]
+    - story: "06.13"
+      name: "NCR Workflow"
+      provides: ["Workflow transition events for alerts"]
+  blocked_by: []
+  blocks:
+    - story: "06.25-06.26"
+      name: "CCP Deviation Alerts"
+      reason: "Extends alert system for CCP monitoring"
+    - story: "06.31"
+      name: "CAPA Creation"
+      reason: "CAPA due alerts use this system"
+    - story: "06.37"
+      name: "Quality Dashboard"
+      reason: "Alert metrics displayed on dashboard"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["Section 18 - Notifications", "NFR-Reliability"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["Alert System", "Notification Integration"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.17.quality-alerts-notifications.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-017-alert-bell.md"
+      name: "Alert Bell Component"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-017-alert-preferences.md"
+      name: "Alert Preferences Page"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for alert tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 6
+    description: "quality_alert_templates, quality_alerts, quality_alert_recipients, user_alert_preferences, quality_alert_delivery_log, quality_alert_sequences"
+  - type: "service"
+    count: 1
+    description: "alert-service.ts with CRUD + delivery + preferences + escalation"
+  - type: "api"
+    count: 9
+    description: "List, Get, Acknowledge, Read, Preferences GET/PUT, Send, Test, Unread-count"
+  - type: "validation"
+    count: 4
+    description: "Zod schemas for acknowledge, preferences, send, list"
+  - type: "pages"
+    count: 1
+    description: "/settings/notifications preferences page"
+  - type: "components"
+    count: 12
+    description: "AlertBell, AlertDropdown, AlertPreferencesForm, ChannelToggle, etc."
+  - type: "integration"
+    count: 3
+    description: "WebSocket handler, Email (SendGrid/Resend), SMS (Twilio)"
+  - type: "test"
+    count: 4
+    description: "Unit tests (service), Integration tests (API), WebSocket tests, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Alert severity: critical, high, medium, low"
+  - "Channels: websocket (real-time), email (async), sms (critical only), push (future)"
+  - "Critical alerts bypass quiet hours and always send all enabled channels"
+  - "SMS only for critical severity by default (user can override)"
+  - "Escalation: if not acknowledged within timeout, escalate to higher roles"
+  - "Delivery log is append-only (immutable) for FDA 21 CFR Part 11 compliance"
+  - "Alert number format: QA-YYYY-NNNNN"
+  - "WebSocket delivery target: <1 second"
+  - "Template system uses Mustache-style interpolation: {{variable}}"
+  - "Quiet hours respect user timezone"
+  - "Phone numbers must be E.164 format for SMS"
+
+# Acceptance Criteria Summary (high-level)
+acceptance_summary:
+  - "Alert tables created with proper schemas"
+  - "Critical alerts (CCP deviation, NCR critical, failed inspection) trigger immediately"
+  - "Alert routing by role (QA_MANAGER, PRODUCTION_LEAD, etc.)"
+  - "WebSocket real-time delivery (<1 second)"
+  - "Email notification integration (SendGrid/Resend)"
+  - "SMS notification for critical alerts (Twilio)"
+  - "User alert preferences (channel toggles, quiet hours)"
+  - "Alert acknowledgment tracking"
+  - "Alert history with read/unread status"
+  - "Escalation rules (auto-escalate after timeout)"
+  - "Alert bell icon with unread count badge"
+  - "Alert dropdown with recent 10 alerts"
+  - "Alert preferences page"
+  - "Admin can send manual alerts"
+  - "Immutable delivery log for audit trail"
+
+# UI Components Summary
+ui_components:
+  - "AlertBell: Bell icon in header with unread count badge"
+  - "AlertDropdown: Recent 10 alerts, quick acknowledge"
+  - "AlertItem: Single alert row with severity badge, subject, time ago"
+  - "AlertSeverityBadge: critical (red), high (orange), medium (yellow), low (gray)"
+  - "AlertStatusBadge: pending, delivered, read, acknowledged"
+  - "AcknowledgeAlertDialog: Confirmation with optional notes"
+  - "AlertPreferencesForm: Full preferences configuration"
+  - "ChannelToggle: Individual channel on/off"
+  - "QuietHoursConfig: Enable, start time, end time, timezone"
+  - "SeverityPreferencesTable: Per-severity channel matrix"
+  - "AlertTypePreferencesTable: Per-alert-type channel overrides"
+  - "SendAlertModal: Admin manual alert sending"
+
+# Database Tables
+database_summary:
+  quality_alert_templates:
+    - "id, org_id, template_code (unique per org)"
+    - "name, description, severity"
+    - "subject_template, body_template, sms_template (Mustache)"
+    - "default_recipients, escalation_roles, escalation_timeout_min"
+    - "channels_enabled, auto_trigger_enabled, trigger_conditions"
+    - "is_active, created_at, updated_at"
+  quality_alerts:
+    - "id, org_id, alert_number (QA-YYYY-NNNNN)"
+    - "template_id, alert_type, severity"
+    - "subject, body, sms_body (rendered)"
+    - "source_type, source_id, source_reference"
+    - "status, channels_sent"
+    - "created_at, expires_at, delivered_at, first_read_at"
+    - "acknowledged_at, acknowledged_by"
+    - "escalation_level, escalated_at, next_escalation_at"
+  quality_alert_recipients:
+    - "id, alert_id, user_id"
+    - "status, escalation_level"
+    - "websocket_sent_at, websocket_delivered_at"
+    - "email_sent_at, email_delivered_at, email_opened_at"
+    - "sms_sent_at, sms_delivered_at"
+    - "read_at, acknowledged_at, acknowledgment_notes"
+  user_alert_preferences:
+    - "id, user_id, org_id"
+    - "alerts_enabled, websocket_enabled, email_enabled, sms_enabled, push_enabled"
+    - "quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone"
+    - "severity_preferences (JSONB), alert_type_preferences (JSONB)"
+    - "email_address, sms_phone_number"
+  quality_alert_delivery_log:
+    - "id, alert_id, recipient_id, user_id"
+    - "channel, status, provider, provider_message_id, provider_response"
+    - "error_message, retry_count, next_retry_at"
+    - "created_at (append-only, no updates)"
+
+# API Endpoints
+api_summary:
+  - "GET /api/quality/alerts - List user's alerts with filters"
+  - "GET /api/quality/alerts/unread-count - Badge count by severity"
+  - "GET /api/quality/alerts/:id - Get single alert"
+  - "POST /api/quality/alerts/:id/acknowledge - Acknowledge alert"
+  - "PUT /api/quality/alerts/:id/read - Mark as read"
+  - "GET /api/quality/alerts/preferences - Get user preferences"
+  - "PUT /api/quality/alerts/preferences - Update preferences"
+  - "POST /api/quality/alerts/send - Admin send alert"
+  - "POST /api/quality/alerts/test - Send test notification to self"
+
+# Alert Types
+alert_types:
+  critical:
+    - type: "ccp_deviation"
+      description: "CCP value outside limits"
+      channels: ["websocket", "email", "sms"]
+      response_time: "<30s"
+    - type: "ncr_critical"
+      description: "NCR with severity=critical (food safety risk)"
+      channels: ["websocket", "email", "sms"]
+      response_time: "<30s"
+    - type: "inspection_failed"
+      description: "Inspection result=fail (critical parameter)"
+      channels: ["websocket", "email", "sms"]
+      response_time: "<30s"
+  high:
+    - type: "inspection_due"
+      description: "Scheduled inspection approaching"
+      channels: ["websocket", "email"]
+      response_time: "5 minutes"
+    - type: "hold_aging"
+      description: "Quality hold not resolved within 48h"
+      channels: ["websocket", "email"]
+      response_time: "hourly check"
+    - type: "ncr_overdue"
+      description: "NCR not progressed within SLA"
+      channels: ["websocket", "email"]
+      response_time: "hourly check"
+  medium:
+    - type: "batch_pending_release"
+      description: "Batch completed, awaiting QA release"
+      channels: ["websocket", "email"]
+      response_time: "15 minutes"
+    - type: "capa_effectiveness_due"
+      description: "CAPA effectiveness check due"
+      channels: ["websocket", "email"]
+      response_time: "daily"
+  low:
+    - type: "supplier_audit_due"
+      description: "Scheduled supplier audit approaching"
+      channels: ["websocket", "email"]
+      response_time: "daily"

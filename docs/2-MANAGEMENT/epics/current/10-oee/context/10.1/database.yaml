@@ -1,0 +1,127 @@
+# Story 10.1 - Database Schema
+# Purpose: Tables, RLS policies, indexes, constraints, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_performance_targets.sql"
+    type: "migration"
+    description: "Create performance_targets table with RLS and indexes"
+  - path: "supabase/migrations/XXX_add_oee_settings_to_settings.sql"
+    type: "migration"
+    description: "Add OEE module settings columns to settings table"
+
+tables:
+  - name: "performance_targets"
+    description: "OEE performance targets for organization/line/machine scope"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "target_type", type: "TEXT", constraints: "NOT NULL CHECK (target_type IN ('organization', 'line', 'machine'))" }
+      - { name: "reference_id", type: "UUID", constraints: "NULLABLE (NULL for org, FK to lines/machines)" }
+      - { name: "oee_target", type: "DECIMAL(5,2)", constraints: "NOT NULL CHECK (oee_target >= 0 AND oee_target <= 100)" }
+      - { name: "availability_target", type: "DECIMAL(5,2)", constraints: "CHECK (availability_target IS NULL OR (availability_target >= 0 AND availability_target <= 100))" }
+      - { name: "performance_target", type: "DECIMAL(5,2)", constraints: "CHECK (performance_target IS NULL OR (performance_target >= 0 AND performance_target <= 100))" }
+      - { name: "quality_target", type: "DECIMAL(5,2)", constraints: "CHECK (quality_target IS NULL OR (quality_target >= 0 AND quality_target <= 100))" }
+      - { name: "warning_threshold", type: "DECIMAL(5,2)", constraints: "DEFAULT 85.0 CHECK (warning_threshold >= 0 AND warning_threshold <= 100)" }
+      - { name: "critical_threshold", type: "DECIMAL(5,2)", constraints: "DEFAULT 75.0 CHECK (critical_threshold >= 0 AND critical_threshold <= 100)" }
+      - { name: "effective_date", type: "DATE", constraints: "NOT NULL DEFAULT CURRENT_DATE" }
+      - { name: "expiry_date", type: "DATE", constraints: "NULLABLE" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_targets_org ON performance_targets(org_id)"
+      - "idx_targets_org_type ON performance_targets(org_id, target_type)"
+      - "idx_targets_org_active ON performance_targets(org_id, is_active) WHERE is_active = true"
+      - "idx_targets_reference ON performance_targets(reference_id) WHERE reference_id IS NOT NULL"
+      - "idx_targets_effective ON performance_targets(org_id, effective_date, expiry_date)"
+      - "idx_targets_active_lookup ON performance_targets(org_id, target_type, reference_id, is_active) WHERE is_active = true"
+    constraints:
+      - "chk_expiry_after_effective CHECK (expiry_date IS NULL OR expiry_date >= effective_date)"
+      - "chk_critical_below_warning CHECK (critical_threshold <= warning_threshold)"
+      - "chk_reference_type_match CHECK ((target_type = 'organization' AND reference_id IS NULL) OR (target_type IN ('line', 'machine') AND reference_id IS NOT NULL))"
+
+# Settings table extension
+settings_extension:
+  table: "settings"
+  columns:
+    - { name: "oee_enabled", type: "BOOLEAN", constraints: "DEFAULT false" }
+    - { name: "oee_snapshot_interval_minutes", type: "INTEGER", constraints: "DEFAULT 5 CHECK (oee_snapshot_interval_minutes >= 1 AND oee_snapshot_interval_minutes <= 60)" }
+    - { name: "oee_auto_fail_on_critical", type: "BOOLEAN", constraints: "DEFAULT true" }
+    - { name: "oee_default_target", type: "DECIMAL(5,2)", constraints: "DEFAULT 85.0 CHECK (oee_default_target >= 0 AND oee_default_target <= 100)" }
+  comments:
+    oee_enabled: "Enable OEE tracking module"
+    oee_snapshot_interval_minutes: "OEE calculation interval (1-60 minutes)"
+    oee_auto_fail_on_critical: "Auto-fail OEE when critical defects detected"
+    oee_default_target: "Default OEE target for new machines (%)"
+
+# RLS Policies
+rls_policies:
+  pattern: "ADR-013 Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "performance_targets"
+      name: "targets_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Org-isolated target viewing"
+
+    - table: "performance_targets"
+      name: "targets_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Prevent cross-org target creation"
+
+    - table: "performance_targets"
+      name: "targets_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Prevent cross-org target modification"
+
+    - table: "performance_targets"
+      name: "targets_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Prevent cross-org target deletion"
+
+# Triggers
+triggers:
+  - name: "update_performance_targets_updated_at"
+    table: "performance_targets"
+    event: "BEFORE UPDATE"
+    function: "update_updated_at_column()"
+    description: "Auto-update updated_at timestamp"
+
+# Business Logic
+business_rules:
+  - rule: "Target Hierarchy"
+    description: "Machine-specific > Line-specific > Organization-wide > Default (85%)"
+    enforcement: "Service layer resolveTarget() method"
+
+  - rule: "Organization Scope"
+    description: "target_type='organization' must have reference_id=NULL"
+    enforcement: "CHECK constraint chk_reference_type_match"
+
+  - rule: "Line/Machine Scope"
+    description: "target_type='line'/'machine' must have valid reference_id"
+    enforcement: "CHECK constraint + FK validation"
+
+  - rule: "Threshold Order"
+    description: "critical_threshold <= warning_threshold"
+    enforcement: "CHECK constraint chk_critical_below_warning"
+
+  - rule: "Date Validity"
+    description: "expiry_date >= effective_date"
+    enforcement: "CHECK constraint chk_expiry_after_effective"
+
+# Performance Notes
+performance:
+  - "Index idx_targets_active_lookup covers most common query pattern (org + type + ref + active)"
+  - "Partial indexes on is_active reduce index size"
+  - "Composite index on effective_date enables fast date range queries"

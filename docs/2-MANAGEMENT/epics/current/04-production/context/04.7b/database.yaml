@@ -1,0 +1,140 @@
+# Story 04.7b: Output Registration Scanner - Database Schema
+# Reuses tables from 04.7a, adds printer_configs for label printing
+
+tables:
+  - name: "license_plates"
+    description: "Reused from 04.7a - stores production output LPs"
+    reuse_from: "04.7a"
+
+  - name: "lp_genealogy"
+    description: "Reused from 04.7a - tracks parent-child LP relationships"
+    reuse_from: "04.7a"
+
+  - name: "printer_configs"
+    description: "Stores ZPL printer configurations per location"
+    columns:
+      - name: "id"
+        type: "uuid"
+        nullable: false
+        default: "gen_random_uuid()"
+      - name: "org_id"
+        type: "uuid"
+        nullable: false
+      - name: "printer_name"
+        type: "text"
+        nullable: false
+      - name: "printer_ip"
+        type: "text"
+        nullable: false
+      - name: "printer_port"
+        type: "integer"
+        nullable: false
+        default: "9100"
+      - name: "printer_type"
+        type: "text"
+        nullable: false
+        default: "'zebra'"
+      - name: "is_default"
+        type: "boolean"
+        nullable: false
+        default: "false"
+      - name: "location_id"
+        type: "uuid"
+        nullable: true
+      - name: "label_template"
+        type: "text"
+        nullable: true
+      - name: "created_at"
+        type: "timestamptz"
+        nullable: false
+        default: "now()"
+      - name: "updated_at"
+        type: "timestamptz"
+        nullable: false
+        default: "now()"
+    constraints:
+      - type: "primary_key"
+        columns: ["id"]
+      - type: "foreign_key"
+        columns: ["org_id"]
+        references: "organizations(id)"
+      - type: "foreign_key"
+        columns: ["location_id"]
+        references: "locations(id)"
+    indexes:
+      - columns: ["org_id", "is_default"]
+      - columns: ["org_id", "location_id"]
+
+  - name: "offline_queue"
+    description: "Stores pending operations when device is offline"
+    columns:
+      - name: "id"
+        type: "uuid"
+        nullable: false
+        default: "gen_random_uuid()"
+      - name: "org_id"
+        type: "uuid"
+        nullable: false
+      - name: "user_id"
+        type: "uuid"
+        nullable: false
+      - name: "operation_type"
+        type: "text"
+        nullable: false
+      - name: "payload"
+        type: "jsonb"
+        nullable: false
+      - name: "status"
+        type: "text"
+        nullable: false
+        default: "'pending'"
+      - name: "retry_count"
+        type: "integer"
+        nullable: false
+        default: "0"
+      - name: "error_message"
+        type: "text"
+        nullable: true
+      - name: "created_at"
+        type: "timestamptz"
+        nullable: false
+        default: "now()"
+      - name: "synced_at"
+        type: "timestamptz"
+        nullable: true
+    constraints:
+      - type: "primary_key"
+        columns: ["id"]
+    indexes:
+      - columns: ["org_id", "status"]
+      - columns: ["user_id", "status"]
+
+rls_policies:
+  - name: "printer_configs_org_isolation"
+    table: "printer_configs"
+    operation: "ALL"
+    using_expression: "org_id = auth.jwt() ->> 'org_id'"
+
+  - name: "offline_queue_user_isolation"
+    table: "offline_queue"
+    operation: "ALL"
+    using_expression: "user_id = auth.uid()"
+
+functions:
+  - name: "get_printer_for_location"
+    description: "Get default printer for a specific location or org default"
+    parameters:
+      - name: "p_org_id"
+        type: "uuid"
+      - name: "p_location_id"
+        type: "uuid"
+    returns: "printer_configs"
+    logic: "Returns printer matching location_id, or org default if no location match"
+
+  - name: "sync_offline_queue"
+    description: "Process pending offline operations"
+    parameters:
+      - name: "p_user_id"
+        type: "uuid"
+    returns: "integer"
+    logic: "Processes all pending operations for user, returns count of synced items"

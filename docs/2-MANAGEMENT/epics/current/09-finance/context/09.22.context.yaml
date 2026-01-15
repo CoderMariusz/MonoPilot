@@ -1,0 +1,163 @@
+story:
+  id: "09.22"
+  name: "Cost Center Budget & Variance"
+  epic: "09-finance"
+  phase: "3"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "fullstack"
+
+dependencies:
+  required:
+    - story: "09.10"
+      provides: ["cost_centers", "cost_center_budgets"]
+    - story: "09.6"
+      provides: ["work_order_costs"]
+  optional:
+    - story: "09.12"
+      provides: ["overhead_allocations"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/finance.md"
+  prd_sections: ["FR-9.10.4", "FR-9.10.5", "FR-9.10.6", "FR-9.11.1", "FR-9.11.2", "FR-9.11.3"]
+  story: "docs/2-MANAGEMENT/epics/current/09-finance/09.22.cost-center-budget-variance.md"
+  patterns:
+    - "apps/frontend/components/finance/budget/BudgetDefinitionForm.tsx"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_enhance_cost_center_budgets.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_budget_variance_alerts.sql"
+      type: "migration"
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_calculate_budget_variance_function.sql"
+      type: "function"
+  api:
+    - path: "apps/frontend/app/api/finance/budgets/route.ts"
+      methods: ["GET", "POST"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/route.ts"
+      methods: ["GET", "PATCH"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/allocate/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/finance/reports/budget-vs-actual/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/budgets/[id]/variance-detail/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/budgets/alerts/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/finance/budgets/alerts/[id]/acknowledge/route.ts"
+      methods: ["POST"]
+  services:
+    - path: "apps/frontend/lib/services/budget-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/budget.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/finance/budgets/page.tsx"
+    - path: "apps/frontend/app/(authenticated)/finance/reports/budget-vs-actual/page.tsx"
+  components:
+    - path: "apps/frontend/components/finance/budget/BudgetDefinitionForm.tsx"
+    - path: "apps/frontend/components/finance/budget/BudgetVsActualReport.tsx"
+    - path: "apps/frontend/components/finance/budget/BudgetVarianceDetailModal.tsx"
+    - path: "apps/frontend/components/finance/budget/BudgetVarianceTrendChart.tsx"
+    - path: "apps/frontend/components/finance/budget/BudgetAlertsList.tsx"
+
+database:
+  tables:
+    - name: "cost_center_budgets"
+      columns:
+        - "allocation_method"
+        - "allocation_percentage"
+        - "projected_spend"
+        - "variance_notes"
+        - "reviewed_by"
+        - "reviewed_at"
+      rls: true
+      indexes:
+        - "cost_center_id, period_start, period_end"
+    - name: "budget_variance_alerts"
+      columns:
+        - "id"
+        - "org_id"
+        - "cost_center_id"
+        - "budget_id"
+        - "alert_type"
+        - "severity"
+        - "budget_amount"
+        - "actual_cost"
+        - "variance_amount"
+        - "variance_percent"
+        - "days_remaining"
+        - "projected_overspend"
+        - "status"
+        - "acknowledged_by"
+        - "acknowledged_at"
+        - "action_plan"
+      rls: true
+      indexes:
+        - "cost_center_id"
+        - "org_id, status"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/finance/budgets"
+    auth: true
+    roles: ["finance_manager", "department_head"]
+  - method: "POST"
+    path: "/api/finance/budgets"
+    auth: true
+    roles: ["finance_manager"]
+  - method: "GET"
+    path: "/api/finance/reports/budget-vs-actual"
+    auth: true
+    roles: ["viewer", "finance_manager"]
+
+ux:
+  wireframes:
+    - id: "FIN-022"
+      description: "Budget Management"
+      components:
+        - "Budget definition form"
+        - "Budget vs actual table"
+        - "Variance detail breakdown"
+  patterns:
+    form: "ShadCN Form"
+    table: "ShadCN DataTable"
+    chart: "Recharts for variance trends"
+
+validation_rules:
+  budget_amount: "Must be > 0"
+  period_dates: "period_start < period_end"
+  no_overlap: "No overlapping budgets for same cost center + category + period"
+  allocation_sum: "Sum of sub-period budgets = total budget"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "cost_center_budgets table enhanced"
+  - "budget_variance_alerts table created"
+  - "calculate_budget_variance() function works"
+  - "Budget CRUD endpoints work"
+  - "Budget allocation works (equal, percentage, custom)"
+  - "Budget vs actual report displays"
+  - "Variance detail breakdown works"
+  - "Budget alerts triggered correctly"
+  - "Alert acknowledgment with action plan works"
+  - "Export to Excel works"
+  - "All tests pass"
+
+output_artifacts:
+  - "Migration: Enhance cost_center_budgets"
+  - "Migration: budget_variance_alerts table"
+  - "Function: calculate_budget_variance()"
+  - "API: 7 budget endpoints"
+  - "Service: BudgetService"
+  - "Component: BudgetDefinitionForm"
+  - "Component: BudgetVsActualReport"
+  - "Component: BudgetVarianceDetailModal"
+  - "Page: Budget management page"
+  - "Page: Budget vs actual report page"
+  - "Tests: Unit, integration, E2E"

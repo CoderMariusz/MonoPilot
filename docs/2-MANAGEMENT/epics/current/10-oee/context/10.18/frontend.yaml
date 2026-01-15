@@ -1,0 +1,77 @@
+# Story 10.18 - Frontend Specification
+# Purpose: Mobile downtime logging UI
+# Agent: FRONTEND-DEV
+
+components:
+  - path: "apps/frontend/components/scanner/downtime/MobileDowntimeLog.tsx"
+    description: "Main mobile downtime logging interface"
+    features:
+      - "QR scan trigger button"
+      - "Selected machine display"
+      - "Quick reason buttons grid"
+      - "Start/End downtime toggle"
+      - "Offline indicator"
+
+  - path: "apps/frontend/components/scanner/downtime/QRMachineScanner.tsx"
+    description: "Camera-based QR scanner for machine selection"
+    features:
+      - "Full-screen camera view"
+      - "QR detection and machine lookup"
+      - "Manual entry fallback"
+
+  - path: "apps/frontend/components/scanner/downtime/QuickReasonButtons.tsx"
+    description: "Large touch-friendly reason selection buttons"
+    buttons:
+      - { code: "JAM", label: "Jam", icon: "AlertTriangle" }
+      - { code: "SETUP", label: "Setup", icon: "Settings" }
+      - { code: "BREAK", label: "Break", icon: "Coffee" }
+      - { code: "MATERIAL", label: "Material", icon: "Package" }
+      - { code: "CLEANING", label: "Cleaning", icon: "Droplet" }
+      - { code: "OTHER", label: "Other", icon: "MoreHorizontal" }
+    features:
+      - "Min 44x44px touch targets"
+      - "Clear icons and labels"
+      - "Selected state highlight"
+
+  - path: "apps/frontend/components/scanner/downtime/PhotoCapture.tsx"
+    description: "Camera photo capture component"
+    features:
+      - "Camera preview"
+      - "Capture button"
+      - "Photo preview before submit"
+      - "Retry option"
+
+  - path: "apps/frontend/components/scanner/downtime/OfflineSyncIndicator.tsx"
+    description: "Shows pending sync count and status"
+    displays:
+      - "Online/Offline status"
+      - "Pending events badge: '3 events pending sync'"
+      - "Sync button when online"
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/scanner/downtime/page.tsx"
+    route: "/scanner/downtime"
+    title: "Log Downtime"
+    mobile_optimized: true
+    features:
+      - "Mobile-first design"
+      - "PWA installable"
+      - "Works offline"
+
+hooks:
+  - path: "apps/frontend/lib/hooks/use-mobile-downtime.ts"
+    exports:
+      - "useMobileDowntime"
+      - "useOfflineSync"
+      - "useQRScanner"
+
+ux:
+  mobile:
+    - "Touch-optimized buttons (44px minimum)"
+    - "Bottom-aligned action buttons"
+    - "Full-width layout"
+    - "Large text for readability"
+  offline:
+    - "Clear offline indicator"
+    - "Queue count badge"
+    - "Auto-sync on reconnect"

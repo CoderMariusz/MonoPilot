@@ -1,0 +1,21 @@
+endpoints:
+  get_bom_cost:
+    method: GET
+    path: "/api/finance/bom-costs/:bomId"
+    response:
+      status: 200
+      body:
+        cost_rollup: "CostRollup object"
+        breakdown:
+          ingredients: "Array with cost per ingredient"
+          packaging: "Array with cost per packaging item"
+          labor: "Labor from routing"
+          overhead: "Overhead allocation"
+
+  calculate_bom_cost:
+    method: POST
+    path: "/api/finance/bom-costs/:bomId/calculate"
+    response:
+      status: 200
+      body:
+        cost_rollup: "Newly calculated CostRollup"

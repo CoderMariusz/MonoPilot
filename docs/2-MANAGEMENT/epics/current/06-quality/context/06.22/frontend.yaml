@@ -1,0 +1,454 @@
+# Story 06.22 - CCP Definition - Frontend Context
+# Generated: 2025-01-15
+
+pages:
+  - path: "app/(authenticated)/quality/haccp/ccp/page.tsx"
+    name: "CCP List Page"
+    components: ["CCPDataTable", "CCPFilters", "CreateCCPWizard"]
+    layout: "Authenticated Layout"
+    features:
+      - "DataTable with pagination"
+      - "Filter by status, hazard type, routing"
+      - "Search by CCP name/number"
+      - "Create CCP button"
+
+  - path: "app/(authenticated)/quality/haccp/ccp/[id]/page.tsx"
+    name: "CCP Detail Page"
+    components: ["CCPDetail", "CCPHeader", "CCPVersionHistory"]
+    features:
+      - "CCP information display"
+      - "Critical limits display"
+      - "Routing link display"
+      - "Version history table"
+      - "Edit/Activate/Deactivate actions"
+
+  - path: "app/(authenticated)/quality/haccp/ccp/new/page.tsx"
+    name: "Create CCP Wizard Page"
+    components: ["CreateCCPWizard", "CCPDecisionTreeWizard"]
+    features:
+      - "Multi-step wizard (4 steps)"
+      - "Optional decision tree (7 questions)"
+      - "Form validation"
+      - "Review before create"
+
+components:
+  # Data Display
+  - name: "CCPDataTable.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "DataTable"
+    pattern: "ShadCN DataTable"
+    props:
+      - name: "data"
+        type: "HACCPCCP[]"
+      - name: "onRowClick"
+        type: "(id: string) => void"
+    features:
+      - "Columns: CCP #, Name, Hazard, Critical Limits, Routing, Status, Effective Date, Actions"
+      - "Row click navigates to detail"
+      - "Inline actions: View, Edit, Activate, Deactivate"
+      - "Sortable columns"
+      - "Pagination"
+
+  - name: "CCPFilters.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Filter Panel"
+    props:
+      - name: "filters"
+        type: "CCPFilterState"
+      - name: "onChange"
+        type: "(filters: CCPFilterState) => void"
+    features:
+      - "Status filter (draft/active/inactive/superseded)"
+      - "Hazard type filter (biological/chemical/physical)"
+      - "Routing filter"
+      - "Search input (debounced 300ms)"
+
+  - name: "CCPDetail.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Detail Container"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+      - name: "versionHistory"
+        type: "HACCPCCP[]"
+    features:
+      - "Three-column layout (desktop)"
+      - "Header with status/actions"
+      - "Critical limits display"
+      - "Monitoring info"
+      - "Routing link"
+      - "Version history"
+
+  - name: "CCPHeader.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Header"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+      - name: "onEdit"
+        type: "() => void"
+      - name: "onActivate"
+        type: "() => void"
+      - name: "onDeactivate"
+        type: "() => void"
+    features:
+      - "CCP number and name"
+      - "Status badge"
+      - "Hazard badge"
+      - "Action buttons (based on status and permissions)"
+
+  # Badges
+  - name: "CCPStatusBadge.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Badge"
+    props:
+      - name: "status"
+        type: "'draft' | 'active' | 'inactive' | 'superseded'"
+    colors:
+      draft: "gray"
+      active: "green"
+      inactive: "yellow"
+      superseded: "gray"
+
+  - name: "CCPHazardBadge.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Badge"
+    props:
+      - name: "hazardType"
+        type: "'biological' | 'chemical' | 'physical'"
+    colors:
+      biological: "red"
+      chemical: "orange"
+      physical: "blue"
+
+  # Forms and Wizards
+  - name: "CreateCCPWizard.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Multi-step Wizard"
+    props:
+      - name: "haccpPlanId"
+        type: "string"
+      - name: "onComplete"
+        type: "(ccp: HACCPCCP) => void"
+    steps:
+      - step: 1
+        name: "Basic Info"
+        component: "CCPFormBasic"
+        fields: ["ccp_number", "ccp_name", "hazard_type", "hazard_description", "control_measure"]
+      - step: 2
+        name: "Critical Limits"
+        component: "CCPFormCriticalLimits"
+        fields: ["critical_limit_min", "critical_limit_max", "unit_of_measure", "target_value"]
+      - step: 3
+        name: "Monitoring"
+        component: "CCPFormMonitoring"
+        fields: ["monitoring_frequency", "monitoring_method", "responsible_role", "corrective_action_std"]
+      - step: 4
+        name: "Routing Link"
+        component: "CCPFormRouting"
+        fields: ["routing_id", "routing_operation_id"]
+    features:
+      - "Progress indicator"
+      - "Next/Previous navigation"
+      - "Field validation per step"
+      - "Review summary before submit"
+
+  - name: "CCPDecisionTreeWizard.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Decision Tree Wizard"
+    props:
+      - name: "onComplete"
+        type: "(result: { isCCP: boolean; answers: Record<string, boolean> }) => void"
+      - name: "onSkip"
+        type: "() => void"
+    questions:
+      - q: "Q1"
+        text: "Do preventive measures exist for the identified hazard?"
+      - q: "Q2"
+        text: "Does this step eliminate or reduce the hazard to an acceptable level?"
+      - q: "Q3"
+        text: "Could contamination occur or increase to unacceptable levels?"
+      - q: "Q4"
+        text: "Will a subsequent step eliminate or reduce the hazard?"
+      - q: "Q5"
+        text: "Is control at this step necessary for safety?"
+      - q: "Q6"
+        text: "Could a loss of control lead to an unacceptable health risk?"
+      - q: "Q7"
+        text: "Is this the last chance to control the hazard?"
+    features:
+      - "7-question flow"
+      - "Yes/No radio buttons (large touch targets)"
+      - "Logic to determine if CCP or not"
+      - "Result page with recommendation"
+      - "Answers stored for audit trail"
+
+  - name: "CCPFormBasic.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Form"
+    fields:
+      - name: "ccp_number"
+        type: "text"
+        validation: "Required, format CCP-N"
+      - name: "ccp_name"
+        type: "text"
+        validation: "Required, 3-200 chars"
+      - name: "hazard_type"
+        type: "select"
+        options: ["biological", "chemical", "physical"]
+        validation: "Required"
+      - name: "hazard_description"
+        type: "textarea"
+        validation: "Required, 10-1000 chars"
+      - name: "control_measure"
+        type: "textarea"
+        validation: "Required, 10-1000 chars"
+
+  - name: "CCPFormCriticalLimits.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Form"
+    fields:
+      - name: "critical_limit_min"
+        type: "number"
+        validation: "Optional, must be < max if both set"
+      - name: "critical_limit_max"
+        type: "number"
+        validation: "Optional, must be > min if both set"
+      - name: "unit_of_measure"
+        type: "text"
+        validation: "Required"
+        examples: ["°C", "pH", "ppm", "mm"]
+      - name: "target_value"
+        type: "number"
+        validation: "Optional"
+
+  - name: "CCPFormMonitoring.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Form"
+    fields:
+      - name: "monitoring_frequency"
+        type: "text"
+        validation: "Required"
+        examples: ["Every receipt", "Hourly", "Every batch"]
+      - name: "monitoring_method"
+        type: "text"
+        validation: "Required"
+        examples: ["Infrared thermometer", "pH meter"]
+      - name: "responsible_role"
+        type: "text"
+        validation: "Required"
+      - name: "responsible_user_id"
+        type: "user-select"
+        validation: "Optional"
+      - name: "corrective_action_std"
+        type: "textarea"
+        validation: "Required, 10-2000 chars"
+      - name: "verification_method"
+        type: "textarea"
+        validation: "Optional"
+      - name: "verification_frequency"
+        type: "text"
+        validation: "Optional"
+
+  - name: "CCPFormRouting.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Form"
+    fields:
+      - name: "routing_id"
+        type: "routing-select"
+        validation: "Optional (required for activation)"
+      - name: "routing_operation_id"
+        type: "operation-select"
+        validation: "Optional (required for activation)"
+        depends_on: "routing_id"
+
+  # Modals and Dialogs
+  - name: "EditCCPModal.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Modal"
+    pattern: "ShadCN Dialog"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+      - name: "open"
+        type: "boolean"
+      - name: "onClose"
+        type: "() => void"
+      - name: "onSave"
+        type: "(updated: Partial<HACCPCCP>) => void"
+    features:
+      - "Only for draft CCPs"
+      - "All fields editable"
+      - "Validation on save"
+
+  - name: "ActivateCCPDialog.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Dialog"
+    pattern: "ShadCN AlertDialog"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+      - name: "canActivate"
+        type: "{ canActivate: boolean; missingFields: string[] }"
+      - name: "onConfirm"
+        type: "(effectiveDate?: string) => void"
+    features:
+      - "Validation check before showing"
+      - "Show missing fields if cannot activate"
+      - "Optional effective date input"
+      - "Confirmation message"
+
+  - name: "DeactivateCCPDialog.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Dialog"
+    pattern: "ShadCN AlertDialog"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+      - name: "onConfirm"
+        type: "(reason: string, expiryDate?: string) => void"
+    features:
+      - "Reason field (required, 10-500 chars)"
+      - "Optional expiry date"
+      - "Warning message"
+
+  - name: "CreateVersionDialog.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Dialog"
+    pattern: "ShadCN AlertDialog"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+      - name: "onConfirm"
+        type: "() => void"
+    features:
+      - "Explanation of versioning"
+      - "New version will be v{N+1}"
+      - "Confirmation button"
+
+  # Display Components
+  - name: "CCPCriticalLimits.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Display"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+    features:
+      - "Display min/max/unit"
+      - "Display target value (if set)"
+      - "Visual range indicator"
+
+  - name: "CCPMonitoringInfo.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Display"
+    props:
+      - name: "ccp"
+        type: "HACCPCCP"
+    features:
+      - "Monitoring frequency"
+      - "Monitoring method"
+      - "Responsible role/user"
+
+  - name: "CCPCorrectiveAction.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Display"
+    props:
+      - name: "correctiveAction"
+        type: "string"
+    features:
+      - "Formatted text display"
+      - "Expandable if long"
+
+  - name: "CCPRoutingLink.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Display"
+    props:
+      - name: "routingName"
+        type: "string"
+      - name: "operationName"
+        type: "string"
+      - name: "routingId"
+        type: "string"
+    features:
+      - "Routing name with link"
+      - "Operation name"
+      - "Badge showing CCP count on operation"
+
+  - name: "CCPVersionHistory.tsx"
+    path: "components/quality/haccp/ccp/"
+    type: "Table"
+    props:
+      - name: "versions"
+        type: "HACCPCCP[]"
+    features:
+      - "Version number"
+      - "Status"
+      - "Effective date"
+      - "Expiry date"
+      - "Created by"
+      - "View version link"
+
+# Hooks
+hooks:
+  - name: "useCCPList"
+    file: "lib/hooks/use-ccp-list.ts"
+    params: ["filters: CCPFilterState"]
+    returns: "{ ccps: HACCPCCP[]; loading: boolean; error: Error | null }"
+
+  - name: "useCCPDetail"
+    file: "lib/hooks/use-ccp-detail.ts"
+    params: ["id: string"]
+    returns: "{ ccp: HACCPCCP | null; versionHistory: HACCPCCP[]; loading: boolean }"
+
+  - name: "useCreateCCP"
+    file: "lib/hooks/use-create-ccp.ts"
+    returns: "{ create: (input: CreateCCPInput) => Promise<HACCPCCP>; loading: boolean }"
+
+  - name: "useActivateCCP"
+    file: "lib/hooks/use-activate-ccp.ts"
+    returns: "{ activate: (id: string, effectiveDate?: string) => Promise<HACCPCCP>; loading: boolean }"
+
+# Types
+types:
+  file: "lib/types/haccp-ccp.ts"
+  interfaces:
+    - name: "HACCPCCP"
+      extends: "Database['public']['Tables']['haccp_ccp']['Row']"
+    - name: "CreateCCPInput"
+      fields: ["All createCCPSchema fields"]
+    - name: "UpdateCCPInput"
+      fields: ["Partial CreateCCPInput"]
+    - name: "CCPFilterState"
+      fields: ["haccp_plan_id?", "status?", "hazard_type?", "routing_id?", "search?"]
+
+# UX Patterns
+ux_patterns:
+  - pattern: "DataTable"
+    library: "ShadCN"
+    customization: "Custom CCP columns"
+  - pattern: "Dialog/Modal"
+    library: "ShadCN"
+    customization: "Activation/Deactivation confirmations"
+  - pattern: "Multi-step Wizard"
+    library: "Custom"
+    steps: 4
+  - pattern: "Decision Tree"
+    library: "Custom"
+    questions: 7
+
+# Responsive Design
+responsive:
+  - breakpoint: "mobile"
+    layout: "Stacked columns, simplified table"
+  - breakpoint: "tablet"
+    layout: "Two-column detail view"
+  - breakpoint: "desktop"
+    layout: "Three-column detail view, full table"
+
+# Accessibility
+accessibility:
+  - "Touch targets min 44px (mobile)"
+  - "Keyboard navigation (wizard, tables)"
+  - "Screen reader labels (form fields, badges)"
+  - "Color contrast (WCAG AA)"
+  - "Focus indicators"

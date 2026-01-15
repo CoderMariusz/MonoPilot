@@ -1,0 +1,76 @@
+# Story 04.7b: Output Registration Scanner
+# Epic 04 - Production
+# Track D: Output Registration Core
+
+story:
+  id: "04.7b"
+  name: "Output Registration Scanner"
+  epic: "04-production"
+  phase: "1B"
+  complexity: "L"
+  estimate_days: 3
+
+dependencies:
+  required:
+    - story: "04.7a"
+      provides:
+        - "output-service.ts"
+        - "by-product-service.ts"
+        - "yield-service.ts"
+        - "output validation schemas"
+        - "/api/production/outputs endpoints"
+    - story: "05.1"
+      provides:
+        - "license_plates table"
+        - "lp_number_sequences table"
+        - "generate_lp_number function"
+    - story: "05.2"
+      provides:
+        - "lp_genealogy table"
+        - "genealogy functions"
+    - story: "03.3"
+      provides:
+        - "work_orders table"
+        - "wo_materials table"
+
+functional_requirements:
+  - id: "FR-012"
+    name: "Output Registration Scanner"
+    description: "Mobile 7-step wizard for production output registration with barcode scanning, number pad input, and ZPL label printing"
+  - id: "FR-013"
+    name: "By-Product Registration Scanner"
+    description: "Mobile workflow for registering by-products with expected quantity calculation and zero-quantity warnings"
+
+acceptance_criteria:
+  - id: "AC-012-01"
+    given: "Operator scans valid WO barcode WO-2025-0156"
+    when: "Barcode validated"
+    then: "Product name, planned qty, registered qty display within 500ms"
+  - id: "AC-012-02"
+    given: "Step 3 QA Status selection displays"
+    when: "Screen renders"
+    then: "Each QA button is >= 64px height with color coding (green=Approved, yellow=Pending, red=Rejected)"
+  - id: "AC-012-03"
+    given: "LP creation completes successfully"
+    when: "Step 5 LP Created displays"
+    then: "Voice announcement 'LP created' plays"
+  - id: "AC-012-04"
+    given: "Printer is configured and Step 6 Print Label loads"
+    when: "User taps Print button"
+    then: "ZPL label sent to printer within 2 seconds"
+  - id: "AC-012-06"
+    given: "No printer is configured for user's location"
+    when: "Step 6 Print Label displays"
+    then: "Print button is disabled with tooltip 'No printer configured'"
+  - id: "AC-013-01"
+    given: "WO.planned_qty=1000 and by-product yield_percent=5"
+    when: "By-product prompt displays"
+    then: "Expected qty shows 50 kg"
+  - id: "AC-013-04"
+    given: "User enters actual by-product qty=45 instead of expected 50"
+    when: "User confirms registration"
+    then: "LP created with qty=45"
+  - id: "AC-013-07"
+    given: "User enters by-product qty=0"
+    when: "Form submits"
+    then: "Warning displays 'By-product quantity is 0. Continue?'"

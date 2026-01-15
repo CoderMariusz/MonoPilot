@@ -1,0 +1,121 @@
+# Story 10.10 - Machine Utilization Heatmap Context (Entry Point)
+# Generated: 2025-01-15
+# Purpose: Story metadata, dependencies, and overview - read this first
+# Phase: 2 (Advanced Analytics)
+
+story:
+  id: "10.10"
+  name: "Machine Utilization Heatmap"
+  slug: "machine-utilization-heatmap"
+  epic: "10-oee"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "frontend"
+  state: "ready"
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies, overview
+  - database.yaml    # Tables, RLS, migrations, indexes
+  - api.yaml         # Endpoints, request/response schemas, services
+  - frontend.yaml    # Components, pages, types, hooks, UX
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "10.4"
+      name: "OEE Calculation Engine"
+      provides: ["oee_snapshots table", "utilization data", "OEE calculation"]
+    - story: "10.5"
+      name: "Real-Time Machine Dashboard"
+      provides: ["machine status", "dashboard patterns"]
+    - story: "01.3"
+      name: "Machine Settings"
+      provides: ["machines table", "machine reference"]
+
+  blocked_by: []
+
+  blocks:
+    - story: "10.12"
+      name: "Performance Dashboard"
+      reason: "Heatmap is a widget in executive dashboard"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/oee.md"
+    sections: ["FR-OEE-016 - Machine Utilization Heatmap"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/oee.md"
+    sections: ["Analytics views", "Utilization calculation"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/10-oee/10.10.machine-utilization-heatmap.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for utilization queries"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 1
+    description: "GET /api/oee/analytics/utilization - heatmap data endpoint"
+  - type: "service"
+    count: 1
+    description: "utilization-analytics-service.ts with heatmap calculation"
+  - type: "components"
+    count: 4
+    description: "Heatmap grid, color gradient, tooltip, time selector"
+  - type: "page"
+    count: 1
+    description: "/oee/analytics/utilization - utilization heatmap page"
+  - type: "test"
+    count: 3
+    description: "Unit (service), Integration (API), E2E (heatmap interaction)"
+
+# Technical notes
+technical_notes:
+  - "Heatmap grid: machines on Y-axis, time slots on X-axis"
+  - "Color gradient: Red (0-50%), Yellow (50-80%), Green (80-100%)"
+  - "Time granularity options: Hourly (24 cells), Daily (7 cells), Weekly (4 cells)"
+  - "Hover tooltips show exact utilization percentage and machine name"
+  - "Data source: oee_snapshots table aggregated by time granularity"
+  - "Utilization = actual_production_time / planned_production_time * 100"
+  - "Performance target: <500ms for daily view"
+
+# Business Rules
+business_rules:
+  - rule: "Utilization Calculation"
+    description: "Utilization % = actual_production_time / planned_production_time"
+    enforcement: "Service layer calculation"
+  - rule: "Color Gradient Thresholds"
+    description: "Red: 0-50%, Yellow: 50-80%, Green: 80-100%"
+    enforcement: "Frontend color utility function"
+  - rule: "Time Granularity"
+    description: "Hourly shows 24 cells, Daily shows 7 days, Weekly shows 4 weeks"
+    enforcement: "API aggregation based on granularity param"
+
+# Context Summary
+summary: |
+  Story 10.10 implements machine utilization heatmap visualization for OEE analytics.
+
+  MVP SCOPE (This Story):
+  - GET /api/oee/analytics/utilization endpoint
+  - Heatmap grid component (machines x time)
+  - Color gradient: Red/Yellow/Green based on utilization %
+  - Time granularity selector: Hourly, Daily, Weekly
+  - Hover tooltips with exact utilization data
+  - Date range picker for historical analysis
+
+  KEY FEATURES:
+  - Visual identification of idle periods and underutilized machines
+  - Peak usage time identification for capacity planning
+  - Color-coded cells for quick assessment
+  - Interactive tooltips with detailed metrics
+
+  INTEGRATION POINTS:
+  - Data from oee_snapshots table (Story 10.4)
+  - Embedded in Performance Dashboard (Story 10.12)
+  - Uses machine data from Story 01.3

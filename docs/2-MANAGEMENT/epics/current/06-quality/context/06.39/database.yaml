@@ -1,0 +1,10 @@
+# Story 06.39 - Quality Analytics Database
+
+materialized_views:
+  - quality_defect_pareto_mv: "Top defects by frequency (90 days)"
+  - quality_root_cause_frequency_mv: "Root cause frequency (90 days)"
+
+refresh_function: refresh_quality_analytics_mvs()
+refresh_schedule: "Hourly"
+
+notes: "Reads from existing tables, no new tables"

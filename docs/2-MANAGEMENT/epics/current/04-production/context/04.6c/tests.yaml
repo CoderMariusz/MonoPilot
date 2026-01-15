@@ -1,0 +1,166 @@
+# Story 04.6c - Test Specifications
+
+test_files:
+  unit:
+    - path: "apps/frontend/lib/services/__tests__/consumption-service.test.ts"
+    - path: "apps/frontend/components/production/consumption/__tests__/FullLPRequiredBadge.test.tsx"
+    - path: "apps/frontend/components/scanner/__tests__/NumberPad.test.tsx"
+  integration:
+    - path: "apps/frontend/app/api/production/work-orders/[woId]/consume/__tests__/full-lp.test.ts"
+  e2e:
+    - path: "e2e/production/one-to-one-consumption.spec.ts"
+
+unit_tests:
+  consumption_service:
+    - test: "validateFullLPConsumption returns error when partial qty for consume_whole_lp=true"
+      given: "consume_whole_lp=true, LP.qty=100, consumeQty=50"
+      when: "validateFullLPConsumption is called"
+      then: "returns { valid: false, error: 'FULL_LP_REQUIRED', lpQty: 100 }"
+
+    - test: "validateFullLPConsumption returns success when full qty for consume_whole_lp=true"
+      given: "consume_whole_lp=true, LP.qty=100, consumeQty=100"
+      when: "validateFullLPConsumption is called"
+      then: "returns { valid: true }"
+
+    - test: "validateFullLPConsumption allows partial for consume_whole_lp=false"
+      given: "consume_whole_lp=false, LP.qty=100, consumeQty=50"
+      when: "validateFullLPConsumption is called"
+      then: "returns { valid: true }"
+
+    - test: "recordConsumption sets is_full_lp=true when full LP consumed"
+      given: "LP.qty=100, consumeQty=100"
+      when: "recordConsumption is called"
+      then: "consumption record has is_full_lp=true"
+
+  full_lp_badge:
+    - test: "FullLPRequiredBadge renders lock icon"
+      given: "component rendered"
+      when: "displayed"
+      then: "lock icon is visible"
+
+    - test: "FullLPRequiredBadge uses correct colors for desktop variant"
+      given: "variant='desktop'"
+      when: "rendered"
+      then: "background is Yellow-900, text is Yellow-300"
+
+    - test: "FullLPRequiredBadge uses correct colors for scanner variant"
+      given: "variant='scanner'"
+      when: "rendered"
+      then: "background is Yellow-600, text is Yellow-900"
+
+  number_pad:
+    - test: "NumberPad disables all keys when disabled=true"
+      given: "disabled=true"
+      when: "rendered"
+      then: "all keys have opacity 50%, cursor not-allowed, onClick ignored"
+
+    - test: "NumberPad keys not clickable when disabled"
+      given: "disabled=true"
+      when: "key [5] clicked"
+      then: "onChange not called, value unchanged"
+
+    - test: "NumberPad keys work when disabled=false"
+      given: "disabled=false, value='10'"
+      when: "key [5] clicked"
+      then: "onChange called with '105'"
+
+integration_tests:
+  full_lp_api:
+    - test: "POST /consume returns FULL_LP_REQUIRED when partial qty for consume_whole_lp=true"
+      given: "wo_material.consume_whole_lp=true, LP.qty=100"
+      when: "POST with consume_qty=50"
+      then: "status 400, error='FULL_LP_REQUIRED', lp_qty=100, requested_qty=50"
+
+    - test: "POST /consume succeeds when full qty for consume_whole_lp=true"
+      given: "wo_material.consume_whole_lp=true, LP.qty=100"
+      when: "POST with consume_qty=100"
+      then: "status 201, consumption created with is_full_lp=true"
+
+    - test: "POST /consume allows partial when consume_whole_lp=false"
+      given: "wo_material.consume_whole_lp=false, LP.qty=100"
+      when: "POST with consume_qty=50"
+      then: "status 201, consumption created"
+
+    - test: "POST /consume records variance when LP.qty differs from required"
+      given: "consume_whole_lp=true, LP.qty=100, required=90"
+      when: "POST with consume_qty=100"
+      then: "consumption created, variance calculated as +11%"
+
+e2e_tests:
+  - scenario: "Desktop - Full LP Required badge displays"
+    steps:
+      - "Navigate to /production/consumption/:woId"
+      - "Find material with consume_whole_lp=true (Water)"
+      - "Verify 'Full LP Required' badge displays with lock icon"
+      - "Verify badge has Yellow-900 background"
+
+  - scenario: "Desktop - Qty input locked for consume_whole_lp=true"
+    steps:
+      - "Navigate to /production/consumption/:woId"
+      - "Click [+] on material with consume_whole_lp=true"
+      - "Select an LP (LP-2025-08900 with 1500 L)"
+      - "Verify Step 2 shows qty input pre-filled with 1500"
+      - "Verify qty input is disabled (read-only)"
+      - "Verify lock icon displays next to input"
+      - "Verify warning banner 'This material requires full LP consumption' displays"
+      - "Attempt to edit qty input"
+      - "Verify input value remains 1500"
+
+  - scenario: "Desktop - Error when partial qty submitted"
+    steps:
+      - "Navigate to /production/consumption/:woId"
+      - "Click [+] on material with consume_whole_lp=true"
+      - "Select LP with qty=100"
+      - "Somehow modify consume_qty to 50 (bypass UI lock via API)"
+      - "Submit consumption"
+      - "Verify error 'Full LP consumption required. LP quantity is 100' displays"
+
+  - scenario: "Scanner - Number pad disabled for consume_whole_lp=true"
+    steps:
+      - "Navigate to /scanner/consume"
+      - "Scan WO barcode"
+      - "Select material with consume_whole_lp=true"
+      - "Scan LP barcode (LP.qty=500)"
+      - "Verify Step 3 shows qty display with 500"
+      - "Verify lock icon displays next to qty"
+      - "Verify number pad is grayed out (50% opacity)"
+      - "Tap number pad key [5]"
+      - "Verify qty still shows 500 (key tap ignored)"
+
+  - scenario: "Scanner - Full Consumption button works for consume_whole_lp=true"
+    steps:
+      - "Navigate to /scanner/consume"
+      - "Scan WO barcode"
+      - "Select material with consume_whole_lp=true"
+      - "Scan LP barcode (LP.qty=500)"
+      - "Verify [Full Consumption (500 kg)] button is enabled"
+      - "Tap [Full Consumption (500 kg)]"
+      - "Verify skips to Step 4 Review"
+      - "Verify Review shows qty=500"
+
+  - scenario: "Variance recorded when LP.qty differs from required"
+    steps:
+      - "Set up: material requires 90 kg, LP has 100 kg"
+      - "Consume full LP (100 kg) for consume_whole_lp=true material"
+      - "Verify consumption recorded"
+      - "Verify variance shows +11% in materials table"
+      - "Verify is_full_lp=true in consumption record"
+
+performance:
+  - metric: "Badge render time"
+    target: "< 50ms"
+    test: "Measure time to render FullLPRequiredBadge component"
+
+  - metric: "Full LP validation response"
+    target: "< 100ms"
+    test: "Measure time for validateFullLPConsumption to complete"
+
+accessibility_tests:
+  - test: "Full LP Required badge has accessible label"
+    verify: "aria-label='Full LP Required' on badge"
+
+  - test: "Disabled number pad is announced by screen reader"
+    verify: "aria-disabled='true' on number pad container"
+
+  - test: "Read-only qty input has accessible description"
+    verify: "aria-describedby points to warning message"

@@ -1,0 +1,129 @@
+# Database Context: 08.16 - Timeline View & Reporting
+# Optional materialized view for timeline performance
+
+database:
+  new_tables: []  # No new tables required
+
+  views:
+    - name: "npd_timeline_view"
+      type: "VIEW (materialized optional)"
+      description: "Performance optimization for timeline queries"
+      columns:
+        - name: "id"
+          type: "INTEGER"
+          description: "Project ID"
+        - name: "project_number"
+          type: "VARCHAR(50)"
+          description: "Project number"
+        - name: "name"
+          type: "VARCHAR(200)"
+          description: "Project name"
+        - name: "status"
+          type: "VARCHAR(20)"
+          description: "Project status"
+        - name: "current_gate"
+          type: "VARCHAR(10)"
+          description: "Current gate (G1-G5)"
+        - name: "category"
+          type: "VARCHAR(50)"
+          description: "Product category"
+        - name: "owner_id"
+          type: "UUID"
+          description: "Owner user ID"
+        - name: "owner_name"
+          type: "VARCHAR(100)"
+          description: "Owner name (joined from users)"
+        - name: "created_at"
+          type: "TIMESTAMPTZ"
+          description: "Project created date (timeline start)"
+        - name: "target_launch_date"
+          type: "DATE"
+          description: "Target launch date (timeline end)"
+        - name: "is_overdue"
+          type: "BOOLEAN"
+          description: "Calculated: target_launch_date < NOW() AND status NOT IN ('launched', 'cancelled')"
+        - name: "duration_days"
+          type: "INTEGER"
+          description: "Calculated: EXTRACT(DAY FROM target_launch_date - created_at)"
+        - name: "org_id"
+          type: "UUID"
+          description: "Organization ID"
+      indexes:
+        - "idx_timeline_view_org_created ON (org_id, created_at)"
+      rls_policies:
+        - name: "timeline_view_org"
+          type: "SELECT"
+          rule: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  existing_tables_used:
+    - table: "npd_projects"
+      columns: ["id", "project_number", "name", "status", "current_gate", "category", "owner_id", "created_at", "target_launch_date", "actual_launch_date", "org_id"]
+      purpose: "Primary data source for timeline"
+    - table: "npd_formulations"
+      columns: ["id", "project_id", "formulation_number", "target_cost", "estimated_cost", "actual_cost", "created_at", "approved_at", "approved_by_id"]
+      purpose: "Cost history export"
+    - table: "npd_gate_checklists"
+      columns: ["id", "project_id", "gate", "checklist_items", "completed_items"]
+      purpose: "Compliance checklist PDF"
+    - table: "npd_compliance_documents"
+      columns: ["id", "project_id", "type", "filename", "uploaded_at", "uploaded_by_id"]
+      purpose: "Compliance checklist PDF"
+    - table: "users"
+      columns: ["id", "name", "email"]
+      purpose: "Join for owner names, approver names"
+
+  queries:
+    - name: "timeline_data_query"
+      type: "SELECT"
+      description: "Fetch timeline data with filters"
+      sql: |
+        SELECT
+          p.id,
+          p.project_number,
+          p.name,
+          p.status,
+          p.current_gate,
+          p.category,
+          p.owner_id,
+          u.name AS owner_name,
+          p.created_at,
+          p.target_launch_date,
+          CASE
+            WHEN p.target_launch_date < NOW() AND p.status NOT IN ('launched', 'cancelled') THEN true
+            ELSE false
+          END AS is_overdue,
+          EXTRACT(DAY FROM p.target_launch_date - p.created_at) AS duration_days
+        FROM npd_projects p
+        LEFT JOIN users u ON p.owner_id = u.id
+        WHERE p.org_id = $1 AND p.status != 'cancelled'
+        -- Filters: gate, category, owner_id, status, date_from, date_to
+        ORDER BY p.created_at ASC
+
+    - name: "cost_history_export_query"
+      type: "SELECT"
+      description: "Fetch cost history for all formulations"
+      sql: |
+        SELECT
+          p.project_number,
+          f.formulation_number,
+          f.target_cost,
+          f.estimated_cost,
+          c.actual_cost,
+          (c.actual_cost - f.target_cost) AS variance,
+          ((c.actual_cost - f.target_cost) / NULLIF(f.target_cost, 0)) * 100 AS variance_pct,
+          f.created_at,
+          c.approved_at,
+          u.name AS approved_by
+        FROM npd_formulations f
+        JOIN npd_projects p ON f.project_id = p.id
+        LEFT JOIN npd_costing c ON c.formulation_id = f.id
+        LEFT JOIN users u ON c.approved_by_id = u.id
+        WHERE p.org_id = $1
+        -- Optional: project_id filter
+        ORDER BY p.project_number, f.formulation_number
+
+migration_file: "YYYYMMDDHHMMSS_create_npd_timeline_view.sql"
+migration_notes:
+  - "View is optional - only create if performance requires (>100 projects)"
+  - "View can be materialized for faster queries"
+  - "RLS policy ensures org isolation"

@@ -1,0 +1,243 @@
+# Story 04.7a: Output Registration Desktop - Frontend Components
+
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/page.tsx"
+    description: "Output Registration page for desktop users"
+    route: "/production/outputs/:woId"
+
+components:
+  - name: "WOSummaryCard"
+    file_path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/components/WOSummaryCard.tsx"
+    props:
+      wo:
+        type: "WorkOrderSummary"
+        required: true
+    internal_state: []
+    description: "Displays WO number, status, product, batch, and quantity progress with visual progress bar"
+
+  - name: "YieldSummaryCard"
+    file_path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/components/YieldSummaryCard.tsx"
+    props:
+      yields:
+        type: "YieldData"
+        required: true
+      onViewMaterialConsumption:
+        type: "function"
+        required: false
+    internal_state: []
+    description: "Shows overall yield, output yield, material yield, operation yield with color coding and trend indicators"
+
+  - name: "OutputHistoryTable"
+    file_path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/components/OutputHistoryTable.tsx"
+    props:
+      outputs:
+        type: "OutputLP[]"
+        required: true
+      summary:
+        type: "OutputSummary"
+        required: true
+      onRegisterOutput:
+        type: "function"
+        required: true
+      onExportCSV:
+        type: "function"
+        required: true
+      onViewLP:
+        type: "function"
+        required: true
+      onPrintLabel:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "qaStatusFilter"
+        type: "string | null"
+      - name: "locationFilter"
+        type: "string | null"
+      - name: "sortColumn"
+        type: "string"
+      - name: "sortDirection"
+        type: "asc | desc"
+    description: "Filterable and sortable table showing all registered outputs with actions"
+
+  - name: "ByProductsSection"
+    file_path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/components/ByProductsSection.tsx"
+    props:
+      byProducts:
+        type: "ByProduct[]"
+        required: true
+      autoCreateEnabled:
+        type: "boolean"
+        required: true
+      onRegisterByProduct:
+        type: "function"
+        required: true
+      onRegisterAll:
+        type: "function"
+        required: true
+      onViewLPs:
+        type: "function"
+        required: true
+    internal_state: []
+    description: "Shows by-products defined in BOM with expected vs actual quantities and registration status"
+
+  - name: "RegisterOutputModal"
+    file_path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/components/RegisterOutputModal.tsx"
+    props:
+      wo:
+        type: "WorkOrderSummary"
+        required: true
+      defaultLocation:
+        type: "Location"
+        required: false
+      requireQAStatus:
+        type: "boolean"
+        required: true
+      onConfirm:
+        type: "function"
+        required: true
+      onCancel:
+        type: "function"
+        required: true
+    internal_state:
+      - name: "quantity"
+        type: "number"
+      - name: "batchNumber"
+        type: "string"
+      - name: "qaStatus"
+        type: "string | null"
+      - name: "locationId"
+        type: "uuid"
+      - name: "expiryDate"
+        type: "Date"
+      - name: "notes"
+        type: "string"
+      - name: "errors"
+        type: "Record<string, string>"
+      - name: "isSubmitting"
+        type: "boolean"
+    description: "Modal form for registering new production output with validation and preview"
+
+  - name: "RegisterByProductModal"
+    file_path: "apps/frontend/app/(authenticated)/production/outputs/[woId]/components/RegisterByProductModal.tsx"
+    props:
+      byProduct:
+        type: "ByProduct"
+        required: true
+      mainOutputLpId:
+        type: "uuid"
+        required: true
+      expectedQty:
+        type: "number"
+        required: true
+      requireQAStatus:
+        type: "boolean"
+        required: true
+      onConfirm:
+        type: "function"
+        required: true
+      onCancel:
+        type: "function"
+        required: true
+      onSkip:
+        type: "function"
+        required: false
+    internal_state:
+      - name: "actualQty"
+        type: "number"
+      - name: "batchNumber"
+        type: "string"
+      - name: "qaStatus"
+        type: "string | null"
+      - name: "locationId"
+        type: "uuid"
+      - name: "expiryDate"
+        type: "Date"
+      - name: "showZeroWarning"
+        type: "boolean"
+    description: "Modal for registering by-product output with pre-calculated expected quantity"
+
+hooks:
+  - name: "useOutputRegistration"
+    file_path: "apps/frontend/lib/hooks/use-output-registration.ts"
+    returns:
+      - "pageData: OutputPageData"
+      - "isLoading: boolean"
+      - "error: Error | null"
+      - "registerOutput: (data: RegisterOutputInput) => Promise<void>"
+      - "registerByProduct: (data: RegisterByProductInput) => Promise<void>"
+      - "exportCSV: () => Promise<void>"
+      - "refetch: () => void"
+    description: "Custom hook managing output registration page state and API calls"
+
+services:
+  - name: "OutputService"
+    file_path: "apps/frontend/lib/services/output-service.ts"
+    methods:
+      - "getOutputPageData(woId: string): Promise<OutputPageData>"
+      - "registerOutput(data: RegisterOutputInput): Promise<RegisterOutputResponse>"
+      - "exportOutputsCSV(woId: string): Promise<Blob>"
+
+  - name: "ByProductService"
+    file_path: "apps/frontend/lib/services/by-product-service.ts"
+    methods:
+      - "registerByProduct(data: RegisterByProductInput): Promise<RegisterByProductResponse>"
+      - "calculateExpectedQty(plannedQty: number, yieldPercent: number): number"
+      - "generateByProductBatch(mainBatch: string, productCode: string): string"
+
+  - name: "YieldService"
+    file_path: "apps/frontend/lib/services/yield-service.ts"
+    methods:
+      - "calculateOutputYield(outputQty: number, plannedQty: number): number"
+      - "calculateMaterialYield(plannedMaterial: number, actualConsumed: number): number"
+      - "getYieldColor(yieldPercent: number): 'green' | 'yellow' | 'red'"
+
+validation:
+  file_path: "apps/frontend/lib/validation/output.ts"
+  schemas:
+    - name: "registerOutputSchema"
+      fields:
+        quantity: "z.number().positive('Quantity must be greater than 0')"
+        batchNumber: "z.string().min(1).max(50)"
+        qaStatus: "z.enum(['approved', 'pending', 'rejected']).optional()"
+        locationId: "z.string().uuid()"
+        expiryDate: "z.date()"
+        notes: "z.string().max(500).optional()"
+    - name: "registerByProductSchema"
+      fields:
+        quantity: "z.number().min(0)"
+        batchNumber: "z.string().min(1).max(50)"
+        qaStatus: "z.enum(['approved', 'pending', 'rejected']).optional()"
+        locationId: "z.string().uuid()"
+        expiryDate: "z.date()"
+
+wireframe_refs:
+  - wireframe_id: "PROD-004"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-004-part1-output-registration-desktop.md"
+    sections:
+      - "WO Summary Card"
+      - "Yield Summary Card"
+      - "Output History Table"
+      - "By-Products Section"
+  - wireframe_id: "PROD-004-part2"
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-004-part2-modals-and-specs.md"
+    sections:
+      - "Register Output Modal"
+      - "Register By-Product Modal"
+      - "Validation Rules"
+      - "API Endpoints"
+
+ui_states:
+  loading:
+    description: "Skeleton loaders for WO Summary, Yield Summary, Output History, By-Products"
+    components: ["WOSummaryCard", "YieldSummaryCard", "OutputHistoryTable", "ByProductsSection"]
+  empty:
+    description: "No outputs registered state with illustration and prompt to register first output"
+    message: "No outputs registered yet. Register your first output to start tracking production progress."
+    action: "[Register First Output] button"
+  error:
+    description: "Error card with warning icon, error message, and retry button"
+    message: "Failed to load output data"
+    actions: ["Retry", "Back to WO Detail"]
+  success:
+    description: "Full data display with all sections populated and interactive"
+    features: ["Filters", "Sorting", "Pagination", "All actions available"]

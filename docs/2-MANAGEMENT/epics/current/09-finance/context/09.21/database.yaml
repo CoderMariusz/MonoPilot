@@ -1,0 +1,30 @@
+# Story 09.21 - Database Context
+# Generated: 2026-01-15
+
+migrations:
+  - name: "create_table_XXX"
+    type: "create_table"
+    path: "supabase/migrations/YYYYMMDD_create_XXX.sql"
+
+tables:
+  - name: "table_name"
+    description: "Table description"
+    columns:
+      - name: "id"
+        type: "UUID"
+        primary_key: true
+      - name: "org_id"
+        type: "UUID"
+        references: "organizations(id)"
+        rls: true
+    rls_policies:
+      - name: "org_isolation"
+        operation: "SELECT"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - columns: ["org_id"]
+        type: "btree"
+
+functions: []
+triggers: []
+views: []

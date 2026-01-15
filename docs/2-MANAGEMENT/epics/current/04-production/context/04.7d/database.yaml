@@ -1,0 +1,213 @@
+# Story 04.7d - Database Schema
+# Purpose: Cumulative output tracking and auto-complete trigger
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_add_wo_output_qty_tracking.sql"
+    type: "migration"
+    description: "Add output_qty to work_orders, create aggregation trigger"
+
+# Tables Modified
+tables_modified:
+  - name: "work_orders"
+    description: "Work Orders - add cumulative output tracking"
+    existing_table: true
+    source: "Story 03.10 - Work Order CRUD"
+    added_columns:
+      - name: "output_qty"
+        type: "DECIMAL(15,4)"
+        constraints: "NOT NULL DEFAULT 0"
+        description: "Cumulative output quantity (excludes by-products)"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "production_outputs"
+    description: "Output records - existing table"
+    existing_table: true
+    source: "Story 04.7a - Output Registration Desktop"
+    used_columns:
+      - name: "quantity"
+        type: "DECIMAL(15,4)"
+        description: "Individual output quantity"
+      - name: "is_by_product"
+        type: "BOOLEAN"
+        description: "Exclude from output_qty aggregation"
+    rls: true
+
+# Migration SQL
+migration_sql: |
+  -- Add output_qty to work_orders
+  ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS output_qty DECIMAL(15,4) NOT NULL DEFAULT 0;
+
+  -- Create function to update WO output_qty
+  CREATE OR REPLACE FUNCTION update_wo_output_qty()
+  RETURNS TRIGGER AS $$
+  DECLARE
+    v_total_qty DECIMAL(15,4);
+  BEGIN
+    -- Calculate sum of non-by-product outputs
+    SELECT COALESCE(SUM(quantity), 0)
+    INTO v_total_qty
+    FROM production_outputs
+    WHERE wo_id = COALESCE(NEW.wo_id, OLD.wo_id)
+    AND is_by_product = false;
+
+    -- Update work_orders
+    UPDATE work_orders
+    SET output_qty = v_total_qty,
+        updated_at = NOW()
+    WHERE id = COALESCE(NEW.wo_id, OLD.wo_id);
+
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  -- Create trigger for INSERT
+  DROP TRIGGER IF EXISTS trg_update_wo_output_qty_insert ON production_outputs;
+  CREATE TRIGGER trg_update_wo_output_qty_insert
+    AFTER INSERT ON production_outputs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_wo_output_qty();
+
+  -- Create trigger for UPDATE
+  DROP TRIGGER IF EXISTS trg_update_wo_output_qty_update ON production_outputs;
+  CREATE TRIGGER trg_update_wo_output_qty_update
+    AFTER UPDATE OF quantity, is_by_product ON production_outputs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_wo_output_qty();
+
+  -- Create trigger for DELETE
+  DROP TRIGGER IF EXISTS trg_update_wo_output_qty_delete ON production_outputs;
+  CREATE TRIGGER trg_update_wo_output_qty_delete
+    AFTER DELETE ON production_outputs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_wo_output_qty();
+
+  -- Create function for auto-complete check
+  CREATE OR REPLACE FUNCTION check_wo_auto_complete()
+  RETURNS TRIGGER AS $$
+  DECLARE
+    v_auto_complete BOOLEAN;
+    v_planned_qty DECIMAL(15,4);
+  BEGIN
+    -- Get auto_complete setting and planned_qty
+    SELECT
+      ps.auto_complete_wo,
+      NEW.planned_qty
+    INTO v_auto_complete, v_planned_qty
+    FROM production_settings ps
+    WHERE ps.org_id = NEW.org_id
+    LIMIT 1;
+
+    -- Check if auto-complete should trigger
+    IF v_auto_complete = true
+      AND NEW.output_qty >= v_planned_qty
+      AND NEW.status = 'in_progress' THEN
+
+      NEW.status := 'completed';
+      NEW.completed_at := NOW();
+    END IF;
+
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  -- Create trigger for auto-complete
+  DROP TRIGGER IF EXISTS trg_check_wo_auto_complete ON work_orders;
+  CREATE TRIGGER trg_check_wo_auto_complete
+    BEFORE UPDATE OF output_qty ON work_orders
+    FOR EACH ROW
+    EXECUTE FUNCTION check_wo_auto_complete();
+
+  -- Index for output aggregation
+  CREATE INDEX IF NOT EXISTS idx_production_outputs_wo_active
+    ON production_outputs(wo_id, is_by_product)
+    WHERE is_by_product = false;
+
+# Triggers
+triggers:
+  - name: "update_wo_output_qty"
+    table: "production_outputs"
+    event: "AFTER INSERT, UPDATE, DELETE"
+    action: "Recalculate and update work_orders.output_qty"
+    condition: "is_by_product = false outputs only"
+
+  - name: "check_wo_auto_complete"
+    table: "work_orders"
+    event: "BEFORE UPDATE OF output_qty"
+    action: "Set status = 'completed' if auto_complete_wo AND output_qty >= planned_qty"
+
+# Data Queries
+queries:
+  get_outputs_for_wo: |
+    SELECT
+      po.id,
+      po.wo_id,
+      po.lp_id,
+      lp.lp_number,
+      po.quantity,
+      po.uom,
+      lp.batch_number,
+      lp.qa_status,
+      lp.location_id,
+      loc.name as location_name,
+      loc.full_path as location_path,
+      lp.expiry_date,
+      po.created_at,
+      po.created_by,
+      u.name as created_by_name,
+      po.notes
+    FROM production_outputs po
+    JOIN license_plates lp ON lp.id = po.lp_id
+    JOIN locations loc ON loc.id = lp.location_id
+    JOIN users u ON u.id = po.created_by
+    WHERE po.wo_id = :wo_id
+    AND po.is_by_product = false
+    AND po.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    ORDER BY po.created_at DESC
+    LIMIT :limit OFFSET :offset
+
+  get_wo_progress: |
+    SELECT
+      wo.id,
+      wo.wo_number,
+      wo.planned_qty,
+      wo.output_qty,
+      wo.status,
+      CASE
+        WHEN wo.planned_qty > 0 THEN (wo.output_qty / wo.planned_qty * 100)
+        ELSE 0
+      END as progress_percent,
+      GREATEST(0, wo.planned_qty - wo.output_qty) as remaining_qty,
+      COUNT(po.id) as outputs_count
+    FROM work_orders wo
+    LEFT JOIN production_outputs po ON po.wo_id = wo.id AND po.is_by_product = false
+    WHERE wo.id = :wo_id
+    AND wo.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    GROUP BY wo.id
+
+  get_outputs_summary: |
+    SELECT
+      COUNT(*) as total_outputs,
+      COALESCE(SUM(po.quantity), 0) as total_qty,
+      COUNT(*) FILTER (WHERE lp.qa_status = 'approved') as approved_count,
+      COUNT(*) FILTER (WHERE lp.qa_status = 'pending') as pending_count,
+      COUNT(*) FILTER (WHERE lp.qa_status = 'rejected') as rejected_count,
+      COALESCE(SUM(po.quantity) FILTER (WHERE lp.qa_status = 'approved'), 0) as approved_qty,
+      COALESCE(SUM(po.quantity) FILTER (WHERE lp.qa_status = 'pending'), 0) as pending_qty,
+      COALESCE(SUM(po.quantity) FILTER (WHERE lp.qa_status = 'rejected'), 0) as rejected_qty
+    FROM production_outputs po
+    JOIN license_plates lp ON lp.id = po.lp_id
+    WHERE po.wo_id = :wo_id
+    AND po.is_by_product = false
+    AND po.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+# Progress Calculation
+progress_calculation:
+  formula: "(output_qty / planned_qty) * 100"
+  notes:
+    - "output_qty excludes by-products"
+    - "Progress can exceed 100% (over-production)"
+    - "Displayed as percentage with progress bar"
+    - "Real-time update after each output registration"

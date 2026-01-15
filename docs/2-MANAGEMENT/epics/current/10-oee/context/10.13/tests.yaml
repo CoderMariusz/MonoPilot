@@ -1,0 +1,48 @@
+# Story 10.13 - Test Specification
+# Purpose: Report builder acceptance criteria
+# Agent: QA-AGENT
+
+acceptance_criteria:
+  - id: "AC-01"
+    given: "user on /oee/reports/builder"
+    when: "selects metrics: OEE, Downtime; dimension: Machine; filter: Last 7 Days; chart: Bar"
+    then: "preview shows bar chart with OEE and downtime by machine"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "custom report built"
+    when: "user clicks [Save Template] and enters name 'Weekly Machine Performance'"
+    then: "template saved and appears in My Templates list"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "saved template 'Weekly Machine Performance'"
+    when: "user clicks [Run]"
+    then: "report generated with current data matching saved configuration"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "template marked as public"
+    when: "other org user tries to access"
+    then: "still not visible (public only within org)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/report-builder-service.test.ts"
+    type: "unit"
+  - path: "apps/frontend/app/api/oee/reports/__tests__/api.test.ts"
+    type: "integration"
+  - path: "tests/e2e/oee-report-builder.spec.ts"
+    type: "e2e"
+
+definition_of_done:
+  - "Report builder UI with drag-drop metric selection"
+  - "Template CRUD works"
+  - "Report generation produces correct data"
+  - "Templates isolated by org"
+  - "Unit tests >80% coverage"

@@ -1,0 +1,155 @@
+endpoints:
+  - name: "Compare Formulations"
+    method: "GET"
+    path: "/api/npd/formulations/compare"
+    auth: required
+    roles: ["NPD_LEAD", "R&D", "VIEWER"]
+
+    query_params:
+      - name: "v1"
+        type: "number"
+        required: true
+        description: "First formulation ID to compare"
+      - name: "v2"
+        type: "number"
+        required: true
+        description: "Second formulation ID to compare"
+
+    response_200:
+      type: "CompareFormulationsResponse"
+      schema:
+        v1:
+          type: "FormulationWithItems"
+          description: "First formulation with all items"
+        v2:
+          type: "FormulationWithItems"
+          description: "Second formulation with all items"
+        diff:
+          added: "ProductDiff[]"
+          removed: "ProductDiff[]"
+          changed: "ProductDiff[]"
+          unchanged: "ProductDiff[]"
+        summary:
+          v1_total_items: "number"
+          v2_total_items: "number"
+          added_count: "number"
+          removed_count: "number"
+          changed_count: "number"
+          cost_difference: "CostDifference | null"
+
+    response_400:
+      - "Invalid version IDs (not numbers)"
+      - "Versions from different projects"
+
+    response_404:
+      - "One or both formulations not found"
+
+    response_403:
+      - "User not authorized to view formulations"
+
+    implementation:
+      - "Validate both formulation IDs exist"
+      - "Validate both from same npd_project_id"
+      - "Fetch formulations with joined items and product details"
+      - "Fetch costing data for both (if available)"
+      - "Calculate diff using product_id as key"
+      - "Return comparison response with diff categorization"
+
+  - name: "Clone Formulation"
+    method: "POST"
+    path: "/api/npd/formulations/:id/clone"
+    auth: required
+    roles: ["NPD_LEAD", "R&D"]
+
+    path_params:
+      - name: "id"
+        type: "number"
+        description: "Source formulation ID to clone"
+
+    request_body:
+      formulation_number:
+        type: "string"
+        required: true
+        pattern: "v\\d+\\.\\d+"
+        example: "v3.0"
+      total_qty:
+        type: "number"
+        required: false
+        description: "Override total quantity (defaults to source)"
+      uom:
+        type: "string"
+        required: false
+        description: "Override UoM (defaults to source)"
+      effective_from:
+        type: "string"
+        format: "date"
+        required: false
+      effective_to:
+        type: "string"
+        format: "date"
+        required: false
+      notes:
+        type: "string"
+        max_length: 2000
+        required: false
+
+    response_201:
+      type: "CloneFormulationResponse"
+      schema:
+        formulation:
+          type: "Formulation"
+          description: "Newly created formulation"
+        cloned_items_count:
+          type: "number"
+          description: "Number of items copied"
+        parent_version:
+          type: "string"
+          description: "Source formulation version (e.g., v2.0)"
+
+    response_400:
+      - "Invalid formulation_number format"
+      - "Duplicate version number for project"
+      - "effective_to before effective_from"
+      - "Invalid total_qty (must be > 0)"
+
+    response_404:
+      - "Source formulation not found"
+
+    response_403:
+      - "User not authorized to create formulations"
+
+    implementation:
+      - "Validate source formulation exists and accessible"
+      - "Validate new version number unique for project"
+      - "Create new formulation record with status 'draft'"
+      - "Set parent_formulation_id to source ID"
+      - "Copy all formulation_items using INSERT...SELECT"
+      - "Auto-recalculate percentages if total_qty changed (trigger)"
+      - "Return new formulation with items count"
+
+validation:
+  compareFormulationsQuerySchema:
+    v1: "z.coerce.number().int().positive()"
+    v2: "z.coerce.number().int().positive()"
+
+  cloneFormulationSchema:
+    formulation_number: "z.string().regex(/^v\\d+\\.\\d+$/, 'Must be format v1.0, v2.1, etc.')"
+    total_qty: "z.number().positive().optional()"
+    uom: "z.string().min(1).max(20).optional()"
+    effective_from: "z.string().datetime().optional().nullable()"
+    effective_to: "z.string().datetime().optional().nullable()"
+    notes: "z.string().max(2000).optional()"
+    refine: "effective_to >= effective_from if both provided"
+
+error_codes:
+  FORMULATIONS_NOT_FOUND: "One or both formulations not found"
+  DIFFERENT_PROJECTS: "Cannot compare formulations from different projects"
+  DUPLICATE_VERSION: "Version number already exists for this project"
+  INVALID_VERSION_FORMAT: "Version must be in format v1.0, v1.1, v2.0"
+  SOURCE_NOT_FOUND: "Source formulation not found"
+  UNAUTHORIZED: "User not authorized for this operation"
+
+performance:
+  compare_load_time: "<500ms for 50 items each"
+  clone_execution: "<300ms including items copy"
+  diff_calculation: "O(n) where n = max(items_v1, items_v2)"

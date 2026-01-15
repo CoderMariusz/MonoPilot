@@ -94,7 +94,7 @@ export async function POST(
       )
     }
 
-    // 1. Get BOM with items, routing, and product
+    // 1. Get BOM with items and product (fetch routing separately to avoid join issues)
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select(`
@@ -109,15 +109,6 @@ export async function POST(
           code,
           name,
           std_price
-        ),
-        routing:routings (
-          id,
-          code,
-          name,
-          setup_cost,
-          working_cost_per_unit,
-          overhead_percent,
-          currency
         ),
         items:bom_items (
           id,
@@ -144,15 +135,36 @@ export async function POST(
       )
     }
 
-    // 2. Check if BOM has routing assigned
-    if (!bom.routing_id || !bom.routing) {
+    // 2. Fetch routing separately if routing_id is set
+    let routingData: {
+      id: string
+      code: string
+      name: string
+      setup_cost: number
+      working_cost_per_unit: number
+      overhead_percent: number
+      currency: string
+    } | null = null
+
+    if (bom.routing_id) {
+      const { data: routing } = await supabase
+        .from('routings')
+        .select('id, code, name, setup_cost, working_cost_per_unit, overhead_percent, currency')
+        .eq('id', bom.routing_id)
+        .single()
+
+      routingData = routing
+    }
+
+    // 3. Check if BOM has routing assigned
+    if (!bom.routing_id || !routingData) {
       return NextResponse.json(
         { error: 'Assign routing to BOM to calculate labor costs', code: 'NO_ROUTING_ASSIGNED' },
         { status: 422 }
       )
     }
 
-    // 3. Check for missing ingredient costs
+    // 4. Check for missing ingredient costs
     const missingCosts: string[] = []
     for (const item of bom.items || []) {
       // eslint-disable-next-line
@@ -174,13 +186,11 @@ export async function POST(
     }
 
     // eslint-disable-next-line
-    const routing = (bom as any).routing
-    // eslint-disable-next-line
     const product = (bom as any).product
     const batchSize = Number(bom.output_qty) || 1
-    const currency = routing?.currency || 'PLN'
+    const currency = routingData.currency || 'PLN'
 
-    // 4. Calculate material costs
+    // 5. Calculate material costs
     let totalMaterialCost = 0
     const materials: MaterialCostBreakdown[] = []
     const warnings: string[] = []
@@ -214,7 +224,7 @@ export async function POST(
 
     totalMaterialCost = roundCurrency(totalMaterialCost)
 
-    // 5. Get routing operations and calculate labor cost
+    // 6. Get routing operations and calculate labor cost
     // Column names from migration 047: operation_name, expected_duration_minutes, setup_time_minutes, cleanup_time_minutes, labor_cost
     const { data: operations, error: opsError } = await supabase
       .from('routing_operations')
@@ -278,26 +288,26 @@ export async function POST(
 
     totalLaborCost = roundCurrency(totalLaborCost)
 
-    // 6. Calculate routing-level costs
-    const setupCost = roundCurrency(Number(routing.setup_cost) || 0)
-    const workingCostPerUnit = Number(routing.working_cost_per_unit) || 0
+    // 7. Calculate routing-level costs
+    const setupCost = roundCurrency(Number(routingData.setup_cost) || 0)
+    const workingCostPerUnit = Number(routingData.working_cost_per_unit) || 0
     const totalWorkingCost = roundCurrency(workingCostPerUnit * batchSize)
     const totalRoutingCost = roundCurrency(setupCost + totalWorkingCost)
 
     const routingBreakdown: RoutingCostBreakdown = {
-      routing_id: routing.id,
-      routing_code: routing.code,
+      routing_id: routingData.id,
+      routing_code: routingData.code,
       setup_cost: setupCost,
       working_cost_per_unit: workingCostPerUnit,
       total_working_cost: totalWorkingCost,
       total_routing_cost: totalRoutingCost
     }
 
-    // 7. Calculate overhead
+    // 8. Calculate overhead
     const subtotalBeforeOverhead = roundCurrency(
       totalMaterialCost + totalLaborCost + totalRoutingCost
     )
-    const overheadPercent = Number(routing.overhead_percent) || 0
+    const overheadPercent = Number(routingData.overhead_percent) || 0
     const overheadCost = roundCurrency((subtotalBeforeOverhead * overheadPercent) / 100)
 
     const overhead: OverheadBreakdown = {
@@ -307,11 +317,11 @@ export async function POST(
       overhead_cost: overheadCost
     }
 
-    // 8. Calculate total cost
+    // 9. Calculate total cost
     const totalCost = roundCurrency(subtotalBeforeOverhead + overheadCost)
     const costPerUnit = roundCurrency(totalCost / batchSize)
 
-    // 9. Calculate percentages
+    // 10. Calculate percentages
     if (totalMaterialCost > 0) {
       for (const mat of materials) {
         mat.percentage = roundCurrency((mat.total_cost / totalMaterialCost) * 100)
@@ -324,7 +334,7 @@ export async function POST(
       }
     }
 
-    // 10. Margin analysis
+    // 11. Margin analysis
     let marginAnalysis = undefined
     const stdPrice = Number(product?.std_price)
     const targetMarginPercent = 30
@@ -339,7 +349,7 @@ export async function POST(
       }
     }
 
-    // 11. Store in product_costs table
+    // 12. Store in product_costs table
     const effectiveFrom = new Date().toISOString().split('T')[0]
 
     // First, close any existing open cost records for this product

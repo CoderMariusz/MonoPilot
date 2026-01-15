@@ -1,0 +1,116 @@
+# Story 06.27 - CoA Templates Test Specifications
+
+unit_tests:
+  file: lib/services/__tests__/coa-template-service.test.ts
+  coverage: ">80%"
+
+  test_suites:
+    - suite: "CoATemplateService.create"
+      tests:
+        - "creates template with correct fields"
+        - "generates template number"
+        - "validates product_id XOR product_type"
+        - "handles missing template gracefully"
+
+    - suite: "CoATemplateService.approve"
+      tests:
+        - "changes status to approved"
+        - "creates version snapshot"
+        - "requires QA_MANAGER role"
+        - "prevents approval of draft without all fields"
+
+    - suite: "CoATemplateService.activate"
+      tests:
+        - "sets is_active = true"
+        - "deactivates other templates for same product/type"
+        - "trigger works correctly"
+
+    - suite: "CoATemplateService.duplicate"
+      tests:
+        - "creates new template with new number"
+        - "copies all fields except id, number, version"
+        - "sets status to draft"
+        - "deep copies JSONB fields"
+
+integration_tests:
+  file: app/api/quality/coa-templates/__tests__/route.test.ts
+
+  test_suites:
+    - endpoint: "POST /api/quality/coa-templates"
+      tests:
+        - "creates template with valid data"
+        - "returns 400 for both product_id and product_type"
+        - "returns 400 for invalid parameter_config"
+        - "enforces org_id from auth"
+
+    - endpoint: "POST /api/quality/coa-templates/:id/approve"
+      tests:
+        - "approves template"
+        - "creates version snapshot"
+        - "returns 403 for non-QA_MANAGER"
+        - "returns 400 for non-pending template"
+
+    - endpoint: "POST /api/quality/coa-templates/:id/upload-logo"
+      tests:
+        - "uploads PNG file successfully"
+        - "returns 400 for invalid file type"
+        - "returns 400 for file > 2MB"
+        - "returns CDN URL"
+
+e2e_tests:
+  file: e2e/quality/coa-templates.spec.ts
+
+  scenarios:
+    - name: "Create and approve template workflow"
+      steps:
+        - "Navigate to CoA Templates"
+        - "Click [+ New Template]"
+        - "Fill name, product type"
+        - "Enter header/footer text"
+        - "Upload logo"
+        - "Select 3 parameters"
+        - "Add compliance statements"
+        - "Click [Preview]"
+        - "Verify preview renders correctly"
+        - "Click [Save Draft]"
+        - "Verify success toast"
+        - "Click [Submit for Approval]"
+        - "Login as QA_MANAGER"
+        - "Navigate to template"
+        - "Click [Approve]"
+        - "Enter approval notes"
+        - "Verify status = 'approved'"
+        - "Verify version snapshot created"
+
+    - name: "Activate template and verify deactivation"
+      steps:
+        - "Create template A for product_type = 'Flour'"
+        - "Approve template A"
+        - "Activate template A"
+        - "Create template B for product_type = 'Flour'"
+        - "Approve template B"
+        - "Activate template B"
+        - "Verify template A.is_active = false"
+        - "Verify template B.is_active = true"
+
+acceptance_criteria_mapping:
+  AC-1: "unit_tests.CoATemplateService.create"
+  AC-2: "integration_tests.POST /api/quality/coa-templates"
+  AC-3: "e2e_tests.create_and_approve_workflow"
+  AC-4: "unit_tests.CoATemplateService.selectParameters"
+  AC-5: "integration_tests.POST upload-logo"
+  AC-6: "unit_tests.CoATemplateService.versioning"
+  AC-7: "unit_tests.CoATemplateService.approve"
+  AC-8: "e2e_tests.activate_template"
+  AC-9: "unit_tests.CoATemplateService.generatePreview"
+  AC-10: "unit_tests.CoATemplateService.duplicate"
+
+performance_tests:
+  - name: "Template list with 100 templates"
+    target: "<500ms response time"
+
+  - name: "Template preview generation"
+    target: "<2s render time"
+
+  - name: "Logo upload (1MB file)"
+    target: "<5s upload time"
