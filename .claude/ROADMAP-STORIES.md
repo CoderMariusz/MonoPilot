@@ -14,17 +14,18 @@
 | 02 | Technical | 23 (17+6) | 17 MVP done | MVP COMPLETE + Phase 2 defined | 74% impl / 100% def |
 | 03 | Planning | 30 (20+10) | 19 MVP done | MVP COMPLETE + Phase 2-3 defined | 63% impl / 100% def |
 | 04 | Production | 18 (7+11) | 7 Phase 0 done | Phase 0 COMPLETE + Phase 1-2 defined | 39% impl / 100% def |
-| 05 | Warehouse | 20 | 20 | COMPLETE | 100% |
+| 05 | Warehouse | 29 (20+9) | 20 Phase 1 done | MVP COMPLETE + Phase 2 defined | 69% impl / 100% def |
 | 06 | Quality | 41 | 0 | NOT STARTED | 0% |
 | 07 | Shipping | 16 | 0 | NOT STARTED | 0% |
 | 08-11 | Premium | 78-97 | 0 | NO STORIES | 0% |
 
-**TOTAL:** 88/127 stories zaimplementowanych w Epic 01-05 (~69%)
+**TOTAL:** 88/136 stories zaimplementowanych w Epic 01-05 (~65%)
 **Note:**
 - Epic 01 has 10 Phase 1B-3 stories defined (01.17-01.26) for security, integrations, enterprise
 - Epic 02 has 6 Phase 2 stories defined (02.16-02.21) covering remaining P2 FR
 - Epic 03 has 10 Phase 2-3 stories defined (03.18-03.27) for forecasting, MRP, supplier quality, EDI
 - Epic 04 has 11 Phase 1-2 stories defined (04.6a-e, 04.7a-d, 04.8, 04.9a-d, 04.10a-g) for full production + OEE
+- Epic 05 has 9 Phase 2 stories defined (05.20-05.28) for scanner workflows, pallets, capacity, cycle counts
 
 ---
 
@@ -305,21 +306,23 @@
 
 ---
 
-## EPIC 05 - WAREHOUSE COMPLETE 100%
+## EPIC 05 - WAREHOUSE 100% STORY DEFINITION | 69% IMPLEMENTED
 
-**Status:** Wszystkie 20 stories zaimplementowane!
+**Status:** MVP COMPLETE (20/20 Phase 1 stories) + 9 Phase 2 stories defined
+
+### Phase 1 - MVP (COMPLETE)
 
 | Story | Nazwa | Status | Testy | AC |
 |-------|-------|--------|-------|-----|
 | 05.0 | Warehouse Settings | COMPLETE | 38/38 | pass |
 | 05.1 | LP Table + CRUD | COMPLETE | 126/126 | 12/12 |
 | 05.2 | LP Genealogy | COMPLETE | 138/138 | pass |
-| 05.3 | LP Reservations | COMPLETE | 64/64 | pass |
-| 05.4 | FIFO/FEFO | COMPLETE | 160/160 | pass |
-| 05.5 | LP CRUD Desktop | COMPLETE | 251/251 | pass |
+| 05.3 | LP Reservations + FIFO/FEFO | COMPLETE | 64/64 | pass |
+| 05.4 | LP Status Management | COMPLETE | 160/160 | pass |
+| 05.5 | LP Search Filters | COMPLETE | 251/251 | pass |
 | 05.6 | LP Detail History | COMPLETE | 344/344 | pass |
 | 05.7 | Warehouse Dashboard | COMPLETE | 87/87 | pass |
-| 05.8 | LP Stock Moves | COMPLETE | 82/82 | pass |
+| 05.8 | ASN CRUD Items | COMPLETE | 82/82 | pass |
 | 05.9 | ASN Receive Workflow | COMPLETE | 14/24 | pass |
 | 05.10 | GRN CRUD Items | COMPLETE | 73/73 | pass |
 | 05.11 | GRN from PO | COMPLETE | 111/111 | pass |
@@ -332,10 +335,36 @@
 | 05.18 | LP Merge Workflow | COMPLETE | 137/149 | pass |
 | 05.19 | Scanner Receive | COMPLETE | 74/74 | pass |
 
-**Metryki:**
+**Metryki Phase 1:**
 - Lacznie testow: **2,265+**
 - Data ukonczenia: 2026-01-09
 - Wszystkie critical issues rozwiazane
+- Completion rate: 100% ✅
+
+### Phase 2 - Advanced Features (STORIES DEFINED)
+
+| Story | Nazwa | Status | FR | Complexity | Uwagi |
+|-------|-------|--------|-----|------------|-------|
+| 05.20 | Scanner Move Workflow | NOT STARTED | 1 FR | M (3-4d) | Mobile LP moves with location scan |
+| 05.21 | Scanner Putaway Workflow | NOT STARTED | 1 FR | M (3-4d) | Guided putaway with FIFO/FEFO zones |
+| 05.22 | Pallet Management | NOT STARTED | 1 FR | L (5-7d) | Pallet CRUD, add/remove LPs, close |
+| 05.23 | GS1 SSCC Support | NOT STARTED | 1 FR | M (3-4d) | SSCC-18 pallet codes, GS1-128 barcodes |
+| 05.24 | Catch Weight Support | NOT STARTED | 1 FR | M (3-4d) | Variable weight per unit, scale integration |
+| 05.25 | Cycle Count | NOT STARTED | 1 FR | L (5-7d) | Count plans, variance analysis, ABC |
+| 05.26 | Location Capacity Management | NOT STARTED | 1 FR | M (3-4d) | Max capacity, occupancy, visual indicators |
+| 05.27 | Zone Management | NOT STARTED | 1 FR | M (3-4d) | Zone CRUD, location assignment, preferred zones |
+| 05.28 | Expiry Alerts Dashboard | NOT STARTED | 1 FR | M (2-3d) | Expiring soon widget, multi-tier alerts |
+
+**Metryki Phase 2:**
+- Stories created: 2026-01-14 (some pre-existed, completed today)
+- Total documentation: ~295KB (9 files: 05.20-05.28)
+- Estimated effort: 32-44 days
+- FR coverage: 9 additional FR (WH-FR-012,013,016,018,021,023,025,026,030)
+
+**Status:**
+- Phase 1 (MVP): 100% COMPLETE ✅ (20/20 stories, 2,265+ tests, 2026-01-09)
+- Phase 2 (Advanced): 100% STORIES DEFINED ✅ Implementation pending
+- Epic 05: 100% story definition complete | 69% implemented (20/29 stories)
 
 ---
 
@@ -446,10 +475,10 @@ Potem: Implementacja
 ## CHECKSUM
 
 ```
-Wygenerowano: 2026-01-14 22:10 UTC
-Zrodlo: .claude/checkpoints/*.yaml + Epic 01-04 gap analysis
-Stories zaimplementowane: 88/127 (Epic 01-05)
-Stories do implementacji: 21 (Epic 04 Phase 1-2) + 10 (Epic 01 Phase 1B-3) + 6 (Epic 02 Phase 2) + 10 (Epic 03 Phase 2-3)
+Wygenerowano: 2026-01-15 00:52 UTC
+Zrodlo: .claude/checkpoints/*.yaml + Epic 01-05 gap analysis
+Stories zaimplementowane: 88/136 (Epic 01-05)
+Stories do implementacji: 21 (Epic 04 Phase 1-2) + 10 (Epic 01 Phase 1B-3) + 6 (Epic 02 Phase 2) + 10 (Epic 03 Phase 2-3) + 9 (Epic 05 Phase 2)
 Stories do napisania: 78-97 (Epic 08-11)
 Epic 01 story definition: 100% complete (26 stories: 16 MVP + 10 Phase 1B-3)
 Epic 01 implementation: 62% (16/26 MVP done, 10 Phase 1B-3 pending)
@@ -457,11 +486,14 @@ Epic 02 story definition: 100% complete (23 stories: 17 MVP + 6 Phase 2)
 Epic 02 implementation: 74% (17/23 MVP done, 6 Phase 2 pending)
 Epic 03 story definition: 100% complete (30 stories: 20 MVP + 10 Phase 2-3)
 Epic 03 implementation: 63% (19/30 MVP ~done, 10 Phase 2-3 pending, 1 in progress, 1 blocked)
-Epic 04 story definition: 100% complete (18 stories: 7 Phase 0 + 10 Phase 1 + 11 Phase 2)
+Epic 04 story definition: 100% complete (18 stories: 7 Phase 0 + 11 Phase 1-2)
 Epic 04 implementation: 39% (7/18 Phase 0 done, 11 Phase 1-2 pending)
-Epic 05 completion date: 2026-01-09
+Epic 05 story definition: 100% complete (29 stories: 20 Phase 1 + 9 Phase 2)
+Epic 05 implementation: 69% (20/29 Phase 1 done, 9 Phase 2 pending)
+Epic 05 Phase 1 completion date: 2026-01-09
 Epic 01 Phase 1B-3 stories: 01.17-01.26 (security, integrations, enterprise)
 Epic 02 Phase 2 stories: 02.16-02.21 (created 2026-01-14, 184KB)
 Epic 03 Phase 2-3 stories: 03.18-03.27 (created 2026-01-14, 376KB)
 Epic 04 Phase 1-2 stories: 04.6a-e, 04.7a-d, 04.8, 04.9a-d, 04.10a-g (created 2026-01-14, ~440KB)
+Epic 05 Phase 2 stories: 05.20-05.28 (completed 2026-01-14, ~295KB)
 ```

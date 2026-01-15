@@ -1,11 +1,11 @@
-# Epic 05 - Warehouse Module - Implementation Plan v2.0
+# Epic 05 - Warehouse Module - Implementation Plan v3.0
 
-**Date:** 2026-01-02
-**Epic:** 05-warehouse (License Plates, GRN/ASN, Stock Moves, Scanner)
-**Status:** Ready for Implementation
-**Total Stories:** 40 (8 Phase 0 + 8 Phase 1 + 8 Phase 2 + 10 Phase 3 + 6 Phase 4)
+**Date:** 2026-01-02 (Updated: 2026-01-14)
+**Epic:** 05-warehouse (License Plates, GRN/ASN, Stock Moves, Scanner, Pallets, Cycle Counts)
+**Status:** Phase 1 COMPLETE (20/20) | Phase 2 Stories Defined (9 stories)
+**Total Stories:** 29 (20 Phase 1 + 9 Phase 2)
 **Max Parallel Tracks:** 4
-**CRITICAL:** Phase 0 UNBLOCKS Epic 04 Production (10 stories waiting)
+**Story Definition:** 100% complete (Phase 2 stories completed 2026-01-14)
 
 ---
 
@@ -672,9 +672,75 @@ agent_context_template: |
 
 ---
 
-**Generated:** 2026-01-02
-**Version:** 2.0
-**Author:** Claude (AI Agent)
-**Changes:** Corrected false parallelism, dependency inconsistencies, unrealistic milestones
-**Total Duration:** 82 days (14 sprints)
-**Critical Path:** 05.0 → 05.1 → Epic 04 Unblock (Day 7-8)
+## Phase 2: Advanced Features (NEW - 2026-01-14)
+
+**Status:** Phase 1 COMPLETE | Phase 2 Stories Defined
+**Stories:** 9 (05.20-05.28)
+**Estimated Effort:** 32-44 days
+
+### Phase 2 Stories
+
+**Scanner Workflows (2 stories):**
+- **05.20** Scanner Move Workflow (M, 3-4d) - Mobile LP moves with location scan
+- **05.21** Scanner Putaway Workflow (M, 3-4d) - Guided putaway with FIFO/FEFO
+
+**Pallet & GS1 (2 stories):**
+- **05.22** Pallet Management (L, 5-7d) - Pallet CRUD, add/remove LPs
+- **05.23** GS1 SSCC Support (M, 3-4d) - SSCC-18 pallet codes
+
+**Inventory Management (5 stories):**
+- **05.24** Catch Weight Support (M, 3-4d) - Variable weight, scale integration
+- **05.25** Cycle Count (L, 5-7d) - Count plans, variance, ABC analysis
+- **05.26** Location Capacity Management (M, 3-4d) - Max capacity, occupancy
+- **05.27** Zone Management (M, 3-4d) - Zone CRUD, preferred zones
+- **05.28** Expiry Alerts Dashboard (M, 2-3d) - Expiring soon widget
+
+### Phase 2 Dependencies
+
+```
+Scanner Workflows:
+05.20 ← 05.1 (LP Table), 05.16 (Stock Moves)
+05.21 ← 05.3 (FIFO/FEFO), 05.16 (Stock Moves)
+
+Pallets:
+05.22 ← 05.1 (LP Table)
+05.23 ← 05.22 (Pallet Management)
+
+Inventory:
+05.24 ← 05.1 (LP Table)
+05.25 ← 05.1 (LP Table), 05.16 (Stock Adjustment)
+05.26 ← 01.9 (Locations)
+05.27 ← 01.9 (Locations)
+05.28 ← 05.1 (LP Table with expiry_date)
+```
+
+**All dependencies satisfied** (Phase 1 complete)
+
+### Recommended Implementation Order
+
+**Track A: Scanner Workflows (6-8 days)**
+1. 05.20 Scanner Move (3-4d)
+2. 05.21 Scanner Putaway (3-4d)
+
+**Track B: Pallets & GS1 (8-11 days)**
+1. 05.22 Pallet Management (5-7d)
+2. 05.23 GS1 SSCC Support (3-4d)
+
+**Track C: Inventory Features (18-25 days - can parallelize)**
+1. 05.24 Catch Weight (3-4d)
+2. 05.25 Cycle Count (5-7d)
+3. 05.26 Location Capacity (3-4d)
+4. 05.27 Zone Management (3-4d)
+5. 05.28 Expiry Alerts (2-3d)
+
+**Optimal Parallel:** Tracks A, B, C run simultaneously → **18-25 days total**
+
+---
+
+**Generated:** 2026-01-02 (Updated: 2026-01-14)
+**Version:** 3.0
+**Author:** Claude (AI Agent) + ORCHESTRATOR
+**Changes v3.0:** Added Phase 2 stories (9 stories, ~295KB documentation)
+**Actual Implementation:** Phase 1 complete 2026-01-09 (20 stories, 2,265 tests)
+**Phase 2 Status:** Stories defined, ready for implementation
+**Critical Achievement:** Epic 04 Phase 1 UNBLOCKED ✅

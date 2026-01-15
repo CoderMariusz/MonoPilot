@@ -483,17 +483,16 @@ epic_04_production:
     defer: "After Phase 1 complete"
 
 # =============================================================================
-# EPIC 05 - WAREHOUSE (100% COMPLETE!)
+# EPIC 05 - WAREHOUSE (100% Story Definition, 69% Implementation)
 # =============================================================================
 
 epic_05_warehouse:
-  status: "COMPLETE"
-  total_stories: 20
+  status: "MVP_COMPLETE_PHASE_2_DEFINED"
+  total_stories: 29  # 20 Phase 1 + 9 Phase 2
   complete: 20
-  partial: 0
-  blocked: 0
-  not_started: 0
-  completion_percentage: 100
+  not_started: 9
+  completion_percentage_implementation: 69
+  completion_percentage_definition: 100
   completion_date: "2026-01-09"
   total_tests: 2265
   last_verified: "2026-01-14"
@@ -504,13 +503,13 @@ epic_05_warehouse:
       - {id: "05.0", name: "Warehouse Settings", status: "✅ COMPLETE", tests: "38/38"}
       - {id: "05.1", name: "LP Table + CRUD", status: "✅ COMPLETE", tests: "126/126"}
       - {id: "05.2", name: "LP Genealogy", status: "✅ COMPLETE", tests: "138/138"}
-      - {id: "05.3", name: "LP Reservations", status: "✅ COMPLETE", tests: "64/64"}
-      - {id: "05.4", name: "FIFO/FEFO", status: "✅ COMPLETE", tests: "160/160"}
-      - {id: "05.5", name: "LP CRUD Desktop", status: "✅ COMPLETE", tests: "251/251"}
+      - {id: "05.3", name: "LP Reservations + FIFO/FEFO", status: "✅ COMPLETE", tests: "64/64"}
+      - {id: "05.4", name: "LP Status Management", status: "✅ COMPLETE", tests: "160/160"}
+      - {id: "05.5", name: "LP Search Filters", status: "✅ COMPLETE", tests: "251/251"}
       - {id: "05.6", name: "LP Detail History", status: "✅ COMPLETE", tests: "344/344"}
       - {id: "05.7", name: "Warehouse Dashboard", status: "✅ COMPLETE", tests: "87/87"}
-      - {id: "05.8", name: "LP Stock Moves", status: "✅ COMPLETE", tests: "82/82"}
-      - {id: "05.9", name: "ASN Receive", status: "✅ COMPLETE", tests: "14/24"}
+      - {id: "05.8", name: "ASN CRUD Items", status: "✅ COMPLETE", tests: "82/82"}
+      - {id: "05.9", name: "ASN Receive Workflow", status: "✅ COMPLETE", tests: "14/24"}
 
   phase_1_goods_receipt:
     status: "✅ COMPLETE"
@@ -522,7 +521,7 @@ epic_05_warehouse:
       - {id: "05.14", name: "LP Label Printing", status: "✅ COMPLETE", tests: "113/123"}
       - {id: "05.15", name: "Over-Receipt Handling", status: "✅ COMPLETE", tests: "66/66"}
 
-  phase_2_scanner_workflows:
+  phase_1_scanner_workflows:
     status: "✅ COMPLETE"
     stories:
       - {id: "05.16", name: "Stock Moves CRUD", status: "✅ COMPLETE", tests: "74/74"}
@@ -530,12 +529,34 @@ epic_05_warehouse:
       - {id: "05.18", name: "LP Merge Workflow", status: "✅ COMPLETE", tests: "137/149"}
       - {id: "05.19", name: "Scanner Receive", status: "✅ COMPLETE", tests: "74/74"}
 
+  phase_2_advanced_features:
+    status: "STORIES_DEFINED"
+    total_stories: 9
+    ready: 9
+    completion_percentage: 0
+    documentation: "~295KB (completed 2026-01-14)"
+
+    stories:
+      - {id: "05.20", name: "Scanner Move Workflow", complexity: M, days: "3-4", fr: "WH-FR-012"}
+      - {id: "05.21", name: "Scanner Putaway Workflow", complexity: M, days: "3-4", fr: "WH-FR-013"}
+      - {id: "05.22", name: "Pallet Management", complexity: L, days: "5-7", fr: "WH-FR-016"}
+      - {id: "05.23", name: "GS1 SSCC Support", complexity: M, days: "3-4", fr: "WH-FR-018"}
+      - {id: "05.24", name: "Catch Weight Support", complexity: M, days: "3-4", fr: "WH-FR-021"}
+      - {id: "05.25", name: "Cycle Count", complexity: L, days: "5-7", fr: "WH-FR-023"}
+      - {id: "05.26", name: "Location Capacity Management", complexity: M, days: "3-4", fr: "WH-FR-025"}
+      - {id: "05.27", name: "Zone Management", complexity: M, days: "3-4", fr: "WH-FR-026"}
+      - {id: "05.28", name: "Expiry Alerts Dashboard", complexity: M, days: "2-3", fr: "WH-FR-030"}
+
+    effort_estimate: "32-44 days"
+    note: "Some stories pre-existed, all completed/verified 2026-01-14"
+
   achievement:
-    description: "Epic 05 Warehouse module 100% complete!"
+    description: "Epic 05 Warehouse Phase 1 100% complete! Phase 2 stories defined."
     completion_date: "2026-01-09"
     stories_completed: 20
     total_tests: 2265
     unblocks: ["Epic 04 Phase 1", "Epic 07 Phase 1B"]
+    story_definition: "100% (29 stories: 20 Phase 1 + 9 Phase 2)"
 
 # =============================================================================
 # EPIC 06-11 - NOT YET IMPLEMENTED
