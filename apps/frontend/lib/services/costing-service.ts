@@ -94,17 +94,20 @@ function roundCurrency(value: number): number {
  *
  * @param bomId - UUID of the BOM to calculate cost for
  * @param quantity - Number of output units (default: 1)
+ * @param orgId - Organization ID for RLS filtering (required for cross-table joins)
  * @returns BOMCostBreakdown with detailed cost breakdown
  */
 export async function calculateTotalBOMCost(
   bomId: string,
-  quantity: number = 1
+  quantity: number = 1,
+  orgId?: string
 ): Promise<CostCalculationResult> {
   try {
     const supabase = await createServerSupabase()
 
     // 1. Get BOM with items (fetch routing separately to avoid join issues)
-    const { data: bom, error: bomError } = await supabase
+    // Include org_id filter for reliable RLS with cross-table joins
+    let bomQuery = supabase
       .from('boms')
       .select(`
         id,
@@ -125,9 +128,16 @@ export async function calculateTotalBOMCost(
         )
       `)
       .eq('id', bomId)
-      .single()
+
+    // Add org_id filter if provided (recommended for cross-table RLS reliability)
+    if (orgId) {
+      bomQuery = bomQuery.eq('org_id', orgId)
+    }
+
+    const { data: bom, error: bomError } = await bomQuery.single()
 
     if (bomError || !bom) {
+      console.error('BOM fetch error:', bomError)
       return {
         success: false,
         error: {
@@ -276,9 +286,10 @@ export async function calculateTotalBOMCost(
  * Useful for pricing and margin calculations
  */
 export async function calculateUnitCost(
-  bomId: string
+  bomId: string,
+  orgId?: string
 ): Promise<{ success: true; unitCost: number; currency: string } | { success: false; error: CostCalculationError }> {
-  const result = await calculateTotalBOMCost(bomId, 1)
+  const result = await calculateTotalBOMCost(bomId, 1, orgId)
 
   if (!result.success) {
     return { success: false, error: result.error }
@@ -286,11 +297,16 @@ export async function calculateUnitCost(
 
   // Get BOM output quantity
   const supabase = await createServerSupabase()
-  const { data: bom } = await supabase
+  let query = supabase
     .from('boms')
     .select('output_qty')
     .eq('id', bomId)
-    .single()
+
+  if (orgId) {
+    query = query.eq('org_id', orgId)
+  }
+
+  const { data: bom } = await query.single()
 
   const outputQty = bom?.output_qty || 1
   const unitCost = roundCurrency(result.data.totalCost / outputQty)
@@ -309,7 +325,8 @@ export async function calculateUnitCost(
 export async function compareBOMCosts(
   bomId1: string,
   bomId2: string,
-  quantity: number = 1
+  quantity: number = 1,
+  orgId?: string
 ): Promise<{
   bom1: BOMCostBreakdown | null
   bom2: BOMCostBreakdown | null
@@ -324,8 +341,8 @@ export async function compareBOMCosts(
   } | null
 }> {
   const [result1, result2] = await Promise.all([
-    calculateTotalBOMCost(bomId1, quantity),
-    calculateTotalBOMCost(bomId2, quantity)
+    calculateTotalBOMCost(bomId1, quantity, orgId),
+    calculateTotalBOMCost(bomId2, quantity, orgId)
   ])
 
   const bom1 = result1.success ? result1.data : null

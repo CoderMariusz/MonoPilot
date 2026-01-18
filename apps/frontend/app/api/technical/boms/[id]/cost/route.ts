@@ -79,8 +79,8 @@ export async function GET(
       )
     }
 
-    // Calculate BOM cost
-    const result = await calculateTotalBOMCost(id, quantity)
+    // Calculate BOM cost - pass org_id for reliable RLS with cross-table joins
+    const result = await calculateTotalBOMCost(id, quantity, currentUser.org_id)
 
     if (!result.success) {
       const statusCode = result.error.code === 'BOM_NOT_FOUND' ? 404 : 500

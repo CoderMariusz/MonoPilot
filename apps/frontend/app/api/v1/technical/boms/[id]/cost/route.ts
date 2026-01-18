@@ -251,7 +251,7 @@ export async function GET(
         const cleanupTime = Number(op.cleanup_time_minutes) || 0
         // labor_cost is stored as hourly rate in the DB
         const laborRate = Number(op.labor_cost) || 0
-        // eslint-disable-next-line
+         
         const machine = (op as any).machine
 
         const setupCost = roundCurrency((setupTime / 60) * laborRate)

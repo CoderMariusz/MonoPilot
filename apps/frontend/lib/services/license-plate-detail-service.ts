@@ -114,17 +114,33 @@ export interface BadgeColors {
 }
 
 // =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Check if string is a valid UUID
+ */
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(str)
+}
+
+// =============================================================================
 // LP Detail Methods
 // =============================================================================
 
 /**
  * Get LP detail with all joined relationships
+ * Accepts either UUID or LP number
  */
 export async function getLPDetail(
   supabase: SupabaseClient,
-  id: string
+  idOrLpNumber: string
 ): Promise<LPDetailView | null> {
-  const { data, error } = await supabase
+  // Determine if input is UUID or LP number
+  const isUUID = isValidUUID(idOrLpNumber)
+
+  const query = supabase
     .from('license_plates')
     .select(`
       *,
@@ -133,8 +149,11 @@ export async function getLPDetail(
       location:locations(id, full_path),
       created_by_user:users!created_by(first_name, last_name)
     `)
-    .eq('id', id)
-    .single()
+
+  // Query by UUID or LP number
+  const { data, error } = isUUID
+    ? await query.eq('id', idOrLpNumber).single()
+    : await query.eq('lp_number', idOrLpNumber).single()
 
   if (error) {
     if (error.code === 'PGRST116') {

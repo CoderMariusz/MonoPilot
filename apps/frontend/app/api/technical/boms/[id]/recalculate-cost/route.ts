@@ -59,8 +59,8 @@ export async function POST(
       return NextResponse.json({ error: 'BOM not found' }, { status: 404 })
     }
 
-    // Calculate BOM cost
-    const result = await calculateTotalBOMCost(id, bom.output_qty || 1)
+    // Calculate BOM cost - pass org_id for reliable RLS with cross-table joins
+    const result = await calculateTotalBOMCost(id, bom.output_qty || 1, currentUser.org_id)
 
     if (!result.success) {
       const statusCode = result.error.code === 'BOM_NOT_FOUND' ? 404 : 500

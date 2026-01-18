@@ -38,6 +38,19 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
   Table,
   TableBody,
   TableCell,
@@ -62,6 +75,8 @@ import {
   ChevronUp,
   Save,
   FileText,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -171,6 +186,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
   // ==================== ITEM FORM STATE ====================
   const [showItemForm, setShowItemForm] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [componentComboboxOpen, setComponentComboboxOpen] = useState(false)
   const [itemForm, setItemForm] = useState({
     component_id: '',
     quantity: '',
@@ -289,9 +305,8 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
   }, [open, isEditMode, initialData])
 
   // ==================== ITEM HANDLERS ====================
-  const componentProducts = allProducts.filter(p =>
-    p.type && ['RM', 'ING', 'PKG', 'WIP'].includes(p.type)
-  )
+  // Show all products as components - user can search/filter by typing
+  const componentProducts = allProducts
 
   // Auto-fill UoM when component selected
   useEffect(() => {
@@ -631,29 +646,64 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
                     </Button>
                   </div>
 
-                  {/* Component Selector */}
+                  {/* Component Selector - Searchable Combobox */}
                   {!editingItemId && (
                     <div className="space-y-2">
                       <Label>Component *</Label>
-                      <Select
-                        value={itemForm.component_id}
-                        onValueChange={(v) => setItemForm(prev => ({ ...prev, component_id: v }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select material..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {componentProducts.map(p => (
-                            <SelectItem key={p.id} value={p.id}>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">{p.type}</Badge>
-                                <span>{p.code}</span>
-                                <span className="text-gray-500">- {p.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={componentComboboxOpen} onOpenChange={setComponentComboboxOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={componentComboboxOpen}
+                            className="w-full justify-between font-normal"
+                          >
+                            {itemForm.component_id ? (
+                              <span className="flex items-center gap-2 truncate">
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  {componentProducts.find(p => p.id === itemForm.component_id)?.type}
+                                </Badge>
+                                <span className="truncate">
+                                  {componentProducts.find(p => p.id === itemForm.component_id)?.code} - {componentProducts.find(p => p.id === itemForm.component_id)?.name}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">Select material...</span>
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[500px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search by code or name..." />
+                            <CommandList>
+                              <CommandEmpty>No product found.</CommandEmpty>
+                              <CommandGroup>
+                                {componentProducts.map(p => (
+                                  <CommandItem
+                                    key={p.id}
+                                    value={`${p.code} ${p.name}`}
+                                    onSelect={() => {
+                                      setItemForm(prev => ({ ...prev, component_id: p.id }))
+                                      setComponentComboboxOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        itemForm.component_id === p.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <Badge variant="outline" className="text-xs mr-2">{p.type}</Badge>
+                                    <span className="font-medium">{p.code}</span>
+                                    <span className="text-gray-500 ml-2 truncate">- {p.name}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   )}
 
