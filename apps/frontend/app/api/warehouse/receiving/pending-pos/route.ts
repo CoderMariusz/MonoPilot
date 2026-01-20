@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
         status,
         supplier_id,
         suppliers:supplier_id(name),
-        expected_date,
+        expected_delivery_date,
         warehouse_id,
         warehouses:warehouse_id(name, code),
         created_at
@@ -101,11 +101,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (date_from) {
-      query = query.gte('expected_date', date_from)
+      query = query.gte('expected_delivery_date', date_from)
     }
 
     if (date_to) {
-      query = query.lte('expected_date', date_to)
+      query = query.lte('expected_delivery_date', date_to)
     }
 
     // Apply sorting
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
       status: po.status,
       supplier_id: po.supplier_id,
       supplier_name: po.suppliers?.name || '',
-      expected_date: po.expected_date,
+      expected_date: po.expected_delivery_date,
       warehouse_id: po.warehouse_id,
       warehouse_name: po.warehouses?.name || '',
       warehouse_code: po.warehouses?.code || '',

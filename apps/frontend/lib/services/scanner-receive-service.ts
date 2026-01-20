@@ -38,7 +38,7 @@ interface PurchaseOrder {
   id: string
   po_number: string
   status: string
-  expected_date: string
+  expected_delivery_date: string
   org_id: string
   warehouse_id: string
   supplier?: { id: string; name: string }
@@ -49,7 +49,7 @@ interface POLine {
   id: string
   po_id: string
   product_id: string
-  ordered_qty: number
+  quantity: number
   received_qty: number
   uom: string
   product?: { name: string; code: string; require_batch?: boolean }
@@ -119,7 +119,7 @@ export class ScannerReceiveService {
 
     // 2. Get PO line
     const { data: poLine, error: lineError } = await supabase
-      .from('po_lines')
+      .from('purchase_order_lines')
       .select('*, product:products(name, code, require_batch)')
       .eq('id', poLineId)
       .eq('po_id', poId)
@@ -148,14 +148,14 @@ export class ScannerReceiveService {
     }
 
     // 6. Validate over-receipt
-    const remainingQty = poLine.ordered_qty - poLine.received_qty
+    const remainingQty = poLine.quantity - poLine.received_qty
     if (receivedQty > remainingQty) {
       if (!warehouseSettings?.allow_over_receipt) {
         throw new Error(`Over-receipt not allowed. Remaining: ${remainingQty}, Attempted: ${receivedQty}`)
       }
 
       const tolerancePct = warehouseSettings?.over_receipt_tolerance_pct || 0
-      const maxAllowed = poLine.ordered_qty * (1 + tolerancePct / 100)
+      const maxAllowed = poLine.quantity * (1 + tolerancePct / 100)
       const totalReceived = poLine.received_qty + receivedQty
 
       if (totalReceived > maxAllowed) {
@@ -265,7 +265,7 @@ export class ScannerReceiveService {
       grn_id: grn.id,
       product_id: poLine.product_id,
       po_line_id: poLineId,
-      ordered_qty: poLine.ordered_qty,
+      ordered_qty: poLine.quantity,
       received_qty: receivedQty,
       uom: poLine.uom,
       lp_id: lp.id,
@@ -281,20 +281,20 @@ export class ScannerReceiveService {
     // 13. Update PO line received_qty
     const newReceivedQty = poLine.received_qty + receivedQty
     await supabase
-      .from('po_lines')
+      .from('purchase_order_lines')
       .update({ received_qty: newReceivedQty })
       .eq('id', poLineId)
 
     // 14. Determine line and PO status
-    const poLineStatus: 'partial' | 'complete' = newReceivedQty >= poLine.ordered_qty ? 'complete' : 'partial'
+    const poLineStatus: 'partial' | 'complete' = newReceivedQty >= poLine.quantity ? 'complete' : 'partial'
 
     // Check if all PO lines are complete
     const { data: allLines } = await supabase
-      .from('po_lines')
-      .select('ordered_qty, received_qty')
+      .from('purchase_order_lines')
+      .select('quantity, received_qty')
       .eq('po_id', poId)
 
-    const allComplete = allLines?.every((line) => line.received_qty >= line.ordered_qty)
+    const allComplete = allLines?.every((line) => line.received_qty >= line.quantity)
     const poStatus: 'partial' | 'closed' = allComplete ? 'closed' : 'partial'
 
     // Update PO status if needed
@@ -367,13 +367,13 @@ export class ScannerReceiveService {
     // Check quantity vs ordered
     if (input.poLineId && input.receivedQty) {
       const { data: poLine } = await supabase
-        .from('po_lines')
-        .select('ordered_qty, received_qty')
+        .from('purchase_order_lines')
+        .select('quantity, received_qty')
         .eq('id', input.poLineId)
         .single()
 
       if (poLine) {
-        const remainingQty = poLine.ordered_qty - poLine.received_qty
+        const remainingQty = poLine.quantity - poLine.received_qty
         if (input.receivedQty > remainingQty) {
           if (!warehouseSettings?.allow_over_receipt) {
             errors.push({
@@ -381,7 +381,7 @@ export class ScannerReceiveService {
               message: `Over-receipt not allowed. Remaining: ${remainingQty}`,
             })
           } else {
-            const overPct = ((input.receivedQty - remainingQty) / poLine.ordered_qty) * 100
+            const overPct = ((input.receivedQty - remainingQty) / poLine.quantity) * 100
             warnings.push({
               field: 'received_qty',
               message: `Over-receipt by ${overPct.toFixed(1)}%`,
@@ -411,10 +411,10 @@ export class ScannerReceiveService {
       .select(`
         id,
         po_number,
-        expected_date,
+        expected_delivery_date,
         status,
         supplier:suppliers(name),
-        lines:po_lines(ordered_qty, received_qty)
+        lines:purchase_order_lines(quantity, received_qty)
       `)
       .in('status', RECEIVABLE_STATUSES)
 
@@ -422,7 +422,7 @@ export class ScannerReceiveService {
       query = query.eq('warehouse_id', warehouseId)
     }
 
-    query = query.order('expected_date', { ascending: true })
+    query = query.order('expected_delivery_date', { ascending: true })
 
     const { data, error } = await query
 
@@ -434,10 +434,10 @@ export class ScannerReceiveService {
       const lines = po.lines || []
       const linesTotal = lines.length
       const linesPending = lines.filter(
-        (l: { ordered_qty: number; received_qty: number }) => l.received_qty < l.ordered_qty
+        (l: { quantity: number; received_qty: number }) => l.received_qty < l.quantity
       ).length
       const totalQtyOrdered = lines.reduce(
-        (sum: number, l: { ordered_qty: number }) => sum + l.ordered_qty,
+        (sum: number, l: { quantity: number }) => sum + l.quantity,
         0
       )
       const totalQtyReceived = lines.reduce(
@@ -449,7 +449,7 @@ export class ScannerReceiveService {
         id: po.id,
         po_number: po.po_number,
         supplier_name: (po.supplier as unknown as { name: string } | null)?.name || 'Unknown',
-        expected_date: po.expected_date,
+        expected_date: po.expected_delivery_date,
         lines_total: linesTotal,
         lines_pending: linesPending,
         total_qty_ordered: totalQtyOrdered,
@@ -468,10 +468,10 @@ export class ScannerReceiveService {
       .select(`
         *,
         supplier:suppliers(id, name),
-        lines:po_lines(
+        lines:purchase_order_lines(
           id,
           product_id,
-          ordered_qty,
+          quantity,
           received_qty,
           uom,
           product:products(name, code)

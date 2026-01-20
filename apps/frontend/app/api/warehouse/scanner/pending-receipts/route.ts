@@ -76,12 +76,14 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('Pending receipts error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       {
         success: false,
         error: {
           code: 'INTERNAL_ERROR',
           message: 'Failed to fetch pending receipts',
+          details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
         },
       },
       { status: 500 }
