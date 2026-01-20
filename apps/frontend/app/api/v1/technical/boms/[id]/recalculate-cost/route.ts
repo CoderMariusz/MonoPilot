@@ -120,7 +120,7 @@ export async function POST(
             code,
             name,
             cost_per_unit,
-            uom
+            base_uom
           )
         )
       `)
@@ -213,7 +213,7 @@ export async function POST(
         ingredient_code: component.code,
         ingredient_name: component.name,
         quantity: quantity,
-        uom: component.uom,
+        uom: component.base_uom,
         unit_cost: unitCost,
         scrap_percent: scrapPercent,
         scrap_cost: scrapCost,

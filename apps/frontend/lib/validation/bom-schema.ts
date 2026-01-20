@@ -19,27 +19,37 @@ export const MAX_NOTES_LENGTH = 2000
 export const MAX_UOM_LENGTH = 20
 
 /**
- * Maps API status values (lowercase) to database status values (capitalized)
- * Used for INSERT/UPDATE operations
+ * Maps API status values to database status values
+ * Database uses lowercase: draft, active, phased_out, inactive
  *
  * @example
- * const dbStatus = API_TO_DB_STATUS['draft'] // 'Draft'
+ * const dbStatus = API_TO_DB_STATUS['draft'] // 'draft'
  */
 export const API_TO_DB_STATUS: Record<string, string> = {
-  draft: 'Draft',
-  active: 'Active',
-  phased_out: 'Phased Out',
-  inactive: 'Inactive',
+  draft: 'draft',
+  active: 'active',
+  phased_out: 'phased_out',
+  inactive: 'inactive',
+  // Also handle capitalized input for backwards compatibility
+  Draft: 'draft',
+  Active: 'active',
+  'Phased Out': 'phased_out',
+  Inactive: 'inactive',
 } as const
 
 /**
- * Maps database status values (capitalized) to API status values (lowercase)
+ * Maps database status values to API status values (both lowercase)
  * Used for SELECT operations and response formatting
  *
  * @example
- * const apiStatus = DB_TO_API_STATUS['Draft'] // 'draft'
+ * const apiStatus = DB_TO_API_STATUS['draft'] // 'draft'
  */
 export const DB_TO_API_STATUS: Record<string, string> = {
+  draft: 'draft',
+  active: 'active',
+  phased_out: 'phased_out',
+  inactive: 'inactive',
+  // Also handle capitalized DB values for backwards compatibility
   Draft: 'draft',
   Active: 'active',
   'Phased Out': 'phased_out',

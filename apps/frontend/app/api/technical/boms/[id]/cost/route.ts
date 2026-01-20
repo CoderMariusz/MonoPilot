@@ -44,7 +44,7 @@ export async function GET(
     // Get current user to verify org access
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('org_id, role:roles(code)')
+      .select('id, org_id, role:roles(code)')
       .eq('id', session.user.id)
       .single()
 
@@ -52,19 +52,33 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    console.log('[BOM Cost Route] User context:', {
+      userId: session.user.id,
+      orgId: currentUser.org_id,
+      hasOrgId: !!currentUser.org_id
+    })
+
     // Verify BOM exists and belongs to user's org
     const { data: bom, error: bomError } = await supabase
       .from('boms')
-      .select('id, org_id')
+      .select('id, org_id, product_id, output_qty, output_uom')
       .eq('id', id)
       .single()
 
+    console.log('[BOM Cost Route] BOM check:', {
+      bomId: id,
+      found: !!bom,
+      bomOrgId: bom?.org_id,
+      userOrgId: currentUser.org_id,
+      error: bomError?.message
+    })
+
     if (bomError || !bom) {
-      return NextResponse.json({ error: 'BOM not found' }, { status: 404 })
+      return NextResponse.json({ error: 'BOM not found', debug: { bomError: bomError?.message } }, { status: 404 })
     }
 
     if (bom.org_id !== currentUser.org_id) {
-      return NextResponse.json({ error: 'BOM not found' }, { status: 404 })
+      return NextResponse.json({ error: 'BOM not found (org mismatch)' }, { status: 404 })
     }
 
     // Parse quantity from query params
@@ -90,7 +104,70 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(result.data, { status: 200 })
+    // Transform camelCase response to snake_case for API contract
+    const costData = result.data
+    const outputQty = bom.output_qty || 1
+    const response = {
+      bom_id: id,
+      product_id: bom.product_id,
+      cost_type: 'standard',
+      batch_size: outputQty,
+      batch_uom: bom.output_uom || 'kg',
+      material_cost: costData.materialCost,
+      labor_cost: costData.laborCost,
+      overhead_cost: costData.overheadCost,
+      total_cost: costData.totalCost,
+      cost_per_unit: costData.totalCost / outputQty,
+      currency: costData.currency,
+      calculated_at: costData.calculatedAt,
+      calculated_by: currentUser.id || null,
+      is_stale: false,
+      breakdown: {
+        materials: costData.breakdown.materials.map((m) => ({
+          ingredient_id: m.productId,
+          ingredient_code: m.productCode,
+          ingredient_name: m.productName,
+          quantity: m.quantity,
+          uom: m.uom,
+          unit_cost: m.unitCost,
+          scrap_percent: m.scrapPercent || 0,
+          scrap_cost: 0,
+          total_cost: m.lineCost,
+          percentage: costData.materialCost > 0 ? (m.lineCost / costData.materialCost) * 100 : 0,
+        })),
+        operations: costData.breakdown.operations.map((op) => ({
+          operation_seq: op.sequence,
+          operation_name: op.operationName,
+          machine_name: null,
+          setup_time_min: op.setupTime,
+          duration_min: op.duration,
+          cleanup_time_min: op.cleanupTime,
+          labor_rate: op.laborRate,
+          setup_cost: 0,
+          run_cost: 0,
+          cleanup_cost: 0,
+          total_cost: op.laborCost,
+          percentage: costData.laborCost > 0 ? (op.laborCost / costData.laborCost) * 100 : 0,
+        })),
+        routing: {
+          routing_id: '',
+          routing_code: '',
+          setup_cost: costData.setupCost,
+          working_cost_per_unit: costData.workingCost / outputQty,
+          total_working_cost: costData.workingCost,
+          total_routing_cost: costData.setupCost + costData.workingCost,
+        },
+        overhead: {
+          allocation_method: 'percentage',
+          overhead_percent: 0,
+          subtotal_before_overhead: costData.totalCost - costData.overheadCost,
+          overhead_cost: costData.overheadCost,
+        },
+      },
+      margin_analysis: null,
+    }
+
+    return NextResponse.json(response, { status: 200 })
   } catch (error) {
     console.error('Error in GET /api/technical/boms/[id]/cost:', error)
 

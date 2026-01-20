@@ -119,7 +119,7 @@ export async function GET(
             code,
             name,
             cost_per_unit,
-            uom
+            base_uom
           )
         )
       `)
@@ -192,7 +192,7 @@ export async function GET(
     const materials: MaterialCostBreakdown[] = []
 
     for (const item of bom.items || []) {
-      const component = (item as { component?: { id?: string; code?: string; name?: string; cost_per_unit?: number; uom?: string } }).component
+      const component = (item as { component?: { id?: string; code?: string; name?: string; cost_per_unit?: number; base_uom?: string } }).component
       if (!component) continue // Skip items without component
 
       const quantity = Number(item.quantity) || 0
@@ -210,7 +210,7 @@ export async function GET(
         ingredient_code: component.code || '',
         ingredient_name: component.name || '',
         quantity: quantity,
-        uom: component.uom || '',
+        uom: component.base_uom || '',
         unit_cost: unitCost,
         scrap_percent: scrapPercent,
         scrap_cost: scrapCost,

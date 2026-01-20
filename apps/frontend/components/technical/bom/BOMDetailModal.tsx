@@ -161,27 +161,24 @@ export function BOMDetailModal({
       const response = await fetch(`/api/technical/boms/${bomId}/cost`)
       if (response.ok) {
         const data = await response.json()
-        // Map camelCase API response to snake_case for component
-        const costPerUnit = bom?.output_qty
-          ? data.totalCost / bom.output_qty
-          : null
+        // API returns snake_case format
         setCostData({
-          total_cost: data.totalCost ?? null,
-          cost_per_unit: costPerUnit,
-          material_cost: data.materialCost ?? null,
-          labor_cost: data.laborCost ?? null,
+          total_cost: data.total_cost ?? null,
+          cost_per_unit: data.cost_per_unit ?? null,
+          material_cost: data.material_cost ?? null,
+          labor_cost: data.labor_cost ?? null,
           breakdown: data.breakdown?.materials?.map((m: {
-            productCode: string
-            productName: string
+            ingredient_code: string
+            ingredient_name: string
             quantity: number
-            unitCost: number
-            lineCost: number
+            unit_cost: number
+            total_cost: number
           }) => ({
-            component_code: m.productCode,
-            component_name: m.productName,
+            component_code: m.ingredient_code,
+            component_name: m.ingredient_name,
             quantity: m.quantity,
-            unit_cost: m.unitCost,
-            total_cost: m.lineCost
+            unit_cost: m.unit_cost,
+            total_cost: m.total_cost
           })) ?? []
         })
       } else {

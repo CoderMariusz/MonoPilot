@@ -175,6 +175,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
   // ==================== DATA STATE ====================
   const [products, setProducts] = useState<Product[]>([])
   const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [routings, setRoutings] = useState<{ id: string; code: string; name: string }[]>([])
   const [items, setItems] = useState<BOMItemLocal[]>([])
   const [version, setVersion] = useState(1)
 
@@ -199,7 +200,7 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
     notes: '',
   })
 
-  // ==================== LOAD PRODUCTS ====================
+  // ==================== LOAD PRODUCTS & ROUTINGS ====================
   useEffect(() => {
     if (open) {
       const fetchProducts = async () => {
@@ -222,7 +223,21 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
           console.error('Error fetching products:', error)
         }
       }
+
+      const fetchRoutings = async () => {
+        try {
+          const response = await fetch('/api/technical/routings?is_active=true')
+          if (response.ok) {
+            const data = await response.json()
+            setRoutings(data.routings || [])
+          }
+        } catch (error) {
+          console.error('Error fetching routings:', error)
+        }
+      }
+
       fetchProducts()
+      fetchRoutings()
     }
   }, [open])
 
@@ -287,16 +302,16 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
       // Populate items
       if (initialData.items && initialData.items.length > 0) {
         const mappedItems: BOMItemLocal[] = initialData.items.map(item => ({
-          id: item.id,
-          component_id: item.product_id,
+          id: item.id || crypto.randomUUID(),
+          component_id: item.product_id || '',
           component: item.component,
-          quantity: item.quantity,
-          uom: item.uom,
-          scrap_percent: item.scrap_percent || 0,
-          sequence: item.sequence,
-          operation_seq: item.operation_seq || 1,
-          is_output: item.is_output || false,
-          consume_whole_lp: item.consume_whole_lp || false,
+          quantity: item.quantity ?? 0,
+          uom: item.uom || '',
+          scrap_percent: item.scrap_percent ?? 0,
+          sequence: item.sequence ?? 0,
+          operation_seq: item.operation_seq ?? 1,
+          is_output: item.is_output ?? false,
+          consume_whole_lp: item.consume_whole_lp ?? false,
           notes: item.notes || '',
         }))
         setItems(mappedItems)
@@ -312,8 +327,9 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
   useEffect(() => {
     if (itemForm.component_id && !editingItemId) {
       const comp = allProducts.find(p => p.id === itemForm.component_id)
-      if (comp && comp.uom) {
-        setItemForm(prev => ({ ...prev, uom: comp.uom }))
+      if (comp) {
+        // Always set a defined value - use empty string as fallback
+        setItemForm(prev => ({ ...prev, uom: comp.uom || '' }))
       }
     }
   }, [itemForm.component_id, allProducts, editingItemId])
@@ -337,14 +353,14 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
     if (item) {
       setEditingItemId(item.id)
       setItemForm({
-        component_id: item.component_id,
-        quantity: item.quantity.toString(),
-        uom: item.uom,
-        scrap_percent: item.scrap_percent.toString(),
-        sequence: item.sequence.toString(),
-        consume_whole_lp: item.consume_whole_lp,
-        operation_seq: item.operation_seq.toString(),
-        is_output: item.is_output,
+        component_id: item.component_id || '',
+        quantity: (item.quantity ?? '').toString(),
+        uom: item.uom || '',
+        scrap_percent: (item.scrap_percent ?? 0).toString(),
+        sequence: (item.sequence ?? '').toString(),
+        consume_whole_lp: item.consume_whole_lp ?? false,
+        operation_seq: (item.operation_seq ?? 1).toString(),
+        is_output: item.is_output ?? false,
         notes: item.notes || '',
       })
     } else {
@@ -724,16 +740,16 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
                       <Input
                         type="number"
                         step="0.001"
-                        value={itemForm.quantity}
-                        onChange={(e) => setItemForm(prev => ({ ...prev, quantity: e.target.value }))}
+                        value={itemForm.quantity ?? ''}
+                        onChange={(e) => setItemForm(prev => ({ ...prev, quantity: e.target.value ?? '' }))}
                         placeholder="50.000"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>UoM *</Label>
                       <Input
-                        value={itemForm.uom}
-                        onChange={(e) => setItemForm(prev => ({ ...prev, uom: e.target.value }))}
+                        value={itemForm.uom ?? ''}
+                        onChange={(e) => setItemForm(prev => ({ ...prev, uom: e.target.value ?? '' }))}
                         placeholder="kg"
                       />
                     </div>
@@ -747,16 +763,16 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
                         type="number"
                         min="0"
                         max="100"
-                        value={itemForm.scrap_percent}
-                        onChange={(e) => setItemForm(prev => ({ ...prev, scrap_percent: e.target.value }))}
+                        value={itemForm.scrap_percent ?? ''}
+                        onChange={(e) => setItemForm(prev => ({ ...prev, scrap_percent: e.target.value ?? '' }))}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Sequence</Label>
                       <Input
                         type="number"
-                        value={itemForm.sequence}
-                        onChange={(e) => setItemForm(prev => ({ ...prev, sequence: e.target.value }))}
+                        value={itemForm.sequence ?? ''}
+                        onChange={(e) => setItemForm(prev => ({ ...prev, sequence: e.target.value ?? '' }))}
                         placeholder="Auto"
                       />
                     </div>
@@ -787,8 +803,8 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
                   <div className="space-y-2">
                     <Label>Notes</Label>
                     <Input
-                      value={itemForm.notes}
-                      onChange={(e) => setItemForm(prev => ({ ...prev, notes: e.target.value }))}
+                      value={itemForm.notes ?? ''}
+                      onChange={(e) => setItemForm(prev => ({ ...prev, notes: e.target.value ?? '' }))}
                       placeholder="Special instructions..."
                     />
                   </div>
@@ -948,8 +964,18 @@ export function BOMCreateModal({ open, onOpenChange, onSuccess, editBomId, initi
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No routing</SelectItem>
+                      {routings.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.code} - {r.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {routings.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No routings available. Create a routing first in Technical → Routings.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Yield %</Label>

@@ -334,7 +334,7 @@ export async function POST(request: NextRequest) {
         bom_type: 'standard',
         effective_from: data.effective_from,
         effective_to: data.effective_to || null,
-        status: API_TO_DB_STATUS[data.status] || 'Draft',
+        status: API_TO_DB_STATUS[data.status] || 'draft',
         output_qty: data.output_qty,
         output_uom: data.output_uom,
         notes: data.notes || null,

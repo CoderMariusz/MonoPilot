@@ -91,7 +91,7 @@ export async function POST(
         version: newVersion,
         effective_from,
         effective_to,
-        status: 'Draft', // AC-2.10.3: Cloned BOMs default to Draft
+        status: 'draft', // AC-2.10.3: Cloned BOMs default to draft
         output_qty: sourceBOM.output_qty,
         output_uom: sourceBOM.output_uom,
         notes: sourceBOM.notes,
@@ -104,12 +104,12 @@ export async function POST(
     if (createError) {
       console.error('Error creating cloned BOM:', createError);
 
-      // Handle date overlap error
-      if (createError.message.includes('BOM_DATE_OVERLAP')) {
+      // Handle date overlap error (from database trigger)
+      if (createError.message.includes('Date range overlaps') || createError.message.includes('BOM_DATE_OVERLAP')) {
         return NextResponse.json(
           {
             error: 'BOM_DATE_OVERLAP',
-            message: 'Date range overlaps with existing BOM for this product',
+            message: 'Date range overlaps with existing BOM for this product. Please choose a different effective date.',
           },
           { status: 400 }
         );
@@ -132,7 +132,7 @@ export async function POST(
       throw new Error(`Failed to fetch source BOM items: ${itemsError.message}`);
     }
 
-    // Clone all items
+    // Clone all items (only include columns that exist in bom_items table)
     if (sourceItems && sourceItems.length > 0) {
       const itemsToClone = sourceItems.map(item => ({
         bom_id: newBOM.id,
@@ -141,11 +141,7 @@ export async function POST(
         uom: item.uom,
         scrap_percent: item.scrap_percent,
         sequence: item.sequence,
-        consume_whole_lp: item.consume_whole_lp,
-        is_by_product: item.is_by_product,
-        yield_percent: item.yield_percent,
-        condition_flags: item.condition_flags,
-        condition_logic: item.condition_logic,
+        operation_seq: item.operation_seq,
         notes: item.notes,
       }));
 
@@ -170,17 +166,23 @@ export async function POST(
           id,
           code,
           name,
-          type,
-          uom
+          base_uom,
+          product_type:product_types (
+            code,
+            name
+          )
         ),
         items:bom_items (
           *,
-          product:products!product_id (
+          component:products!product_id (
             id,
             code,
             name,
-            type,
-            uom
+            base_uom,
+            product_type:product_types (
+              code,
+              name
+            )
           )
         )
       `)

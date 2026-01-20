@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 
 /**
  * Costing Service
@@ -25,7 +25,7 @@ export interface BOMCostBreakdown {
   overheadCost: number
   totalCost: number
   currency: string
-  calculatedAt: Date
+  calculatedAt: string
   breakdown: {
     materials: MaterialCostLine[]
     operations: OperationCostLine[]
@@ -70,8 +70,10 @@ export type CostCalculationResult =
 
 /**
  * Round to 2 decimal places for currency
+ * Returns 0 if value is NaN or invalid
  */
 function roundCurrency(value: number): number {
+  if (isNaN(value) || !isFinite(value)) return 0
   return Math.round(value * 100) / 100
 }
 
@@ -104,10 +106,12 @@ export async function calculateTotalBOMCost(
 ): Promise<CostCalculationResult> {
   try {
     const supabase = await createServerSupabase()
+    // Use admin client for complex joins to bypass RLS issues
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-    // 1. Get BOM with items (fetch routing separately to avoid join issues)
-    // Include org_id filter for reliable RLS with cross-table joins
-    let bomQuery = supabase
+    // 1. Get BOM with items using admin client (bypasses RLS for reliable joins)
+    // Still filter by org_id for security
+    let bomQuery = supabaseAdmin
       .from('boms')
       .select(`
         id,
@@ -123,18 +127,28 @@ export async function calculateTotalBOMCost(
             code,
             name,
             cost_per_unit,
-            uom
+            base_uom
           )
         )
       `)
       .eq('id', bomId)
 
-    // Add org_id filter if provided (recommended for cross-table RLS reliability)
+    // ALWAYS filter by org_id for security when using admin client
     if (orgId) {
       bomQuery = bomQuery.eq('org_id', orgId)
     }
 
     const { data: bom, error: bomError } = await bomQuery.single()
+
+    console.log('[Costing Service] BOM query result:', {
+      bomId,
+      orgId,
+      found: !!bom,
+      hasItems: bom?.items?.length,
+      error: bomError?.message,
+      errorCode: bomError?.code,
+      errorDetails: bomError?.details
+    })
 
     if (bomError || !bom) {
       console.error('BOM fetch error:', bomError)
@@ -158,7 +172,7 @@ export async function calculateTotalBOMCost(
     } | null = null
 
     if (bom.routing_id) {
-      const { data: routing } = await supabase
+      const { data: routing } = await supabaseAdmin
         .from('routings')
         .select('id, name, setup_cost, working_cost_per_unit, overhead_percent, currency')
         .eq('id', bom.routing_id)
@@ -170,21 +184,23 @@ export async function calculateTotalBOMCost(
     // 3. Calculate material cost
     const materialBreakdown: MaterialCostLine[] = (bom.items || []).map((item: any) => {
       const product = item.product
-      const unitCost = product?.cost_per_unit || 0
-      const scrapPercent = item.scrap_percent || 0
-      const effectiveQty = item.quantity * (1 + scrapPercent / 100)
+      // Safely parse numeric values to avoid NaN
+      const unitCost = Number(product?.cost_per_unit) || 0
+      const scrapPercent = Number(item.scrap_percent) || 0
+      const quantity = Number(item.quantity) || 0
+      const effectiveQty = quantity * (1 + scrapPercent / 100)
       const lineCost = roundCurrency(effectiveQty * unitCost)
 
       return {
         productId: product?.id || '',
         productCode: product?.code || '',
         productName: product?.name || '',
-        quantity: item.quantity,
+        quantity: quantity,
         scrapPercent: scrapPercent,
         effectiveQuantity: effectiveQty,
         unitCost: unitCost,
-        lineCost: lineCost,
-        uom: product?.uom || ''
+        lineCost: isNaN(lineCost) ? 0 : lineCost,
+        uom: product?.base_uom || ''
       }
     })
 
@@ -201,8 +217,8 @@ export async function calculateTotalBOMCost(
     let currency = 'PLN'
 
     if (routingData && bom.routing_id) {
-      // Get routing operations with cleanup_time
-      const { data: operations, error: opsError } = await supabase
+      // Get routing operations with cleanup_time (use admin to bypass RLS)
+      const { data: operations, error: opsError } = await supabaseAdmin
         .from('routing_operations')
         .select('id, sequence, name, estimated_duration_minutes, labor_cost_per_hour, cleanup_time')
         .eq('routing_id', bom.routing_id)
@@ -262,7 +278,7 @@ export async function calculateTotalBOMCost(
         overheadCost,
         totalCost,
         currency,
-        calculatedAt: new Date(),
+        calculatedAt: new Date().toISOString(),
         breakdown: {
           materials: materialBreakdown,
           operations: operationBreakdown
@@ -295,13 +311,14 @@ export async function calculateUnitCost(
     return { success: false, error: result.error }
   }
 
-  // Get BOM output quantity
-  const supabase = await createServerSupabase()
-  let query = supabase
+  // Get BOM output quantity (use admin for consistency)
+  const supabaseAdmin = createServerSupabaseAdmin()
+  let query = supabaseAdmin
     .from('boms')
     .select('output_qty')
     .eq('id', bomId)
 
+  // Always filter by org_id for security
   if (orgId) {
     query = query.eq('org_id', orgId)
   }

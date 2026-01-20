@@ -210,7 +210,7 @@ export async function POST(
         org_id: orgId,
         product_id: target_product_id,
         version: nextVersion,
-        status: 'Draft', // Always draft for cloned BOM
+        status: 'draft', // Always draft for cloned BOM
         routing_id: sourceBom.routing_id,
         effective_from: cloneEffectiveFrom,
         effective_to: effective_to || null,

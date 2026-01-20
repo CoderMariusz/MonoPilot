@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { LogOut, User, Settings, Power } from 'lucide-react'
 import { signOut, signOutAllDevices } from '@/lib/auth/auth-client'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,12 @@ export function UserMenu({ user }: UserMenuProps) {
   const { toast } = useToast()
   const [showLogoutAllModal, setShowLogoutAllModal] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Prevent hydration mismatch with Radix UI IDs
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -76,6 +82,20 @@ export function UserMenu({ user }: UserMenuProps) {
         .join('')
         .toUpperCase()
     : user.email[0].toUpperCase()
+
+  // Show placeholder during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <Button
+        variant="ghost"
+        className="relative h-10 w-10 rounded-full"
+      >
+        <div className="flex h-full w-full items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <span className="text-sm font-medium">{initials}</span>
+        </div>
+      </Button>
+    )
+  }
 
   return (
     <>
