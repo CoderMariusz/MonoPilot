@@ -93,7 +93,7 @@ export async function GET(
         notes,
         created_at,
         updated_at,
-        product:products(id, code, name, uom, supplier_lead_time_days)
+        product:products(id, code, name, base_uom, lead_time_days)
       `)
       .eq('supplier_id', supplierId)
 

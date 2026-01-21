@@ -137,7 +137,7 @@ export async function PUT(
       .eq('org_id', currentUser.org_id)
       .select(`
         *,
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .single()
 

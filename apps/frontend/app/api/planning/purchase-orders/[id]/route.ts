@@ -51,7 +51,7 @@ export async function GET(
         warehouses(id, code, name),
         po_lines(
           *,
-          products(id, code, name, uom)
+          products(id, code, name, base_uom)
         )
       `)
       .eq('id', id)

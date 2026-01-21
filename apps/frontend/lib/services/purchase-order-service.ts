@@ -600,7 +600,7 @@ export class PurchaseOrderService {
         tax_code:tax_codes(id, code, rate),
         lines:purchase_order_lines(
           *,
-          product:products(id, code, name, uom)
+          product:products(id, code, name, base_uom)
         )
       `)
       .eq('id', id)
@@ -1231,7 +1231,7 @@ export class PurchaseOrderService {
       .insert(lineData)
       .select(`
         *,
-        product:products(id, code, name, uom)
+        product:products(id, code, name, base_uom)
       `)
       .single()
 
@@ -1331,7 +1331,7 @@ export class PurchaseOrderService {
       .eq('id', lineId)
       .select(`
         *,
-        product:products(id, code, name, uom)
+        product:products(id, code, name, base_uom)
       `)
       .single()
 

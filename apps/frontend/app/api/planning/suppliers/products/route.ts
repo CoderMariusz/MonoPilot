@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         suppliers(id, code, name, currency, is_active),
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .eq('org_id', currentUser.org_id)
 
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
         .select(`
           *,
           suppliers(id, code, name, currency, is_active),
-          products(id, code, name, uom)
+          products(id, code, name, base_uom)
         `)
         .single()
 
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         suppliers(id, code, name, currency, is_active),
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .single()
 

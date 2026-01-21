@@ -247,7 +247,7 @@ export class GRNService {
       .from('grn_items')
       .select(`
         *,
-        product:products(name, code, uom),
+        product:products(name, code, base_uom),
         location:locations(full_path),
         lp:license_plates(lp_number)
       `)

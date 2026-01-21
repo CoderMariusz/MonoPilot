@@ -125,7 +125,7 @@ export async function listPOLines(poId: string): Promise<ListResult> {
       .from('po_lines')
       .select(`
         *,
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .eq('po_id', poId)
       .eq('org_id', orgId)
@@ -169,7 +169,7 @@ export async function getPOLineById(lineId: string): Promise<ServiceResult> {
       .from('po_lines')
       .select(`
         *,
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .eq('id', lineId)
       .eq('org_id', orgId)
@@ -313,7 +313,7 @@ export async function addPOLine(
       .insert(lineData)
       .select(`
         *,
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .single()
 
@@ -460,7 +460,7 @@ export async function updatePOLine(
       .eq('org_id', orgId)
       .select(`
         *,
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .single()
 

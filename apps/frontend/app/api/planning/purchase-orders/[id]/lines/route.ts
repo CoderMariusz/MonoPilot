@@ -58,7 +58,7 @@ export async function GET(
       .from('po_lines')
       .select(`
         *,
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .eq('po_id', id)
       .eq('org_id', currentUser.org_id)
@@ -147,10 +147,10 @@ export async function POST(
       )
     }
 
-    // Get product details (uom)
+    // Get product details (base_uom)
     const { data: product, error: productError } = await supabaseAdmin
       .from('products')
-      .select('uom')
+      .select('base_uom')
       .eq('id', validatedData.product_id)
       .eq('org_id', currentUser.org_id)
       .single()
@@ -194,7 +194,7 @@ export async function POST(
       product_id: validatedData.product_id,
       sequence,
       quantity: validatedData.quantity,
-      uom: product.uom,
+      uom: product.base_uom,
       unit_price: validatedData.unit_price,
       discount_percent: validatedData.discount_percent || 0,
       line_subtotal: Number(line_subtotal.toFixed(2)),
@@ -213,7 +213,7 @@ export async function POST(
       .insert(lineData)
       .select(`
         *,
-        products(id, code, name, uom)
+        products(id, code, name, base_uom)
       `)
       .single()
 
