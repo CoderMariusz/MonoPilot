@@ -24,3 +24,5 @@ P7: ✓ tech-writer 17:42 report:done docs:updated
 DEPLOY: ✓ 21-01-2026 17:42 status:DEPLOYED environment:production
 P3: ✓ frontend-dev 21:00 files:2 tests:10/10
 P3: frontend-dev 21:02 files:1 scanner-landing:done
+P3: 23:20 files:3 tests:- status:fix
+P3: ✓ backend-dev 23:20 files:7 fix:users.role->roles(code)

@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         output_qty,
         uom,
         status,
-        products!inner(id, name, uom)
+        products!inner(id, name, base_uom)
       `
       )
       .eq('id', input.wo_id)

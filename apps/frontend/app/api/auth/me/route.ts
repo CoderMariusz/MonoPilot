@@ -19,15 +19,20 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Join with roles table to get role code (users has role_id FK, not role string)
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, email, first_name, last_name, role, org_id')
+      .select('id, email, first_name, last_name, org_id, roles(code)')
       .eq('id', session.user.id)
       .single()
 
     if (userError || !user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
+
+    // Extract role code from joined roles table (handle both array and single object)
+    const roleData = user.roles as { code: string } | { code: string }[] | null
+    const roleCode = (Array.isArray(roleData) ? roleData[0]?.code : roleData?.code) || 'viewer'
 
     return NextResponse.json({
       user: {
@@ -36,7 +41,7 @@ export async function GET() {
         first_name: user.first_name,
         last_name: user.last_name,
         name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
-        role: user.role,
+        role: roleCode,
         org_id: user.org_id,
       }
     })

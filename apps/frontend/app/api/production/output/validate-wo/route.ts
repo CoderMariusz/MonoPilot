@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         batch_number,
         production_line_id,
         org_id,
-        products!inner(id, name, code, uom, shelf_life_days),
+        products!inner(id, name, code, base_uom, shelf_life_days),
         production_lines(id, name)
       `
       )
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       id: string
       name: string
       code: string
-      uom: string
+      base_uom: string
       shelf_life_days: number
     }
     const productionLine = wo.production_lines as { id: string; name: string } | null
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         registered_qty: registeredQty,
         remaining_qty: remainingQty,
         progress_percent: plannedQty > 0 ? Math.round((registeredQty / plannedQty) * 100) : 0,
-        uom: products.uom || wo.uom,
+        uom: products.base_uom || wo.uom,
         batch_number: wo.batch_number || wo.wo_number,
         line_name: productionLine?.name || 'Default Line',
         shelf_life_days: products.shelf_life_days || 90,
@@ -168,7 +168,7 @@ async function getByProductsFromBOM(
       quantity_per,
       yield_percent,
       is_by_product,
-      products!bom_items_material_id_fkey(id, name, code, uom)
+      products!bom_items_material_id_fkey(id, name, code, base_uom)
     `
     )
     .eq('bom_id', bom.id)
@@ -177,7 +177,7 @@ async function getByProductsFromBOM(
   if (!bomItems) return []
 
   return bomItems.map((item) => {
-    const product = item.products as { id: string; name: string; code: string; uom: string }
+    const product = item.products as { id: string; name: string; code: string; base_uom: string }
     const yieldPercent = Number(item.yield_percent) || 0
     const expectedQty = Math.round(((plannedQty * yieldPercent) / 100) * 100) / 100
 
@@ -187,7 +187,7 @@ async function getByProductsFromBOM(
       code: product.code,
       yield_percent: yieldPercent,
       expected_qty: expectedQty,
-      uom: product.uom,
+      uom: product.base_uom,
     }
   })
 }

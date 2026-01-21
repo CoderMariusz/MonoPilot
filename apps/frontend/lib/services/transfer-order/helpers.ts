@@ -40,9 +40,10 @@ export async function getCurrentUserData(): Promise<UserData | null> {
 
     // Use admin client to bypass RLS for users table lookup
     // This avoids potential RLS recursion issues
+    // Join with roles table to get role code (users has role_id FK, not role string)
     const { data: userData, error } = await supabaseAdmin
       .from('users')
-      .select('org_id, role')
+      .select('org_id, roles(code)')
       .eq('id', user.id)
       .single()
 
@@ -65,9 +66,14 @@ export async function getCurrentUserData(): Promise<UserData | null> {
       return null
     }
 
+    // Extract role code from joined roles table (handle both array and single object)
+    const roleData = userData.roles as { code: string } | { code: string }[] | null
+    const roleCode = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+    const finalRole = roleCode || 'viewer'
+
     return {
       orgId: userData.org_id,
-      role: userData.role,
+      role: finalRole,
       userId: user.id
     }
   } catch (error) {

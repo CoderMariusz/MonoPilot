@@ -49,19 +49,14 @@ export async function PUT(
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Fetch current line to verify it exists
+    // Fetch current line to verify it exists (purchase_order_lines doesn't have org_id)
     const { data: currentLine, error: lineError } = await supabaseAdmin
-      .from('po_lines')
-      .select('po_id, org_id, product_id')
+      .from('purchase_order_lines')
+      .select('po_id, product_id')
       .eq('id', lineId)
       .single()
 
     if (lineError || !currentLine) {
-      return NextResponse.json({ error: 'PO line not found' }, { status: 404 })
-    }
-
-    // Verify org_id isolation
-    if (currentLine.org_id !== currentUser.org_id) {
       return NextResponse.json({ error: 'PO line not found' }, { status: 404 })
     }
 
@@ -70,14 +65,19 @@ export async function PUT(
       return NextResponse.json({ error: 'PO line does not belong to this PO' }, { status: 400 })
     }
 
-    // AC-2.8: Check PO status
+    // AC-2.8: Check PO status and verify org isolation via PO
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
-      .select('status, supplier_id')
+      .select('status, supplier_id, org_id')
       .eq('id', id)
       .single()
 
     if (poError || !po) {
+      return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
+    }
+
+    // Verify org_id isolation via the parent PO
+    if (po.org_id !== currentUser.org_id) {
       return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
     }
 
@@ -113,28 +113,25 @@ export async function PUT(
     const tax_amount = line_total * (tax_rate / 100)
     const line_total_with_tax = line_total + tax_amount
 
-    // Prepare update data (AC-2.3: Cannot edit product_id, uom, sequence)
+    // Prepare update data (AC-2.3: Cannot edit product_id, uom, line_number)
+    // Note: purchase_order_lines table doesn't have line_subtotal, tax_amount, line_total_with_tax
     const updateData = {
       quantity: validatedData.quantity,
       unit_price: validatedData.unit_price,
       discount_percent: validatedData.discount_percent || 0,
-      line_subtotal: Number(line_subtotal.toFixed(2)),
       discount_amount: Number(discount_amount.toFixed(2)),
       line_total: Number(line_total.toFixed(2)),
-      tax_amount: Number(tax_amount.toFixed(2)),
-      line_total_with_tax: Number(line_total_with_tax.toFixed(2)),
       expected_delivery_date: validatedData.expected_delivery_date
         ? validatedData.expected_delivery_date.toISOString().split('T')[0]
         : null,
       updated_at: new Date().toISOString(),
     }
 
-    // Update line
+    // Update line (no org_id filter - purchase_order_lines doesn't have it)
     const { data, error: updateError } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .update(updateData)
       .eq('id', lineId)
-      .eq('org_id', currentUser.org_id)
       .select(`
         *,
         products(id, code, name, base_uom)
@@ -206,19 +203,14 @@ export async function DELETE(
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Fetch line to verify it exists
+    // Fetch line to verify it exists (purchase_order_lines doesn't have org_id)
     const { data: line, error: lineError } = await supabaseAdmin
-      .from('po_lines')
-      .select('po_id, org_id, sequence')
+      .from('purchase_order_lines')
+      .select('po_id, line_number')
       .eq('id', lineId)
       .single()
 
     if (lineError || !line) {
-      return NextResponse.json({ error: 'PO line not found' }, { status: 404 })
-    }
-
-    // Verify org_id isolation
-    if (line.org_id !== currentUser.org_id) {
       return NextResponse.json({ error: 'PO line not found' }, { status: 404 })
     }
 
@@ -227,14 +219,19 @@ export async function DELETE(
       return NextResponse.json({ error: 'PO line does not belong to this PO' }, { status: 400 })
     }
 
-    // AC-2.8: Check PO status
+    // AC-2.8: Check PO status and verify org isolation via PO
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
-      .select('status')
+      .select('status, org_id')
       .eq('id', id)
       .single()
 
     if (poError || !po) {
+      return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
+    }
+
+    // Verify org_id isolation via the parent PO
+    if (po.org_id !== currentUser.org_id) {
       return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
     }
 
@@ -246,12 +243,11 @@ export async function DELETE(
       )
     }
 
-    // Delete line
+    // Delete line (no org_id filter - purchase_order_lines doesn't have it)
     const { error: deleteError } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .delete()
       .eq('id', lineId)
-      .eq('org_id', currentUser.org_id)
 
     if (deleteError) {
       console.error('Error deleting PO line:', deleteError)
@@ -259,20 +255,19 @@ export async function DELETE(
     }
 
     // AC-2.4: Re-sequence remaining lines
-    // Get all remaining lines for this PO
+    // Get all remaining lines for this PO (no org_id filter)
     const { data: remainingLines } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .select('id')
       .eq('po_id', id)
-      .eq('org_id', currentUser.org_id)
-      .order('sequence', { ascending: true })
+      .order('line_number', { ascending: true })
 
     if (remainingLines && remainingLines.length > 0) {
-      // Update sequence numbers (1, 2, 3, ...)
+      // Update line_number (1, 2, 3, ...)
       for (let i = 0; i < remainingLines.length; i++) {
         await supabaseAdmin
-          .from('po_lines')
-          .update({ sequence: i + 1 })
+          .from('purchase_order_lines')
+          .update({ line_number: i + 1 })
           .eq('id', remainingLines[i].id)
       }
     }

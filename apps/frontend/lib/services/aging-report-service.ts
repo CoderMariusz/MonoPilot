@@ -143,7 +143,7 @@ export class AgingReportService {
         product_id,
         quantity,
         created_at,
-        products!inner(id, name, code, uom, unit_cost, category_id)
+        products!inner(id, name, code, base_uom, unit_cost, category_id)
       `)
       .eq('org_id', orgId)
       .eq('status', 'available')
@@ -183,7 +183,7 @@ export class AgingReportService {
           product_id: productId,
           product_name: product.name,
           product_sku: product.code,
-          uom: product.uom,
+          uom: product.base_uom,
           bucket_0_7_days: { qty: 0, lp_count: 0, value: 0 },
           bucket_8_30_days: { qty: 0, lp_count: 0, value: 0 },
           bucket_31_90_days: { qty: 0, lp_count: 0, value: 0 },
@@ -267,7 +267,7 @@ export class AgingReportService {
         product_id,
         quantity,
         expiry_date,
-        products!inner(id, name, code, uom, unit_cost, category_id)
+        products!inner(id, name, code, base_uom, unit_cost, category_id)
       `)
       .eq('org_id', orgId)
       .eq('status', 'available')
@@ -308,7 +308,7 @@ export class AgingReportService {
           product_id: productId,
           product_name: product.name,
           product_sku: product.code,
-          uom: product.uom,
+          uom: product.base_uom,
           bucket_0_7_days: { qty: 0, lp_count: 0, value: 0 },
           bucket_8_30_days: { qty: 0, lp_count: 0, value: 0 },
           bucket_31_90_days: { qty: 0, lp_count: 0, value: 0 },
@@ -426,7 +426,7 @@ export class AgingReportService {
             lp_number,
             quantity,
             created_at,
-            products!inner(name, uom),
+            products!inner(name, base_uom),
             locations!inner(location_code),
             warehouses!inner(name)
           `)
@@ -447,7 +447,7 @@ export class AgingReportService {
             age_days: ageDays,
             expiry_days: null,
             quantity: lp.quantity,
-            uom: lp.products?.uom ?? '',
+            uom: lp.products?.base_uom ?? '',
             location_code: lp.locations?.location_code ?? '',
             warehouse_name: lp.warehouses?.name ?? '',
           }
@@ -460,7 +460,7 @@ export class AgingReportService {
             lp_number,
             quantity,
             expiry_date,
-            products!inner(name, uom),
+            products!inner(name, base_uom),
             locations!inner(location_code),
             warehouses!inner(name)
           `)
@@ -482,7 +482,7 @@ export class AgingReportService {
             age_days: null,
             expiry_days: expiryDays,
             quantity: lp.quantity,
-            uom: lp.products?.uom ?? '',
+            uom: lp.products?.base_uom ?? '',
             location_code: lp.locations?.location_code ?? '',
             warehouse_name: lp.warehouses?.name ?? '',
           }

@@ -212,19 +212,17 @@ describe('Batch 3A: Purchase Orders', () => {
         .single()
 
       const { data, error } = await supabase
-        .from('po_lines')
+        .from('purchase_order_lines')
         .insert({
-          org_id: testOrgId,
           po_id: poData?.id,
           product_id: productId,
-          sequence: 1,
+          line_number: 1,
           quantity: 10,
           uom: 'kg',
           unit_price: 50,
-          line_subtotal: 500,
-          tax_amount: 40,
-          line_total: 540,
-          line_total_with_tax: 540,
+          discount_percent: 0,
+          discount_amount: 0,
+          line_total: 500,
         })
         .select()
         .single()

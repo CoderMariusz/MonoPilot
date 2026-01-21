@@ -378,32 +378,23 @@ export class POBulkService {
           continue
         }
 
-        // Create PO lines
+        // Create PO lines (no org_id - purchase_order_lines uses po_id FK for RLS)
         const poLines = group.products.map((product, index) => ({
-          org_id: user.org_id,
           po_id: po.id,
           product_id: product.product_id,
-          sequence: index + 1,
+          line_number: index + 1,
           quantity: product.quantity,
           uom: product.uom,
           unit_price: product.unit_price,
           discount_percent: 0,
-          line_subtotal: Number((product.quantity * product.unit_price).toFixed(2)),
           discount_amount: 0,
           line_total: Number((product.quantity * product.unit_price).toFixed(2)),
-          tax_amount: Number(
-            (product.quantity * product.unit_price * (taxRate / 100)).toFixed(2)
-          ),
-          line_total_with_tax: Number(
-            (product.quantity * product.unit_price * (1 + taxRate / 100)).toFixed(2)
-          ),
           expected_delivery_date: product.expected_delivery,
-          received_qty: 0,
           notes: product.notes,
         }))
 
         const { error: linesError } = await supabase
-          .from('po_lines')
+          .from('purchase_order_lines')
           .insert(poLines)
 
         if (linesError) {

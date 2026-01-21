@@ -14,21 +14,19 @@ import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/ser
 
 export interface POLine {
   id: string
-  org_id: string
   po_id: string
   product_id: string
-  sequence: number
+  line_number: number
   quantity: number
   uom: string
   unit_price: number
   discount_percent: number
-  line_subtotal: number
   discount_amount: number
   line_total: number
-  tax_amount: number
-  line_total_with_tax: number
   expected_delivery_date: string | null
+  confirmed_delivery_date: string | null
   received_qty: number
+  notes: string | null
   created_at: string
   updated_at: string
   // Populated data (JOIN results)
@@ -36,7 +34,7 @@ export interface POLine {
     id: string
     code: string
     name: string
-    uom: string
+    base_uom: string
   }
 }
 
@@ -120,16 +118,15 @@ export async function listPOLines(poId: string): Promise<ListResult> {
       }
     }
 
-    // Fetch lines with product details
+    // Fetch lines with product details (no org_id filter - purchase_order_lines doesn't have it)
     const { data, error } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .select(`
         *,
         products(id, code, name, base_uom)
       `)
       .eq('po_id', poId)
-      .eq('org_id', orgId)
-      .order('sequence', { ascending: true })
+      .order('line_number', { ascending: true })
 
     if (error) {
       console.error('Error listing PO lines:', error)
@@ -165,14 +162,14 @@ export async function getPOLineById(lineId: string): Promise<ServiceResult> {
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
+    // Note: purchase_order_lines doesn't have org_id, isolation is via po_id FK
     const { data, error } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .select(`
         *,
         products(id, code, name, base_uom)
       `)
       .eq('id', lineId)
-      .eq('org_id', orgId)
       .single()
 
     if (error || !data) {
@@ -267,20 +264,18 @@ export async function addPOLine(
 
     const tax_rate = (supplier?.tax_codes as any)?.rate || 0
 
-    // Get next sequence number
+    // Get next line_number
     const { count } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .select('*', { count: 'exact', head: true })
       .eq('po_id', poId)
 
-    const sequence = (count || 0) + 1
+    const line_number = (count || 0) + 1
 
     // AC-3.2.2: Calculate line amounts
     const line_subtotal = Number(input.quantity) * Number(input.unit_price)
     const discount_amount = line_subtotal * (Number(input.discount_percent || 0) / 100)
     const line_total = line_subtotal - discount_amount
-    const tax_amount = line_total * (tax_rate / 100)
-    const line_total_with_tax = line_total + tax_amount
 
     // Prepare line data
     const expectedDeliveryDate = input.expected_delivery_date
@@ -289,27 +284,23 @@ export async function addPOLine(
           : input.expected_delivery_date.toISOString().split('T')[0])
       : null
 
+    // Note: purchase_order_lines doesn't have org_id - isolation is via po_id FK
     const lineData = {
-      org_id: orgId,
       po_id: poId,
       product_id: input.product_id,
-      sequence,
+      line_number,
       quantity: input.quantity,
       uom: product.uom, // AC-3.2.3: Inherit UoM from product
       unit_price: input.unit_price,
       discount_percent: input.discount_percent || 0,
-      line_subtotal: Number(line_subtotal.toFixed(2)),
       discount_amount: Number(discount_amount.toFixed(2)),
       line_total: Number(line_total.toFixed(2)),
-      tax_amount: Number(tax_amount.toFixed(2)),
-      line_total_with_tax: Number(line_total_with_tax.toFixed(2)),
       expected_delivery_date: expectedDeliveryDate,
-      received_qty: 0,
     }
 
     // Insert line
     const { data, error: insertError } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .insert(lineData)
       .select(`
         *,
@@ -360,12 +351,11 @@ export async function updatePOLine(
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Fetch current line
+    // Fetch current line (purchase_order_lines doesn't have org_id)
     const { data: currentLine, error: lineError } = await supabaseAdmin
-      .from('po_lines')
-      .select('po_id, org_id, product_id, quantity, unit_price, discount_percent')
+      .from('purchase_order_lines')
+      .select('po_id, product_id, quantity, unit_price, discount_percent')
       .eq('id', lineId)
-      .eq('org_id', orgId)
       .single()
 
     if (lineError || !currentLine) {
@@ -376,10 +366,10 @@ export async function updatePOLine(
       }
     }
 
-    // Check PO status
+    // Check PO status and verify org isolation via the parent PO
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
-      .select('status, supplier_id')
+      .select('status, supplier_id, org_id')
       .eq('id', currentLine.po_id)
       .single()
 
@@ -388,6 +378,15 @@ export async function updatePOLine(
         success: false,
         error: 'Purchase order not found',
         code: 'PO_NOT_FOUND',
+      }
+    }
+
+    // Verify org_id isolation via the parent PO
+    if (po.org_id !== orgId) {
+      return {
+        success: false,
+        error: 'PO line not found',
+        code: 'NOT_FOUND',
       }
     }
 
@@ -445,19 +444,15 @@ export async function updatePOLine(
         : null
     }
 
-    // Always update calculated fields
-    updateData.line_subtotal = Number(line_subtotal.toFixed(2))
+    // Always update calculated fields (purchase_order_lines table schema)
     updateData.discount_amount = Number(discount_amount.toFixed(2))
     updateData.line_total = Number(line_total.toFixed(2))
-    updateData.tax_amount = Number(tax_amount.toFixed(2))
-    updateData.line_total_with_tax = Number(line_total_with_tax.toFixed(2))
 
-    // Update line
+    // Update line (no org_id filter - purchase_order_lines doesn't have it)
     const { data, error: updateError } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .update(updateData)
       .eq('id', lineId)
-      .eq('org_id', orgId)
       .select(`
         *,
         products(id, code, name, base_uom)
@@ -501,12 +496,11 @@ export async function deletePOLine(lineId: string): Promise<ServiceResult<null>>
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Fetch current line
+    // Fetch current line (purchase_order_lines doesn't have org_id)
     const { data: currentLine, error: lineError } = await supabaseAdmin
-      .from('po_lines')
-      .select('po_id, org_id')
+      .from('purchase_order_lines')
+      .select('po_id')
       .eq('id', lineId)
-      .eq('org_id', orgId)
       .single()
 
     if (lineError || !currentLine) {
@@ -517,10 +511,10 @@ export async function deletePOLine(lineId: string): Promise<ServiceResult<null>>
       }
     }
 
-    // Check PO status
+    // Check PO status and verify org isolation via the parent PO
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
-      .select('status')
+      .select('status, org_id')
       .eq('id', currentLine.po_id)
       .single()
 
@@ -532,6 +526,15 @@ export async function deletePOLine(lineId: string): Promise<ServiceResult<null>>
       }
     }
 
+    // Verify org_id isolation via the parent PO
+    if (po.org_id !== orgId) {
+      return {
+        success: false,
+        error: 'PO line not found',
+        code: 'NOT_FOUND',
+      }
+    }
+
     if (['closed', 'receiving'].includes(po.status.toLowerCase())) {
       return {
         success: false,
@@ -540,12 +543,11 @@ export async function deletePOLine(lineId: string): Promise<ServiceResult<null>>
       }
     }
 
-    // Delete line
+    // Delete line (no org_id filter - purchase_order_lines doesn't have it)
     const { error: deleteError } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .delete()
       .eq('id', lineId)
-      .eq('org_id', orgId)
 
     if (deleteError) {
       console.error('Error deleting PO line:', deleteError)

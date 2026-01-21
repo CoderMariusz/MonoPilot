@@ -171,6 +171,7 @@ export function POLinesDataTable({
               cell: ({ row }: { row: { original: POLine } }) => (
                 <div className="flex items-center gap-1">
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
@@ -180,6 +181,7 @@ export function POLinesDataTable({
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -294,7 +296,7 @@ export function POLinesDataTable({
       <div className="p-4 border-b flex items-center justify-between">
         <h3 className="font-medium">PO Lines</h3>
         {isEditable && (
-          <Button size="sm" onClick={onAddLine} className="gap-2">
+          <Button type="button" size="sm" onClick={onAddLine} className="gap-2">
             <Plus className="h-4 w-4" />
             Add Line
           </Button>
@@ -312,7 +314,7 @@ export function POLinesDataTable({
             Add products to your purchase order to continue.
           </p>
           {isEditable && (
-            <Button onClick={onAddLine} className="gap-2">
+            <Button type="button" onClick={onAddLine} className="gap-2">
               <Plus className="h-4 w-4" />
               Add First Line
             </Button>
@@ -354,6 +356,7 @@ export function POLinesDataTable({
             </span>
             {isEditable && (
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={onAddLine}

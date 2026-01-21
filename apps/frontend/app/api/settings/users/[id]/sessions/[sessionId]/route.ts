@@ -28,10 +28,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current user to check role
+    // Get current user to check role (join with roles table to get role code)
     const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role')
+      .select('roles(code)')
       .eq('id', user.id)
       .single()
 
@@ -39,8 +39,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Authorization
-    const isAdmin = currentUser.role === 'admin'
+    // Authorization (extract role code from joined roles table, handle both array and single object)
+    const roleData = currentUser.roles as { code: string } | { code: string }[] | null
+    const roleCode = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+    const isAdmin = roleCode === 'admin'
     const isOwnSessions = user.id === userId
 
     if (!isOwnSessions && !isAdmin) {

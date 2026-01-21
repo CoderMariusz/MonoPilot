@@ -54,15 +54,15 @@ export async function GET(
     }
 
     // AC-2.2: Fetch PO lines with product details
+    // Note: purchase_order_lines doesn't have org_id, RLS is via po_id FK
     const { data, error } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .select(`
         *,
         products(id, code, name, base_uom)
       `)
       .eq('po_id', id)
-      .eq('org_id', currentUser.org_id)
-      .order('sequence', { ascending: true })
+      .order('line_number', { ascending: true })
 
     if (error) {
       console.error('Error fetching PO lines:', error)
@@ -174,7 +174,7 @@ export async function POST(
 
     // Get next sequence number
     const { count } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .select('*', { count: 'exact', head: true })
       .eq('po_id', id)
 
@@ -187,21 +187,17 @@ export async function POST(
     const tax_amount = line_total * (tax_rate / 100)
     const line_total_with_tax = line_total + tax_amount
 
-    // Prepare line data
+    // Prepare line data (no org_id - purchase_order_lines uses po_id FK for RLS)
     const lineData = {
-      org_id: currentUser.org_id,
       po_id: id,
       product_id: validatedData.product_id,
-      sequence,
+      line_number: sequence,
       quantity: validatedData.quantity,
       uom: product.base_uom,
       unit_price: validatedData.unit_price,
       discount_percent: validatedData.discount_percent || 0,
-      line_subtotal: Number(line_subtotal.toFixed(2)),
       discount_amount: Number(discount_amount.toFixed(2)),
       line_total: Number(line_total.toFixed(2)),
-      tax_amount: Number(tax_amount.toFixed(2)),
-      line_total_with_tax: Number(line_total_with_tax.toFixed(2)),
       expected_delivery_date: validatedData.expected_delivery_date
         ? validatedData.expected_delivery_date.toISOString().split('T')[0]
         : null,
@@ -209,7 +205,7 @@ export async function POST(
 
     // Insert line
     const { data, error: insertError } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .insert(lineData)
       .select(`
         *,

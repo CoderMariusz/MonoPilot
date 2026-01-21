@@ -426,14 +426,15 @@ export async function checkAutoComplete(
     return { autoCompleted: false }
   }
 
-  // Get user role for permission check
+  // Get user role for permission check (join with roles table to get role code)
   const { data: user } = await supabase
     .from('users')
-    .select('role')
+    .select('roles(code)')
     .eq('id', userId)
     .single()
 
-  const userRole = user?.role || 'operator'
+  const roleData = user?.roles as { code: string } | { code: string }[] | null
+  const userRole = (Array.isArray(roleData) ? roleData[0]?.code : roleData?.code) || 'operator'
 
   try {
     // Auto-complete the WO

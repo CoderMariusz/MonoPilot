@@ -97,8 +97,9 @@ export function PurchaseOrderFormModal({
           throw new Error('Failed to fetch suppliers')
         }
 
-        const data = await response.json()
-        setSuppliers(data.suppliers || [])
+        const json = await response.json()
+        // API returns { success, data: [...], meta } format
+        setSuppliers(json.data || json.suppliers || [])
       } catch (error) {
         console.error('Error fetching suppliers:', error)
         toast({
@@ -122,14 +123,15 @@ export function PurchaseOrderFormModal({
     const fetchWarehouses = async () => {
       try {
         setLoadingWarehouses(true)
-        const response = await fetch('/api/settings/warehouses?is_active=true')
+        const response = await fetch('/api/v1/settings/warehouses?status=active')
 
         if (!response.ok) {
           throw new Error('Failed to fetch warehouses')
         }
 
-        const data = await response.json()
-        setWarehouses(data.warehouses || [])
+        const json = await response.json()
+        // API returns { data: [...], pagination: {...} } format
+        setWarehouses(json.data || json.warehouses || [])
       } catch (error) {
         console.error('Error fetching warehouses:', error)
         toast({

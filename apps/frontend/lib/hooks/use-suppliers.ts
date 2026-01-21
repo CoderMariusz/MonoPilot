@@ -51,16 +51,20 @@ export function useSuppliers(params: SupplierListParams = {}) {
         throw new Error('Failed to fetch suppliers')
       }
 
-      const data = await response.json()
+      const json = await response.json()
 
       // Transform response to expected format
+      // API returns { success, data: suppliers[], meta: {...} }
+      const suppliers = json.data || json.suppliers || []
+      const meta = json.meta || {}
+
       return {
-        data: data.suppliers || [],
+        data: suppliers,
         meta: {
-          total: data.total || data.suppliers?.length || 0,
-          page: params.page || 1,
-          limit: params.limit || 20,
-          pages: Math.ceil((data.total || data.suppliers?.length || 0) / (params.limit || 20)),
+          total: meta.total || suppliers.length,
+          page: meta.page || params.page || 1,
+          limit: meta.limit || params.limit || 20,
+          pages: meta.pages || Math.ceil((meta.total || suppliers.length) / (params.limit || 20)),
         },
       }
     },
@@ -84,8 +88,8 @@ export function useSupplierSummary() {
           throw new Error('Failed to fetch supplier summary')
         }
 
-        const data = await listResponse.json()
-        const suppliers: Supplier[] = data.suppliers || []
+        const json = await listResponse.json()
+        const suppliers: Supplier[] = json.data || json.suppliers || []
 
         const total_count = suppliers.length
         const active_count = suppliers.filter((s) => s.is_active).length
@@ -356,8 +360,8 @@ export function useNextSupplierCode() {
         // Fallback: calculate from list
         const listResponse = await fetch('/api/planning/suppliers')
         if (listResponse.ok) {
-          const data = await listResponse.json()
-          const suppliers: Supplier[] = data.suppliers || []
+          const json = await listResponse.json()
+          const suppliers: Supplier[] = json.data || json.suppliers || []
           const maxNum = suppliers.reduce((max, s) => {
             const match = s.code.match(/SUP-(\d+)/)
             if (match) {
@@ -396,8 +400,8 @@ export function useValidateSupplierCode(code: string, excludeId?: string) {
         // Fallback: check from list
         const listResponse = await fetch('/api/planning/suppliers')
         if (listResponse.ok) {
-          const data = await listResponse.json()
-          const suppliers: Supplier[] = data.suppliers || []
+          const json = await listResponse.json()
+          const suppliers: Supplier[] = json.data || json.suppliers || []
           const exists = suppliers.some((s) => s.code === code && s.id !== excludeId)
           return !exists // Return true if valid (doesn't exist)
         }

@@ -340,7 +340,7 @@ export async function cleanupTestData(orgId: string) {
 
   // Delete in correct order (respect foreign keys)
   await supabase.from('po_approval_history').delete().eq('org_id', orgId);
-  await supabase.from('po_lines').delete().eq('org_id', orgId);
+  await supabase.from('purchase_order_lines').delete().eq('org_id', orgId);
   await supabase.from('purchase_orders').delete().eq('org_id', orgId);
   await supabase.from('supplier_products').delete().eq('org_id', orgId);
   await supabase.from('products').delete().eq('org_id', orgId);

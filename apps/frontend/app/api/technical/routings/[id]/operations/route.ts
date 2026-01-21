@@ -45,9 +45,10 @@ export async function POST(
     }
 
     // BUG-003 FIX: Check user role (admin or technical only)
+    // Join with roles table to get role code (users has role_id FK, not role string)
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('role')
+      .select('roles(code)')
       .eq('id', session.user.id)
       .single()
 
@@ -55,7 +56,9 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    if (!['admin', 'technical'].includes(userData.role)) {
+    const roleData = userData.roles as { code: string } | { code: string }[] | null
+    const userRoleCode = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
+    if (!userRoleCode || !['admin', 'technical'].includes(userRoleCode)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }

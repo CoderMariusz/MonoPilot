@@ -108,9 +108,9 @@ export default function CreatePurchaseOrderPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch reference data
-  const { data: suppliersData, isLoading: suppliersLoading } = useSuppliers({})
-  const { data: warehousesData, isLoading: warehousesLoading } = useWarehouses({})
+  // Fetch reference data - only active suppliers and warehouses
+  const { data: suppliersData, isLoading: suppliersLoading } = useSuppliers({ status: 'active' })
+  const { data: warehousesData, isLoading: warehousesLoading } = useWarehouses({ status: 'active' })
   const { data: taxCodesData, isLoading: taxCodesLoading } = useTaxCodes()
   const { data: duplicatePO, isLoading: duplicateLoading } = usePurchaseOrder(duplicateId)
 
