@@ -2,7 +2,7 @@
  * API Route: Reverse Consumption
  * Story 04.6a: Material Consumption Desktop
  *
- * POST /api/production/work-orders/:woId/consumptions/:id/reverse
+ * POST /api/production/work-orders/:id/consumptions/:consumptionId/reverse
  * Reverses a consumption record (Manager only)
  *
  * Security:
@@ -33,10 +33,10 @@ const ALLOWED_ROLES = ['owner', 'admin', 'production_manager']
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ woId: string; id: string }> }
+  { params }: { params: Promise<{ id: string; consumptionId: string }> }
 ) {
   try {
-    const { woId, id: consumptionId } = await params
+    const { id: woId, consumptionId } = await params
     const supabase = await createServerSupabase()
 
     // 1. Authentication
@@ -229,7 +229,7 @@ export async function POST(
       },
     })
   } catch (error) {
-    console.error('Error in POST /api/production/work-orders/:woId/consumptions/:id/reverse:', error)
+    console.error('Error in POST /api/production/work-orders/:id/consumptions/:consumptionId/reverse:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

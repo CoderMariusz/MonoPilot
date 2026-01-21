@@ -53,7 +53,7 @@ vi.mock('@/lib/auth/server', () => ({
 
 /**
  * API Route handler will be at:
- * apps/frontend/app/api/production/work-orders/[woId]/consume/route.ts
+ * apps/frontend/app/api/production/work-orders/[id]/consume/direct/route.ts
  *
  * Expected request body:
  * {

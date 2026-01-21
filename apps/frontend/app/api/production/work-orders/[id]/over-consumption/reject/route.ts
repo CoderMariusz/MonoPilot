@@ -2,7 +2,7 @@
  * API Route: Reject Over-Consumption Request
  * Story 04.6e: Over-Consumption Control
  *
- * POST /api/production/work-orders/:woId/over-consumption/reject
+ * POST /api/production/work-orders/:id/over-consumption/reject
  * Rejects an over-consumption request with required reason (Manager/Admin only)
  *
  * Security:
@@ -28,10 +28,10 @@ const ALLOWED_ROLES = ['owner', 'admin', 'production_manager']
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ woId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { woId } = await params
+    const { id: woId } = await params
     const supabase = await createServerSupabase()
 
     // 1. Authentication
@@ -167,7 +167,7 @@ export async function POST(
       { status: 200 }
     )
   } catch (error) {
-    console.error('Error in POST /api/production/work-orders/:woId/over-consumption/reject:', error)
+    console.error('Error in POST /api/production/work-orders/:id/over-consumption/reject:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

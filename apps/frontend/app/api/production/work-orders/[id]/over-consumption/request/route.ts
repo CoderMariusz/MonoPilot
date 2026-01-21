@@ -2,7 +2,7 @@
  * API Route: Request Over-Consumption Approval
  * Story 04.6e: Over-Consumption Control
  *
- * POST /api/production/work-orders/:woId/over-consumption/request
+ * POST /api/production/work-orders/:id/over-consumption/request
  * Creates an over-consumption approval request when consumption exceeds BOM
  *
  * Security:
@@ -29,10 +29,10 @@ const ALLOWED_ROLES = ['owner', 'admin', 'production_manager', 'production_opera
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ woId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { woId } = await params
+    const { id: woId } = await params
     const supabase = await createServerSupabase()
 
     // 1. Authentication
@@ -238,7 +238,7 @@ export async function POST(
       { status: 201 }
     )
   } catch (error) {
-    console.error('Error in POST /api/production/work-orders/:woId/over-consumption/request:', error)
+    console.error('Error in POST /api/production/work-orders/:id/over-consumption/request:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -3,10 +3,10 @@
  * Story: 04.6e - Over-Consumption Control
  *
  * Tests over-consumption approval workflow API endpoints:
- * - POST /api/production/work-orders/:woId/over-consumption/request
- * - POST /api/production/work-orders/:woId/over-consumption/approve
- * - POST /api/production/work-orders/:woId/over-consumption/reject
- * - GET  /api/production/work-orders/:woId/over-consumption/pending
+ * - POST /api/production/work-orders/:id/over-consumption/request
+ * - POST /api/production/work-orders/:id/over-consumption/approve
+ * - POST /api/production/work-orders/:id/over-consumption/reject
+ * - GET  /api/production/work-orders/:id/over-consumption/pending
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -289,13 +289,13 @@ describe('Over-Consumption API (Story 04.6e)', () => {
   })
 
   // ==========================================================================
-  // POST /api/production/work-orders/:woId/over-consumption/request
+  // POST /api/production/work-orders/:id/over-consumption/request
   // ==========================================================================
   describe('POST /over-consumption/request', () => {
     describe('Authentication', () => {
       it('should return 401 for unauthenticated request', async () => {
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -303,7 +303,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(401)
       })
@@ -319,7 +319,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
 
       it('should return 201 when over-consumption request created', async () => {
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -327,7 +327,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(201)
         const data = await response.json()
@@ -337,7 +337,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
 
       it('should include variance information in response', async () => {
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -345,7 +345,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         const data = await response.json()
         expect(data.variance_percent).toBe(10)
@@ -355,7 +355,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
 
       it('should include message in response', async () => {
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -363,7 +363,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         const data = await response.json()
         expect(data.message).toMatch(/approval request.*created/i)
@@ -388,7 +388,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         mockWorkOrder = { id: 'wo-123', wo_number: 'WO-2025-001' }
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -396,7 +396,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(400)
         const data = await response.json()
@@ -408,7 +408,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         mockProductionSettings = { allow_over_consumption: true }
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -416,7 +416,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(400)
         const data = await response.json()
@@ -428,7 +428,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -436,7 +436,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(400)
         const data = await response.json()
@@ -448,7 +448,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         mockWorkOrder = null
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -456,7 +456,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: 10,
         }, 'invalid-wo')
-        const response = await POST(request, { params: Promise.resolve({ woId: 'invalid-wo' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'invalid-wo' }) })
 
         expect(response.status).toBe(404)
         const data = await response.json()
@@ -473,7 +473,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupOverConsumptionMaterial()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/request/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/request/route'
         )
 
         const request = createRequest('POST', {
@@ -481,7 +481,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           lp_id: 'lp-1',
           requested_qty: -10,
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(400)
       })
@@ -489,7 +489,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
   })
 
   // ==========================================================================
-  // POST /api/production/work-orders/:woId/over-consumption/approve
+  // POST /api/production/work-orders/:id/over-consumption/approve
   // ==========================================================================
   describe('POST /over-consumption/approve', () => {
     describe('Authorization', () => {
@@ -498,7 +498,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -507,7 +507,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           body: JSON.stringify({ request_id: 'req-1' }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(403)
         const data = await response.json()
@@ -522,7 +522,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -531,7 +531,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           body: JSON.stringify({ request_id: 'req-1' }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(200)
         const data = await response.json()
@@ -544,7 +544,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -553,7 +553,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           body: JSON.stringify({ request_id: 'req-1' }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(200)
       })
@@ -563,7 +563,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -575,7 +575,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(200)
         const data = await response.json()
@@ -587,7 +587,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -596,7 +596,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           body: JSON.stringify({ request_id: 'req-1' }),
           headers: { 'Content-Type': 'application/json' },
         })
-        await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         // Check audit log was created
         const auditInsert = insertedRecords.find(r => r.table === 'activity_logs')
@@ -622,7 +622,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         }
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -631,7 +631,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           body: JSON.stringify({ request_id: 'req-1' }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(400)
         const data = await response.json()
@@ -642,7 +642,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         mockApprovalRequest = null
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -651,7 +651,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           body: JSON.stringify({ request_id: 'invalid-req' }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(404)
         const data = await response.json()
@@ -661,7 +661,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
   })
 
   // ==========================================================================
-  // POST /api/production/work-orders/:woId/over-consumption/reject
+  // POST /api/production/work-orders/:id/over-consumption/reject
   // ==========================================================================
   describe('POST /over-consumption/reject', () => {
     describe('Authorization', () => {
@@ -670,7 +670,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/reject/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/reject/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/reject')
@@ -682,7 +682,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(403)
       })
@@ -695,7 +695,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/reject/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/reject/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/reject')
@@ -707,7 +707,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(200)
         const data = await response.json()
@@ -720,7 +720,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/reject/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/reject/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/reject')
@@ -732,7 +732,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         const data = await response.json()
         expect(data.consumption_id).toBeUndefined()
@@ -745,7 +745,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/reject/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/reject/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/reject')
@@ -754,7 +754,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           body: JSON.stringify({ request_id: 'req-1' }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(400)
         const data = await response.json()
@@ -766,7 +766,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         setupPendingRequest()
 
         const { POST } = await import(
-          '@/app/api/production/work-orders/[woId]/over-consumption/reject/route'
+          '@/app/api/production/work-orders/[id]/over-consumption/reject/route'
         )
 
         const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/reject')
@@ -778,7 +778,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         })
-        const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+        const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
         expect(response.status).toBe(400)
       })
@@ -786,7 +786,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
   })
 
   // ==========================================================================
-  // GET /api/production/work-orders/:woId/over-consumption/pending
+  // GET /api/production/work-orders/:id/over-consumption/pending
   // ==========================================================================
   describe('GET /over-consumption/pending', () => {
     it('should return pending requests for WO', async () => {
@@ -795,12 +795,12 @@ describe('Over-Consumption API (Story 04.6e)', () => {
       mockWorkOrder = { id: 'wo-123', wo_number: 'WO-2025-001' }
 
       const { GET } = await import(
-        '@/app/api/production/work-orders/[woId]/over-consumption/pending/route'
+        '@/app/api/production/work-orders/[id]/over-consumption/pending/route'
       )
 
       const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/pending')
       const request = new NextRequest(url, { method: 'GET' })
-      const response = await GET(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+      const response = await GET(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
       expect(response.status).toBe(200)
       const data = await response.json()
@@ -814,12 +814,12 @@ describe('Over-Consumption API (Story 04.6e)', () => {
       mockWorkOrder = { id: 'wo-123', wo_number: 'WO-2025-001' }
 
       const { GET } = await import(
-        '@/app/api/production/work-orders/[woId]/over-consumption/pending/route'
+        '@/app/api/production/work-orders/[id]/over-consumption/pending/route'
       )
 
       const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/pending')
       const request = new NextRequest(url, { method: 'GET' })
-      const response = await GET(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+      const response = await GET(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
       expect(response.status).toBe(200)
       const data = await response.json()
@@ -845,7 +845,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
       }
 
       const { POST } = await import(
-        '@/app/api/production/work-orders/[woId]/over-consumption/approve/route'
+        '@/app/api/production/work-orders/[id]/over-consumption/approve/route'
       )
 
       const url = new URL('http://localhost:3000/api/production/work-orders/wo-123/over-consumption/approve')
@@ -854,7 +854,7 @@ describe('Over-Consumption API (Story 04.6e)', () => {
         body: JSON.stringify({ request_id: 'req-1' }),
         headers: { 'Content-Type': 'application/json' },
       })
-      const response = await POST(request, { params: Promise.resolve({ woId: 'wo-123' }) })
+      const response = await POST(request, { params: Promise.resolve({ id: 'wo-123' }) })
 
       // Should return 404 to not leak information about other org's data
       expect(response.status).toBe(404)

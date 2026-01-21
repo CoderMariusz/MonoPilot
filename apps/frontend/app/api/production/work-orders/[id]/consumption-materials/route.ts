@@ -2,7 +2,7 @@
  * API Route: WO Materials with Consumption Progress
  * Story 04.6a: Material Consumption Desktop
  *
- * GET /api/production/work-orders/:woId/materials
+ * GET /api/production/work-orders/:id/consumption-materials
  * Returns materials for a work order with consumption progress
  *
  * Security:
@@ -25,10 +25,10 @@ const ALLOWED_ROLES = ['owner', 'admin', 'production_manager', 'production_opera
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ woId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { woId } = await params
+    const { id: woId } = await params
     const supabase = await createServerSupabase()
 
     // 1. Authentication
@@ -182,7 +182,7 @@ export async function GET(
       total: formattedMaterials.length,
     })
   } catch (error) {
-    console.error('Error in GET /api/production/work-orders/:woId/materials:', error)
+    console.error('Error in GET /api/production/work-orders/:id/consumption-materials:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

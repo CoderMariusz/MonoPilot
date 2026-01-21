@@ -2,7 +2,7 @@
  * API Route: Record Material Consumption
  * Story 04.6a: Material Consumption Desktop
  *
- * POST /api/production/work-orders/:woId/consume
+ * POST /api/production/work-orders/:id/consume/direct
  * Records direct material consumption from LP (no reservation required)
  *
  * Security:
@@ -37,10 +37,10 @@ const ALLOWED_ROLES = ['owner', 'admin', 'production_manager', 'production_opera
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ woId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { woId } = await params
+    const { id: woId } = await params
     const supabase = await createServerSupabase()
 
     // 1. Authentication
@@ -334,7 +334,7 @@ export async function POST(
       { status: 201 }
     )
   } catch (error) {
-    console.error('Error in POST /api/production/work-orders/:woId/consume:', error)
+    console.error('Error in POST /api/production/work-orders/:id/consume/direct:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

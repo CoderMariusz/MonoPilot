@@ -2,7 +2,7 @@
  * API Route: Get Pending Over-Consumption Requests
  * Story 04.6e: Over-Consumption Control
  *
- * GET /api/production/work-orders/:woId/over-consumption/pending
+ * GET /api/production/work-orders/:id/over-consumption/pending
  * Returns pending over-consumption approval requests for a work order
  *
  * Security:
@@ -25,10 +25,10 @@ const ALLOWED_ROLES = ['owner', 'admin', 'production_manager', 'production_opera
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ woId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { woId } = await params
+    const { id: woId } = await params
     const supabase = await createServerSupabase()
 
     // 1. Authentication
@@ -100,7 +100,7 @@ export async function GET(
     // 6. Return success response
     return NextResponse.json({ requests: pendingRequests || [] }, { status: 200 })
   } catch (error) {
-    console.error('Error in GET /api/production/work-orders/:woId/over-consumption/pending:', error)
+    console.error('Error in GET /api/production/work-orders/:id/over-consumption/pending:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
