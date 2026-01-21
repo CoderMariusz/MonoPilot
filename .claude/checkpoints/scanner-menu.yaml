@@ -1,0 +1,42 @@
+# ============================================================================
+# Scanner Menu Integration
+# ============================================================================
+# Status: COMPLETE
+# Date: 2026-01-21
+# Type: UX Enhancement
+# ============================================================================
+
+TASK: Add Scanner to Navigation Menu
+REQUIREMENT: Scanner dependent on Warehouse module
+
+FILES:
+  Modified:
+    - apps/frontend/components/navigation/Sidebar.tsx
+      - Added Smartphone icon import
+      - Added scanner to allModules array (after warehouse)
+      - Added conditional visibility: scanner requires warehouse enabled
+  Created:
+    - apps/frontend/app/(authenticated)/scanner/page.tsx
+      - Landing page with 3 workflow cards
+      - Receive, Consume, Output workflows
+      - Mobile-optimized layout
+    - apps/frontend/components/navigation/__tests__/Sidebar.test.tsx
+      - Test: scanner visible when warehouse enabled
+      - Test: scanner hidden when warehouse disabled
+      - Test: scanner routing works
+
+BEHAVIOR:
+  - Scanner appears in sidebar between Warehouse and Quality
+  - Visibility: ONLY when warehouse module is enabled
+  - Color: teal-600
+  - Icon: Smartphone (lucide-react)
+  - Route: /scanner → landing page with 3 workflows
+
+TESTS:
+  - Sidebar.test.tsx: 10 tests covering visibility logic
+  - Manual: Verified in browser (warehouse toggle)
+
+DEPLOYMENT: ✓ 21-01-2026 21:30
+# ============================================================================
+# COMPLETE
+# ============================================================================

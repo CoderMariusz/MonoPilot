@@ -9,6 +9,7 @@ import {
   Calendar,
   Factory,
   Warehouse,
+  Smartphone,
   ShieldCheck,
   Truck,
   Lightbulb,
@@ -65,6 +66,13 @@ const allModules: SidebarModule[] = [
     color: 'text-amber-600',
   },
   {
+    key: 'scanner',
+    name: 'Scanner',
+    icon: Smartphone,
+    href: '/scanner',
+    color: 'text-teal-600',
+  },
+  {
     key: 'quality',
     name: 'Quality',
     icon: ShieldCheck,
@@ -93,10 +101,14 @@ export function Sidebar({ enabledModules = [] }: SidebarProps) {
 
   // Filter modules based on enabled_modules
   // Settings is always shown (required for configuration)
-  const modules = allModules.filter(
-    (module) =>
-      module.key === 'settings' || enabledModules.includes(module.key)
-  )
+  // Scanner requires warehouse to be enabled (depends on warehouse module)
+  const modules = allModules.filter((module) => {
+    if (module.key === 'settings') return true
+    if (module.key === 'scanner') {
+      return enabledModules.includes('warehouse')
+    }
+    return enabledModules.includes(module.key)
+  })
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
