@@ -1,7 +1,7 @@
 /**
  * GET /api/planning/products/:id/active-bom
  * Story 3.10: Get active BOM for product on a specific date
- * Returns the active BOM (status='Active', effective_from <= date, effective_to is null or >= date)
+ * Returns the active BOM (status='active', effective_from <= date, effective_to is null or >= date)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -42,7 +42,7 @@ export async function GET(
     const targetDate = dateParam || new Date().toISOString().split('T')[0]
 
     // Find active BOM for product on target date
-    // Conditions: status='Active', effective_from <= date, (effective_to is null OR effective_to >= date)
+    // Conditions: status='active', effective_from <= date, (effective_to is null OR effective_to >= date)
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select(`
@@ -65,7 +65,7 @@ export async function GET(
       `)
       .eq('org_id', currentUser.org_id)
       .eq('product_id', productId)
-      .eq('status', 'Active')
+      .eq('status', 'active')
       .lte('effective_from', targetDate)
       .or(`effective_to.gte.${targetDate},effective_to.is.null`)
       .order('version', { ascending: false })

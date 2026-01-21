@@ -16,28 +16,63 @@ import { ALLOWED_ROLES, TO_NUMBER_PREFIX, TO_NUMBER_PADDING } from './constants'
 /**
  * Get current user's org_id, role, and user_id from JWT
  * AC-3.6.7: Role-based authorization for Transfer Orders
+ *
+ * Uses admin client to bypass RLS and avoid potential recursion issues
+ * when querying the users table for org_id lookup.
  */
 export async function getCurrentUserData(): Promise<UserData | null> {
-  const supabase = await createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
+  try {
+    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-  if (!user) return null
+    // Get authenticated user from session
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  const { data: userData, error } = await supabase
-    .from('users')
-    .select('org_id, role')
-    .eq('id', user.id)
-    .single()
+    if (authError) {
+      console.error('[getCurrentUserData] Auth error:', authError.message)
+      return null
+    }
 
-  if (error || !userData) {
-    console.error('Failed to get user data:', user.id, error)
+    if (!user) {
+      console.error('[getCurrentUserData] No authenticated user found')
+      return null
+    }
+
+    // Use admin client to bypass RLS for users table lookup
+    // This avoids potential RLS recursion issues
+    const { data: userData, error } = await supabaseAdmin
+      .from('users')
+      .select('org_id, role')
+      .eq('id', user.id)
+      .single()
+
+    if (error) {
+      console.error('[getCurrentUserData] Failed to get user data:', {
+        userId: user.id,
+        error: error.message,
+        code: error.code,
+      })
+      return null
+    }
+
+    if (!userData) {
+      console.error('[getCurrentUserData] User not found in users table:', user.id)
+      return null
+    }
+
+    if (!userData.org_id) {
+      console.error('[getCurrentUserData] User has no org_id:', user.id)
+      return null
+    }
+
+    return {
+      orgId: userData.org_id,
+      role: userData.role,
+      userId: user.id
+    }
+  } catch (error) {
+    console.error('[getCurrentUserData] Unexpected error:', error)
     return null
-  }
-
-  return {
-    orgId: userData.org_id,
-    role: userData.role,
-    userId: user.id
   }
 }
 

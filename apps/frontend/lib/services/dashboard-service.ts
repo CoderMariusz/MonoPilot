@@ -549,8 +549,8 @@ export async function fetchDashboardStats(orgId: string): Promise<DashboardStats
 
   // Process BOMs
   const boms = bomsResult.data || []
-  const activeBoms = boms.filter((b: any) => b.status === 'Active').length
-  const phasedBoms = boms.filter((b: any) => b.status === 'Phased Out').length
+  const activeBoms = boms.filter((b: any) => b.status === 'active').length
+  const phasedBoms = boms.filter((b: any) => b.status === 'phased_out').length
 
   // Process Routings
   const routings = routingsResult.data || []
@@ -819,7 +819,7 @@ export async function fetchRecentActivity(
 
     allActivities.push({
       id: `bom-${b.id}`,
-      type: (isCreated ? 'bom_created' : (b.status === 'Active' ? 'bom_activated' : 'bom_created')) as ActivityType,
+      type: (isCreated ? 'bom_created' : (b.status === 'active' ? 'bom_activated' : 'bom_created')) as ActivityType,
       entity_type: 'bom' as EntityType,
       entity_id: b.id,
       description: `BOM v${b.version} for ${productCode} ${isCreated ? 'created' : 'updated'}`,

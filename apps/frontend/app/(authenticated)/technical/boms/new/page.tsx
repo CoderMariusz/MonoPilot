@@ -242,7 +242,7 @@ export default function CreateBOMPage() {
         output_uom: outputUom,
         yield_percent: parseFloat(yieldPercent) || 100,
         notes: notes || null,
-        routing_id: routingId || null,
+        routing_id: routingId && routingId !== 'none' ? routingId : null,
         units_per_box: unitsPerBox ? parseInt(unitsPerBox) : null,
         boxes_per_pallet: boxesPerPallet ? parseInt(boxesPerPallet) : null,
       }
@@ -771,7 +771,7 @@ export default function CreateBOMPage() {
                       </div>
                     </div>
                   </CollapsibleContent>
-                  {!routingId && (
+                  {(!routingId || routingId === 'none') && (
                     <div className="mt-4 p-3 bg-yellow-50 rounded-lg flex items-start gap-2">
                       <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
                       <div className="text-sm">
@@ -812,7 +812,7 @@ export default function CreateBOMPage() {
                         <SelectValue placeholder="Select routing..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No routing</SelectItem>
+                        <SelectItem value="none">No routing</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

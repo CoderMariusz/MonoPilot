@@ -49,7 +49,7 @@ export async function GET(
         *,
         suppliers(id, code, name, currency, payment_terms, tax_code_id),
         warehouses(id, code, name),
-        po_lines(
+        lines:purchase_order_lines(
           *,
           products(id, code, name, base_uom)
         )
@@ -257,11 +257,11 @@ export async function DELETE(
     }
 
     // Auto-delete PO lines if PO is in Draft status
+    // Note: purchase_order_lines doesn't have org_id - it's enforced via FK to purchase_orders
     const { error: deleteLinesError } = await supabaseAdmin
-      .from('po_lines')
+      .from('purchase_order_lines')
       .delete()
       .eq('po_id', id)
-      .eq('org_id', currentUser.org_id)
 
     if (deleteLinesError) {
       console.error('Error deleting PO lines:', deleteLinesError)

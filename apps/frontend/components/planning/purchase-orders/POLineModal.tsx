@@ -25,6 +25,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -272,7 +273,7 @@ export function POLineModal({
             {/* Product Selection */}
             {mode === 'add' ? (
               <div className="space-y-2">
-                <FormLabel>Product *</FormLabel>
+                <Label>Product *</Label>
                 <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -339,7 +340,7 @@ export function POLineModal({
               </div>
             ) : (
               <div className="space-y-2">
-                <FormLabel>Product</FormLabel>
+                <Label>Product</Label>
                 <div className="border rounded-lg p-3 bg-gray-50">
                   <div className="font-medium">{selectedProduct?.name}</div>
                   <div className="text-xs text-muted-foreground">
@@ -405,7 +406,7 @@ export function POLineModal({
                 )}
               />
               <div className="space-y-2">
-                <FormLabel>Unit of Measure</FormLabel>
+                <Label>Unit of Measure</Label>
                 <Input
                   value={selectedProduct?.base_uom || '-'}
                   disabled

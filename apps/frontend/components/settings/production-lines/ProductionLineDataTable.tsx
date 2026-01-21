@@ -70,7 +70,7 @@ export function ProductionLineDataTable({
   readOnly = false,
 }: ProductionLineDataTableProps) {
   const [searchValue, setSearchValue] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Debounced search (300ms)
@@ -96,7 +96,7 @@ export function ProductionLineDataTable({
   // Handle filter changes
   useEffect(() => {
     const filters: Partial<ProductionLineListParams> = {}
-    if (statusFilter) filters.status = statusFilter as ProductionLineStatus
+    if (statusFilter && statusFilter !== 'all') filters.status = statusFilter as ProductionLineStatus
     onFilter(filters)
   }, [statusFilter, onFilter])
 
@@ -170,7 +170,7 @@ export function ProductionLineDataTable({
             <SelectValue placeholder="All Statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Statuses</SelectItem>
+            <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="maintenance">Maintenance</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>

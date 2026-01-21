@@ -42,7 +42,7 @@ const CURRENCY_OPTIONS = [
 ]
 
 const PAYMENT_TERMS_OPTIONS = [
-  { value: '', label: 'All Payment Terms' },
+  { value: 'all', label: 'All Payment Terms' },
   { value: 'Net 7', label: 'Net 7' },
   { value: 'Net 30', label: 'Net 30' },
   { value: 'Net 45', label: 'Net 45' },
@@ -86,7 +86,7 @@ export function SupplierFilters({
 
   const handlePaymentTermsChange = useCallback(
     (value: string) => {
-      onFilterChange({ ...filters, payment_terms: value || null })
+      onFilterChange({ ...filters, payment_terms: value === 'all' ? null : value })
     },
     [filters, onFilterChange]
   )
@@ -127,7 +127,7 @@ export function SupplierFilters({
           Payment Terms
         </label>
         <Select
-          value={filters.payment_terms || ''}
+          value={filters.payment_terms || 'all'}
           onValueChange={handlePaymentTermsChange}
         >
           <SelectTrigger data-testid="filter-payment-terms" id="filter-payment-terms">
@@ -135,7 +135,7 @@ export function SupplierFilters({
           </SelectTrigger>
           <SelectContent>
             {PAYMENT_TERMS_OPTIONS.map((option) => (
-              <SelectItem key={option.value || 'all'} value={option.value}>
+              <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
             ))}
@@ -280,7 +280,7 @@ export function SupplierFilters({
 
       {/* Payment Terms Filter */}
       <Select
-        value={filters.payment_terms || ''}
+        value={filters.payment_terms || 'all'}
         onValueChange={handlePaymentTermsChange}
       >
         <SelectTrigger data-testid="filter-payment-terms" className="w-[160px]">
@@ -288,7 +288,7 @@ export function SupplierFilters({
         </SelectTrigger>
         <SelectContent>
           {PAYMENT_TERMS_OPTIONS.map((option) => (
-            <SelectItem key={option.value || 'all'} value={option.value}>
+            <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
           ))}
