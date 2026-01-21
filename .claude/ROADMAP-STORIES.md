@@ -14,7 +14,7 @@
 | 02 | Technical | 23 (17+6) | 17 MVP done | MVP COMPLETE + Phase 2 defined | 74% impl / 100% def |
 | 03 | Planning | 30 (20+10) | 19 MVP done | MVP COMPLETE + Phase 2-3 defined | 63% impl / 100% def |
 | 04 | Production | 18 (7+11) | **15 Phase 0+1** | Phase 0 COMPLETE + **04.6a-c + 04.7b-c + 04.8 (6 stories) DEPLOYED** | **83% impl** / 100% def |
-| 05 | Warehouse | 29 (20+9) | 20 Phase 1 done | MVP COMPLETE + Phase 2 defined | 69% impl / 100% def |
+| 05 | Warehouse | 29 (20+9) | **22 Phase 1+2** | MVP COMPLETE + **05.20 + 05.21 DEPLOYED** + Phase 2 defined | **76% impl** / 100% def |
 | **06** | **Quality** | **41 (12+29)** | **12 Phase 1-2 done** | **Phase 1-2 COMPLETE + Phase 2B-4 defined** | **29% impl / 100% def** |
 | 07 | Shipping | 24 (16+8) | 0 | Phase 1-3 100% STORIES DEFINED | 0% impl / 100% def |
 | **08** | **NPD** | **18 (0+18)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
@@ -22,7 +22,9 @@
 | **10** | **OEE** | **20 (0+20)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 | **11** | **Integrations** | **18 (0+18)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 
-**TOTAL:** 110/283 stories zaimplementowanych w Epic 01-07 (~39%)
+**TOTAL:** 112/283 stories zaimplementowanych w Epic 01-07 (~40%)
+**NEW:** Story 05.21 Scanner Putaway - DEPLOYED (2026-01-21)
+**NEW:** Story 05.20 Scanner Move - DEPLOYED (2026-01-21)
 **NEW:** Story 04.8 Material Reservations - DEPLOYED (2026-01-21)
 **NEW:** Story 04.7b Output Registration Scanner - DEPLOYED (2026-01-21)
 **NEW:** Story 04.7c By-Product Registration - DEPLOYED (2026-01-21)
@@ -362,9 +364,9 @@
 
 ---
 
-## EPIC 05 - WAREHOUSE 100% STORY DEFINITION | 69% IMPLEMENTED
+## EPIC 05 - WAREHOUSE 100% STORY DEFINITION | 76% IMPLEMENTED
 
-**Status:** MVP COMPLETE (20/20 Phase 1 stories) + 9 Phase 2 stories defined
+**Status:** MVP COMPLETE (20/20 Phase 1 stories) + **05.20 + 05.21 DEPLOYED** + 7 Phase 2 stories defined
 
 ### Phase 1 - MVP (COMPLETE)
 
@@ -397,12 +399,12 @@
 - Wszystkie critical issues rozwiazane
 - Completion rate: 100%
 
-### Phase 2 - Advanced Features (STORIES DEFINED)
+### Phase 2 - Advanced Features (IN PROGRESS)
 
 | Story | Nazwa | Status | FR | Complexity | Uwagi |
 |-------|-------|--------|-----|------------|-------|
-| 05.20 | Scanner Move Workflow | NOT STARTED | 1 FR | M (3-4d) | Mobile LP moves with location scan |
-| 05.21 | Scanner Putaway Workflow | NOT STARTED | 1 FR | M (3-4d) | Guided putaway with FIFO/FEFO zones |
+| **05.20** | **Scanner Move Workflow** | **DEPLOYED** | 1 FR | M (3-4d) | **P1-P7 COMPLETE - 2026-01-21** |
+| **05.21** | **Scanner Putaway Workflow** | **DEPLOYED** | 1 FR | M (3-4d) | **P1-P7 COMPLETE - 2026-01-21** |
 | 05.22 | Pallet Management | NOT STARTED | 1 FR | L (5-7d) | Pallet CRUD, add/remove LPs, close |
 | 05.23 | GS1 SSCC Support | NOT STARTED | 1 FR | M (3-4d) | SSCC-18 pallet codes, GS1-128 barcodes |
 | 05.24 | Catch Weight Support | NOT STARTED | 1 FR | M (3-4d) | Variable weight per unit, scale integration |
@@ -411,16 +413,33 @@
 | 05.27 | Zone Management | NOT STARTED | 1 FR | M (3-4d) | Zone CRUD, location assignment, preferred zones |
 | 05.28 | Expiry Alerts Dashboard | NOT STARTED | 1 FR | M (2-3d) | Expiring soon widget, multi-tier alerts |
 
+**05.20 Scanner Move Workflow - DEPLOYED (2026-01-21):**
+- Tests: 228 (P2 RED) -> 182/191 (P3 GREEN)
+- AC: 14/14 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (2 minor issues)
+- Features: 3-step wizard, LP lookup, location lookup, validate-move, execute move, recent moves, audio/haptic feedback
+- Documentation: API reference + Workflow guide created
+
+**05.21 Scanner Putaway Workflow - DEPLOYED (2026-01-21):**
+- Tests: 189 (P2 RED) -> 141/141 (P3 GREEN)
+- AC: 11/11 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (zero issues)
+- Features: 5-step wizard, FIFO/FEFO location suggestions, zone preferences, location override with reason, stock move creation
+- Documentation: API reference + Workflow guide created
+- Scanner landing page updated with Putaway card
+
 **Metryki Phase 2:**
 - Stories created: 2026-01-14 (some pre-existed, completed today)
 - Total documentation: ~295KB (9 files: 05.20-05.28)
-- Estimated effort: 32-44 days
-- FR coverage: 9 additional FR (WH-FR-012,013,016,018,021,023,025,026,030)
+- Estimated effort remaining: 25-36 days (05.22-05.28)
+- FR coverage: 7 additional FR (WH-FR-016,018,021,023,025,026,030)
 
 **Status:**
 - Phase 1 (MVP): 100% COMPLETE (20/20 stories, 2,265+ tests, 2026-01-09)
-- Phase 2 (Advanced): 100% STORIES DEFINED Implementation pending
-- Epic 05: 100% story definition complete | 69% implemented (20/29 stories)
+- Phase 2 (Advanced): **2/9 DEPLOYED** (05.20 + 05.21 complete, 7 remaining)
+- Epic 05: 100% story definition complete | **76% implemented (22/29 stories)**
 
 ---
 
@@ -663,6 +682,7 @@ See detailed breakdowns in separate sections below. All premium modules have com
 
 ```
 04.6a + 04.6b + 04.6c + 04.7b + 04.7c + 04.8 DEPLOYED (2026-01-21)
+05.20 + 05.21 Scanner Move + Putaway DEPLOYED (2026-01-21)
 
 Kolejnosc implementacji:
 1. 04.6d-e - Consumption Advanced (4 dni)
@@ -670,11 +690,14 @@ Kolejnosc implementacji:
 3. 04.7d   - Multiple Outputs (2 dni)
 ```
 
-### Priorytet 3: Epic 02 deploy (1-2 dni)
+### Priorytet 3: Epic 05 Phase 2 (25-36 dni remaining)
 
 ```
-Deploy remaining PRODUCTION-READY stories:
-- 02.9, 02.15 ready for deployment
+05.20 + 05.21 Scanner Move + Putaway DEPLOYED (2026-01-21)
+
+Kolejnosc implementacji:
+1. 05.22 - Pallet Management (5-7 dni)
+2. 05.23-05.28 - pozostale (20-29 dni)
 ```
 
 ### Priorytet 4: Epic 06-07 (100-120 dni)
@@ -705,8 +728,8 @@ Potem: Implementacja
 | Premium | Epic 08-11 stories | 30-40 | Sierpien 2026 |
 | Premium | Epic 08-11 impl | 115-145 | Q4 2026 |
 
-**TOTAL do MVP (Epic 01-07):** ~182-232 dni remaining
-**TOTAL do Enterprise (Epic 01-11):** ~332-432 dni remaining
+**TOTAL do MVP (Epic 01-07):** ~178-228 dni remaining
+**TOTAL do Enterprise (Epic 01-11):** ~328-428 dni remaining
 
 ---
 
@@ -715,8 +738,8 @@ Potem: Implementacja
 ```
 Wygenerowano: 2026-01-21 (updated)
 Zrodlo: .claude/checkpoints/*.yaml + Epic 01-11 COMPLETE gap analysis + ORCHESTRATOR story generation
-Stories zaimplementowane: 110/283 (Epic 01-07) ~39%
-Stories do implementacji: 173 total across Epic 01-11 (all Phase 2+ features + Premium modules)
+Stories zaimplementowane: 112/283 (Epic 01-07) ~40%
+Stories do implementacji: 171 total across Epic 01-11 (all Phase 2+ features + Premium modules)
 Stories do napisania: 0 (100% STORY DEFINITION COMPLETE!)
 Epic 01 story definition: 100% complete (26 stories: 16 MVP + 10 Phase 1B-3)
 Epic 01 implementation: 62% (16/26 MVP done, 10 Phase 1B-3 pending)
@@ -727,7 +750,7 @@ Epic 03 implementation: 63% (19/30 MVP ~done, 10 Phase 2-3 pending)
 Epic 04 story definition: 100% complete (18 stories: 7 Phase 0 + 11 Phase 1-2)
 Epic 04 implementation: 83% (15/18 Phase 0+04.6a+04.6b+04.6c+04.7b+04.7c+04.8 done, 3 Phase 1-2 pending)
 Epic 05 story definition: 100% complete (29 stories: 20 Phase 1 + 9 Phase 2)
-Epic 05 implementation: 69% (20/29 Phase 1 done, 9 Phase 2 pending)
+Epic 05 implementation: 76% (22/29 Phase 1 + 05.20 + 05.21 done, 7 Phase 2 pending)
 Epic 06 story definition: 100% complete (41 stories: 12 Phase 1-2A + 29 Phase 2B-4)
 Epic 06 implementation: 29% (12/41 Phase 1-2A done, 29 Phase 2B-4 pending)
 Epic 07 story definition: 100% complete (24 stories: 16 Phase 1 + 8 Phase 2-3)
@@ -740,6 +763,6 @@ Epic 10 story definition: 100% complete (20 stories: 5 Phase 1A + 4 Phase 1B + 6
 Epic 10 implementation: 0% (0/20 all pending - premium module)
 Epic 11 story definition: 100% complete (18 stories: 6 Phase 1 + 8 Phase 2 + 4 Phase 3)
 Epic 11 implementation: 0% (0/18 all pending - premium module)
-LATEST: Story 04.8 Material Reservations - DEPLOYED 2026-01-21 (P1-P7 complete, 192 tests, 8/8 AC)
+LATEST: Story 05.21 Scanner Putaway - DEPLOYED 2026-01-21 (P1-P7 complete, 189 tests, 11/11 AC)
 MONOPILOT: 100% STORY DEFINITION COMPLETE - ALL 11 EPIC MODULES FULLY DEFINED!
 ```

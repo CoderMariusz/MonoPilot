@@ -52,6 +52,14 @@ export const HapticFeedback = {
   },
 
   /**
+   * Warning buzz (75ms)
+   * Used for: location mismatch, warnings
+   */
+  warning: (): void => {
+    vibrate(75)
+  },
+
+  /**
    * Enable or disable haptic feedback
    */
   setEnabled: (enabled: boolean): void => {

@@ -7,7 +7,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Package, Factory, CheckCircle2 } from 'lucide-react'
+import { Package, Factory, CheckCircle2, MapPin, ArrowRightLeft } from 'lucide-react'
 
 export const metadata = {
   title: 'Scanner Workflows | MonoPilot',
@@ -27,6 +27,18 @@ const workflows: WorkflowCard[] = [
     description: 'Receive incoming goods into warehouse inventory. Scan items, verify quantities, and create license plates.',
     href: '/scanner/receive',
     icon: <Package className="h-12 w-12 text-blue-600" />,
+  },
+  {
+    title: 'Move LP',
+    description: 'Move license plates between warehouse locations. Scan LP and destination to relocate inventory.',
+    href: '/scanner/move',
+    icon: <ArrowRightLeft className="h-12 w-12 text-cyan-600" />,
+  },
+  {
+    title: 'Putaway',
+    description: 'Move received goods to storage locations. Get FIFO/FEFO optimized location suggestions for efficient picking.',
+    href: '/scanner/putaway',
+    icon: <MapPin className="h-12 w-12 text-purple-600" />,
   },
   {
     title: 'Consume Material',
@@ -54,7 +66,7 @@ export default function ScannerLandingPage() {
       </div>
 
       {/* Workflow Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {workflows.map((workflow) => (
           <Card
             key={workflow.href}

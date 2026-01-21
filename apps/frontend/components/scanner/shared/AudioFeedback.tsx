@@ -134,6 +134,14 @@ export const AudioFeedback = {
   },
 
   /**
+   * Play warning tone (550Hz, 250ms) - mid-high pitch
+   * Used for: location mismatch, warnings
+   */
+  playWarning: (): void => {
+    playTone(550, 250)
+  },
+
+  /**
    * Enable or disable audio feedback
    */
   setEnabled: (enabled: boolean): void => {
