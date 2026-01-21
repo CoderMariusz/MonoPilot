@@ -225,12 +225,14 @@ export async function POST(
       )
     }
 
-    // 14. Full LP consumption check
+    // 14. Full LP consumption check (Story 04.6c - 1:1 Consumption Enforcement)
     if (material.consume_whole_lp && Math.abs(consume_qty - lpQty) > 0.0001) {
       return NextResponse.json(
         {
-          error: `Full LP consumption required. LP quantity is ${lpQty}`,
-          code: ERROR_CODES.FULL_LP_REQUIRED,
+          error: ERROR_CODES.FULL_LP_REQUIRED,
+          message: `Full LP consumption required. LP quantity is ${lpQty}`,
+          lp_qty: lpQty,
+          requested_qty: consume_qty,
         },
         { status: 400 }
       )

@@ -94,6 +94,17 @@ export interface LPValidationResult {
 }
 
 /**
+ * Full LP validation result (Story 04.6c)
+ * Used for 1:1 consumption enforcement
+ */
+export interface FullLPValidationResult {
+  valid: boolean
+  error?: 'FULL_LP_REQUIRED'
+  lpQty?: number
+  message?: string
+}
+
+/**
  * Consumption recording result
  */
 export interface ConsumptionResult {
@@ -184,6 +195,52 @@ export async function getAvailableLPs(
 
   const data = await response.json()
   return data.data || []
+}
+
+/**
+ * Validate Full LP consumption requirement (Story 04.6c)
+ *
+ * Checks if material requires full LP consumption (consume_whole_lp=true)
+ * and validates that the consume quantity matches the LP quantity exactly.
+ *
+ * @param consumeWholeLP - Whether the material requires full LP consumption
+ * @param consumeQty - Quantity to consume
+ * @param lpQty - Available quantity on the LP
+ * @returns FullLPValidationResult with valid flag and error details if invalid
+ */
+export function validateFullLPConsumption(
+  consumeWholeLP: boolean,
+  consumeQty: number,
+  lpQty: number
+): FullLPValidationResult {
+  // If consume_whole_lp is not set, any quantity is valid
+  if (!consumeWholeLP) {
+    return { valid: true }
+  }
+
+  // For 1:1 consumption, consume_qty must match LP qty exactly
+  // Use small tolerance for floating point comparison
+  if (Math.abs(consumeQty - lpQty) > 0.0001) {
+    return {
+      valid: false,
+      error: 'FULL_LP_REQUIRED',
+      lpQty: lpQty,
+      message: `Full LP consumption required. LP quantity is ${lpQty}`,
+    }
+  }
+
+  return { valid: true }
+}
+
+/**
+ * Check if consumption will use the full LP quantity
+ *
+ * @param consumeQty - Quantity being consumed
+ * @param lpQty - Total LP quantity
+ * @returns true if consuming the full LP
+ */
+export function isFullLPConsumption(consumeQty: number, lpQty: number): boolean {
+  return Math.abs(consumeQty - lpQty) < 0.0001
 }
 
 /**
@@ -329,6 +386,7 @@ export async function reverseConsumption(
     body: JSON.stringify({
       consumption_id: request.consumption_id,
       reason: request.reason,
+      notes: request.notes,
     }),
   })
 

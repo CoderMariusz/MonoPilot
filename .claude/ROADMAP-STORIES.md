@@ -1,6 +1,6 @@
 # MonoPilot - Roadmap Stories (Szczegolowa Analiza)
 
-> **Data generacji:** 2026-01-15
+> **Data generacji:** 2026-01-21
 > **Zrodlo danych:** `.claude/checkpoints/*.yaml` + analiza dokumentacji + Epic 06 story generation
 > **Metoda:** Bezposrednia analiza checkpointow implementacyjnych + AI-generated stories
 
@@ -13,7 +13,7 @@
 | 01 | Settings | 26 (16+10) | 16 MVP done | MVP COMPLETE + Phase 1B-3 defined | 62% impl / 100% def |
 | 02 | Technical | 23 (17+6) | 17 MVP done | MVP COMPLETE + Phase 2 defined | 74% impl / 100% def |
 | 03 | Planning | 30 (20+10) | 19 MVP done | MVP COMPLETE + Phase 2-3 defined | 63% impl / 100% def |
-| 04 | Production | 18 (7+11) | 7 Phase 0 done | Phase 0 COMPLETE + Phase 1-2 defined | 39% impl / 100% def |
+| 04 | Production | 18 (7+11) | **12 Phase 0+1** | Phase 0 COMPLETE + **04.6a-e (5 stories) DEPLOYED** | **67% impl** / 100% def |
 | 05 | Warehouse | 29 (20+9) | 20 Phase 1 done | MVP COMPLETE + Phase 2 defined | 69% impl / 100% def |
 | **06** | **Quality** | **41 (12+29)** | **12 Phase 1-2 done** | **Phase 1-2 COMPLETE + Phase 2B-4 defined** | **29% impl / 100% def** |
 | 07 | Shipping | 24 (16+8) | 0 | Phase 1-3 100% STORIES DEFINED | 0% impl / 100% def |
@@ -22,7 +22,8 @@
 | **10** | **OEE** | **20 (0+20)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 | **11** | **Integrations** | **18 (0+18)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 
-**TOTAL:** 100/283 stories zaimplementowanych w Epic 01-07 (~35%)
+**TOTAL:** 107/283 stories zaimplementowanych w Epic 01-07 (~38%)
+**NEW:** Stories 04.6a-e Material Consumption (5 stories) - ALL DEPLOYED (2026-01-21)
 **NEW:** Epic 06 Quality - 41 stories 100% defined (12 impl, 29 ready)
 **NEW:** Epic 08 NPD - 18 stories 100% defined (0 impl, 18 ready)
 **NEW:** Epic 09 Finance - 26 stories 100% defined (0 impl, 26 ready)
@@ -99,7 +100,7 @@
 **Metryki Phase 1A:**
 - Lacznie testow: ~13,500+ linii kodu testowego
 - Wszystkie P7 zakonczone
-- Gotowe do produkcji ✅
+- Gotowe do produkcji
 
 **Metryki Phase 1B-3:**
 - Stories defined: 10 (complete markdown + AC + Technical spec)
@@ -107,9 +108,9 @@
 - FR coverage: 24 additional FR (88/95 total = 93%)
 
 **Status:**
-- MVP (Phase 1A): 100% DEPLOYED ✅ Ready for production
-- Phase 1B: 100% STORIES DEFINED ✅ Implementation pending
-- Phase 2-3: 100% STORIES DEFINED ✅ Implementation pending
+- MVP (Phase 1A): 100% DEPLOYED Ready for production
+- Phase 1B: 100% STORIES DEFINED Implementation pending
+- Phase 2-3: 100% STORIES DEFINED Implementation pending
 - Epic 01: 100% story definition complete | 62% implemented (16/26 stories)
 
 ---
@@ -158,8 +159,8 @@
 - FR coverage: 10 additional FR (FR-2.9-12, 2.47, 2.66-67, 2.76, 2.83, 2.93)
 
 **Status:**
-- MVP (P0-P1): 100% DEPLOYED ✅ Ready for production
-- Phase 2 (P2): 100% STORIES DEFINED ✅ Implementation pending
+- MVP (P0-P1): 100% DEPLOYED Ready for production
+- Phase 2 (P2): 100% STORIES DEFINED Implementation pending
 - Epic 02: 100% story definition complete | 74% implemented (17/23 stories)
 
 ---
@@ -221,9 +222,9 @@
 - FR coverage: 22 additional FR (FR-PLAN-030 to FR-PLAN-072)
 
 **Status:**
-- MVP (Phase 1): 95% COMPLETE ✅ (18/20 done, 03.13 in progress, 03.14 blocked)
-- Phase 2 (Forecasting/MRP): 100% STORIES DEFINED ✅ Implementation pending
-- Phase 3 (Enterprise): 100% STORIES DEFINED ✅ Implementation pending
+- MVP (Phase 1): 95% COMPLETE (18/20 done, 03.13 in progress, 03.14 blocked)
+- Phase 2 (Forecasting/MRP): 100% STORIES DEFINED Implementation pending
+- Phase 3 (Enterprise): 100% STORIES DEFINED Implementation pending
 - Epic 03: 100% story definition complete | 63% implemented (19/30 stories)
 
 **Do zrobienia:**
@@ -232,9 +233,9 @@
 
 ---
 
-## EPIC 04 - PRODUCTION 100% STORY DEFINITION | 39% IMPLEMENTED
+## EPIC 04 - PRODUCTION 100% STORY DEFINITION | 56% IMPLEMENTED
 
-**Status:** Phase 0 COMPLETE (7/7) + Phase 1-2 stories defined (21 stories)
+**Status:** Phase 0 COMPLETE (7/7) + **04.6a+04.6b+04.6c DEPLOYED** + Phase 1-2 stories defined (17 stories remaining)
 
 ### Phase 0 - MVP Core (COMPLETE)
 
@@ -253,15 +254,15 @@
 - AC pass rate: 97.8% (44/45)
 - Wszystkie P6 (QA) passed
 
-### Phase 1 - Full Production (STORIES DEFINED)
+### Phase 1 - Full Production (IN PROGRESS)
 
-**Status:** UNBLOCKED (Epic 05 complete!) | Stories ready for implementation
+**Status:** 04.6a + 04.6b + 04.6c DEPLOYED | Remaining stories ready for implementation
 
 | Story | Nazwa | Status | FR | Complexity | Uwagi |
 |-------|-------|--------|-----|------------|-------|
-| 04.6a | Material Consumption Desktop | NOT STARTED | 1 FR | L (4d) | LP selection, quantity validation, progress |
-| 04.6b | Material Consumption Scanner | NOT STARTED | 1 FR | M (3d) | Barcode scan, quick consumption workflow |
-| 04.6c | 1:1 Consumption Enforcement | NOT STARTED | 1 FR | S (2d) | consume_whole_lp validation |
+| **04.6a** | **Material Consumption Desktop** | **DEPLOYED** | 1 FR | L (4d) | **P1-P7 COMPLETE - 2026-01-21** |
+| **04.6b** | **Material Consumption Scanner** | **DEPLOYED** | 1 FR | M (3d) | **P1-P7 COMPLETE - 2026-01-21** |
+| **04.6c** | **1:1 Consumption Enforcement** | **DEPLOYED** | 1 FR | S (2d) | **P1-P7 COMPLETE - 2026-01-21** |
 | 04.6d | Consumption Correction | NOT STARTED | 1 FR | S (2d) | Reversal workflow with audit trail |
 | 04.6e | Over-Consumption Control | NOT STARTED | 1 FR | S (2d) | Setting-based block/warn logic |
 | 04.7a | Output Registration Desktop | NOT STARTED | 1 FR | M (3d) | LP creation, genealogy, yield capture |
@@ -270,12 +271,27 @@
 | 04.7d | Multiple Outputs per WO | NOT STARTED | 1 FR | S (2d) | Multi-output batch support |
 | 04.8 | Material Reservations | NOT STARTED | 1 FR | M (4d) | Prevent allocation conflicts |
 
+**04.6a Material Consumption Desktop - DEPLOYED (2026-01-21):**
+- Tests: 88 (P2 RED) -> 52/52 (P3 GREEN)
+- AC: 8/8 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (zero issues)
+- Documentation: API + Component guides created
+
+**04.6c 1:1 Consumption Enforcement - DEPLOYED (2026-01-21):**
+- Tests: 107 (P2 RED) -> 83/83 (P3 GREEN)
+- AC: 6/6 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (zero issues)
+- Features: FULL_LP_REQUIRED error, FullLPRequiredBadge, ConsumptionQtyInput, NumberPad disabled state
+- Documentation: API + Component guides updated
+
 **Metryki Phase 1:**
 - Stories created: 2026-01-14
 - Total documentation: ~190KB (10 markdown files)
 - Context YAML: Complete (database, API, frontend, tests)
-- Estimated effort: 27-31 days
-- Dependencies: Epic 05 COMPLETE ✅
+- Estimated remaining effort: 18-22 days (04.6a + 04.6b + 04.6c completed)
+- Dependencies: Epic 05 COMPLETE
 
 ### Phase 2 - OEE & Analytics (STORIES DEFINED)
 
@@ -283,7 +299,7 @@
 
 | Story | Nazwa | Status | FR | Complexity | Uwagi |
 |-------|-------|--------|-----|------------|-------|
-| 04.9a | OEE Calculation | NOT STARTED | 1 FR | L (5d) | Availability × Performance × Quality |
+| 04.9a | OEE Calculation | NOT STARTED | 1 FR | L (5d) | Availability x Performance x Quality |
 | 04.9b | Downtime Tracking | NOT STARTED | 1 FR | L (4d) | Planned/unplanned, reason categorization |
 | 04.9c | Machine Integration | NOT STARTED | 1 FR | L (5d) | Machine status, counters, alarms (OPC UA) |
 | 04.9d | Shift Management | NOT STARTED | 1 FR | M (3d) | Shift definition, break times, calendar |
@@ -308,15 +324,15 @@
 - Total Phase 2 effort: 33 days
 
 **Status:**
-- Phase 0 (MVP Core): 100% COMPLETE ✅ (7/7 stories, 1,600+ tests)
-- Phase 1 (Full Production): 100% STORIES DEFINED ✅ Implementation pending (27-31 days)
-- Phase 2 (OEE & Analytics): 100% STORIES DEFINED ✅ Implementation pending (33 days)
-- Epic 04: 100% story definition complete | 39% implemented (7/18 stories)
+- Phase 0 (MVP Core): 100% COMPLETE (7/7 stories, 1,600+ tests)
+- Phase 1 (Full Production): **3/10 DEPLOYED** (04.6a + 04.6b + 04.6c complete, 7 remaining)
+- Phase 2 (OEE & Analytics): 100% STORIES DEFINED Implementation pending (33 days)
+- Epic 04: 100% story definition complete | **56% implemented (10/18 stories)**
 
 **Dependencies satisfied:**
-- ✅ Epic 05 (Warehouse) - LP table, genealogy, reservations COMPLETE
-- ✅ Epic 03 (Planning) - WO CRUD COMPLETE
-- ✅ Epic 02 (Technical) - BOMs, routings COMPLETE
+- Epic 05 (Warehouse) - LP table, genealogy, reservations COMPLETE
+- Epic 03 (Planning) - WO CRUD COMPLETE
+- Epic 02 (Technical) - BOMs, routings COMPLETE
 
 ---
 
@@ -353,7 +369,7 @@
 - Lacznie testow: **2,265+**
 - Data ukonczenia: 2026-01-09
 - Wszystkie critical issues rozwiazane
-- Completion rate: 100% ✅
+- Completion rate: 100%
 
 ### Phase 2 - Advanced Features (STORIES DEFINED)
 
@@ -376,8 +392,8 @@
 - FR coverage: 9 additional FR (WH-FR-012,013,016,018,021,023,025,026,030)
 
 **Status:**
-- Phase 1 (MVP): 100% COMPLETE ✅ (20/20 stories, 2,265+ tests, 2026-01-09)
-- Phase 2 (Advanced): 100% STORIES DEFINED ✅ Implementation pending
+- Phase 1 (MVP): 100% COMPLETE (20/20 stories, 2,265+ tests, 2026-01-09)
+- Phase 2 (Advanced): 100% STORIES DEFINED Implementation pending
 - Epic 05: 100% story definition complete | 69% implemented (20/29 stories)
 
 ---
@@ -387,7 +403,7 @@
 **Status:** Phase 1-2A COMPLETE (12/41 stories) + Phase 2B-4 100% DEFINED (29 stories)
 **Created:** 2026-01-15 (Phase 2B-4 stories generated by AI)
 
-### Phase 1A-1B: Core Quality (COMPLETE ✅)
+### Phase 1A-1B: Core Quality (COMPLETE)
 
 **Timeline:** Weeks 1-4 | **Stories:** 10 | **Status:** IMPLEMENTATION READY
 
@@ -406,7 +422,7 @@
 
 **Deliverables:** Incoming inspection operational, basic NCR creation
 
-### Phase 2A: In-Process & Final Inspection (COMPLETE ✅)
+### Phase 2A: In-Process & Final Inspection (COMPLETE)
 
 **Timeline:** Weeks 5-6 | **Stories:** 2 | **Status:** IMPLEMENTATION READY
 
@@ -415,7 +431,7 @@
 | 06.10 | In-Process Inspection | FR-QA-006 | L (5d) | READY | WO integration |
 | 06.11 | Final Inspection + Batch Release | FR-QA-007, FR-QA-010 | L (5d) | READY | Batch gate |
 
-### Phase 2B: NCR Workflow & Advanced QA (STORIES DEFINED 📝)
+### Phase 2B: NCR Workflow & Advanced QA (STORIES DEFINED)
 
 **Timeline:** Weeks 7-10 | **Stories:** 7 | **Status:** TO IMPLEMENT | **Estimated:** 18-22 days
 
@@ -426,12 +442,12 @@
 | 06.14 | NCR Root Cause Analysis | FR-QA-009 | M (2-3d) | TO IMPLEMENT | 2/5 context files |
 | 06.15 | NCR Corrective Action | FR-QA-009 | M (2-3d) | TO IMPLEMENT | 1/5 context files |
 | 06.16 | NCR Verification & Close | FR-QA-009 | M (2-3d) | TO IMPLEMENT | 0/5 context files |
-| 06.17 | Quality Alerts & Notifications | FR-QA-* | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
+| 06.17 | Quality Alerts & Notifications | FR-QA-* | M (3-4d) | TO IMPLEMENT | 5/5 context files |
 | 06.18 | Test Result Trending & Charts | FR-QA-004 | M (3-4d) | TO IMPLEMENT | 1/5 context files |
 
 **Deliverables:** Full NCR lifecycle, quality alerts, test trending
 
-### Phase 2C: Operation Quality Checkpoints (COMPLETE ✅)
+### Phase 2C: Operation Quality Checkpoints (COMPLETE)
 
 **Timeline:** Week 11 | **Stories:** 2 | **Status:** IMPLEMENTATION READY
 
@@ -440,41 +456,41 @@
 | 06.19 | Operation Quality Checkpoints | FR-QA-026 | L (4d) | READY | Routing checkpoints |
 | 06.20 | Checkpoint Results & Sign-off | FR-QA-026 | M (3d) | READY | Operator sign-off |
 
-### Phase 3: HACCP & CoA (STORIES DEFINED 📝)
+### Phase 3: HACCP & CoA (STORIES DEFINED)
 
 **Timeline:** Weeks 12-16 | **Stories:** 10 | **Status:** TO IMPLEMENT | **Estimated:** 32-40 days
 
 | Story | Nazwa | FR | Complexity | Status | Context |
 |-------|-------|-----|------------|--------|---------|
 | 06.21 | HACCP Plan Setup | FR-QA-013 | L (4-5d) | TO IMPLEMENT | 0/5 context files |
-| 06.22 | CCP Definition | FR-QA-014 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.23 | CCP Monitoring Desktop | FR-QA-014 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
+| 06.22 | CCP Definition | FR-QA-014 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
+| 06.23 | CCP Monitoring Desktop | FR-QA-014 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
 | 06.24 | CCP Monitoring Scanner | FR-QA-014 | L (4-5d) | TO IMPLEMENT | 1/5 context files |
 | 06.25 | CCP Deviation Handling | FR-QA-015 | M (3-4d) | TO IMPLEMENT | 1/5 context files |
 | 06.26 | CCP Deviation Alerts | FR-QA-015 | M (2-3d) | TO IMPLEMENT | 1/5 context files |
-| 06.27 | CoA Templates | FR-QA-012 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.28 | CoA Generation Engine | FR-QA-011 | L (4-5d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.29 | CoA PDF Export | FR-QA-011 | M (2-3d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.30 | HACCP Verification Records | FR-QA-013 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
+| 06.27 | CoA Templates | FR-QA-012 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
+| 06.28 | CoA Generation Engine | FR-QA-011 | L (4-5d) | TO IMPLEMENT | 5/5 context files |
+| 06.29 | CoA PDF Export | FR-QA-011 | M (2-3d) | TO IMPLEMENT | 5/5 context files |
+| 06.30 | HACCP Verification Records | FR-QA-013 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
 
 **Deliverables:** HACCP/CCP monitoring, CoA generation, PDF export
 
-### Phase 4: CAPA, Supplier Quality & Analytics (STORIES DEFINED 📝)
+### Phase 4: CAPA, Supplier Quality & Analytics (STORIES DEFINED)
 
 **Timeline:** Weeks 17-22 | **Stories:** 10 | **Status:** TO IMPLEMENT | **Estimated:** 28-36 days
 
 | Story | Nazwa | FR | Complexity | Status | Context |
 |-------|-------|-----|------------|--------|---------|
-| 06.31 | CAPA Creation | FR-QA-016 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.32 | CAPA Action Items | FR-QA-017 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.33 | CAPA Effectiveness Check | FR-QA-017 | M (2-3d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.34 | Supplier Quality Ratings | FR-QA-018 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.35 | Supplier Audits CRUD | FR-QA-019 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.36 | Supplier Audit Findings | FR-QA-019 | M (2-3d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.37 | Quality Dashboard | FR-QA-020 | L (5-6d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.38 | Audit Trail Reports | FR-QA-021 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.39 | Quality Analytics | FR-QA-022 | L (4-5d) | TO IMPLEMENT | 5/5 context files ✅ |
-| 06.40 | Document Control & Versioning | FR-QA-024 | M (3-4d) | TO IMPLEMENT | 5/5 context files ✅ |
+| 06.31 | CAPA Creation | FR-QA-016 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
+| 06.32 | CAPA Action Items | FR-QA-017 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
+| 06.33 | CAPA Effectiveness Check | FR-QA-017 | M (2-3d) | TO IMPLEMENT | 5/5 context files |
+| 06.34 | Supplier Quality Ratings | FR-QA-018 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
+| 06.35 | Supplier Audits CRUD | FR-QA-019 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
+| 06.36 | Supplier Audit Findings | FR-QA-019 | M (2-3d) | TO IMPLEMENT | 5/5 context files |
+| 06.37 | Quality Dashboard | FR-QA-020 | L (5-6d) | TO IMPLEMENT | 5/5 context files |
+| 06.38 | Audit Trail Reports | FR-QA-021 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
+| 06.39 | Quality Analytics | FR-QA-022 | L (4-5d) | TO IMPLEMENT | 5/5 context files |
+| 06.40 | Document Control & Versioning | FR-QA-024 | M (3-4d) | TO IMPLEMENT | 5/5 context files |
 
 **Deliverables:** CAPA workflow, supplier quality, dashboard, analytics, document control
 
@@ -487,20 +503,20 @@
 - Estimated remaining effort: 78-98 days (Phase 2B-4)
 
 **Status:**
-- Phase 1A-1B (Core Quality): 100% IMPLEMENTATION READY ✅
-- Phase 2A (In-Process/Final): 100% IMPLEMENTATION READY ✅
-- Phase 2B (NCR Workflow): 100% STORIES DEFINED ✅ Implementation pending
-- Phase 2C (Checkpoints): 100% IMPLEMENTATION READY ✅
-- Phase 3 (HACCP/CoA): 100% STORIES DEFINED ✅ Implementation pending
-- Phase 4 (CAPA/Analytics): 100% STORIES DEFINED ✅ Implementation pending
+- Phase 1A-1B (Core Quality): 100% IMPLEMENTATION READY
+- Phase 2A (In-Process/Final): 100% IMPLEMENTATION READY
+- Phase 2B (NCR Workflow): 100% STORIES DEFINED Implementation pending
+- Phase 2C (Checkpoints): 100% IMPLEMENTATION READY
+- Phase 3 (HACCP/CoA): 100% STORIES DEFINED Implementation pending
+- Phase 4 (CAPA/Analytics): 100% STORIES DEFINED Implementation pending
 - **Epic 06: 100% story definition complete | 29% implemented (12/41 stories)**
 
 **Dependencies satisfied:**
-- ✅ Epic 01 (Settings) - organizations, users, roles, RLS
-- ✅ Epic 02 (Technical) - products, routings, operations
-- ✅ Epic 03 (Planning) - suppliers, purchase orders, work orders
-- ✅ Epic 04 (Production) - WO operations
-- ✅ Epic 05 (Warehouse) - license plates, LP service, GRNs
+- Epic 01 (Settings) - organizations, users, roles, RLS
+- Epic 02 (Technical) - products, routings, operations
+- Epic 03 (Planning) - suppliers, purchase orders, work orders
+- Epic 04 (Production) - WO operations
+- Epic 05 (Warehouse) - license plates, LP service, GRNs
 
 **Next Steps:**
 1. Implement Phase 2B stories (06.12-06.18) - 18-22 days
@@ -526,7 +542,7 @@
 | 07.4 | SO Line Pricing | 1 FR | M (3d) | NOT STARTED | Line-level pricing, discounts |
 | 07.5 | SO Clone/Import | 2 FR | M (3-4d) | NOT STARTED | Clone template, CSV import |
 | 07.6 | SO Allergen Validation | 1 FR | M (2-3d) | NOT STARTED | Customer allergen restrictions |
-| 07.7 | Inventory Allocation | 3 FR | L (5-7d) | NOT STARTED | Auto/manual allocation, FIFO/FEFO ✅ UNBLOCKED |
+| 07.7 | Inventory Allocation | 3 FR | L (5-7d) | NOT STARTED | Auto/manual allocation, FIFO/FEFO UNBLOCKED |
 | 07.8 | Pick List Generation | 3 FR | L (4-5d) | NOT STARTED | Wave picking, assignment |
 | 07.9 | Pick Confirmation Desktop | 5 FR | M (3-4d) | NOT STARTED | FIFO/FEFO suggestions, short pick |
 | 07.10 | Pick Scanner | 4 FR | M (3-4d) | NOT STARTED | Mobile picking workflow |
@@ -541,7 +557,7 @@
 - Total stories: 16 (all have complete markdown documentation)
 - Total documentation: ~540KB (pre-existing)
 - Estimated effort: 60-79 days sequential | ~40-50 days with parallelization
-- Dependencies: Epic 05 COMPLETE ✅ (inventory allocation unblocked)
+- Dependencies: Epic 05 COMPLETE (inventory allocation unblocked)
 
 ### Phase 2-3 - Advanced Features (STORIES DEFINED)
 
@@ -581,289 +597,29 @@
 - FR coverage: 32 additional FR (FR-7.4-8, 7.16, 7.20, 7.29, 7.32-33, 7.43-72)
 
 **Status:**
-- Phase 1 (MVP): 0% implemented, 100% STORIES DEFINED ✅ (16/16 ready)
-- Phase 2-3 (Advanced): 0% implemented, 100% STORIES DEFINED ✅ (8/8 ready)
+- Phase 1 (MVP): 0% implemented, 100% STORIES DEFINED (16/16 ready)
+- Phase 2-3 (Advanced): 0% implemented, 100% STORIES DEFINED (8/8 ready)
 - Epic 07: 100% story definition complete | 0% implemented (0/24 stories)
 
-**Blokery rozwiązane:**
-- ✅ Epic 05 (Warehouse) - Inventory allocation UNBLOCKED
-- ✅ Epic 03 (Planning) - Sales orders can reference products/BOMs
-- ✅ Epic 02 (Technical) - Products, allergens available
+**Blokery rozwiazane:**
+- Epic 05 (Warehouse) - Inventory allocation UNBLOCKED
+- Epic 03 (Planning) - Sales orders can reference products/BOMs
+- Epic 02 (Technical) - Products, allergens available
 
-**Szacowany effort całości:** 108-143 dni sequential | ~70-90 dni with parallelization
-
----
-
-## EPIC 08 - NPD (NEW PRODUCT DEVELOPMENT) 100% STORY DEFINITION | 0% IMPLEMENTED
-
-**Status:** Phase 1-3 100% DEFINED (18 stories) - Premium Add-on Module
-**Created:** 2026-01-15 (All stories generated by ORCHESTRATOR)
-**Type:** Premium (+$30/user/month)
-**Module:** NPD (New Product Development)
-
-### Phase 1: MVP Core (STORIES DEFINED 📝)
-
-**Timeline:** Weeks 1-6 | **Stories:** 8 | **Estimated:** 22-28 days
-
-| Story | Nazwa | FR | Complexity | Status | Uwagi |
-|-------|-------|-----|------------|--------|-------|
-| 08.1 | NPD Settings & Module Config | NPD-FR-01 | S (1-2d) | TO IMPLEMENT | Module toggle, NPD-only mode |
-| 08.2 | NPD Projects CRUD & Kanban | NPD-FR-01,02,04,05 | L (4-5d) | TO IMPLEMENT | Stage-Gate dashboard |
-| 08.3 | Stage-Gate Workflow | NPD-FR-03,17-21 | L (5-6d) | TO IMPLEMENT | Gate checklists, transitions |
-| 08.4 | Formulations CRUD & Versioning | NPD-FR-08,09,11-14 | L (5-6d) | TO IMPLEMENT | Recipe versioning, lineage |
-| 08.5 | Allergen Aggregation & Display | NPD-FR-10,30,61 | M (3-4d) | TO IMPLEMENT | Auto-aggregate from items |
-| 08.6 | Gate Approvals & History | NPD-FR-21,22 | M (2-3d) | TO IMPLEMENT | Approval workflow |
-| 08.7 | Formulation Costing | NPD-FR-23-27 | M (3-4d) | TO IMPLEMENT | Target/estimated/actual costs |
-| 08.8 | Compliance Documents Upload | NPD-FR-31-35 | M (3-4d) | TO IMPLEMENT | HACCP, label proof, CoA |
-
-**Deliverables:** NPD projects with Stage-Gate, formulations with versioning, allergen aggregation, costing, compliance docs
-
-### Phase 2: Advanced Features (STORIES DEFINED 📝)
-
-**Timeline:** Weeks 7-12 | **Stories:** 7 | **Estimated:** 20-26 days
-
-| Story | Nazwa | FR | Complexity | Status | Uwagi |
-|-------|-------|-----|------------|--------|-------|
-| 08.9 | Formulation Compare & Clone | NPD-FR-15,16 | M (2-3d) | TO IMPLEMENT | Side-by-side diff, clone |
-| 08.10 | Risk Management | NPD-FR-48-52 | M (3-4d) | TO IMPLEMENT | Risk register, 5×5 matrix |
-| 08.11 | Handoff Wizard | NPD-FR-37-40,43-46 | L (5-6d) | TO IMPLEMENT | 8-step wizard, validation |
-| 08.12 | Handoff: Formulation → BOM | NPD-FR-41,58,59 | M (3-4d) | TO IMPLEMENT | Convert to production BOM |
-| 08.13 | Handoff: Pilot WO Creation | NPD-FR-42,57,60 | M (3-4d) | TO IMPLEMENT | Auto-create pilot work order |
-| 08.14 | NPD-Only Mode & Export | NPD-FR-47 | M (2-3d) | TO IMPLEMENT | PDF/Excel export for R&D |
-| 08.15 | Event Sourcing & Notifications | NPD-FR-53-56,70-74 | M (3-4d) | TO IMPLEMENT | Event log, retry, alerts |
-
-**Deliverables:** Handoff to production (Formulation → Product + BOM + Pilot WO), risk management, notifications
-
-### Phase 3: Enterprise Features (STORIES DEFINED 📝)
-
-**Timeline:** Weeks 13-15 | **Stories:** 3 | **Estimated:** 8-12 days
-
-| Story | Nazwa | FR | Complexity | Status | Uwagi |
-|-------|-------|-----|------------|--------|-------|
-| 08.16 | Timeline View & Reporting | NPD-FR-06,07,28,36 | M (3-4d) | TO IMPLEMENT | Gantt view, CSV export |
-| 08.17 | Finance Approval Workflow | NPD-FR-29,66,71,72 | M (3-4d) | TO IMPLEMENT | Finance approval for costing |
-| 08.18 | Access Control & Audit Trail | NPD-FR-63-69 | M (3-5d) | TO IMPLEMENT | RLS per NPD role, audit log |
-
-**Deliverables:** Timeline Gantt view, finance approval, RLS policies, audit trail
-
-**Metryki Epic 08:**
-- Total stories: 18 (100% defined)
-- Implemented: 0 (Premium module - not started)
-- Ready for implementation: 18 (Phase 1-3)
-- Context files created: 18 folders (partial coverage - _index.yaml minimum)
-- Total documentation: ~15,000 lines markdown + ~3,000 lines YAML
-- Estimated total effort: 50-66 days (Phase 1-3)
-
-**Status:**
-- Phase 1 (MVP Core): 100% STORIES DEFINED ✅ Implementation pending
-- Phase 2 (Advanced): 100% STORIES DEFINED ✅ Implementation pending
-- Phase 3 (Enterprise): 100% STORIES DEFINED ✅ Implementation pending
-- **Epic 08: 100% story definition complete | 0% implemented (0/18 stories)**
-
-**Dependencies satisfied:**
-- ✅ Epic 01 (Settings) - organizations, users, roles, allergens
-- ✅ Epic 02 (Technical) - products, BOMs
-- ✅ Epic 03 (Planning) - work orders
-
-**Key Features:**
-- **Stage-Gate Methodology:** G0 (Idea) → G1 (Feasibility) → G2 (Business Case) → G3 (Development) → G4 (Testing) → Launch
-- **Formulation Versioning:** Version control (v1.0, v1.1, v2.0), lineage tracking, date overlap prevention
-- **Auto-Allergen Aggregation:** Reuse Epic 01 allergen system
-- **Costing:** Target vs estimated vs actual with variance alerts (warning 20%, blocker 50%)
-- **Handoff:** Formulation → Product + BOM + Pilot WO (transactional)
-- **NPD-Only Mode:** Standalone for R&D consultancies (PDF/Excel export)
-- **Event Sourcing:** Audit trail with retry mechanism
-
-**Next Steps:**
-1. Implement Phase 1 stories (08.1-08.8) - 22-28 days
-2. Implement Phase 2 stories (08.9-08.15) - 20-26 days
-3. Implement Phase 3 stories (08.16-08.18) - 8-12 days
-4. Total: ~50-66 days (2.5-3 months)
+**Szacowany effort calosci:** 108-143 dni sequential | ~70-90 dni with parallelization
 
 ---
 
-## EPIC 09 - FINANCE 100% STORY DEFINITION | 0% IMPLEMENTED
+## EPIC 08-11 - PREMIUM MODULES (100% STORY DEFINITION | 0% IMPLEMENTED)
 
-**Status:** Phase 1-3 100% DEFINED (26 stories) - Premium Add-on Module
-**Created:** 2026-01-15
-**Type:** Premium (+$40/user/month)
-**Module:** Finance (Production Costing & Analysis)
+See detailed breakdowns in separate sections below. All premium modules have complete story definitions.
 
-### Phase 1: MVP Core (10 stories) - Estimated 28-36 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 09.1 | Finance Settings & Module Config | settings | S (1-2d) | TO IMPLEMENT |
-| 09.2 | Standard Cost Definition | FR-9.1.4 | M (3-4d) | TO IMPLEMENT |
-| 09.3 | Material Cost Tracking | FR-9.1.1, 9.3.1 | M (3-4d) | TO IMPLEMENT |
-| 09.4 | Labor Cost Tracking | FR-9.1.2, 9.3.2 | M (3-4d) | TO IMPLEMENT |
-| 09.5 | BOM Costing | FR-9.2.1, 9.2.2 | M (3-4d) | TO IMPLEMENT |
-| 09.6 | WO Cost Summary | FR-9.3.4, 9.3.6 | M (3-4d) | TO IMPLEMENT |
-| 09.7 | Inventory Valuation FIFO/WAC | FR-9.5.1, 9.5.2, 9.5.4 | L (4-5d) | TO IMPLEMENT |
-| 09.8 | Currency Management | FR-9.8.1-5 | M (3-4d) | TO IMPLEMENT |
-| 09.9 | Tax Code Integration | FR-9.9.1-3 | S (1-2d) | TO IMPLEMENT |
-| 09.10 | Cost Center CRUD | FR-9.10.1-3 | M (3-4d) | TO IMPLEMENT |
-
-### Phase 2: Variance Analysis (10 stories) - Estimated 30-40 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 09.11 | Cost Rollup & Multi-Level | FR-9.1.5, 9.1.7 | M (3-4d) | TO IMPLEMENT |
-| 09.12 | Overhead Allocation | FR-9.1.3, 9.3.3 | L (4-5d) | TO IMPLEMENT |
-| 09.13 | Material Variance | FR-9.4.1, 9.4.2, FIN-052 | M (3-4d) | TO IMPLEMENT |
-| 09.14 | Labor Variance | FR-9.4.3, 9.4.4, FIN-053 | M (3-4d) | TO IMPLEMENT |
-| 09.15 | Yield & Scrap Variance | FR-9.4.6, 9.3.8, 9.2.5 | M (3-4d) | TO IMPLEMENT |
-| 09.16 | Real-Time Variance Dashboard | FR-FIN-050, 051, 055 | L (4-5d) | TO IMPLEMENT |
-| 09.17 | Variance Drill-Down | FR-FIN-054, 056 | M (3-4d) | TO IMPLEMENT |
-| 09.18 | BOM Cost Simulation & Compare | FR-9.2.3, 9.2.4 | M (2-3d) | TO IMPLEMENT |
-| 09.19 | Cost Reporting Suite | FR-9.6.1-4 | L (4-5d) | TO IMPLEMENT |
-| 09.20 | WO Cost by Operation | FR-9.3.7, 9.1.6 | M (3-4d) | TO IMPLEMENT |
-
-### Phase 3: Advanced Analytics (6 stories) - Estimated 18-24 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 09.21 | Margin Analysis | FR-9.7.1-4, FIN-057 | L (4-5d) | TO IMPLEMENT |
-| 09.22 | Cost Center Budget & Variance | FR-9.10.4-6, 9.11.1-3 | M (3-4d) | TO IMPLEMENT |
-| 09.23 | Budget Management | FR-9.11.4-6 | M (3-4d) | TO IMPLEMENT |
-| 09.24 | Cost Dashboard & Trends | FR-9.6.5-8 | L (4-5d) | TO IMPLEMENT |
-| 09.25 | Variance Root Cause & Approval | FR-9.4.7, 9.4.8, 9.1.8 | M (3-4d) | TO IMPLEMENT |
-| 09.26 | Accounting Integration (Comarch) | FR-9.12.1-7, FIN-058 | M (4-5d) | TO IMPLEMENT |
-
-**Metryki:**
-- Total stories: 26 (100% defined)
-- Estimated effort: 76-100 days
-- FR coverage: 101 FR (100%)
-- Documentation: ~1.2 MB
-
-**Status:** Epic 09 100% story definition complete | 0% implemented
-
----
-
-## EPIC 10 - OEE & PERFORMANCE 100% STORY DEFINITION | 0% IMPLEMENTED
-
-**Status:** Phase 1-3 100% DEFINED (20 stories) - Premium Add-on Module
-**Created:** 2026-01-15
-**Type:** Premium (+$35/user/month)
-**Module:** OEE & Performance Analytics
-
-### Phase 1A: MVP Core (5 stories) - Estimated 16-20 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 10.1 | OEE Settings & Targets | OEE-009 | M (2-3d) | TO IMPLEMENT |
-| 10.2 | Downtime Reason Codes & Categories | OEE-004, 005 | M (2-3d) | TO IMPLEMENT |
-| 10.3 | Downtime Event Tracking | OEE-003 | L (4-5d) | TO IMPLEMENT |
-| 10.4 | OEE Calculation Engine | OEE-001, 006, 007, 008 | L (5-6d) | TO IMPLEMENT |
-| 10.5 | Real-Time Machine Dashboard | OEE-002 | L (4-5d) | TO IMPLEMENT |
-
-### Phase 1B: MVP Complete (4 stories) - Estimated 12-16 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 10.6 | OEE Threshold Alerts | OEE-010 | M (3-4d) | TO IMPLEMENT |
-| 10.7 | Shift Report Generation | OEE-011 | M (3-4d) | TO IMPLEMENT |
-| 10.8 | Energy Consumption Tracking | OEE-012, 013 | M (3-4d) | TO IMPLEMENT |
-| 10.9 | Historical Trend Analysis | OEE-014, 015 | M (3-4d) | TO IMPLEMENT |
-
-### Phase 2: Growth (6 stories) - Estimated 18-24 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 10.10 | Machine Utilization Heatmap | OEE-016 | M (2-3d) | TO IMPLEMENT |
-| 10.11 | Downtime Pareto Analysis | OEE-017 | M (2-3d) | TO IMPLEMENT |
-| 10.12 | Performance Dashboard | OEE-018 | L (4-5d) | TO IMPLEMENT |
-| 10.13 | Custom Report Builder | OEE-019 | L (4-5d) | TO IMPLEMENT |
-| 10.14 | Email Alerts & Shift Handover | OEE-020, 021 | M (3-4d) | TO IMPLEMENT |
-| 10.15 | Production Rate Tracking | OEE-023 | M (3-4d) | TO IMPLEMENT |
-
-### Phase 3: Enterprise (5 stories) - Estimated 14-18 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 10.16 | MTBF/MTTR Calculation | OEE-022 | M (3-4d) | TO IMPLEMENT |
-| 10.17 | Bottleneck Analysis | OEE-024 | M (3-4d) | TO IMPLEMENT |
-| 10.18 | Mobile Downtime Logging | OEE-025 | M (3-4d) | TO IMPLEMENT |
-| 10.19 | TPM & Benchmarking | OEE-026, 027 | M (3-4d) | TO IMPLEMENT |
-| 10.20 | Export to BI Tools | OEE-028 | M (3-4d) | TO IMPLEMENT |
-
-**Metryki:**
-- Total stories: 20 (100% defined)
-- Estimated effort: 60-78 days
-- FR coverage: 28 FR (100%)
-- Documentation: ~325 KB
-
-**Status:** Epic 10 100% story definition complete | 0% implemented
-
----
-
-## EPIC 11 - INTEGRATIONS 100% STORY DEFINITION | 0% IMPLEMENTED
-
-**Status:** Phase 1-3 100% DEFINED (18 stories) - Premium Add-on Module
-**Created:** 2026-01-15
-**Type:** Premium (+$50/user/month)
-**Module:** Integrations & External Connectivity
-
-### Phase 1: MVP Core (6 stories) - Estimated 18-24 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 11.1 | Integrations Settings & Dashboard | FR-INT-001 | M (3-4d) | TO IMPLEMENT |
-| 11.2 | API Keys Management & Scopes | FR-INT-002, 003, 004 | L (4-5d) | TO IMPLEMENT |
-| 11.3 | Integration Logs & Audit Trail | FR-INT-005 | M (3-4d) | TO IMPLEMENT |
-| 11.4 | Webhook Configuration & Events | FR-INT-006, 007 | L (4-5d) | TO IMPLEMENT |
-| 11.5 | Data Export (CSV/JSON) | FR-INT-008 | M (2-3d) | TO IMPLEMENT |
-| 11.6 | Supplier Portal & Comarch Basic | FR-INT-009-012 | M (3-4d) | TO IMPLEMENT |
-
-**Deliverables:** API keys, webhooks, logs, export, supplier portal, Comarch invoice push
-
-### Phase 2: Advanced Integrations (8 stories) - Estimated 24-32 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 11.7 | Customer Portal | FR-INT-013, 014 | M (3-4d) | TO IMPLEMENT |
-| 11.8 | EDI ORDERS Inbound | FR-INT-015 | L (4-5d) | TO IMPLEMENT |
-| 11.9 | EDI INVOIC Outbound | FR-INT-016 | M (3-4d) | TO IMPLEMENT |
-| 11.10 | EDI DESADV Outbound | FR-INT-017 | M (3-4d) | TO IMPLEMENT |
-| 11.11 | Import Templates (Products/BOMs) | FR-INT-018, 019 | M (3-4d) | TO IMPLEMENT |
-| 11.12 | Retry Logic & Dead Letter Queue | FR-INT-020, 021 | M (3-4d) | TO IMPLEMENT |
-| 11.13 | Comarch Advanced (CoA/VAT) | FR-INT-022, 023 | M (3-4d) | TO IMPLEMENT |
-| 11.14 | XML Export | FR-INT-024 | S (1-2d) | TO IMPLEMENT |
-
-**Deliverables:** Customer portal, EDI (ORDERS/INVOIC/DESADV), import, retry/DLQ, Comarch CoA/VAT
-
-### Phase 3: Enterprise Features (4 stories) - Estimated 12-16 days
-
-| Story | Nazwa | FR | Complexity | Status |
-|-------|-------|-----|------------|--------|
-| 11.15 | EDI Advanced (ORDRSP/RECADV) | FR-INT-025, 026 | M (3-4d) | TO IMPLEMENT |
-| 11.16 | Comarch Payment Reconciliation | FR-INT-027 | M (3-4d) | TO IMPLEMENT |
-| 11.17 | Custom Integration Builder | FR-INT-028 | L (4-5d) | TO IMPLEMENT |
-| 11.18 | API Marketplace & Bi-directional Webhooks | FR-INT-029, 030 | M (3-4d) | TO IMPLEMENT |
-
-**Deliverables:** EDI advanced, payment reconciliation, low-code builder, API marketplace
-
-**Metryki:**
-- Total stories: 18 (100% defined)
-- Estimated effort: 54-72 days
-- FR coverage: 30 FR (100%)
-- Documentation: ~565 KB
-
-**Status:** Epic 11 100% story definition complete | 0% implemented
-
-**Key Integrations:**
-- **Comarch Optima**: Polish ERP (invoices, CoA, VAT, payments)
-- **EDI**: EDIFACT (ORDERS, INVOIC, DESADV, ORDRSP, RECADV)
-- **Portals**: Supplier (PO view, delivery) + Customer (order tracking)
-- **API**: REST API with keys, scopes, rate limiting
-- **Webhooks**: Outbound + bi-directional events
-- **Import/Export**: CSV/JSON/XML bulk operations
-
-**Next Steps:**
-1. Implement Phase 1 stories (11.1-11.6) - 18-24 days
-2. Implement Phase 2 stories (11.7-11.14) - 24-32 days
-3. Implement Phase 3 stories (11.15-11.18) - 12-16 days
-4. Total: ~54-72 days (2.5-3.5 months)
+| Epic | Module | Stories | Estimated Effort |
+|------|--------|---------|------------------|
+| 08 | NPD | 18 | 50-66 days |
+| 09 | Finance | 26 | 76-100 days |
+| 10 | OEE | 20 | 60-78 days |
+| 11 | Integrations | 18 | 54-72 days |
 
 ---
 
@@ -877,13 +633,13 @@
    Effort: 2 dni
 ```
 
-### Priorytet 2: Epic 04 Phase 1 (18-24 dni)
+### Priorytet 2: Epic 04 Phase 1 (18-22 dni remaining)
 
 ```
-Epic 05 COMPLETE -> Epic 04 Phase 1 UNBLOCKED!
+04.6a + 04.6b + 04.6c DEPLOYED (2026-01-21)
 
 Kolejnosc implementacji:
-1. 04.6a-e - Material Consumption (12-15 dni)
+1. 04.6d-e - Consumption Advanced (4 dni)
 2. 04.7a-d - Output Registration (8-10 dni)
 3. 04.8   - Material Reservations (2-3 dni)
 ```
@@ -916,25 +672,25 @@ Potem: Implementacja
 | Faza | Scope | Dni | Target |
 |------|-------|-----|--------|
 | Immediate | 03.13 + Epic 02 deploy | 3-5 | Styczen 2026 |
-| Phase 1 | Epic 04 Phase 1 | 18-24 | Luty 2026 |
+| Phase 1 | Epic 04 Phase 1 (remaining) | 18-22 | Luty 2026 |
 | Phase 2 | Epic 06 Quality | 52-68 | Marzec-Kwiecien 2026 |
 | Phase 3 | Epic 07 Shipping | 50-60 | Maj-Czerwiec 2026 |
 | Phase 4 | Epic 04 Phase 2 (OEE) | 25-32 | Lipiec 2026 |
 | Premium | Epic 08-11 stories | 30-40 | Sierpien 2026 |
 | Premium | Epic 08-11 impl | 115-145 | Q4 2026 |
 
-**TOTAL do MVP (Epic 01-07):** ~200-250 dni remaining
-**TOTAL do Enterprise (Epic 01-11):** ~350-450 dni remaining
+**TOTAL do MVP (Epic 01-07):** ~193-243 dni remaining
+**TOTAL do Enterprise (Epic 01-11):** ~343-443 dni remaining
 
 ---
 
 ## CHECKSUM
 
 ```
-Wygenerowano: 2026-01-15 18:15 UTC
+Wygenerowano: 2026-01-21 (updated)
 Zrodlo: .claude/checkpoints/*.yaml + Epic 01-11 COMPLETE gap analysis + ORCHESTRATOR story generation
-Stories zaimplementowane: 100/283 (Epic 01-07) ~35%
-Stories do implementacji: 183 total across Epic 01-11 (all Phase 2+ features + Premium modules)
+Stories zaimplementowane: 102/283 (Epic 01-07) ~36%
+Stories do implementacji: 181 total across Epic 01-11 (all Phase 2+ features + Premium modules)
 Stories do napisania: 0 (100% STORY DEFINITION COMPLETE!)
 Epic 01 story definition: 100% complete (26 stories: 16 MVP + 10 Phase 1B-3)
 Epic 01 implementation: 62% (16/26 MVP done, 10 Phase 1B-3 pending)
@@ -943,7 +699,7 @@ Epic 02 implementation: 74% (17/23 MVP done, 6 Phase 2 pending)
 Epic 03 story definition: 100% complete (30 stories: 20 MVP + 10 Phase 2-3)
 Epic 03 implementation: 63% (19/30 MVP ~done, 10 Phase 2-3 pending)
 Epic 04 story definition: 100% complete (18 stories: 7 Phase 0 + 11 Phase 1-2)
-Epic 04 implementation: 39% (7/18 Phase 0 done, 11 Phase 1-2 pending)
+Epic 04 implementation: 56% (10/18 Phase 0+04.6a+04.6b+04.6c done, 8 Phase 1-2 pending)
 Epic 05 story definition: 100% complete (29 stories: 20 Phase 1 + 9 Phase 2)
 Epic 05 implementation: 69% (20/29 Phase 1 done, 9 Phase 2 pending)
 Epic 06 story definition: 100% complete (41 stories: 12 Phase 1-2A + 29 Phase 2B-4)
@@ -958,11 +714,6 @@ Epic 10 story definition: 100% complete (20 stories: 5 Phase 1A + 4 Phase 1B + 6
 Epic 10 implementation: 0% (0/20 all pending - premium module)
 Epic 11 story definition: 100% complete (18 stories: 6 Phase 1 + 8 Phase 2 + 4 Phase 3)
 Epic 11 implementation: 0% (0/18 all pending - premium module)
-Epic 06 Phase 2B-4 stories: 06.12-06.40 (created 2026-01-15, ~50K lines)
-Epic 07 Phase 2-3 stories: 07.17-07.24 (created 2026-01-15, ~310KB)
-Epic 08 Phase 1-3 stories: 08.1-08.18 (created 2026-01-15, ~1.4MB)
-Epic 09 Phase 1-3 stories: 09.1-09.26 (created 2026-01-15, ~1.2MB)
-Epic 10 Phase 1-3 stories: 10.1-10.20 (created 2026-01-15, ~325KB)
-Epic 11 Phase 1-3 stories: 11.1-11.18 (created 2026-01-15, ~565KB)
+LATEST: Story 04.6c 1:1 Consumption Enforcement - DEPLOYED 2026-01-21 (P1-P7 complete, 107 tests, 6/6 AC)
 MONOPILOT: 100% STORY DEFINITION COMPLETE - ALL 11 EPIC MODULES FULLY DEFINED!
 ```

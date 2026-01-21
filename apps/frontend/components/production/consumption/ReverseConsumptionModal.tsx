@@ -41,10 +41,10 @@ interface ReverseConsumptionModalProps {
 }
 
 const REVERSAL_REASONS = [
-  { value: 'wrong_lp', label: 'Scanned wrong LP' },
-  { value: 'wrong_qty', label: 'Wrong quantity entered' },
-  { value: 'operator_error', label: 'Operator error' },
-  { value: 'quality_issue', label: 'Quality issue' },
+  { value: 'scanned_wrong_lp', label: 'Scanned Wrong LP' },
+  { value: 'wrong_quantity', label: 'Wrong Quantity Entered' },
+  { value: 'operator_error', label: 'Operator Error' },
+  { value: 'quality_issue', label: 'Quality Issue' },
   { value: 'other', label: 'Other (specify)' },
 ]
 
@@ -157,6 +157,8 @@ export function ReverseConsumptionModal({
               size="icon"
               className="ml-auto"
               onClick={handleClose}
+              aria-label="Close"
+              data-testid="close-modal-button"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -288,7 +290,7 @@ export function ReverseConsumptionModal({
           </Button>
           <Button
             onClick={handleConfirmReversal}
-            disabled={reverseConsumption.isPending || !reason}
+            disabled={reverseConsumption.isPending || !reason || (reason === 'other' && !notes.trim())}
             className="bg-amber-600 hover:bg-amber-700"
           >
             {reverseConsumption.isPending && (

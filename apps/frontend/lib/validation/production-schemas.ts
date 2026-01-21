@@ -64,3 +64,96 @@ export const woStatusEnum = z.enum([
 ])
 
 export type WOStatus = z.infer<typeof woStatusEnum>
+
+/**
+ * Story 04.6d: Consumption Reversal Schemas
+ * Validates reversal request bodies for material consumption correction
+ */
+
+// Reversal reason enum (per 04.6d spec)
+export const reversalReasonEnum = z.enum([
+  'scanned_wrong_lp',
+  'wrong_quantity',
+  'operator_error',
+  'quality_issue',
+  'other',
+])
+
+export type ReversalReason = z.infer<typeof reversalReasonEnum>
+
+// Labels for reversal reasons (for UI display)
+export const reversalReasonLabels = {
+  scanned_wrong_lp: 'Scanned Wrong LP',
+  wrong_quantity: 'Wrong Quantity Entered',
+  operator_error: 'Operator Error',
+  quality_issue: 'Quality Issue',
+  other: 'Other (specify)',
+} as const
+
+// Reverse consumption request schema
+export const reverseConsumptionSchema = z
+  .object({
+    consumption_id: z.string().uuid('Invalid consumption ID'),
+    reason: reversalReasonEnum,
+    notes: z.string().max(500, 'Notes must be 500 characters or less').optional(),
+  })
+  .refine(
+    (data) => data.reason !== 'other' || (data.notes && data.notes.trim().length > 0),
+    {
+      message: 'Notes are required when reason is "other"',
+      path: ['notes'],
+    }
+  )
+
+export type ReverseConsumptionInput = z.infer<typeof reverseConsumptionSchema>
+
+/**
+ * Story 04.6e: Over-Consumption Control Schemas
+ * Validates over-consumption request, approval, and rejection
+ */
+
+// Over-consumption request schema
+export const overConsumptionRequestSchema = z.object({
+  wo_material_id: z.string().uuid('Invalid material ID'),
+  lp_id: z.string().uuid('Invalid LP ID'),
+  requested_qty: z.number().positive('Quantity must be positive'),
+})
+
+export type OverConsumptionRequestInput = z.infer<typeof overConsumptionRequestSchema>
+
+// Over-consumption approval schema
+export const overConsumptionApprovalSchema = z.object({
+  request_id: z.string().uuid('Invalid request ID'),
+  reason: z.string().max(500).optional(),
+})
+
+export type OverConsumptionApprovalInput = z.infer<typeof overConsumptionApprovalSchema>
+
+// Over-consumption rejection schema
+export const overConsumptionRejectionSchema = z.object({
+  request_id: z.string().uuid('Invalid request ID'),
+  reason: z
+    .string()
+    .min(1, 'Rejection reason is required')
+    .max(500)
+    .refine((val) => val.trim().length > 0, 'Rejection reason is required'),
+})
+
+export type OverConsumptionRejectionInput = z.infer<typeof overConsumptionRejectionSchema>
+
+/**
+ * Story 04.7d: Multiple Outputs per WO - Output Query Schema
+ * Validates pagination and filtering parameters for output list API
+ */
+
+// Output query parameters
+export const outputQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'Page must be at least 1').default(1),
+  limit: z.coerce.number().int().min(1).max(100, 'Limit cannot exceed 100').default(20),
+  qa_status: z.enum(['approved', 'pending', 'rejected']).optional(),
+  location_id: z.string().uuid('Invalid location ID').optional(),
+  sort: z.enum(['created_at', 'qty', 'lp_number']).default('created_at'),
+  order: z.enum(['asc', 'desc']).default('desc'),
+})
+
+export type OutputQueryInput = z.infer<typeof outputQuerySchema>

@@ -2,16 +2,22 @@
  * POST /api/production/work-orders/:id/outputs
  * GET /api/production/work-orders/:id/outputs
  * Story 4.12: Output Registration Desktop
+ * Story 04.7d: Multiple Outputs per WO (pagination & filtering)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import {
   registerOutput,
-  getWOOutputs,
   calculateConsumptionAllocation,
   OUTPUT_ERROR_CODES,
 } from '@/lib/services/output-registration-service'
+import {
+  getOutputsForWO,
+  type OutputQueryOptions,
+  type QAStatus,
+} from '@/lib/services/output-aggregation-service'
+import { outputQuerySchema } from '@/lib/validation/production-schemas'
 
 // POST - Register new output (AC-4.12.7)
 export async function POST(
@@ -143,7 +149,7 @@ export async function POST(
   }
 }
 
-// GET - Get output history for WO
+// GET - Get output history for WO (Story 04.7d: with pagination and filtering)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -159,7 +165,7 @@ export async function GET(
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Unauthorized', message: 'Authentication required' },
+        { error: 'Unauthorized' },
         { status: 401 }
       )
     }
@@ -181,43 +187,63 @@ export async function GET(
     // Verify WO belongs to user's org
     const { data: wo, error: woError } = await supabase
       .from('work_orders')
-      .select('id, org_id, planned_quantity, output_qty, uom')
+      .select('id, org_id')
       .eq('id', woId)
       .single()
 
-    if (woError || !wo || wo.org_id !== userRecord.org_id) {
+    if (woError || !wo) {
       return NextResponse.json(
-        { error: 'NOT_FOUND', message: 'Work order not found' },
+        { error: 'Not Found', message: 'Work order not found' },
         { status: 404 }
       )
     }
 
-    // Get outputs
-    const outputs = await getWOOutputs(woId)
+    if (wo.org_id !== userRecord.org_id) {
+      return NextResponse.json(
+        { error: 'Not Found', message: 'Work order not found' },
+        { status: 404 }
+      )
+    }
 
-    // Get allocation preview
-    const allocation = await calculateConsumptionAllocation(woId, 1)
+    // Parse and validate query parameters (Story 04.7d)
+    const { searchParams } = new URL(request.url)
+    const queryParams = {
+      page: searchParams.get('page') || undefined,
+      limit: searchParams.get('limit') || undefined,
+      qa_status: searchParams.get('qa_status') || undefined,
+      location_id: searchParams.get('location_id') || undefined,
+      sort: searchParams.get('sort') || undefined,
+      order: searchParams.get('order') || undefined,
+    }
 
-    // Calculate progress (AC-4.12.5)
-    const progress = wo.planned_quantity
-      ? ((Number(wo.output_qty) || 0) / Number(wo.planned_quantity)) * 100
-      : 0
+    // Validate query parameters
+    const validationResult = outputQuerySchema.safeParse(queryParams)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Bad Request', message: validationResult.error.errors[0].message },
+        { status: 400 }
+      )
+    }
+
+    const options: OutputQueryOptions = {
+      page: validationResult.data.page,
+      limit: validationResult.data.limit,
+      qa_status: validationResult.data.qa_status as QAStatus | undefined,
+      location_id: validationResult.data.location_id,
+      sort: validationResult.data.sort as 'created_at' | 'qty' | 'lp_number' | undefined,
+      order: validationResult.data.order,
+    }
+
+    // Get outputs with pagination and filtering
+    const result = await getOutputsForWO(woId, options)
 
     return NextResponse.json({
-      data: outputs,
-      summary: {
-        planned_qty: wo.planned_quantity,
-        output_qty: wo.output_qty || 0,
-        progress_percent: Math.round(progress * 100) / 100,
-        uom: wo.uom,
-        total_reserved: allocation.totalReserved,
-        cumulative_consumed: allocation.cumulativeAfter - 1, // subtract preview qty
-      },
+      data: result,
     })
   } catch (error) {
     console.error('Get outputs error:', error)
     return NextResponse.json(
-      { error: 'INTERNAL_ERROR', message: 'An unexpected error occurred' },
+      { error: 'Internal Server Error', message: 'An unexpected error occurred' },
       { status: 500 }
     )
   }

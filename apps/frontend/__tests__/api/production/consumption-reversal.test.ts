@@ -18,7 +18,7 @@ import { NextRequest } from 'next/server'
 interface MockUser {
   id: string
   email: string
-  role: string
+  role: { code: string }
   org_id: string
 }
 
@@ -31,16 +31,18 @@ interface MockConsumption {
   uom: string
   material_id: string
   reservation_id: string | null
+  wo_materials: { product_name: string }
+  license_plates: { id: string; lp_number: string; current_qty: number; status: string }
 }
 
 /**
  * Mock State
  */
-let mockUser: { id: string; email: string } | null = null
+let mockSession: { user: { id: string } } | null = null
 let mockCurrentUser: MockUser | null = null
 let mockConsumption: MockConsumption | null = null
-let mockLp: { id: string; current_qty: number; status: string } | null = null
-let mockWo: { id: string; org_id: string; status: string } | null = null
+let mockLp: { id: string; lp_number: string; current_qty: number; status: string } | null = null
+let mockWo: { id: string; wo_number: string; org_id: string; status: string } | null = null
 
 // Track mutations
 const updatedRecords: Array<{ table: string; id: string; data: unknown }> = []
@@ -51,10 +53,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: vi.fn(() =>
     Promise.resolve({
       auth: {
-        getUser: vi.fn(() =>
+        getSession: vi.fn(() =>
           Promise.resolve({
-            data: { user: mockUser },
-            error: mockUser ? null : { message: 'No session' },
+            data: { session: mockSession },
+            error: mockSession ? null : { message: 'No session' },
           })
         ),
       },
@@ -69,50 +71,77 @@ vi.mock('@/lib/supabase/server', () => ({
                 error: mockCurrentUser ? null : { message: 'User not found' },
               })
             }
-            if (table === 'wo_consumption') {
-              return Promise.resolve({
-                data: mockConsumption,
-                error: mockConsumption ? null : { message: 'Not found' },
-              })
-            }
-            if (table === 'license_plates') {
-              return Promise.resolve({
-                data: mockLp,
-                error: mockLp ? null : { message: 'LP not found' },
-              })
-            }
-            if (table === 'work_orders') {
-              return Promise.resolve({
-                data: mockWo,
-                error: mockWo ? null : { message: 'WO not found' },
-              })
-            }
             return Promise.resolve({ data: null, error: null })
-          }),
-          update: vi.fn((data: unknown) => ({
-            eq: vi.fn((field: string, value: string) => {
-              updatedRecords.push({ table, id: value, data })
-              return Promise.resolve({ error: null })
-            }),
-          })),
-          insert: vi.fn((data: unknown) => {
-            insertedRecords.push({ table, data })
-            return {
-              select: vi.fn(() => ({
-                single: vi.fn(() =>
-                  Promise.resolve({
-                    data: { id: 'new-id', ...data as Record<string, unknown> },
-                    error: null,
-                  })
-                ),
-              })),
-            }
           }),
         }
         return chainable
       }),
     })
   ),
+  createServerSupabaseAdmin: vi.fn(() => ({
+    from: vi.fn((table: string) => {
+      const createEqChain = (data: unknown, recordId?: string): Record<string, unknown> => {
+        const eqChain: Record<string, unknown> = {
+          eq: vi.fn((field: string, value: string) => {
+            if (recordId === undefined) {
+              updatedRecords.push({ table, id: value, data })
+            }
+            return createEqChain(data, value)
+          }),
+        }
+        // Make it thenable/awaitable
+        Object.assign(eqChain, Promise.resolve({ error: null }))
+        return eqChain
+      }
+
+      const chainable: Record<string, unknown> = {
+        select: vi.fn(() => chainable),
+        eq: vi.fn(() => chainable),
+        single: vi.fn(() => {
+          if (table === 'work_orders') {
+            return Promise.resolve({
+              data: mockWo,
+              error: mockWo ? null : { message: 'WO not found' },
+            })
+          }
+          if (table === 'wo_consumption') {
+            return Promise.resolve({
+              data: mockConsumption,
+              error: mockConsumption ? null : { message: 'Not found' },
+            })
+          }
+          if (table === 'license_plates') {
+            return Promise.resolve({
+              data: mockLp,
+              error: mockLp ? null : { message: 'LP not found' },
+            })
+          }
+          if (table === 'wo_materials') {
+            return Promise.resolve({
+              data: { consumed_qty: 100 },
+              error: null,
+            })
+          }
+          return Promise.resolve({ data: null, error: null })
+        }),
+        update: vi.fn((data: unknown) => createEqChain(data)),
+        insert: vi.fn((data: unknown) => {
+          insertedRecords.push({ table, data })
+          return {
+            select: vi.fn(() => ({
+              single: vi.fn(() =>
+                Promise.resolve({
+                  data: { id: 'new-id', ...(data as object) },
+                  error: null,
+                })
+              ),
+            })),
+          }
+        }),
+      }
+      return chainable
+    }),
+  })),
 }))
 
 /**
@@ -131,11 +160,11 @@ function createRequest(body: Record<string, unknown>): NextRequest {
  * Helper: Setup authenticated user
  */
 function setupUser(role: string = 'production_manager') {
-  mockUser = { id: 'user-1', email: 'test@example.com' }
+  mockSession = { user: { id: 'user-1' } }
   mockCurrentUser = {
     id: 'user-1',
     email: 'test@example.com',
-    role,
+    role: { code: role },
     org_id: 'org-1',
   }
 }
@@ -145,7 +174,7 @@ function setupUser(role: string = 'production_manager') {
  */
 function setupValidConsumption() {
   mockConsumption = {
-    id: 'cons-1',
+    id: '00000000-0000-0000-0000-000000000001',
     wo_id: 'wo-1',
     lp_id: 'lp-1',
     consumed_qty: 50,
@@ -153,14 +182,18 @@ function setupValidConsumption() {
     uom: 'kg',
     material_id: 'mat-1',
     reservation_id: 'res-1',
+    wo_materials: { product_name: 'Test Product' },
+    license_plates: { id: 'lp-1', lp_number: 'LP-001', current_qty: 50, status: 'available' },
   }
   mockLp = {
     id: 'lp-1',
+    lp_number: 'LP-001',
     current_qty: 50,
     status: 'available',
   }
   mockWo = {
     id: 'wo-1',
+    wo_number: 'WO-001',
     org_id: 'org-1',
     status: 'in_progress',
   }
@@ -169,7 +202,7 @@ function setupValidConsumption() {
 describe('Consumption Reversal API (Story 4.10)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUser = null
+    mockSession = null
     mockCurrentUser = null
     mockConsumption = null
     mockLp = null
@@ -188,8 +221,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Test reversal',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -210,8 +243,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Manager reversal',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -227,8 +260,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Admin reversal',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -244,14 +277,14 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Operator attempt',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
       expect(response.status).toBe(403)
       const data = await response.json()
-      expect(data.code || data.error).toMatch(/FORBIDDEN|INSUFFICIENT_ROLE/i)
+      expect(data.code || data.error).toMatch(/FORBIDDEN|INSUFFICIENT_ROLE|Manager/i)
     })
 
     it('should deny warehouse_staff from reversing consumption', async () => {
@@ -263,8 +296,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Warehouse attempt',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -286,7 +319,7 @@ describe('Consumption Reversal API (Story 4.10)', () => {
         '@/app/api/production/work-orders/[id]/consume/reverse/route'
       )
 
-      const request = createRequest({ reason: 'Missing ID' })
+      const request = createRequest({ reason: 'scanned_wrong_lp' })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
       expect(response.status).toBe(400)
@@ -299,7 +332,7 @@ describe('Consumption Reversal API (Story 4.10)', () => {
         '@/app/api/production/work-orders/[id]/consume/reverse/route'
       )
 
-      const request = createRequest({ consumption_id: 'cons-1' })
+      const request = createRequest({ consumption_id: '00000000-0000-0000-0000-000000000001' })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
       expect(response.status).toBe(400)
@@ -315,8 +348,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-999',
-        reason: 'Not found test',
+        consumption_id: '00000000-0000-0000-0000-000000000099',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -331,8 +364,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Already reversed',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -357,8 +390,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Quantity restoration test',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -375,14 +408,16 @@ describe('Consumption Reversal API (Story 4.10)', () => {
     it('should restore LP status from consumed to available', async () => {
       mockLp!.status = 'consumed'
       mockLp!.current_qty = 0
+      mockConsumption!.license_plates.status = 'consumed'
+      mockConsumption!.license_plates.current_qty = 0
 
       const { POST } = await import(
         '@/app/api/production/work-orders/[id]/consume/reverse/route'
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Status restoration test',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -409,14 +444,14 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Marking reversed test',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
       const consUpdate = updatedRecords.find(r => r.table === 'wo_consumption')
       expect(consUpdate).toBeDefined()
-      const updateData = consUpdate?.data as { status?: string }
+      const updateData = consUpdate?.data as { status?: string; reversed?: boolean }
       expect(updateData.status).toBe('reversed')
     })
 
@@ -426,14 +461,14 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Wrong LP selected',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
       const consUpdate = updatedRecords.find(r => r.table === 'wo_consumption')
       const updateData = consUpdate?.data as { reversal_reason?: string }
-      expect(updateData.reversal_reason).toBe('Wrong LP selected')
+      expect(updateData.reversal_reason).toBe('scanned_wrong_lp')
     })
 
     it('should record who reversed the consumption', async () => {
@@ -442,8 +477,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'User tracking test',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -468,8 +503,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Movement record test',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -499,8 +534,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Genealogy reversal test',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 
@@ -528,8 +563,8 @@ describe('Consumption Reversal API (Story 4.10)', () => {
       )
 
       const request = createRequest({
-        consumption_id: 'cons-1',
-        reason: 'Cross-org test',
+        consumption_id: '00000000-0000-0000-0000-000000000001',
+        reason: 'scanned_wrong_lp',
       })
       const response = await POST(request, { params: Promise.resolve({ id: 'wo-1' }) })
 

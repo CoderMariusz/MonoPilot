@@ -311,3 +311,70 @@ export async function getPendingByProducts(
     expectedQty: mainOutputQty * bp.yieldPercent / 100,
   }))
 }
+
+// ============================================================================
+// Story 04.7a - Additional By-Product Functions
+// ============================================================================
+
+/**
+ * Calculate expected by-product quantity
+ * Formula: plannedQty * yieldPercent / 100
+ *
+ * @param plannedQty - Planned quantity of main product
+ * @param yieldPercent - By-product yield percentage
+ * @returns Expected by-product quantity, rounded to 1 decimal
+ */
+export function calculateExpectedQty(
+  plannedQty: number,
+  yieldPercent: number
+): number {
+  const expected = (plannedQty * yieldPercent) / 100
+  // Round to 1 decimal place
+  return Math.round(expected * 10) / 10
+}
+
+/**
+ * Calculate expected by-product quantity (Story 04.7c)
+ * Alias without rounding for precise calculations
+ *
+ * @param plannedQty - Planned quantity of main product
+ * @param yieldPercent - By-product yield percentage
+ * @returns Expected by-product quantity (no rounding)
+ */
+export function calculateExpectedByProductQty(
+  plannedQty: number,
+  yieldPercent: number
+): number {
+  return (plannedQty * yieldPercent) / 100
+}
+
+/**
+ * Generate by-product batch number
+ * Format: {mainBatch}-BP-{productCode}
+ *
+ * @param mainBatch - Main output batch number
+ * @param productCode - By-product product code
+ * @returns Generated batch number
+ */
+export function generateByProductBatch(
+  mainBatch: string,
+  productCode: string
+): string {
+  // Handle empty product code
+  if (!productCode) {
+    return `${mainBatch}-BP`
+  }
+
+  // Sanitize product code - replace special characters (except hyphen/underscore) with dash
+  const sanitizedCode = productCode.replace(/[^a-zA-Z0-9_-]/g, '-')
+
+  // Generate batch number
+  const batchNumber = `${mainBatch}-BP-${sanitizedCode}`
+
+  // Truncate to max 50 characters if needed
+  if (batchNumber.length > 50) {
+    return batchNumber.slice(0, 50)
+  }
+
+  return batchNumber
+}

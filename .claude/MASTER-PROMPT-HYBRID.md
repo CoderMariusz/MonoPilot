@@ -2,8 +2,8 @@
 
 ## TARGET
 ```yaml
-Epic: {{EPIC_ID}} {{EPIC_NAME}} 04-production
-Stories: {{STORY_IDS}} 04.5 04.1 04.2a
+Epic: {{EPIC_ID}} {{EPIC_NAME}} 3-planning 04-production
+Stories: {{STORY_IDS}} 03.13 04.6a
 Mode: Hybrid (Claude Agents + GLM Implementation)
 ```
 

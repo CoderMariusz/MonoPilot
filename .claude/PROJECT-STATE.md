@@ -1,36 +1,87 @@
 # MonoPilot - Project State
 
-> Last Updated: 2026-01-13
-> Overall Progress: **71/83 stories COMPLETE (82%)**
-> TypeScript Status: ✅ **ZERO ERRORS** (strict mode enabled)
+> Last Updated: 2026-01-21
+> Overall Progress: **76/83 stories COMPLETE (92%)**
+> TypeScript Status: ZERO ERRORS (strict mode enabled)
 
 ---
 
-## 🎯 Current Status
+## Current Status
 
 ### Completed Epics
 
 | Epic | Module | Stories | Status | Progress |
 |------|--------|---------|--------|----------|
-| **Epic 01** | Settings | 16/16 | ✅ **PRODUCTION-READY** | 100% |
-| **Epic 02** | Technical | 16/16 | ✅ **PRODUCTION-READY** | 100% |
-| **Epic 04** | Production Phase 0 | 7/7 | ✅ **PRODUCTION-READY** | 100% |
-| **Epic 05** | Warehouse | **20/20** | ✅ **PRODUCTION-READY** | 🎉 **100% COMPLETE!** |
+| **Epic 01** | Settings | 16/16 | **PRODUCTION-READY** | 100% |
+| **Epic 02** | Technical | 16/16 | **PRODUCTION-READY** | 100% |
+| **Epic 04** | Production Phase 0 | 7/7 | **PRODUCTION-READY** | 100% |
+| **Epic 05** | Warehouse | **20/20** | **PRODUCTION-READY** | **100% COMPLETE!** |
 
 ### In Progress Epics
 
 | Epic | Module | Stories | Completion | Next Steps |
 |------|--------|---------|------------|------------|
-| **Epic 03** | Planning | 18/20 | 90% | Complete 03.13 (Material Availability) |
-| **Epic 04 Phase 1** | Production Full | 0/10 | 0% | ✅ **UNBLOCKED - Ready to Start!** |
+| **Epic 03** | Planning | 19/20 | 95% | 03.14 deferred to Phase 2 |
+| **Epic 04 Phase 1** | Production Full | 5/10 | 50% | Continue 04.6e (Over-Consumption) |
 
 ---
 
-## 🚀 Epic 05 - Warehouse Module (COMPLETE!)
+## Epic 04 Phase 1 - Material Consumption (In Progress)
+
+### Stories Status
+
+| Story | Description | Status | Tests | ACs |
+|-------|-------------|--------|-------|-----|
+| 04.6 | Material Consumption Core | **DEPLOYED** | 158/158 | All |
+| 04.6a | Material Consumption Desktop | **DEPLOYED** | 48/48 | All |
+| 04.6b | Material Consumption Scanner | **DEPLOYED** | 38/38 | All |
+| 04.6c | 1:1 Consumption Enforcement | **DEPLOYED** | 42/42 | All |
+| 04.6d | Consumption Correction (Reversal) | **DEPLOYED** | 109/109 | 8/8 |
+| 04.6e | Over-Consumption Handling | Planned | - | - |
+| 04.7a | Output Registration Desktop | Planned | - | - |
+| 04.7b | Output Registration Scanner | Planned | - | - |
+| 04.8 | By-Product Registration | Planned | - | - |
+| 04.9 | Multiple Outputs | Planned | - | - |
+
+### Story 04.6d - Consumption Correction (COMPLETE)
+
+**Status**: DEPLOYED (2026-01-21)
+**PRD Reference**: FR-PROD-009
+
+**Deliverables**:
+- API Route: POST /api/production/work-orders/:id/consume/reverse
+- Component: ReverseConsumptionModal.tsx
+- Hook: useReverseConsumption
+- Validation: reverseConsumptionSchema (Zod)
+- Tests: 109 passing (unit + integration + e2e)
+- Documentation: API docs, component guide, migration guide
+
+**Key Features**:
+- Role-based access (Manager/Admin only)
+- Predefined reversal reasons with notes
+- LP quantity restoration (atomic)
+- LP status update (consumed -> available)
+- Genealogy record update (is_reversed = true)
+- Audit log entry creation
+- Multi-tenancy isolation
+
+**Acceptance Criteria**: 8/8 PASS
+- AC1: Reverse button visible to Manager/Admin
+- AC2: Reverse button hidden for Operator
+- AC3: LP quantity restored
+- AC4: Consumption record updated
+- AC5: Genealogy record updated
+- AC6: Reason field required
+- AC7: Audit trail created
+- AC8: LP status restored
+
+---
+
+## Epic 05 - Warehouse Module (COMPLETE!)
 
 ### Completion Summary
 
-**Status**: ✅ **100% COMPLETE** (2026-01-09)
+**Status**: **100% COMPLETE** (2026-01-09)
 **Duration**: ~8 hours (6 waves)
 **Agents Used**: 32+ agents (backend-dev, frontend-dev, test-writer, code-reviewer, qa-agent, tech-writer)
 **Stories Completed**: 20 total
@@ -41,146 +92,85 @@
 
 | Story | Description | Status | Tests | ACs |
 |-------|-------------|--------|-------|-----|
-| 05.0 | Warehouse Settings | ✅ COMPLETE | 38/38 | 15/15 |
-| 05.1 | LP Table + CRUD | ✅ COMPLETE | 126/126 | 12/12 |
-| 05.2 | LP Genealogy | ✅ COMPLETE | 138/138 | 25/25 |
-| 05.3 | LP Reservations + FIFO/FEFO | ✅ COMPLETE | 64/64 | 18/18 |
-| 05.4 | LP Status Management | ✅ COMPLETE | 160/160 | Full |
-| 05.5 | LP Search/Filters | ✅ COMPLETE | 251/251 | Full |
-| 05.6 | LP Detail + History | ✅ COMPLETE | 93/93 | 17/18 |
-| 05.7 | Warehouse Dashboard | ✅ COMPLETE | 52/52 | 13/13 |
-| 05.8 | ASN CRUD + Items | ✅ COMPLETE | 82/82 | 12/12 |
-| 05.9 | ASN Receive Workflow | ✅ COMPLETE | 14/14 | 12/12 |
-| 05.10 | GRN CRUD + Items | ✅ COMPLETE | 73/73 | Full |
-| 05.11 | GRN From PO | ✅ COMPLETE | 111/111 | 15/20 |
-| 05.12 | GRN From TO | ✅ COMPLETE | 155/155 | 11/15 |
-| 05.13 | Over-Receipt Control | ✅ COMPLETE | 42/42 | All |
-| 05.14 | LP Label Printing | ✅ COMPLETE | 113/123 | 10/10 |
-| 05.15 | Over-Receipt Handling | ✅ COMPLETE | 66/66 | Full |
-| 05.16 | Stock Moves CRUD | ✅ COMPLETE | 74/74 | 15/15 |
-| 05.17 | LP Split Workflow | ✅ COMPLETE | 112/112 | 25/25 |
-| 05.18 | LP Merge Workflow | ✅ COMPLETE | 133/145 | 25/25 |
-| 05.19 | Scanner Receive | ✅ COMPLETE | 74/74 | Full |
-
-### Key Deliverables
-
-**Phase 0 - Foundation** (Stories 05.0-05.9):
-- License Plate table with full genealogy tracking
-- FIFO/FEFO pick suggestions
-- LP reservations and status management
-- ASN CRUD with receive workflow
-- Warehouse dashboard with KPIs
-
-**Phase 1 - Goods Receipt** (Stories 05.10-05.15):
-- GRN CRUD with items (Goods Receipt Notes)
-- GRN from Purchase Orders (auto-populate)
-- GRN from Transfer Orders (inter-warehouse)
-- Over-receipt control and approval workflow
-- LP label printing (GS1-128, SSCC-18)
-
-**Phase 2 - Advanced** (Stories 05.16-05.19):
-- Stock moves CRUD with atomic LP updates
-- LP split workflow (parent → N children)
-- LP merge workflow (N sources → 1 target)
-- Scanner receive (5-step mobile wizard)
-
-### Technical Highlights
-
-**Database**:
-- 18 migrations (091-114)
-- 3 RPC functions: `split_license_plate()`, `create_grn_from_po()`, `create_grn_from_to()`, `execute_stock_move()`
-- Full RLS policies (ADR-013 compliant)
-
-**Services**:
-- ASN service (14 methods)
-- GRN service (12+ methods)
-- LP service with genealogy tracking
-- Over-receipt validation service
-- Label printing service
-
-**Frontend**:
-- 10+ page components
-- 50+ UI components (modals, wizards, badges)
-- Scanner workflows with audio/haptic feedback
-- Mobile-friendly touch interface
+| 05.0 | Warehouse Settings | COMPLETE | 38/38 | 15/15 |
+| 05.1 | LP Table + CRUD | COMPLETE | 126/126 | 12/12 |
+| 05.2 | LP Genealogy | COMPLETE | 138/138 | 25/25 |
+| 05.3 | LP Reservations + FIFO/FEFO | COMPLETE | 64/64 | 18/18 |
+| 05.4 | LP Status Management | COMPLETE | 160/160 | Full |
+| 05.5 | LP Search/Filters | COMPLETE | 251/251 | Full |
+| 05.6 | LP Detail + History | COMPLETE | 93/93 | 17/18 |
+| 05.7 | Warehouse Dashboard | COMPLETE | 52/52 | 13/13 |
+| 05.8 | ASN CRUD + Items | COMPLETE | 82/82 | 12/12 |
+| 05.9 | ASN Receive Workflow | COMPLETE | 14/14 | 12/12 |
+| 05.10 | GRN CRUD + Items | COMPLETE | 73/73 | Full |
+| 05.11 | GRN From PO | COMPLETE | 111/111 | 15/20 |
+| 05.12 | GRN From TO | COMPLETE | 155/155 | 11/15 |
+| 05.13 | Over-Receipt Control | COMPLETE | 42/42 | All |
+| 05.14 | LP Label Printing | COMPLETE | 113/123 | 10/10 |
+| 05.15 | Over-Receipt Handling | COMPLETE | 66/66 | Full |
+| 05.16 | Stock Moves CRUD | COMPLETE | 74/74 | 15/15 |
+| 05.17 | LP Split Workflow | COMPLETE | 112/112 | 25/25 |
+| 05.18 | LP Merge Workflow | COMPLETE | 133/145 | 25/25 |
+| 05.19 | Scanner Receive | COMPLETE | 74/74 | Full |
 
 ---
 
-## 📊 Epic Summaries
+## Epic Summaries
 
 ### Epic 01 - Settings (100% Complete)
 
-**Total Stories**: 16/16 ✅
+**Total Stories**: 16/16
 **Status**: PRODUCTION-READY
 
 Key modules: Roles & Permissions, Users, Locations, UOMs, Machines, Production Calendars, Holiday Management, Work Schedules, Settings Dashboard.
 
 ### Epic 02 - Technical (100% Complete)
 
-**Total Stories**: 16/16 ✅
+**Total Stories**: 16/16
 **Status**: PRODUCTION-READY
 
 Key modules: Products CRUD, Product Versioning, Product Allergens, BOMs CRUD, BOM Items (Core + Advanced), BOM Alternatives, Routings CRUD, Routing Operations, BOM-Routing Costs, Traceability (Config + Queries), Shelf Life, Nutrition Calculation, Technical Dashboard.
 
-### Epic 03 - Planning (90% Complete)
+### Epic 03 - Planning (95% Complete)
 
-**Total Stories**: 18/20 (2 remaining)
+**Total Stories**: 19/20 (1 deferred)
 **Status**: NEARLY COMPLETE
 
-**Complete**: Suppliers, PO CRUD, PO Approval, PO Bulk Operations, TO CRUD, TO Partial Shipments, TO LP Pre-selection, WO CRUD, WO BOM Snapshot, WO Material Reservations, WO Operations Copy, WO Gantt Chart, Planning Dashboard, Planning Settings.
+**Complete**: Suppliers, PO CRUD, PO Approval, PO Bulk Operations, TO CRUD, TO Partial Shipments, TO LP Pre-selection, WO CRUD, WO BOM Snapshot, WO Material Reservations, WO Operations Copy, WO Gantt Chart, Planning Dashboard, Planning Settings, Material Availability Check (03.13).
 
-**Remaining**:
-- **03.13** - Material Availability Check (PARTIAL, P4-P7 needed, 2 days)
-- **03.14** - WO Scheduling (BLOCKED, defer to Phase 2)
+**Deferred**:
+- **03.14** - WO Scheduling (defer to Phase 2)
 
-### Epic 04 - Production (Phase 0: 100%, Phase 1: 0%)
+### Epic 04 - Production (Phase 0: 100%, Phase 1: 50%)
 
-**Phase 0 MVP Core**: 7/7 ✅ **COMPLETE**
+**Phase 0 MVP Core**: 7/7 **COMPLETE**
 - Stories: Dashboard, WO Start, WO Pause/Resume, WO Complete, Operation Start/Complete, Yield Tracking, Production Settings
 
-**Phase 1 Full Production**: 0/10 ⏳ **READY TO START** (unblocked!)
-- Material Consumption (5 stories: desktop, scanner, 1:1, correction, over-consumption)
-- Output Registration (4 stories: desktop, scanner, by-products, multiple outputs)
-- Material Reservations (1 story)
-- Estimated: 18-24 days
+**Phase 1 Material Consumption**: 5/10 **IN PROGRESS**
+- 04.6: Material Consumption Core - DEPLOYED
+- 04.6a: Desktop Consumption - DEPLOYED
+- 04.6b: Scanner Consumption - DEPLOYED
+- 04.6c: 1:1 Enforcement - DEPLOYED
+- 04.6d: Consumption Correction - **DEPLOYED** (2026-01-21)
+- 04.6e: Over-Consumption - Planned
+- 04.7-04.9: Output Registration - Planned
 
 ---
 
-## 🎯 TypeScript Fix Campaign (2026-01-13)
+## TypeScript Fix Campaign (2026-01-13)
 
-### Status: ✅ **COMPLETE - ZERO ERRORS ACHIEVED!**
+### Status: **COMPLETE - ZERO ERRORS ACHIEVED!**
 
 **Duration**: ~3 hours (2 phases, 14 agents)
 **Initial Errors**: 499
-**Final Errors**: **0** ✅
-**Strict Mode**: ✅ **ENABLED**
-
-### Phase 1 (5 agents, ~2 hours)
-- Errors fixed: 104 (499 → 395)
-- Issue: Verification from wrong directory (claimed success prematurely)
-
-### Phase 2 (9 agents, ~1 hour)
-- Errors fixed: 395 (395 → 0)
-- **VERIFIED** from correct directory: `apps/frontend/`
-
-### Key Fixes
-1. **BOM role pattern** - Simplified extraction (10 files)
-2. **Import names** - createServerClient → createClient (4 files)
-3. **Supabase auth mocks** - Fixed module path (2 test files)
-4. **Test factories** - Created type-safe infrastructure
-5. **Component props** - Added missing interfaces
-6. **Type guards** - Null/undefined handling
+**Final Errors**: **0**
+**Strict Mode**: **ENABLED**
 
 ### Configuration
 ```bash
-ENFORCEMENT_MODE="strict"  # ✅ BLOCKS ALL ERRORS
-BASELINE_ERRORS=0          # ✅ ZERO BASELINE
+ENFORCEMENT_MODE="strict"  # BLOCKS ALL ERRORS
+BASELINE_ERRORS=0          # ZERO BASELINE
 ```
-
-**Reports**:
-- `TYPESCRIPT-FIX-PHASE2-REPORT.md` - Complete campaign analysis
-- `TYPE-CHECK-README.md` - Monitoring guide
-- `TYPE-CHECK-STATUS.md` - Initial analysis
 
 **Commands**:
 - `pnpm type-check:status` - Dashboard
@@ -189,69 +179,65 @@ BASELINE_ERRORS=0          # ✅ ZERO BASELINE
 
 ---
 
-## 🔥 Next Steps
+## Next Steps
 
 ### Immediate (This Week)
-1. **Optional**: Complete Epic 03.13 - Material Availability Check (2 days)
-2. **Start Epic 04 Phase 1** - Material Consumption stories (04.6a-e)
+1. **Start 04.6e** - Over-Consumption Handling
+2. **Start 04.7a** - Output Registration Desktop
 
 ### Short Term (Next 2-4 Weeks)
-1. Complete Epic 04 Phase 1 (18-24 days)
-2. Parallel: Polish Epic 01/02 partial stories (8-12 days)
+1. Complete Epic 04 Phase 1 (remaining 5 stories)
+2. Start Epic 04 Phase 2 - Output Registration
 
 ### Deferred
 1. Epic 03.14 - WO Scheduling (after Epic 04 stable)
-2. Epic 04 Phase 2 - OEE Analytics (after Phase 1 complete)
+2. Epic 04 Phase 3 - OEE Analytics (after Phase 2 complete)
 
 ---
 
-## 📁 Database Status
+## Database Status
 
-**Total Migrations**: 114 applied
-**Recent Migrations** (Epic 05):
-- 091-096: ASN tables (asns, asn_items, RLS, functions)
-- 097-099: GRN tables (grns, grn_items, warehouse settings trigger fix)
-- 105-107: LP transactions, block reason, split LP function
-- 109-110: GRN from PO function
-- 112-114: Over-receipt approvals, stock moves tables, GRN from TO function
+**Total Migrations**: 114+ applied
+**Recent Migrations** (Epic 04 Phase 1):
+- wo_consumption table with reversal fields
+- lp_genealogy is_reversed column
+- lp_movements consumption_reversal type
+- activity_logs consumption_reversal action
 
 ---
 
-## 🐛 Known Issues
+## Known Issues
 
 ### None Critical
-All Epic 05 blockers resolved:
-- ✅ 05.6 - lp_transactions table created
-- ✅ 05.9 - Type conflict fixed (VarianceReason)
-- ✅ All migrations applied successfully
+All blockers resolved.
 
 ---
 
-## 📝 Recent Commits
+## Recent Commits
 
 ```
-13cb307f feat(typescript): Phase 2 - fix remaining 395 errors, achieve ZERO ✅
-c19ff81d feat: fix all 499 TypeScript errors - ZERO ERRORS ACHIEVED! 🎉
-0c92cc0e docs: add comprehensive TypeScript error monitoring guides
-39a59a7d docs: update project state and roadmap, cleanup old handoff docs
-26aff4af fix(lint): remove invalid ESLint disable comment
+305a04eb feat(production): Add Material Consumption feature (Story 04.6)
+76b213ed docs(planning): Add Story 03.13 documentation and complete P7 phase
+d9435580 feat(warehouse): Add Inventory Browser with aging, expiring items & adjustments (WH-INV-001)
+09187f31 fix(technical): Improve BOM cost calculation and location hooks
+df6e73bb refactor(eslint): Optimize ESLint config for development - reduce warnings from 1225 to 690
 ```
 
 ---
 
-## 📈 Project Metrics
+## Project Metrics
 
-**Overall Completion**: 82% (71/83 stories complete)
+**Overall Completion**: 92% (76/83 stories complete)
 **Stories by Status**:
-- Complete: 71
-- Partial: 8
-- Blocked: 4
-- Not Started: 0
+- Complete: 76
+- In Progress: 0
+- Planned: 5
+- Deferred: 2
 
 **Velocity**: 3-5 stories/week
-**Target Completion**: Mid-February 2026
+**Target Completion**: Early February 2026
 
 ---
 
-**Last Updated**: 2026-01-13
-**Status**: Epic 05 COMPLETE, Epic 04 Phase 1 ready to start
+**Last Updated**: 2026-01-21
+**Status**: Epic 04 Phase 1 at 50%, Story 04.6d DEPLOYED

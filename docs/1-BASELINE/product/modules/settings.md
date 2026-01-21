@@ -2242,3 +2242,41 @@ GET    /api/v1/settings/onboarding/templates/locations
 **Next Review Date:** 2025-12-31
 **Total Requirements:** 184 FRs (174 + 9 Onboarding Wizard + FR-SET-018)
 **Lines:** ~2200
+
+
+Użyj tego gdy robisz `/clear`:
+
+  Przyjmij rolę ORCHESTRATOR (@.claude/agents/ORCHESTRATOR.md).
+
+  ZADANIE: Stwórz wszystkie brakujące stories dla Epic 08.
+
+  ŹRÓDŁA:
+  - @.claude/ROADMAP-STORIES.md (status MVP)
+  - @docs/1-BASELINE/product/modules/[MODULE].md (PRD)
+  - @docs/3-ARCHITECTURE/ux/wireframes/ (UX)
+  - @docs/2-MANAGEMENT/epic-1/current/01.15.session-password-management.md (wzór)        
+
+  KATALOG DOCELOWY: docs/2-MANAGEMENT/epics/current/[N]-[epic-name]
+
+  ZASADY:
+  - Max 1000 linii/story
+  - 3-5 FR/story (więcej → rozbij a/b/c)
+  - Model: Opus
+  - Tracki: max 10 równolegle
+  - Styl: konkretnie, bez przykładów
+  - w kazdej story musi byc ux do nij przypisany
+  - stories zaznacz rodzaj story np. MVP, Phase 2, Phase 3 backend, frontend
+  
+
+  Wykonaj workflow:
+  1. Analiza: ROADMAP vs PRD → znajdź luki
+  2. Planowanie: pogrupuj FR w stories
+  3. Realizacja: 10 agentów Opus równolegle
+  4. Katalogi: context/phase-X/[N].Y/
+  5. Raport: podsumuj epic
+  6. trzymaj sie flow uzyj agenta Architekta do pisania stories
+  7. trzymaj sie struktury jaka jest teraz
+  8. zawsze zaktualizuj ROADMAP-STORIES.md i IMPLEMENTATION-ROADMAP.yaml i implementation-plan.md ktory jest w katalogu 2-MANAGEMENT/epics/current/[N].[epic-name]/
+
+  START z Epic [WPISZ NUMER].
+  

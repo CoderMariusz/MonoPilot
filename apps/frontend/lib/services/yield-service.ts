@@ -347,3 +347,99 @@ export class YieldService {
     return 'Low Yield'
   }
 }
+
+// ============================================================================
+// Story 04.7a - Output Registration Yield Functions
+// Different thresholds: green >= 95%, yellow >= 80%, red < 80%
+// ============================================================================
+
+/**
+ * Yield thresholds for Story 04.7a Output Registration
+ */
+export const YIELD_THRESHOLDS_04_7A = {
+  green: 95, // >= 95% green
+  yellow: 80, // >= 80% yellow
+  red: 0, // < 80% red
+}
+
+/**
+ * Calculate output yield (Story 04.7a)
+ * Formula: (outputQty / plannedQty) * 100, rounded to 1 decimal
+ *
+ * @param outputQty - Actual output quantity
+ * @param plannedQty - Planned quantity
+ * @returns Yield percentage or null if invalid
+ */
+export function calculateOutputYield(
+  outputQty: number,
+  plannedQty: number
+): number | null {
+  // Handle zero planned qty - return null (not infinity)
+  if (plannedQty === 0) {
+    return null
+  }
+
+  const yieldPercent = (outputQty / plannedQty) * 100
+  // Round to 1 decimal place
+  return Math.round(yieldPercent * 10) / 10
+}
+
+/**
+ * Calculate material yield (Story 04.7a)
+ * Formula: (plannedMaterial / actualConsumed) * 100, rounded to 1 decimal
+ * Higher is better - means less material consumed than planned
+ *
+ * @param plannedMaterial - Planned material quantity
+ * @param actualConsumed - Actual consumed quantity
+ * @returns Yield percentage or null if invalid
+ */
+export function calculateMaterialYield(
+  plannedMaterial: number,
+  actualConsumed: number
+): number | null {
+  // Handle zero actual consumed - return null (not infinity)
+  if (actualConsumed === 0) {
+    return null
+  }
+
+  // Handle zero planned - return null
+  if (plannedMaterial === 0) {
+    return null
+  }
+
+  const yieldPercent = (plannedMaterial / actualConsumed) * 100
+  // Round to 1 decimal place
+  return Math.round(yieldPercent * 10) / 10
+}
+
+/**
+ * Get yield color for Story 04.7a thresholds
+ * - Green: yield >= 95%
+ * - Yellow: 80% <= yield < 95%
+ * - Red: yield < 80%
+ *
+ * @param yieldPercent - Yield percentage
+ * @returns Color indicator (green, yellow, red)
+ */
+export function getYieldColor(yieldPercent: number): YieldColor {
+  if (yieldPercent >= YIELD_THRESHOLDS_04_7A.green) {
+    return 'green'
+  }
+  if (yieldPercent >= YIELD_THRESHOLDS_04_7A.yellow) {
+    return 'yellow'
+  }
+  return 'red'
+}
+
+/**
+ * Get yield label for display (Story 04.7a)
+ *
+ * @param yieldPercent - Yield percentage or null
+ * @returns Formatted string or "N/A"
+ */
+export function getYieldLabel(yieldPercent: number | null): string {
+  if (yieldPercent === null) {
+    return 'N/A'
+  }
+  return `${yieldPercent}%`
+}

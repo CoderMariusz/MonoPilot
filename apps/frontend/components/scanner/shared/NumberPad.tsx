@@ -17,6 +17,8 @@ interface NumberPadProps {
   maxValue?: number
   onQuickAdjust?: (delta: number) => void
   className?: string
+  /** When true, all keys are non-interactive (for consume_whole_lp=true) */
+  disabled?: boolean
 }
 
 export function NumberPad({
@@ -26,8 +28,11 @@ export function NumberPad({
   maxValue,
   onQuickAdjust,
   className,
+  disabled = false,
 }: NumberPadProps) {
   const handleDigit = (digit: string) => {
+    if (disabled) return
+
     const newValue = value + digit
 
     // Prevent multiple decimals
@@ -43,16 +48,19 @@ export function NumberPad({
   }
 
   const handleBackspace = () => {
+    if (disabled) return
     if (value.length > 0) {
       onChange(value.slice(0, -1))
     }
   }
 
   const handleClear = () => {
+    if (disabled) return
     onChange('')
   }
 
   const handleQuickAdjust = (delta: number) => {
+    if (disabled) return
     if (onQuickAdjust) {
       onQuickAdjust(delta)
     } else {
@@ -63,13 +71,26 @@ export function NumberPad({
     }
   }
 
-  const digitClass =
-    'h-12 min-h-[48px] w-full text-xl font-semibold hover:bg-gray-100 active:bg-gray-200'
-  const adjustClass =
-    'h-12 min-h-[48px] w-full text-lg font-semibold hover:bg-blue-50 active:bg-blue-100 text-blue-600'
+  const digitClass = cn(
+    'h-12 min-h-[48px] w-full text-xl font-semibold',
+    disabled
+      ? 'opacity-50 cursor-not-allowed hover:bg-transparent active:bg-transparent'
+      : 'hover:bg-gray-100 active:bg-gray-200'
+  )
+  const adjustClass = cn(
+    'h-12 min-h-[48px] w-full text-lg font-semibold text-blue-600',
+    disabled
+      ? 'opacity-50 cursor-not-allowed hover:bg-transparent active:bg-transparent'
+      : 'hover:bg-blue-50 active:bg-blue-100'
+  )
 
   return (
-    <div className={cn('w-full max-w-md mx-auto', className)}>
+    <div
+      className={cn('w-full max-w-md mx-auto', disabled && 'opacity-50', className)}
+      aria-disabled={disabled}
+      role="group"
+      aria-label="Number pad"
+    >
       {/* Main grid: 4 columns (0-9 + decimal + backspace + quick adjusts) */}
       <div className="grid grid-cols-4 gap-1 sm:gap-2">
         {/* Row 1 */}
