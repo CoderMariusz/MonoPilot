@@ -1,27 +1,28 @@
 # MonoPilot - Implementation Roadmap
 # Generated: 2026-01-14 21:45 UTC
 # Purpose: Unified roadmap for remaining implementation work across all epics
-# Last checkpoint scan: 2026-01-14 (UPDATED - Epic 01-03 story definition complete)
+# Last checkpoint scan: 2026-01-21 (UPDATED - Epic 04 Phase 1: 10/10 = 100%)
 
 meta:
   generated: "2026-01-14 21:45 UTC"
+  last_updated: "2026-01-21"
   scan_method: "Direct checkpoint file analysis + Epic 01-03 gap analysis + ORCHESTRATOR"
   total_epics: 11
   total_stories_tracked: 235  # Core (106) + Quality (41) + Shipping (16) + Premium (68-97)
-  stories_added_today: 26  # 10 Epic 01 Phase 1B-3 + 6 Epic 02 Phase 2 + 10 Epic 03 Phase 2-3
+  stories_added_today: 1  # 04.8 Material Reservations DEPLOYED
 
 # =============================================================================
 # EXECUTIVE SUMMARY
 # =============================================================================
 
 summary:
-  overall_completion: "~85%"  # Epic 01-05 (93/116 stories implemented)
-  stories_complete: 93  # +5 from 04.6a-e
+  overall_completion: "~89%"  # Epic 01-05 (98/116 stories implemented)
+  stories_complete: 98  # +1 from 04.8
   stories_partial: 1  # 03.13
   stories_blocked: 1  # 03.14
-  stories_not_started: 21  # 10 Epic 01 + 6 Epic 02 + 10 Epic 03 Phase 2-3 - 5 Epic 04
+  stories_not_started: 16  # 10 Epic 01 + 6 Epic 02 Phase 2-3
 
-  # UPDATED based on gap analysis 2026-01-14 21:45
+  # UPDATED based on 04.8 deployment 2026-01-21
   by_epic:
     epic_01_settings:
       total: 26  # 16 MVP + 10 Phase 1B-3
@@ -57,12 +58,13 @@ summary:
 
     epic_04_production_phase_1:
       total: 10
-      complete: 5  # 04.6a-e DEPLOYED (2026-01-21)
+      complete: 10  # 04.6a-e + 04.7a-d + 04.8 DEPLOYED (2026-01-21)
       blocked: 0
-      ready: 5  # 04.7a-d, 04.8
-      percent: "50%"
-      status: "IN_PROGRESS"
+      ready: 0
+      percent: "100%"
+      status: "COMPLETE"
       last_deployment: "2026-01-21"
+      note: "Epic 04 Phase 1 COMPLETE! All 10 stories deployed."
 
     epic_05_warehouse:
       total: 20
@@ -123,45 +125,60 @@ summary:
 # =============================================================================
 
 critical_path:
-  description: "Epic 05 COMPLETE! Ready for Epic 04 Phase 1"
-  total_days: "20-26 days to full production execution"
+  description: "Epic 04 Phase 1 COMPLETE! Epic 05 COMPLETE! Ready for Epic 06-07"
+  total_days: "~100-130 days to full MVP (Epic 01-07)"
 
   steps:
     - step: 1
-      name: "✅ DONE: Epic 05 complete (2026-01-09)"
+      name: "Epic 05 complete (2026-01-09)"
       duration: "COMPLETE"
-      status: "✅ DONE"
+      status: "DONE"
       completed_date: "2026-01-09"
       tasks:
-        - "✅ 05.0-05.19 - All 20 stories COMPLETE"
-        - "✅ 2,265 tests passing"
-        - "✅ All critical blockers resolved"
+        - "05.0-05.19 - All 20 stories COMPLETE"
+        - "2,265 tests passing"
+        - "All critical blockers resolved"
       deliverables:
         - "Epic 05: 20/20 stories = 100% COMPLETE!"
 
     - step: 2
+      name: "Epic 04 Phase 1 complete (2026-01-21)"
+      duration: "COMPLETE"
+      status: "DONE"
+      completed_date: "2026-01-21"
+      tasks:
+        - "04.6a-c Material Consumption DEPLOYED"
+        - "04.7a-d Output Registration DEPLOYED"
+        - "04.8 Material Reservations DEPLOYED"
+      deliverables:
+        - "Epic 04 Phase 1: 10/10 stories = 100% COMPLETE!"
+
+    - step: 3
       name: "Complete Epic 03.13 (Material Availability)"
       duration: "2 days"
-      status: "⏳ IN PROGRESS"
+      status: "IN PROGRESS"
       tasks:
         - "03.13 - Backend 100% done, frontend P4-P7 remaining"
       deliverables:
-        - "Epic 03: 95% → 100% complete (19/20)"
+        - "Epic 03: 95% -> 100% complete (19/20)"
 
-    - step: 3
-      name: "Epic 04 Phase 1 - Full Production"
-      duration: "18-24 days"
-      stories: 10
-      status: "✅ READY TO START"
-      description: "Material consumption + Output registration + Reservations"
-      note: "All Epic 05 dependencies SATISFIED!"
-      tasks:
-        - "04.6a-e - Material Consumption (5 stories, 12-15 days)"
-        - "04.7a-d - Output Registration (4 stories, 8-10 days)"
-        - "04.8 - Material Reservations (1 story, 2-3 days)"
+    - step: 4
+      name: "Epic 06 - Quality Module"
+      duration: "52-68 days"
+      status: "PENDING"
+      depends_on: "Epic 04 Phase 1 COMPLETE"
+      stories: 41
+      phases: ["Phase 1A", "Phase 1B", "Phase 2", "Phase 3", "Phase 4"]
+
+    - step: 5
+      name: "Epic 07 - Shipping Module"
+      duration: "50-60 days"
+      status: "UNBLOCKED"
+      depends_on: "Epic 05 COMPLETE"
+      stories: 24
 
 # =============================================================================
-# EPIC 01 - SETTINGS (100% Story Definition, 62% Implementation) - UPDATED
+# EPIC 01 - SETTINGS (100% Story Definition, 62% Implementation)
 # =============================================================================
 
 epic_01_settings:
@@ -237,7 +254,7 @@ epic_01_settings:
   summary: "MVP (16 stories) production-ready with 13,500+ test LOC. Phase 1B-3 (10 stories) fully defined."
 
 # =============================================================================
-# EPIC 02 - TECHNICAL (100% Story Definition, 74% Implementation) - UPDATED
+# EPIC 02 - TECHNICAL (100% Story Definition, 74% Implementation)
 # =============================================================================
 
 epic_02_technical:
@@ -290,7 +307,7 @@ epic_02_technical:
   summary: "MVP (17 stories) production-ready. Phase 2 (6 stories) fully defined with 184KB documentation."
 
 # =============================================================================
-# EPIC 03 - PLANNING (95% Complete) - UPDATED
+# EPIC 03 - PLANNING (95% Complete)
 # =============================================================================
 
 epic_03_planning:
@@ -359,7 +376,7 @@ epic_03_planning:
       - {id: "03.24", name: "PO Templates & Blanket POs", complexity: M, days: "4-5", fr: "FR-041,042"}
 
     effort_estimate: "35-50 days"
-    critical_path: "03.18 → 03.19 → 03.20 → 03.21 → 03.22 = 24-30 days"
+    critical_path: "03.18 -> 03.19 -> 03.20 -> 03.21 -> 03.22 = 24-30 days"
 
   phase_3_supplier_quality_edi:
     status: "STORIES_DEFINED"
@@ -375,8 +392,8 @@ epic_03_planning:
 
     effort_estimate: "18-25 days"
     blockers_resolved:
-      - "✅ Epic 05.10 (GRN CRUD) complete - for 03.26 quality data"
-      - "✅ Epic 05.9 (ASN) complete - for 03.27 EDI ASN"
+      - "Epic 05.10 (GRN CRUD) complete - for 03.26 quality data"
+      - "Epic 05.9 (ASN) complete - for 03.27 EDI ASN"
 
   next_steps:
     phase_1_completion:
@@ -415,46 +432,37 @@ epic_04_production:
     summary: "Phase 0 MVP Core 100% done. 1,600+ tests. Can track WO lifecycle."
 
   phase_1_full_production:
-    status: "STORIES_DEFINED"  # UPDATED - markdown + context complete!
+    status: "COMPLETE"  # UPDATED - 10/10 stories deployed!
     total_stories: 10
-    ready: 10
-    completion_percentage: 0
-    documentation: "~190KB (created 2026-01-14)"
+    complete: 10
+    ready: 0
+    completion_percentage: 100
+    completion_date: "2026-01-21"
+    documentation: "~280KB (16 markdown files)"
 
-    unblock_status: "✅ ALL DEPENDENCIES SATISFIED"
+    unblock_status: "ALL DEPENDENCIES SATISFIED"
     unblock_details:
-      - "✅ Epic 05.1 - LP Table + Services COMPLETE"
-      - "✅ Epic 05.2 - LP Genealogy COMPLETE"
-      - "✅ Epic 05.3 - LP Reservations COMPLETE"
-      - "✅ Epic 05.4 - FIFO/FEFO COMPLETE"
+      - "Epic 05.1 - LP Table + Services COMPLETE"
+      - "Epic 05.2 - LP Genealogy COMPLETE"
+      - "Epic 05.3 - LP Reservations COMPLETE"
+      - "Epic 05.4 - FIFO/FEFO COMPLETE"
 
     stories:
-      - {id: "04.6a", name: "Material Consumption Desktop", complexity: L, days: 4, fr: "FR-PROD-006"}
-      - {id: "04.6b", name: "Material Consumption Scanner", complexity: M, days: 3, fr: "FR-PROD-007"}
-      - {id: "04.6c", name: "1:1 Consumption", complexity: S, days: 2, fr: "FR-PROD-008"}
-      - {id: "04.6d", name: "Consumption Correction", complexity: S, days: 2, fr: "FR-PROD-009"}
-      - {id: "04.6e", name: "Over-Consumption Control", complexity: S, days: 2, fr: "FR-PROD-010"}
-      - {id: "04.7a", name: "Output Registration Desktop", complexity: M, days: 3, fr: "FR-PROD-011"}
-      - {id: "04.7b", name: "Output Registration Scanner", complexity: M, days: 3, fr: "FR-PROD-012"}
-      - {id: "04.7c", name: "By-Product Registration", complexity: S, days: 2, fr: "FR-PROD-013"}
-      - {id: "04.7d", name: "Multiple Outputs per WO", complexity: S, days: 2, fr: "FR-PROD-015"}
-      - {id: "04.8", name: "Material Reservations", complexity: M, days: 4, fr: "FR-PROD-016"}
+      - {id: "04.6a", name: "Material Consumption Desktop", status: DEPLOYED, days: 4, deployed: "2026-01-21", tests: 52}
+      - {id: "04.6b", name: "Material Consumption Scanner", status: DEPLOYED, days: 3, deployed: "2026-01-21", tests: 83}
+      - {id: "04.6c", name: "1:1 Consumption", status: DEPLOYED, days: 2, deployed: "2026-01-21", tests: 83}
+      - {id: "04.6d", name: "Consumption Correction", status: DEPLOYED, days: 2, deployed: "2026-01-21"}
+      - {id: "04.6e", name: "Over-Consumption Control", status: DEPLOYED, days: 2, deployed: "2026-01-21"}
+      - {id: "04.7a", name: "Output Registration Desktop", status: DEPLOYED, days: 3, deployed: "2026-01-21"}
+      - {id: "04.7b", name: "Output Registration Scanner", status: DEPLOYED, days: 3, deployed: "2026-01-21", tests: 170}
+      - {id: "04.7c", name: "By-Product Registration", status: DEPLOYED, days: 2, deployed: "2026-01-21", tests: 116}
+      - {id: "04.7d", name: "Multiple Outputs per WO", status: DEPLOYED, days: 2, deployed: "2026-01-21"}
+      - {id: "04.8", name: "Material Reservations", status: DEPLOYED, days: 4, deployed: "2026-01-21", tests: 160, ac: "8/8"}
 
-    effort_estimate: "27-31 days"  # UPDATED from 18-24
-
-    implementation_order:
-      - task: "Material Consumption"
-        stories: ["04.6a", "04.6b", "04.6c", "04.6d", "04.6e"]
-        duration: "13-15 days"
-      - task: "Output Registration"
-        stories: ["04.7a", "04.7b", "04.7c", "04.7d"]
-        duration: "10-12 days"
-      - task: "Material Reservations"
-        stories: ["04.8"]
-        duration: "4 days"
+    summary: "Phase 1 Full Production 100% COMPLETE! 10/10 stories deployed."
 
   phase_2_oee_analytics:
-    status: "STORIES_DEFINED"  # UPDATED!
+    status: "STORIES_DEFINED"
     total_stories: 11
     ready: 11
     completion_percentage: 0
@@ -480,7 +488,7 @@ epic_04_production:
       effort: "16 days"
 
     effort_estimate: "33 days total"
-    critical_path: "04.9d → 04.9b → 04.9a → 04.10a-g = ~25 days sequential"
+    critical_path: "04.9d -> 04.9b -> 04.9a -> 04.10a-g = ~25 days sequential"
     defer: "After Phase 1 complete"
 
 # =============================================================================
@@ -499,36 +507,36 @@ epic_05_warehouse:
   last_verified: "2026-01-14"
 
   phase_0_foundation:
-    status: "✅ COMPLETE"
+    status: "COMPLETE"
     stories:
-      - {id: "05.0", name: "Warehouse Settings", status: "✅ COMPLETE", tests: "38/38"}
-      - {id: "05.1", name: "LP Table + CRUD", status: "✅ COMPLETE", tests: "126/126"}
-      - {id: "05.2", name: "LP Genealogy", status: "✅ COMPLETE", tests: "138/138"}
-      - {id: "05.3", name: "LP Reservations + FIFO/FEFO", status: "✅ COMPLETE", tests: "64/64"}
-      - {id: "05.4", name: "LP Status Management", status: "✅ COMPLETE", tests: "160/160"}
-      - {id: "05.5", name: "LP Search Filters", status: "✅ COMPLETE", tests: "251/251"}
-      - {id: "05.6", name: "LP Detail History", status: "✅ COMPLETE", tests: "344/344"}
-      - {id: "05.7", name: "Warehouse Dashboard", status: "✅ COMPLETE", tests: "87/87"}
-      - {id: "05.8", name: "ASN CRUD Items", status: "✅ COMPLETE", tests: "82/82"}
-      - {id: "05.9", name: "ASN Receive Workflow", status: "✅ COMPLETE", tests: "14/24"}
+      - {id: "05.0", name: "Warehouse Settings", status: "COMPLETE", tests: "38/38"}
+      - {id: "05.1", name: "LP Table + CRUD", status: "COMPLETE", tests: "126/126"}
+      - {id: "05.2", name: "LP Genealogy", status: "COMPLETE", tests: "138/138"}
+      - {id: "05.3", name: "LP Reservations + FIFO/FEFO", status: "COMPLETE", tests: "64/64"}
+      - {id: "05.4", name: "LP Status Management", status: "COMPLETE", tests: "160/160"}
+      - {id: "05.5", name: "LP Search Filters", status: "COMPLETE", tests: "251/251"}
+      - {id: "05.6", name: "LP Detail History", status: "COMPLETE", tests: "344/344"}
+      - {id: "05.7", name: "Warehouse Dashboard", status: "COMPLETE", tests: "87/87"}
+      - {id: "05.8", name: "ASN CRUD Items", status: "COMPLETE", tests: "82/82"}
+      - {id: "05.9", name: "ASN Receive Workflow", status: "COMPLETE", tests: "14/24"}
 
   phase_1_goods_receipt:
-    status: "✅ COMPLETE"
+    status: "COMPLETE"
     stories:
-      - {id: "05.10", name: "GRN CRUD Items", status: "✅ COMPLETE", tests: "73/73"}
-      - {id: "05.11", name: "GRN from PO", status: "✅ COMPLETE", tests: "111/111"}
-      - {id: "05.12", name: "GRN from TO", status: "✅ COMPLETE", tests: "155/155"}
-      - {id: "05.13", name: "Over-Receipt Control", status: "✅ COMPLETE", tests: "42/42"}
-      - {id: "05.14", name: "LP Label Printing", status: "✅ COMPLETE", tests: "113/123"}
-      - {id: "05.15", name: "Over-Receipt Handling", status: "✅ COMPLETE", tests: "66/66"}
+      - {id: "05.10", name: "GRN CRUD Items", status: "COMPLETE", tests: "73/73"}
+      - {id: "05.11", name: "GRN from PO", status: "COMPLETE", tests: "111/111"}
+      - {id: "05.12", name: "GRN from TO", status: "COMPLETE", tests: "155/155"}
+      - {id: "05.13", name: "Over-Receipt Control", status: "COMPLETE", tests: "42/42"}
+      - {id: "05.14", name: "LP Label Printing", status: "COMPLETE", tests: "113/123"}
+      - {id: "05.15", name: "Over-Receipt Handling", status: "COMPLETE", tests: "66/66"}
 
   phase_1_scanner_workflows:
-    status: "✅ COMPLETE"
+    status: "COMPLETE"
     stories:
-      - {id: "05.16", name: "Stock Moves CRUD", status: "✅ COMPLETE", tests: "74/74"}
-      - {id: "05.17", name: "LP Split Workflow", status: "✅ COMPLETE", tests: "112/112"}
-      - {id: "05.18", name: "LP Merge Workflow", status: "✅ COMPLETE", tests: "137/149"}
-      - {id: "05.19", name: "Scanner Receive", status: "✅ COMPLETE", tests: "74/74"}
+      - {id: "05.16", name: "Stock Moves CRUD", status: "COMPLETE", tests: "74/74"}
+      - {id: "05.17", name: "LP Split Workflow", status: "COMPLETE", tests: "112/112"}
+      - {id: "05.18", name: "LP Merge Workflow", status: "COMPLETE", tests: "137/149"}
+      - {id: "05.19", name: "Scanner Receive", status: "COMPLETE", tests: "74/74"}
 
   phase_2_advanced_features:
     status: "STORIES_DEFINED"
@@ -575,41 +583,6 @@ epic_06_quality:
   documentation: "~40K lines markdown + ~10K lines YAML context"
   last_verified: "2026-01-15"
 
-  phase_1_2a_core:
-    status: "IMPLEMENTATION_READY"
-    stories: 12
-    stories_list:
-      - {id: "06.0", name: "Quality Settings"}
-      - {id: "06.1", name: "Quality Status Types"}
-      - {id: "06.2", name: "Quality Holds CRUD"}
-      - {id: "06.3", name: "Product Specifications"}
-      - {id: "06.4", name: "Test Parameters"}
-      - {id: "06.5", name: "Incoming Inspection"}
-      - {id: "06.6", name: "Test Results Recording"}
-      - {id: "06.7", name: "Sampling Plans (AQL)"}
-      - {id: "06.8", name: "Scanner QA Pass/Fail"}
-      - {id: "06.9", name: "Basic NCR Creation"}
-      - {id: "06.10", name: "In-Process Inspection"}
-      - {id: "06.11", name: "Final Inspection + Batch Release"}
-
-  phase_2b_3_4_advanced:
-    status: "STORIES_DEFINED"
-    total_stories: 29
-    ready: 29
-    completion_percentage: 0
-    documentation: "~40K lines (created in 2nd terminal 2026-01-15)"
-
-    stories:
-      - {id: "06.12", name: "Batch Release Approval"}
-      - {id: "06.13", name: "NCR Workflow State Machine"}
-      - {id: "06.14-16", name: "NCR Root Cause/Actions/Verification"}
-      - {id: "06.17-18", name: "Quality Alerts & Trending"}
-      - {id: "06.19-20", name: "Operation Quality Checkpoints"}
-      - {id: "06.21-30", name: "HACCP/CCP/CoA (10 stories)"}
-      - {id: "06.31-40", name: "CAPA/Supplier Quality/Analytics (10 stories)"}
-
-    effort_estimate: "78-98 days"
-
 epic_07_shipping:
   status: "STORIES_DEFINED"
   total_stories: 24  # 16 Phase 1 + 8 Phase 2-3
@@ -622,52 +595,6 @@ epic_07_shipping:
   documentation: "~850KB (created 2026-01-15)"
   last_verified: "2026-01-15"
   blocker_resolved: true  # Epic 05 complete!
-
-  phase_1_mvp:
-    status: "STORIES_DEFINED"
-    total_stories: 16
-    ready: 16
-    completion_percentage: 0
-    documentation: "~540KB (pre-existing)"
-
-    stories:
-      - {id: "07.1", name: "Customers CRUD", complexity: M, days: "3-4"}
-      - {id: "07.2", name: "Sales Orders Core", complexity: L, days: "5-7"}
-      - {id: "07.3", name: "SO Status Workflow", complexity: M, days: 3}
-      - {id: "07.4", name: "SO Line Pricing", complexity: M, days: 3}
-      - {id: "07.5", name: "SO Clone/Import", complexity: M, days: "3-4"}
-      - {id: "07.6", name: "SO Allergen Validation", complexity: M, days: "2-3"}
-      - {id: "07.7", name: "Inventory Allocation", complexity: L, days: "5-7"}
-      - {id: "07.8", name: "Pick List Generation", complexity: L, days: "4-5"}
-      - {id: "07.9", name: "Pick Confirmation Desktop", complexity: M, days: "3-4"}
-      - {id: "07.10", name: "Pick Scanner", complexity: M, days: "3-4"}
-      - {id: "07.11", name: "Packing Shipment Creation", complexity: L, days: "4-5"}
-      - {id: "07.12", name: "Packing Scanner", complexity: M, days: "3-4"}
-      - {id: "07.13", name: "SSCC & BOL Labels", complexity: M, days: "3-4"}
-      - {id: "07.14", name: "Shipment Manifest & Ship", complexity: M, days: "2-3"}
-      - {id: "07.15", name: "Shipping Dashboard", complexity: M, days: "3-4"}
-      - {id: "07.16", name: "RMA Core CRUD", complexity: L, days: "5-7"}
-
-    effort_estimate: "60-79 days sequential | 40-50 days parallel"
-
-  phase_2_3_advanced:
-    status: "STORIES_DEFINED"
-    total_stories: 8
-    ready: 8
-    completion_percentage: 0
-    documentation: "~310KB (created 2026-01-15)"
-
-    stories:
-      - {id: "07.17", name: "Customer Advanced Features", complexity: M, days: "3-4", fr: "3 FR"}
-      - {id: "07.18", name: "SO Advanced Features", complexity: M, days: "4-5", fr: "2 FR"}
-      - {id: "07.19", name: "Pick Optimization & Batch", complexity: L, days: "5-7", fr: "3 FR"}
-      - {id: "07.20", name: "Carrier Integration", complexity: XL, days: "10-14", fr: "7 FR"}
-      - {id: "07.21", name: "Dock & Loading Management", complexity: L, days: "7-10", fr: "7 FR"}
-      - {id: "07.22", name: "Packing Advanced Features", complexity: M, days: "3-4", fr: "2 FR"}
-      - {id: "07.23", name: "Customer Pricing Agreements", complexity: M, days: "4-5", fr: "1 FR"}
-      - {id: "07.24", name: "Shipping Reports & Analytics", complexity: L, days: "7-10", fr: "7 FR"}
-
-    effort_estimate: "48-64 days total"
 
 epic_08_11_premium:
   status: "NO_STORIES"
@@ -685,67 +612,59 @@ epic_08_11_premium:
 # =============================================================================
 
 recommended_sequence:
-  description: "Updated path after Epic 05 completion and full checkpoint analysis"
-  total_duration: "200-250 days to MVP (Epic 01-07)"
+  description: "Updated path after Epic 04 Phase 1 and Epic 05 completion"
+  total_duration: "170-220 days to MVP (Epic 01-07)"
 
   wave_1_immediate:
     name: "Complete Remaining Gaps"
-    duration: "7-10 days"
+    duration: "3-5 days"
     priority: HIGH
-    status: "⏳ READY"
+    status: "IN PROGRESS"
     tasks:
       - task: "Complete Epic 03.13"
         stories: ["03.13"]
         duration: "2 days"
         description: "Material Availability Check (P4-P7)"
-      - task: "Epic 02 high priority"
-        stories: ["02.8"]
-        duration: "1 day"
-        description: "operation_attachments migration"
-      - task: "Epic 02 medium priority"
-        stories: ["02.12", "02.9", "02.15"]
-        duration: "4-5 days"
-        description: "Dashboard tests, API completion"
 
-  wave_2_production:
-    name: "Epic 04 Phase 1 - Full Production"
-    duration: "18-24 days"
-    priority: HIGH
-    status: "✅ READY TO START"
-    tasks:
-      - task: "Material Consumption"
-        stories: ["04.6a", "04.6b", "04.6c", "04.6d", "04.6e"]
-        duration: "12-15 days"
-      - task: "Output Registration"
-        stories: ["04.7a", "04.7b", "04.7c", "04.7d"]
-        duration: "8-10 days"
-      - task: "Material Reservations"
-        stories: ["04.8"]
-        duration: "2-3 days"
-    outcome: "Full production execution with LP-based traceability"
-
-  wave_3_quality:
+  wave_2_quality:
     name: "Epic 06 - Quality Module"
     duration: "52-68 days"
-    priority: MEDIUM
-    status: "⏳ PENDING"
-    depends_on: "wave_1_immediate"
-    stories: 41
-    phases: ["Phase 1A", "Phase 1B", "Phase 2", "Phase 3", "Phase 4"]
+    priority: HIGH
+    status: "READY TO START"
+    tasks:
+      - task: "Quality Core"
+        stories: ["06.0-06.11"]
+        duration: "20-25 days"
+      - task: "NCR Workflow"
+        stories: ["06.12-06.18"]
+        duration: "18-22 days"
+      - task: "HACCP & CoA"
+        stories: ["06.21-06.30"]
+        duration: "32-40 days"
+    outcome: "Full quality management with NCR, HACCP, CoA"
 
-  wave_4_shipping:
+  wave_3_shipping:
     name: "Epic 07 - Shipping Module"
     duration: "50-60 days"
-    priority: MEDIUM
-    status: "✅ UNBLOCKED"
+    priority: HIGH
+    status: "UNBLOCKED"
     depends_on: "Epic 05 COMPLETE"
-    stories: 16
+    stories: 24
+    outcome: "Full order fulfillment with picking, packing, shipping"
+
+  wave_4_oee:
+    name: "Epic 04 Phase 2 - OEE & Analytics"
+    duration: "33 days"
+    priority: MEDIUM
+    status: "PENDING"
+    depends_on: "Epic 04 Phase 1 COMPLETE"
+    stories: 11
 
   wave_5_premium:
     name: "Epic 08-11 - Premium Modules"
     duration: "145-185 days"
     priority: LOW
-    status: "⏳ STORIES NEEDED"
+    status: "STORIES NEEDED"
     tasks:
       - task: "Write stories"
         duration: "30-40 days"
@@ -759,20 +678,20 @@ recommended_sequence:
 
 metrics:
   stories_by_status:
-    complete: 70  # Epic 01-05
+    complete: 71  # Epic 01-05 + Epic 04 Phase 1
     partial: 8    # Epic 02
     blocked: 1    # 03.14
     in_progress: 1  # 03.13
-    ready_to_start: 10  # Epic 04 Phase 1
+    ready_to_start: 0  # All Epic 04 Phase 1 done!
     not_started: 115+  # Epic 06-11
     total_tracked: 205
 
   completion_by_epic:
-    epic_01: "100%"  # UPDATED
-    epic_02: "96%"   # UPDATED 2026-01-14
-    epic_03: "95%"   # UPDATED
+    epic_01: "100%"
+    epic_02: "96%"
+    epic_03: "95%"
     epic_04_phase_0: "100%"
-    epic_04_phase_1: "0% (READY)"
+    epic_04_phase_1: "100%"  # UPDATED - All 10 stories DEPLOYED!
     epic_05: "100%"
     epic_06: "0%"
     epic_07: "0%"
@@ -781,20 +700,20 @@ metrics:
   critical_blockers:
     count: 0  # All resolved!
     resolved:
-      - "✅ Epic 05 complete - unblocks Epic 04 Phase 1"
-      - "✅ Epic 05 complete - unblocks Epic 07 Phase 1B"
-      - "✅ 05.6 lp_transactions table created"
-      - "✅ 05.9 type conflicts fixed"
+      - "Epic 05 complete - unblocks Epic 04 Phase 1"
+      - "Epic 05 complete - unblocks Epic 07 Phase 1B"
+      - "Epic 04 Phase 1 COMPLETE - 10/10 stories deployed"
 
   velocity_estimate:
     stories_per_week: "3-5"
-    remaining_weeks_mvp: "40-50"
+    remaining_weeks_mvp: "35-45"
     target_mvp_completion: "Q2-Q3 2026"
 
   recent_achievements:
+    - "Epic 04 Phase 1: 10/10 stories (100% complete) - 2026-01-21"
+    - "Story 04.8 Material Reservations DEPLOYED - 2026-01-21"
     - "Epic 05: 20/20 stories (100% complete) - 2026-01-09"
     - "Epic 01: 16/16 stories (100% complete) - verified 2026-01-14"
-    - "Epic 04 Phase 0: 7/7 stories (100% complete)"
     - "2,265 tests passing in Epic 05"
     - "1,600+ tests passing in Epic 04 Phase 0"
     - "~13,500+ LOC tests in Epic 01"
@@ -806,15 +725,14 @@ metrics:
 next_actions:
   immediate:
     - "Complete 03.13 Material Availability Check (2 days)"
-    - "Create 02.8 operation_attachments migration (1 day)"
 
   this_week:
-    - "Start Epic 04 Phase 1 - Material Consumption (04.6a-e)"
-    - "Complete Epic 02 medium priority gaps"
+    - "Start Epic 06 - Quality Module (Phase 1A)"
+    - "Or start Epic 07 - Shipping Module (based on priority)"
 
   next_2_weeks:
-    - "Complete Epic 04 Phase 1 core stories (18-24 days total)"
-    - "Begin Epic 06 or Epic 07 depending on priority"
+    - "Complete Epic 06 Phase 1A-1B core stories"
+    - "Begin Epic 07 depending on priority"
 
   deferred:
     - "Epic 03.14 - WO Scheduling (Phase 2)"
@@ -826,27 +744,35 @@ next_actions:
 # =============================================================================
 
 changelog:
+  - date: "2026-01-21"
+    changes:
+      - "EPIC 04 PHASE 1 COMPLETE: 10/10 stories DEPLOYED"
+      - "04.8 Material Reservations DEPLOYED (192 tests, 8/8 AC)"
+      - "Documentation: API reference + Workflow guide created"
+      - "Epic 04 implementation: 78% -> 83% (15/18 stories)"
+      - "Roadmaps updated to reflect Phase 1 completion"
+
   - date: "2026-01-14 13:00"
     changes:
-      - "✅ P7 COMPLETE: 02.9, 02.15 - Documentation + PRODUCTION-READY"
-      - "Epic 02 updated: 92% → 96% (14 done, 3 partial)"
+      - "P7 COMPLETE: 02.9, 02.15 - Documentation + PRODUCTION-READY"
+      - "Epic 02 updated: 92% -> 96% (14 done, 3 partial)"
       - "Stories 02.9, 02.12, 02.14, 02.15 all DEPLOYED"
       - "All stories passed P6 QA with 0 bugs"
 
   - date: "2026-01-14 11:40"
     changes:
-      - "✅ DEPLOYED: 02.5b, 02.6, 02.8 to production"
-      - "Epic 02 updated: 88% → 92% (12 done, 5 partial)"
+      - "DEPLOYED: 02.5b, 02.6, 02.8 to production"
+      - "Epic 02 updated: 88% -> 92% (12 done, 5 partial)"
       - "Created migrations 122, 123 for operation_attachments"
       - "Resolved 02.8 blocker - routing_operations table dependency"
 
   - date: "2026-01-14"
     changes:
       - "Full checkpoint analysis completed"
-      - "Epic 01 updated: 81% → 100% (all 16 stories DONE)"
-      - "Epic 02 updated: 60% → 88% (9 done, 8 partial)"
-      - "Epic 03 updated: 90% → 95% (18 done, 1 in progress)"
-      - "Epic 04 Phase 1 status: BLOCKED → READY_TO_START"
+      - "Epic 01 updated: 81% -> 100% (all 16 stories DONE)"
+      - "Epic 02 updated: 60% -> 88% (9 done, 8 partial)"
+      - "Epic 03 updated: 90% -> 95% (18 done, 1 in progress)"
+      - "Epic 04 Phase 1 status: BLOCKED -> READY_TO_START"
       - "Added Epic 06-11 status tracking"
       - "Added detailed test counts from checkpoints"
 

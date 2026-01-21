@@ -17,6 +17,7 @@
  */
 
 import { createServerSupabase } from '@/lib/supabase/server'
+import { WOReservationService } from '@/lib/services/wo-reservation-service'
 
 export type WOCompleteErrorCode =
   | 'NOT_FOUND'
@@ -294,9 +295,18 @@ export async function completeWorkOrder(
   const producedQty = Number(wo.produced_quantity) || 0
   const actualYieldPercent = calculateYieldPercent(producedQty, plannedQty)
 
-  // AC-11: Material reservation release placeholder
-  // Phase 0: Just log, actual release in Phase 1 (Story 04.6a)
-  console.log(`Material reservation release skipped - Epic 05 required (WO: ${wo.wo_number})`)
+  // AC-11 (Story 04.8): Release all active material reservations on WO completion
+  // Release LP reservations - status='active' -> 'released', set released_at timestamp
+  let releasedReservationsCount = 0
+  try {
+    releasedReservationsCount = await WOReservationService.releaseAllWOReservations(woId)
+    if (releasedReservationsCount > 0) {
+      console.log(`Released ${releasedReservationsCount} material reservations for WO: ${wo.wo_number}`)
+    }
+  } catch (releaseError) {
+    // Log but don't fail WO completion if reservation release fails
+    console.error(`Failed to release reservations for WO ${wo.wo_number}:`, releaseError)
+  }
 
   // AC-1: Update WO status with optimistic locking
   const { error: updateError } = await supabase
@@ -440,16 +450,22 @@ export async function checkAutoComplete(
 }
 
 /**
- * Release material reservations (placeholder for Phase 1)
- * Will be implemented in Story 04.6a when LP system is available
+ * Release material reservations for a Work Order (Story 04.8 AC-5)
+ * Releases all active LP reservations: status='active' -> 'released'
+ * Updates released_at timestamp
  *
  * @param woId Work order ID
- * @param orgId Organization ID
+ * @param _orgId Organization ID (unused, retained for backward compatibility)
+ * @returns Number of reservations released
  */
 export async function releaseMaterialReservations(
   woId: string,
-  orgId: string,
-): Promise<void> {
-  // Phase 0: Just log, no actual implementation
-  console.log(`Material reservation release skipped - Epic 05 required (WO: ${woId}, Org: ${orgId})`)
+  _orgId: string,
+): Promise<number> {
+  try {
+    return await WOReservationService.releaseAllWOReservations(woId)
+  } catch (error) {
+    console.error(`Failed to release material reservations for WO ${woId}:`, error)
+    return 0
+  }
 }
