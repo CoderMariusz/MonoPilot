@@ -597,11 +597,7 @@ export class PurchaseOrderService {
         *,
         suppliers(id, code, name, currency),
         warehouses(id, code, name),
-        tax_code:tax_codes(id, code, rate),
-        lines:purchase_order_lines(
-          *,
-          product:products(id, code, name, base_uom)
-        )
+        tax_code:tax_codes(id, code, rate)
       `)
       .eq('id', id)
       .eq('org_id', orgId)
@@ -611,7 +607,25 @@ export class PurchaseOrderService {
       return null
     }
 
-    return data as unknown as PurchaseOrderWithLines
+    // Fetch lines separately to avoid relationship detection issues
+    const { data: lines, error: linesError } = await supabaseAdmin
+      .from('purchase_order_lines')
+      .select(`
+        *,
+        product:products(id, code, name, base_uom)
+      `)
+      .eq('po_id', id)
+      .order('line_number', { ascending: true })
+
+    if (linesError) {
+      console.error('Error fetching PO lines:', linesError)
+    }
+
+    // Combine PO with lines
+    return {
+      ...data,
+      lines: lines || []
+    } as unknown as PurchaseOrderWithLines
   }
 
   /**
@@ -878,13 +892,10 @@ export class PurchaseOrderService {
   ): Promise<ServiceResult> {
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Get PO with line count
+    // Get PO
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
-      .select(`
-        id, status, org_id,
-        lines:purchase_order_lines(id)
-      `)
+      .select('id, status, org_id')
       .eq('id', id)
       .single()
 
@@ -913,9 +924,23 @@ export class PurchaseOrderService {
       }
     }
 
+    // Query lines separately to avoid relationship detection issues
+    const { data: lines, error: linesError } = await supabaseAdmin
+      .from('purchase_order_lines')
+      .select('id')
+      .eq('po_id', id)
+
+    if (linesError) {
+      console.error('Error fetching PO lines:', linesError)
+      return {
+        success: false,
+        error: 'Error checking purchase order lines',
+        code: 'DATABASE_ERROR',
+      }
+    }
+
     // Must have lines
-    const lines = (po as any).lines || []
-    if (lines.length === 0) {
+    if (!lines || lines.length === 0) {
       return {
         success: false,
         error: 'Cannot submit PO without line items',
@@ -1052,10 +1077,7 @@ export class PurchaseOrderService {
 
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
-      .select(`
-        id, status, org_id,
-        lines:purchase_order_lines(id, received_qty)
-      `)
+      .select('id, status, org_id')
       .eq('id', id)
       .single()
 
@@ -1084,9 +1106,23 @@ export class PurchaseOrderService {
       }
     }
 
+    // Query lines separately to check for receipts
+    const { data: lines, error: linesError } = await supabaseAdmin
+      .from('purchase_order_lines')
+      .select('id, received_qty')
+      .eq('po_id', id)
+
+    if (linesError) {
+      console.error('Error fetching PO lines:', linesError)
+      return {
+        success: false,
+        error: 'Error checking purchase order lines',
+        code: 'DATABASE_ERROR',
+      }
+    }
+
     // Check for receipts
-    const lines = (po as any).lines || []
-    const hasReceipts = lines.some((line: any) => line.received_qty > 0)
+    const hasReceipts = (lines || []).some((line: any) => line.received_qty > 0)
     if (hasReceipts) {
       return {
         success: false,
@@ -1697,13 +1733,12 @@ export async function submitPO(
 ): Promise<SubmitPOResult> {
   const supabaseAdmin = createServerSupabaseAdmin()
 
-  // Get PO with lines
+  // Get PO
   const { data: po, error: poError } = await supabaseAdmin
     .from('purchase_orders')
     .select(`
       id, status, total, org_id, created_by, po_number,
-      suppliers(name),
-      lines:purchase_order_lines(id)
+      suppliers(name)
     `)
     .eq('id', poId)
     .eq('org_id', orgId)
@@ -1723,9 +1758,19 @@ export async function submitPO(
     throw new Error('Cannot submit: PO must be in draft status')
   }
 
+  // Query lines separately to avoid relationship detection issues
+  const { data: lines, error: linesError } = await supabaseAdmin
+    .from('purchase_order_lines')
+    .select('id')
+    .eq('po_id', poId)
+
+  if (linesError) {
+    console.error('Error fetching PO lines:', linesError)
+    throw new Error('Error checking purchase order lines')
+  }
+
   // Must have at least one line
-  const lines = (po as any).lines || []
-  if (lines.length === 0) {
+  if (!lines || lines.length === 0) {
     throw new Error('Cannot submit PO: Purchase order must have at least one line item')
   }
 

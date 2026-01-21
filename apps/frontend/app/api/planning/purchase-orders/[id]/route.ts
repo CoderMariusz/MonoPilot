@@ -42,17 +42,13 @@ export async function GET(
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // AC-1.6: Fetch PO with supplier, warehouse, and lines
+    // AC-1.6: Fetch PO with supplier, warehouse
     const { data, error } = await supabaseAdmin
       .from('purchase_orders')
       .select(`
         *,
         suppliers(id, code, name, currency, payment_terms, tax_code_id),
-        warehouses(id, code, name),
-        lines:purchase_order_lines(
-          *,
-          products(id, code, name, base_uom)
-        )
+        warehouses(id, code, name)
       `)
       .eq('id', id)
       .eq('org_id', currentUser.org_id)
@@ -62,7 +58,27 @@ export async function GET(
       return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ purchase_order: data })
+    // Fetch lines separately to avoid relationship detection issues
+    const { data: lines, error: linesError } = await supabaseAdmin
+      .from('purchase_order_lines')
+      .select(`
+        *,
+        products(id, code, name, base_uom)
+      `)
+      .eq('po_id', id)
+      .order('line_number', { ascending: true })
+
+    if (linesError) {
+      console.error('Error fetching PO lines:', linesError)
+    }
+
+    // Combine PO with lines
+    const poWithLines = {
+      ...data,
+      lines: lines || []
+    }
+
+    return NextResponse.json({ purchase_order: poWithLines })
   } catch (error) {
     console.error('Error in GET /api/planning/purchase-orders/:id:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -728,25 +728,14 @@ export class POBulkService {
 
     const supabase = createServerSupabaseAdmin()
 
-    // Build query
+    // Build query - fetch POs first, then lines separately
     let query = supabase
       .from('purchase_orders')
       .select(
         `
         *,
         suppliers (id, code, name),
-        warehouses (id, code, name),
-        po_lines (
-          id,
-          sequence,
-          quantity,
-          uom,
-          unit_price,
-          discount_percent,
-          line_total,
-          expected_delivery_date,
-          products (id, code, name)
-        )
+        warehouses (id, code, name)
       `
       )
       .eq('org_id', orgId)
@@ -786,6 +775,39 @@ export class POBulkService {
       throw new Error('EXPORT_LIMIT_EXCEEDED')
     }
 
+    // Fetch lines separately for all POs
+    const poIdList = pos.map(po => po.id)
+    const { data: allLines, error: linesError } = await supabase
+      .from('purchase_order_lines')
+      .select(`
+        id,
+        po_id,
+        line_number,
+        quantity,
+        uom,
+        unit_price,
+        discount_percent,
+        line_total,
+        expected_delivery_date,
+        products (id, code, name)
+      `)
+      .in('po_id', poIdList)
+      .order('line_number', { ascending: true })
+
+    if (linesError) {
+      console.error('Error fetching PO lines for export:', linesError)
+      throw new Error('DATABASE_ERROR')
+    }
+
+    // Group lines by PO ID
+    const linesByPoId = (allLines || []).reduce((acc, line) => {
+      if (!acc[line.po_id]) {
+        acc[line.po_id] = []
+      }
+      acc[line.po_id].push(line)
+      return acc
+    }, {} as Record<string, any[]>)
+
     // Create workbook with 3 sheets
     const workbook = ExcelService.createWorkbook()
 
@@ -801,7 +823,7 @@ export class POBulkService {
       'Subtotal': po.subtotal,
       'Tax Amount': po.tax_amount,
       'Total': po.total,
-      'Lines Count': (po.po_lines as any[])?.length || 0,
+      'Lines Count': (linesByPoId[po.id] || []).length,
       'Payment Terms': po.payment_terms || '',
       'Created At': po.created_at,
     }))
@@ -811,12 +833,12 @@ export class POBulkService {
     // Sheet 2: Lines
     const linesData: Record<string, unknown>[] = []
     for (const po of pos) {
-      const lines = po.po_lines as any[] || []
+      const lines = linesByPoId[po.id] || []
       for (const line of lines) {
         linesData.push({
           'PO Number': po.po_number,
           'Supplier': (po.suppliers as any)?.name || '',
-          'Line #': line.sequence,
+          'Line #': line.line_number,
           'Product Code': line.products?.code || '',
           'Product Name': line.products?.name || '',
           'Quantity': line.quantity,

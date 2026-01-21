@@ -586,12 +586,7 @@ export class POStatusService {
     // Get PO details
     const { data: po } = await supabaseAdmin
       .from('purchase_orders')
-      .select(
-        `
-        id, status, org_id, total,
-        lines:purchase_order_lines(id)
-      `
-      )
+      .select('id, status, org_id, total')
       .eq('id', poId)
       .eq('org_id', orgId)
       .single()
@@ -631,14 +626,26 @@ export class POStatusService {
     }
 
     // Business rule: Cannot submit without lines
-    const lines = (po as any).lines || []
-    if (
-      (toStatusCode === 'submitted' || toStatusCode === 'pending_approval') &&
-      lines.length === 0
-    ) {
-      return {
-        valid: false,
-        reason: 'Cannot submit PO without line items',
+    if (toStatusCode === 'submitted' || toStatusCode === 'pending_approval') {
+      // Query lines separately to avoid relationship detection issues
+      const { data: lines, error: linesError } = await supabaseAdmin
+        .from('purchase_order_lines')
+        .select('id')
+        .eq('po_id', poId)
+
+      if (linesError) {
+        console.error('Error fetching PO lines:', linesError)
+        return {
+          valid: false,
+          reason: 'Error checking purchase order lines',
+        }
+      }
+
+      if (!lines || lines.length === 0) {
+        return {
+          valid: false,
+          reason: 'Cannot submit PO without line items',
+        }
       }
     }
 

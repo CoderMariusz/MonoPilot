@@ -413,8 +413,7 @@ export class ScannerReceiveService {
         po_number,
         expected_delivery_date,
         status,
-        supplier:suppliers(name),
-        lines:purchase_order_lines(quantity, received_qty)
+        supplier:suppliers(name)
       `)
       .in('status', RECEIVABLE_STATUSES)
 
@@ -430,18 +429,42 @@ export class ScannerReceiveService {
       throw new Error(`Failed to fetch pending receipts: ${error.message}`)
     }
 
-    return (data || []).map((po) => {
-      const lines = po.lines || []
+    if (!data || data.length === 0) {
+      return []
+    }
+
+    // Fetch lines separately for all POs
+    const poIds = data.map(po => po.id)
+    const { data: allLines, error: linesError } = await supabase
+      .from('purchase_order_lines')
+      .select('po_id, quantity, received_qty')
+      .in('po_id', poIds)
+
+    if (linesError) {
+      console.error('Error fetching PO lines:', linesError)
+    }
+
+    // Group lines by PO ID
+    const linesByPoId = (allLines || []).reduce((acc, line) => {
+      if (!acc[line.po_id]) {
+        acc[line.po_id] = []
+      }
+      acc[line.po_id].push(line)
+      return acc
+    }, {} as Record<string, { quantity: number; received_qty: number }[]>)
+
+    return data.map((po) => {
+      const lines = linesByPoId[po.id] || []
       const linesTotal = lines.length
       const linesPending = lines.filter(
-        (l: { quantity: number; received_qty: number }) => l.received_qty < l.quantity
+        (l) => l.received_qty < l.quantity
       ).length
       const totalQtyOrdered = lines.reduce(
-        (sum: number, l: { quantity: number }) => sum + l.quantity,
+        (sum, l) => sum + l.quantity,
         0
       )
       const totalQtyReceived = lines.reduce(
-        (sum: number, l: { received_qty: number }) => sum + l.received_qty,
+        (sum, l) => sum + l.received_qty,
         0
       )
 
@@ -467,15 +490,7 @@ export class ScannerReceiveService {
       .from('purchase_orders')
       .select(`
         *,
-        supplier:suppliers(id, name),
-        lines:purchase_order_lines(
-          id,
-          product_id,
-          quantity,
-          received_qty,
-          uom,
-          product:products(name, code)
-        )
+        supplier:suppliers(id, name)
       `)
       .or(`po_number.eq.${barcode},id.eq.${barcode}`)
       .single()
@@ -484,7 +499,28 @@ export class ScannerReceiveService {
       return null
     }
 
-    return data as PurchaseOrder
+    // Fetch lines separately to avoid relationship detection issues
+    const { data: lines, error: linesError } = await supabase
+      .from('purchase_order_lines')
+      .select(`
+        id,
+        product_id,
+        quantity,
+        received_qty,
+        uom,
+        product:products(name, code)
+      `)
+      .eq('po_id', data.id)
+      .order('line_number', { ascending: true })
+
+    if (linesError) {
+      console.error('Error fetching PO lines:', linesError)
+    }
+
+    return {
+      ...data,
+      lines: lines || []
+    } as PurchaseOrder
   }
 
   /**
