@@ -7,7 +7,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Package, Factory, CheckCircle2, MapPin, ArrowRightLeft } from 'lucide-react'
+import { Package, Factory, CheckCircle2, MapPin, ArrowRightLeft, ClipboardList, BoxesIcon } from 'lucide-react'
 
 export const metadata = {
   title: 'Scanner Workflows | MonoPilot',
@@ -51,6 +51,18 @@ const workflows: WorkflowCard[] = [
     description: 'Register finished goods from production. Create new license plates and record output quantities.',
     href: '/scanner/output',
     icon: <CheckCircle2 className="h-12 w-12 text-green-600" />,
+  },
+  {
+    title: 'Pick Order',
+    description: 'Pick items for sales orders using FIFO/FEFO suggestions. Scan locations and LPs to confirm picks.',
+    href: '/scanner/shipping/pick',
+    icon: <ClipboardList className="h-12 w-12 text-indigo-600" />,
+  },
+  {
+    title: 'Pack Shipment',
+    description: 'Pack picked items into boxes for shipping. Scan items, manage boxes, and verify allergen compliance.',
+    href: '/scanner/pack',
+    icon: <BoxesIcon className="h-12 w-12 text-amber-600" />,
   },
 ]
 

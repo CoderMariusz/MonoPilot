@@ -28,7 +28,21 @@ export const SYSTEM_ROLES = [
 ] as const
 
 /**
+ * Warehouse elevated roles - can perform warehouse operations across the organization
+ * Used for pick list management, inventory operations, and shipping workflows
+ */
+export const WAREHOUSE_ELEVATED_ROLES = [
+  'warehouse',
+  'warehouse_manager',
+  'manager',
+  'admin',
+  'owner',
+  'super_admin',
+] as const
+
+/**
  * Type helpers for role codes
  */
 export type AdminRole = (typeof ADMIN_ROLES)[number]
 export type SystemRole = (typeof SYSTEM_ROLES)[number]
+export type WarehouseElevatedRole = (typeof WAREHOUSE_ELEVATED_ROLES)[number]

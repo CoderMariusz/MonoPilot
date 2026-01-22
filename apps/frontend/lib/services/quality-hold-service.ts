@@ -85,7 +85,7 @@ export interface CreateHoldResponse {
     lp_id: string
     lp_number: string
     previous_status: string
-    new_status: 'HOLD'
+    new_status: 'hold'
   }>
 }
 
@@ -105,7 +105,7 @@ export interface ReleaseHoldResponse {
   lp_updates?: Array<{
     lp_id: string
     lp_number: string
-    previous_status: 'HOLD'
+    previous_status: 'hold'
     new_status: string
     disposition_action: string
   }>
@@ -286,8 +286,8 @@ export async function createHold(
 
   if (itemsError) throw new Error(`Failed to create hold items: ${itemsError.message}`)
 
-  // Update LP qa_status to HOLD for all LP items
-  const lpUpdates: Array<{ lp_id: string; lp_number: string; previous_status: string; new_status: 'HOLD' }> = []
+  // Update LP qa_status to hold for all LP items
+  const lpUpdates: Array<{ lp_id: string; lp_number: string; previous_status: string; new_status: 'hold' }> = []
 
   if (lpItems.length > 0) {
     // Get current LP statuses
@@ -301,13 +301,13 @@ export async function createHold(
         lpUpdates.push({
           lp_id: lp.id,
           lp_number: lp.lp_number,
-          previous_status: lp.qa_status,
-          new_status: 'HOLD',
+          previous_status: (lp.qa_status as string).toLowerCase(),
+          new_status: 'hold',
         })
       }
     }
 
-    // Update LP qa_status to HOLD
+    // Update LP qa_status to HOLD (database uses uppercase enum)
     const { error: lpUpdateError } = await supabase
       .from('license_plates')
       .update({ qa_status: 'HOLD', updated_at: new Date().toISOString() })
@@ -450,32 +450,39 @@ export async function releaseHold(
     .eq('reference_type', 'lp')
 
   // Determine new LP qa_status based on disposition
-  let newQaStatus: string
+  // Database uses UPPERCASE enum, API response uses lowercase
+  let dbQaStatus: string
+  let apiQaStatus: string
   let setQuantityZero = false
 
   switch (disposition) {
     case 'release':
-      newQaStatus = 'PASSED'
+      dbQaStatus = 'PASSED'
+      apiQaStatus = 'passed'
       break
     case 'rework':
-      newQaStatus = 'PENDING'
+      dbQaStatus = 'PENDING'
+      apiQaStatus = 'pending'
       break
     case 'scrap':
-      newQaStatus = 'FAILED'
+      dbQaStatus = 'FAILED'
+      apiQaStatus = 'failed'
       setQuantityZero = true
       break
     case 'return':
-      newQaStatus = 'FAILED'
+      dbQaStatus = 'FAILED'
+      apiQaStatus = 'failed'
       break
     default:
-      newQaStatus = 'PENDING'
+      dbQaStatus = 'PENDING'
+      apiQaStatus = 'pending'
   }
 
   // Update LP statuses
   const lpUpdates: Array<{
     lp_id: string
     lp_number: string
-    previous_status: 'HOLD'
+    previous_status: 'hold'
     new_status: string
     disposition_action: string
   }> = []
@@ -494,16 +501,16 @@ export async function releaseHold(
         lpUpdates.push({
           lp_id: lp.id,
           lp_number: lp.lp_number,
-          previous_status: 'HOLD',
-          new_status: newQaStatus,
+          previous_status: 'hold',
+          new_status: apiQaStatus,
           disposition_action: disposition,
         })
       }
     }
 
-    // Update LP qa_status
+    // Update LP qa_status (database uses uppercase enum)
     const updateData: Record<string, unknown> = {
-      qa_status: newQaStatus,
+      qa_status: dbQaStatus,
       updated_at: new Date().toISOString(),
     }
 
