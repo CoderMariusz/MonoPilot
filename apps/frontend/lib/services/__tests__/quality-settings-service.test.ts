@@ -15,11 +15,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as QualitySettingsService from '../quality-settings-service';
 import { DEFAULT_QUALITY_SETTINGS } from '@/lib/validation/quality-settings';
+import { createServerSupabase } from '@/lib/supabase/server';
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: vi.fn(),
 }));
+
+const mockedCreateServerSupabase = vi.mocked(createServerSupabase);
 
 describe('Quality Settings Service', () => {
   let mockSupabase: any;
@@ -36,6 +39,8 @@ describe('Quality Settings Service', () => {
       eq: vi.fn(() => mockSupabase),
       single: vi.fn(),
     };
+    // Connect the mock to return mockSupabase
+    mockedCreateServerSupabase.mockResolvedValue(mockSupabase);
   });
 
   afterEach(() => {

@@ -1,15 +1,15 @@
 # MonoPilot - Implementation Roadmap
 # Generated: 2026-01-14 21:45 UTC
 # Purpose: Unified roadmap for remaining implementation work across all epics
-# Last checkpoint scan: 2026-01-21 (UPDATED - Epic 04 Phase 1: 10/10 = 100%)
+# Last checkpoint scan: 2026-01-22 (UPDATED - Epic 07: 07.1 Customers CRUD DEPLOYED)
 
 meta:
   generated: "2026-01-14 21:45 UTC"
-  last_updated: "2026-01-21"
+  last_updated: "2026-01-22"
   scan_method: "Direct checkpoint file analysis + Epic 01-03 gap analysis + ORCHESTRATOR"
   total_epics: 11
   total_stories_tracked: 235  # Core (106) + Quality (41) + Shipping (16) + Premium (68-97)
-  stories_added_today: 1  # 04.8 Material Reservations DEPLOYED
+  stories_added_today: 1  # 07.1 Customers CRUD DEPLOYED
 
 # =============================================================================
 # EXECUTIVE SUMMARY
@@ -17,12 +17,12 @@ meta:
 
 summary:
   overall_completion: "~89%"  # Epic 01-05 (98/116 stories implemented)
-  stories_complete: 98  # +1 from 04.8
+  stories_complete: 99  # +1 from 07.1
   stories_partial: 1  # 03.13
   stories_blocked: 1  # 03.14
-  stories_not_started: 16  # 10 Epic 01 + 6 Epic 02 Phase 2-3
+  stories_not_started: 15  # 10 Epic 01 + 6 Epic 02 Phase 2-3 - 1
 
-  # UPDATED based on 04.8 deployment 2026-01-21
+  # UPDATED based on 07.1 deployment 2026-01-22
   by_epic:
     epic_01_settings:
       total: 26  # 16 MVP + 10 Phase 1B-3
@@ -85,12 +85,15 @@ summary:
       status: "NOT_STARTED"
 
     epic_07_shipping:
-      total: 16
-      complete: 0
-      stories_documented: 16
-      percent: "0%"
-      status: "NOT_STARTED"
+      total: 24  # 16 Phase 1 + 8 Phase 2-3
+      complete: 4  # 07.1 + 07.2 + 07.4 + 07.5 DEPLOYED
+      not_started: 20
+      percent_implementation: "17%"
+      percent_definition: "100%"
+      status: "IN_PROGRESS"
       blocker_resolved: true  # Epic 05 complete!
+      last_deployment: "2026-01-22"
+      note: "07.1 Customers CRUD + 07.2 Sales Orders + 07.4 Pricing + 07.5 Clone/Import DEPLOYED"
 
     epic_08_npd:
       total_estimated: "15-20"
@@ -125,7 +128,7 @@ summary:
 # =============================================================================
 
 critical_path:
-  description: "Epic 04 Phase 1 COMPLETE! Epic 05 COMPLETE! Ready for Epic 06-07"
+  description: "Epic 04 Phase 1 COMPLETE! Epic 05 COMPLETE! Epic 07 IN PROGRESS!"
   total_days: "~100-130 days to full MVP (Epic 01-07)"
 
   steps:
@@ -154,6 +157,20 @@ critical_path:
         - "Epic 04 Phase 1: 10/10 stories = 100% COMPLETE!"
 
     - step: 3
+      name: "Epic 07 Shipping (IN PROGRESS)"
+      duration: "46-61 days remaining"
+      status: "IN PROGRESS"
+      started_date: "2026-01-22"
+      tasks:
+        - "07.1 Customers CRUD DEPLOYED (2026-01-22)"
+        - "07.2 Sales Orders Core DEPLOYED (2026-01-22)"
+        - "07.4 SO Line Pricing DEPLOYED (2026-01-22)"
+        - "07.5 SO Clone/Import DEPLOYED (2026-01-22)"
+        - "07.3, 07.6-07.16 remaining"
+      deliverables:
+        - "Epic 07: 4/24 stories deployed, 20 remaining"
+
+    - step: 4
       name: "Complete Epic 03.13 (Material Availability)"
       duration: "2 days"
       status: "IN PROGRESS"
@@ -162,20 +179,13 @@ critical_path:
       deliverables:
         - "Epic 03: 95% -> 100% complete (19/20)"
 
-    - step: 4
+    - step: 5
       name: "Epic 06 - Quality Module"
       duration: "52-68 days"
       status: "PENDING"
       depends_on: "Epic 04 Phase 1 COMPLETE"
       stories: 41
       phases: ["Phase 1A", "Phase 1B", "Phase 2", "Phase 3", "Phase 4"]
-
-    - step: 5
-      name: "Epic 07 - Shipping Module"
-      duration: "50-60 days"
-      status: "UNBLOCKED"
-      depends_on: "Epic 05 COMPLETE"
-      stories: 24
 
 # =============================================================================
 # EPIC 01 - SETTINGS (100% Story Definition, 62% Implementation)
@@ -584,17 +594,23 @@ epic_06_quality:
   last_verified: "2026-01-15"
 
 epic_07_shipping:
-  status: "STORIES_DEFINED"
+  status: "IN_PROGRESS"
   total_stories: 24  # 16 Phase 1 + 8 Phase 2-3
-  complete: 0
-  not_started: 24
-  completion_percentage_implementation: 0
+  complete: 4  # 07.1 + 07.2 + 07.4 + 07.5 DEPLOYED
+  not_started: 20
+  completion_percentage_implementation: 17
   completion_percentage_definition: 100
   prd_complete: true
   architecture_complete: true
-  documentation: "~850KB (created 2026-01-15)"
-  last_verified: "2026-01-15"
+  documentation: "~850KB (created 2026-01-15) + API/Guide docs"
+  last_verified: "2026-01-22"
   blocker_resolved: true  # Epic 05 complete!
+
+  deployed_stories:
+    - {id: "07.1", name: "Customers CRUD", status: DEPLOYED, deployed: "2026-01-22", tests: 136, ac: "10/10"}
+    - {id: "07.2", name: "Sales Orders Core", status: DEPLOYED, deployed: "2026-01-22", tests: 287, ac: "12/12"}
+    - {id: "07.4", name: "SO Line Pricing", status: DEPLOYED, deployed: "2026-01-22", tests: 87, ac: "12/12"}
+    - {id: "07.5", name: "SO Clone/Import", status: DEPLOYED, deployed: "2026-01-22", tests: 106, ac: "11/11"}
 
 epic_08_11_premium:
   status: "NO_STORIES"
@@ -613,7 +629,7 @@ epic_08_11_premium:
 
 recommended_sequence:
   description: "Updated path after Epic 04 Phase 1 and Epic 05 completion"
-  total_duration: "170-220 days to MVP (Epic 01-07)"
+  total_duration: "160-205 days to MVP (Epic 01-07)"
 
   wave_1_immediate:
     name: "Complete Remaining Gaps"
@@ -626,7 +642,23 @@ recommended_sequence:
         duration: "2 days"
         description: "Material Availability Check (P4-P7)"
 
-  wave_2_quality:
+  wave_2_shipping:
+    name: "Epic 07 - Shipping Module (IN PROGRESS)"
+    duration: "46-61 days remaining"
+    priority: HIGH
+    status: "IN PROGRESS"
+    depends_on: "Epic 05 COMPLETE"
+    stories: 24
+    complete: 4
+    remaining: 20
+    outcome: "Full order fulfillment with picking, packing, shipping"
+    recent_deployments:
+      - "07.1 Customers CRUD (2026-01-22)"
+      - "07.2 Sales Orders Core (2026-01-22)"
+      - "07.4 SO Line Pricing (2026-01-22)"
+      - "07.5 SO Clone/Import (2026-01-22)"
+
+  wave_3_quality:
     name: "Epic 06 - Quality Module"
     duration: "52-68 days"
     priority: HIGH
@@ -642,15 +674,6 @@ recommended_sequence:
         stories: ["06.21-06.30"]
         duration: "32-40 days"
     outcome: "Full quality management with NCR, HACCP, CoA"
-
-  wave_3_shipping:
-    name: "Epic 07 - Shipping Module"
-    duration: "50-60 days"
-    priority: HIGH
-    status: "UNBLOCKED"
-    depends_on: "Epic 05 COMPLETE"
-    stories: 24
-    outcome: "Full order fulfillment with picking, packing, shipping"
 
   wave_4_oee:
     name: "Epic 04 Phase 2 - OEE & Analytics"
@@ -678,12 +701,12 @@ recommended_sequence:
 
 metrics:
   stories_by_status:
-    complete: 71  # Epic 01-05 + Epic 04 Phase 1
+    complete: 75  # Epic 01-05 + Epic 04 Phase 1 + Epic 07 (4)
     partial: 8    # Epic 02
     blocked: 1    # 03.14
     in_progress: 1  # 03.13
     ready_to_start: 0  # All Epic 04 Phase 1 done!
-    not_started: 115+  # Epic 06-11
+    not_started: 111+  # Epic 06-11 (minus 4 from Epic 07)
     total_tracked: 205
 
   completion_by_epic:
@@ -694,7 +717,7 @@ metrics:
     epic_04_phase_1: "100%"  # UPDATED - All 10 stories DEPLOYED!
     epic_05: "100%"
     epic_06: "0%"
-    epic_07: "0%"
+    epic_07: "17%"  # UPDATED - 4/24 stories DEPLOYED!
     epic_08_11: "0% (NO STORIES)"
 
   critical_blockers:
@@ -703,20 +726,21 @@ metrics:
       - "Epic 05 complete - unblocks Epic 04 Phase 1"
       - "Epic 05 complete - unblocks Epic 07 Phase 1B"
       - "Epic 04 Phase 1 COMPLETE - 10/10 stories deployed"
+      - "Epic 07 Customers CRUD - unblocks Sales Orders"
 
   velocity_estimate:
     stories_per_week: "3-5"
-    remaining_weeks_mvp: "35-45"
+    remaining_weeks_mvp: "32-41"
     target_mvp_completion: "Q2-Q3 2026"
 
   recent_achievements:
+    - "Story 07.1 Customers CRUD DEPLOYED - 2026-01-22"
+    - "Story 07.2 Sales Orders Core DEPLOYED - 2026-01-22"
+    - "Story 07.4 SO Line Pricing DEPLOYED - 2026-01-22"
+    - "Story 07.5 SO Clone/Import DEPLOYED - 2026-01-22"
     - "Epic 04 Phase 1: 10/10 stories (100% complete) - 2026-01-21"
-    - "Story 04.8 Material Reservations DEPLOYED - 2026-01-21"
     - "Epic 05: 20/20 stories (100% complete) - 2026-01-09"
     - "Epic 01: 16/16 stories (100% complete) - verified 2026-01-14"
-    - "2,265 tests passing in Epic 05"
-    - "1,600+ tests passing in Epic 04 Phase 0"
-    - "~13,500+ LOC tests in Epic 01"
 
 # =============================================================================
 # NEXT ACTIONS
@@ -725,14 +749,17 @@ metrics:
 next_actions:
   immediate:
     - "Complete 03.13 Material Availability Check (2 days)"
+    - "Continue Epic 07 - 07.3 SO Status Workflow"
 
   this_week:
-    - "Start Epic 06 - Quality Module (Phase 1A)"
-    - "Or start Epic 07 - Shipping Module (based on priority)"
+    - "07.3 SO Status Workflow (3 days)"
+    - "07.6 SO Allergen Validation (2-3 days)"
+    - "Start Epic 06 - Quality Module (Phase 1A) if parallel"
 
   next_2_weeks:
-    - "Complete Epic 06 Phase 1A-1B core stories"
-    - "Begin Epic 07 depending on priority"
+    - "07.7 Inventory Allocation (5-7 days)"
+    - "07.8 Pick List Generation (4-5 days)"
+    - "Continue Epic 06 Phase 1A-1B core stories"
 
   deferred:
     - "Epic 03.14 - WO Scheduling (Phase 2)"
@@ -744,6 +771,14 @@ next_actions:
 # =============================================================================
 
 changelog:
+  - date: "2026-01-22"
+    changes:
+      - "EPIC 07 PROGRESS: 4/24 stories DEPLOYED"
+      - "07.1 Customers CRUD DEPLOYED (136 tests, 10/10 AC)"
+      - "Documentation: API reference (customers.md) + Guide (customer-management.md) created"
+      - "Epic 07 implementation: 0% -> 17% (4/24 stories)"
+      - "Roadmaps updated to reflect Epic 07 progress"
+
   - date: "2026-01-21"
     changes:
       - "EPIC 04 PHASE 1 COMPLETE: 10/10 stories DEPLOYED"

@@ -1,6 +1,6 @@
 # MonoPilot - Roadmap Stories (Szczegolowa Analiza)
 
-> **Data generacji:** 2026-01-21
+> **Data generacji:** 2026-01-22
 > **Zrodlo danych:** `.claude/checkpoints/*.yaml` + analiza dokumentacji + Epic 06 story generation
 > **Metoda:** Bezposrednia analiza checkpointow implementacyjnych + AI-generated stories
 
@@ -16,13 +16,17 @@
 | 04 | Production | 18 (7+11) | **15 Phase 0+1** | Phase 0 COMPLETE + **04.6a-c + 04.7b-c + 04.8 (6 stories) DEPLOYED** | **83% impl** / 100% def |
 | 05 | Warehouse | 29 (20+9) | **22 Phase 1+2** | MVP COMPLETE + **05.20 + 05.21 DEPLOYED** + Phase 2 defined | **76% impl** / 100% def |
 | **06** | **Quality** | **41 (12+29)** | **12 Phase 1-2 done** | **Phase 1-2 COMPLETE + Phase 2B-4 defined** | **29% impl / 100% def** |
-| 07 | Shipping | 24 (16+8) | 0 | Phase 1-3 100% STORIES DEFINED | 0% impl / 100% def |
+| **07** | **Shipping** | **24 (16+8)** | **4 Phase 1** | **07.1 + 07.2 + 07.4 + 07.5 DEPLOYED** + Phase 1-3 STORIES DEFINED | **17% impl / 100% def** |
 | **08** | **NPD** | **18 (0+18)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 | **09** | **Finance** | **26 (0+26)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 | **10** | **OEE** | **20 (0+20)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 | **11** | **Integrations** | **18 (0+18)** | **0** | **Phase 1-3 100% STORIES DEFINED** | **0% impl / 100% def** |
 
-**TOTAL:** 112/283 stories zaimplementowanych w Epic 01-07 (~40%)
+**TOTAL:** 116/283 stories zaimplementowanych w Epic 01-07 (~41%)
+**NEW:** Story 07.1 Customers CRUD - DEPLOYED (2026-01-22)
+**NEW:** Story 07.5 SO Clone/Import - DEPLOYED (2026-01-22)
+**NEW:** Story 07.4 SO Line Pricing - DEPLOYED (2026-01-22)
+**NEW:** Story 07.2 Sales Orders Core - DEPLOYED (2026-01-22)
 **NEW:** Story 05.21 Scanner Putaway - DEPLOYED (2026-01-21)
 **NEW:** Story 05.20 Scanner Move - DEPLOYED (2026-01-21)
 **NEW:** Story 04.8 Material Reservations - DEPLOYED (2026-01-21)
@@ -262,57 +266,18 @@
 
 **Status:** 04.6a + 04.6b + 04.6c + 04.7b + 04.7c + 04.8 DEPLOYED | Remaining stories ready for implementation
 
-| Story | Nazwa | Status | FR | Complexity | Uwagi |
-|-------|-------|--------|-----|------------|-------|
-| **04.6a** | **Material Consumption Desktop** | **DEPLOYED** | 1 FR | L (4d) | **P1-P7 COMPLETE - 2026-01-21** |
-| **04.6b** | **Material Consumption Scanner** | **DEPLOYED** | 1 FR | M (3d) | **P1-P7 COMPLETE - 2026-01-21** |
-| **04.6c** | **1:1 Consumption Enforcement** | **DEPLOYED** | 1 FR | S (2d) | **P1-P7 COMPLETE - 2026-01-21** |
+| Story | Nazwa | FR | Complexity | Status | Uwagi |
+|-------|-------|-----|------------|--------|-------|
+| **04.6a** | **Material Consumption Desktop** | **1 FR** | **L (4d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
+| **04.6b** | **Material Consumption Scanner** | **1 FR** | **M (3d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
+| **04.6c** | **1:1 Consumption Enforcement** | **1 FR** | **S (2d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
 | 04.6d | Consumption Correction | NOT STARTED | 1 FR | S (2d) | Reversal workflow with audit trail |
 | 04.6e | Over-Consumption Control | NOT STARTED | 1 FR | S (2d) | Setting-based block/warn logic |
 | 04.7a | Output Registration Desktop | NOT STARTED | 1 FR | M (3d) | LP creation, genealogy, yield capture |
-| **04.7b** | **Output Registration Scanner** | **DEPLOYED** | 1 FR | M (3d) | **P1-P7 COMPLETE - 2026-01-21** |
-| **04.7c** | **By-Product Registration** | **DEPLOYED** | 1 FR | S (2d) | **P1-P7 COMPLETE - 2026-01-21** |
+| **04.7b** | **Output Registration Scanner** | **1 FR** | **M (3d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
+| **04.7c** | **By-Product Registration** | **1 FR** | **S (2d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
 | 04.7d | Multiple Outputs per WO | NOT STARTED | 1 FR | S (2d) | Multi-output batch support |
-| **04.8** | **Material Reservations** | **DEPLOYED** | 1 FR | M (4d) | **P1-P7 COMPLETE - 2026-01-21** |
-
-**04.6a Material Consumption Desktop - DEPLOYED (2026-01-21):**
-- Tests: 88 (P2 RED) -> 52/52 (P3 GREEN)
-- AC: 8/8 passed
-- QA: PASS (zero bugs)
-- Code Review: APPROVED (zero issues)
-- Documentation: API + Component guides created
-
-**04.6c 1:1 Consumption Enforcement - DEPLOYED (2026-01-21):**
-- Tests: 107 (P2 RED) -> 83/83 (P3 GREEN)
-- AC: 6/6 passed
-- QA: PASS (zero bugs)
-- Code Review: APPROVED (zero issues)
-- Features: FULL_LP_REQUIRED error, FullLPRequiredBadge, ConsumptionQtyInput, NumberPad disabled state
-- Documentation: API + Component guides updated
-
-**04.7b Output Registration Scanner - DEPLOYED (2026-01-21):**
-- Tests: 171 (P2 RED) -> 157/170 (P3 GREEN)
-- AC: 18/18 passed
-- QA: PASS (zero bugs)
-- Code Review: APPROVED (zero blocking issues)
-- Features: 7-step wizard, WO validation (500ms), LP creation, QA status selection, ZPL label printing (2s target), by-product registration, offline queue
-- Documentation: Scanner output components guide, API reference, ZPL label guide, offline queue guide
-
-**04.7c By-Product Registration - DEPLOYED (2026-01-21):**
-- Tests: 160 (P2 RED) -> 116/116 (P3 GREEN)
-- AC: 8/8 passed
-- QA: PASS (zero bugs)
-- Code Review: APPROVED (zero issues)
-- Features: Expected qty calculation, auto-create LPs, manual registration, genealogy linkage, zero qty warning
-- Documentation: By-product registration guide created
-
-**04.8 Material Reservations - DEPLOYED (2026-01-21):**
-- Tests: 192 (P2 RED) -> 160/160 (P3 GREEN)
-- AC: 8/8 passed
-- QA: PASS (zero bugs after fix)
-- Code Review: APPROVED (zero issues)
-- Features: LP reservation for WO materials, FIFO/FEFO picking, multi-LP allocation, auto-release on WO completion, over-reservation warning
-- Documentation: API reference + Workflow guide created
+| **04.8** | **Material Reservations** | **1 FR** | **M (4d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
 
 **Metryki Phase 1:**
 - Stories created: 2026-01-14
@@ -325,8 +290,8 @@
 
 **OEE Core (4 stories):**
 
-| Story | Nazwa | Status | FR | Complexity | Uwagi |
-|-------|-------|--------|-----|------------|-------|
+| Story | Nazwa | FR | Complexity | Status | Uwagi |
+|-------|-------|-----|------------|--------|-------|
 | 04.9a | OEE Calculation | NOT STARTED | 1 FR | L (5d) | Availability x Performance x Quality |
 | 04.9b | Downtime Tracking | NOT STARTED | 1 FR | L (4d) | Planned/unplanned, reason categorization |
 | 04.9c | Machine Integration | NOT STARTED | 1 FR | L (5d) | Machine status, counters, alarms (OPC UA) |
@@ -334,8 +299,8 @@
 
 **Analytics Reports (7 stories):**
 
-| Story | Nazwa | Status | FR | Complexity | Uwagi |
-|-------|-------|--------|-----|------------|-------|
+| Story | Nazwa | FR | Complexity | Status | Uwagi |
+|-------|-------|-----|------------|--------|-------|
 | 04.10a | OEE Summary Report | NOT STARTED | 1 FR | M (3d) | OEE by machine/line/shift, trends |
 | 04.10b | Downtime Analysis Report | NOT STARTED | 1 FR | M (3d) | Pareto analysis, planned vs unplanned |
 | 04.10c | Yield Analysis Report | NOT STARTED | 1 FR | M (2d) | Yield trends, operator performance |
@@ -401,10 +366,10 @@
 
 ### Phase 2 - Advanced Features (IN PROGRESS)
 
-| Story | Nazwa | Status | FR | Complexity | Uwagi |
-|-------|-------|--------|-----|------------|-------|
-| **05.20** | **Scanner Move Workflow** | **DEPLOYED** | 1 FR | M (3-4d) | **P1-P7 COMPLETE - 2026-01-21** |
-| **05.21** | **Scanner Putaway Workflow** | **DEPLOYED** | 1 FR | M (3-4d) | **P1-P7 COMPLETE - 2026-01-21** |
+| Story | Nazwa | FR | Complexity | Status | Uwagi |
+|-------|-------|-----|------------|--------|-------|
+| **05.20** | **Scanner Move Workflow** | **1 FR** | **M (3-4d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
+| **05.21** | **Scanner Putaway Workflow** | **1 FR** | **M (3-4d)** | **DEPLOYED** | **P1-P7 COMPLETE - 2026-01-21** |
 | 05.22 | Pallet Management | NOT STARTED | 1 FR | L (5-7d) | Pallet CRUD, add/remove LPs, close |
 | 05.23 | GS1 SSCC Support | NOT STARTED | 1 FR | M (3-4d) | SSCC-18 pallet codes, GS1-128 barcodes |
 | 05.24 | Catch Weight Support | NOT STARTED | 1 FR | M (3-4d) | Variable weight per unit, scale integration |
@@ -412,23 +377,6 @@
 | 05.26 | Location Capacity Management | NOT STARTED | 1 FR | M (3-4d) | Max capacity, occupancy, visual indicators |
 | 05.27 | Zone Management | NOT STARTED | 1 FR | M (3-4d) | Zone CRUD, location assignment, preferred zones |
 | 05.28 | Expiry Alerts Dashboard | NOT STARTED | 1 FR | M (2-3d) | Expiring soon widget, multi-tier alerts |
-
-**05.20 Scanner Move Workflow - DEPLOYED (2026-01-21):**
-- Tests: 228 (P2 RED) -> 182/191 (P3 GREEN)
-- AC: 14/14 passed
-- QA: PASS (zero bugs)
-- Code Review: APPROVED (2 minor issues)
-- Features: 3-step wizard, LP lookup, location lookup, validate-move, execute move, recent moves, audio/haptic feedback
-- Documentation: API reference + Workflow guide created
-
-**05.21 Scanner Putaway Workflow - DEPLOYED (2026-01-21):**
-- Tests: 189 (P2 RED) -> 141/141 (P3 GREEN)
-- AC: 11/11 passed
-- QA: PASS (zero bugs)
-- Code Review: APPROVED (zero issues)
-- Features: 5-step wizard, FIFO/FEFO location suggestions, zone preferences, location override with reason, stock move creation
-- Documentation: API reference + Workflow guide created
-- Scanner landing page updated with Putaway card
 
 **Metryki Phase 2:**
 - Stories created: 2026-01-14 (some pre-existed, completed today)
@@ -571,21 +519,21 @@
 
 ---
 
-## EPIC 07 - SHIPPING 100% STORY DEFINITION | 0% IMPLEMENTED
+## EPIC 07 - SHIPPING 100% STORY DEFINITION | 17% IMPLEMENTED
 
-**Status:** Phase 1 stories defined (16/16) + Phase 2-3 stories defined (8 stories) - implementation NOT STARTED
+**Status:** **07.1 + 07.2 + 07.4 + 07.5 DEPLOYED** + Phase 1 stories defined (12/16 remaining) + Phase 2-3 stories defined (8 stories)
 
-### Phase 1 - MVP Core (STORIES DEFINED)
+### Phase 1 - MVP Core (IN PROGRESS)
 
-**Status:** UNBLOCKED (Epic 05 complete!) | Stories ready for implementation
+**Status:** UNBLOCKED (Epic 05 complete!) | **07.1 + 07.2 + 07.4 + 07.5 DEPLOYED** | Stories ready for implementation
 
 | Story | Nazwa | FR | Complexity | Status | Uwagi |
 |-------|-------|-----|------------|--------|-------|
-| 07.1 | Customers CRUD | 3 FR | M (3-4d) | NOT STARTED | Customers, contacts, addresses |
-| 07.2 | Sales Orders Core | 10 FR | L (5-7d) | NOT STARTED | SO CRUD, lines, status, allocation |
+| **07.1** | **Customers CRUD** | **3 FR** | **M (3-4d)** | **DEPLOYED** | **Customers, contacts, addresses - P1-P7 COMPLETE 2026-01-22** |
+| **07.2** | **Sales Orders Core** | **10 FR** | **L (5-7d)** | **DEPLOYED** | **SO CRUD, lines, status - P1-P7 COMPLETE 2026-01-22** |
 | 07.3 | SO Status Workflow | 3 FR | M (3d) | NOT STARTED | Hold, cancel, confirmation |
-| 07.4 | SO Line Pricing | 1 FR | M (3d) | NOT STARTED | Line-level pricing, discounts |
-| 07.5 | SO Clone/Import | 2 FR | M (3-4d) | NOT STARTED | Clone template, CSV import |
+| **07.4** | **SO Line Pricing** | **1 FR** | **M (3d)** | **DEPLOYED** | **Line-level pricing, discounts - P1-P7 COMPLETE 2026-01-22** |
+| **07.5** | **SO Clone/Import** | **2 FR** | **M (3-4d)** | **DEPLOYED** | **Clone template, CSV import - P1-P7 COMPLETE 2026-01-22** |
 | 07.6 | SO Allergen Validation | 1 FR | M (2-3d) | NOT STARTED | Customer allergen restrictions |
 | 07.7 | Inventory Allocation | 3 FR | L (5-7d) | NOT STARTED | Auto/manual allocation, FIFO/FEFO UNBLOCKED |
 | 07.8 | Pick List Generation | 3 FR | L (4-5d) | NOT STARTED | Wave picking, assignment |
@@ -598,10 +546,43 @@
 | 07.15 | Shipping Dashboard | 2 FR | M (3-4d) | NOT STARTED | KPIs, alerts, active shipments |
 | 07.16 | RMA Core CRUD | 7 FR | L (5-7d) | NOT STARTED | Returns processing |
 
+**07.1 Customers CRUD - DEPLOYED (2026-01-22):**
+- Tests: 134 (P2 RED) -> 136/151 (P3 GREEN)
+- AC: 10/10 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (zero issues)
+- Features: Customer CRUD with code/name/category/allergen restrictions, contacts management (primary contact), addresses (billing/shipping/dock hours), payment terms, credit limits, RLS policies
+- Documentation: API reference (customers.md) + User guide (customer-management.md) created
+
+**07.2 Sales Orders Core - DEPLOYED (2026-01-22):**
+- Tests: 273 (P2 RED) -> 287/346 (P3 GREEN)
+- AC: 12/12 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (zero issues)
+- Features: SO CRUD, lines management, status workflow (draft/confirmed), order number generation (SO-YYYY-NNNNN), line totals, discounts (percent/fixed), SO total calculation, RLS policies
+- Documentation: API reference + Workflow guide created
+
+**07.4 SO Line Pricing - DEPLOYED (2026-01-22):**
+- Tests: 67 (P2 RED) -> 87/87 (P3 GREEN)
+- AC: 12/12 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (zero issues)
+- Features: Auto-populate unit_price from product.std_price, manual price override, percentage/fixed discounts, line total calculation, order total recalculation, validation (positive price, discount 0-100%)
+- Documentation: API reference (so-line-pricing.md) + User guide (pricing-discounts.md) created
+
+**07.5 SO Clone/Import - DEPLOYED (2026-01-22):**
+- Tests: 106 (P2 RED) -> all passing (P3 GREEN)
+- AC: 11/11 passed
+- QA: PASS (zero bugs)
+- Code Review: APPROVED (zero issues)
+- Features: Clone SO with customer/lines/pricing preserved, CSV import with validation, multi-customer grouping, row-level error reporting, preview before import
+- Documentation: API reference (so-clone-import.md) + User guide (so-clone-import-guide.md) created
+
 **Metryki Phase 1:**
 - Total stories: 16 (all have complete markdown documentation)
+- **Implemented: 4 (07.1 + 07.2 + 07.4 + 07.5 DEPLOYED)**
 - Total documentation: ~540KB (pre-existing)
-- Estimated effort: 60-79 days sequential | ~40-50 days with parallelization
+- Estimated effort remaining: 46-61 days sequential | ~26-36 days with parallelization
 - Dependencies: Epic 05 COMPLETE (inventory allocation unblocked)
 
 ### Phase 2-3 - Advanced Features (STORIES DEFINED)
@@ -642,16 +623,16 @@
 - FR coverage: 32 additional FR (FR-7.4-8, 7.16, 7.20, 7.29, 7.32-33, 7.43-72)
 
 **Status:**
-- Phase 1 (MVP): 0% implemented, 100% STORIES DEFINED (16/16 ready)
+- Phase 1 (MVP): **25% implemented (4/16)**, 100% STORIES DEFINED (12/16 remaining)
 - Phase 2-3 (Advanced): 0% implemented, 100% STORIES DEFINED (8/8 ready)
-- Epic 07: 100% story definition complete | 0% implemented (0/24 stories)
+- Epic 07: 100% story definition complete | **17% implemented (4/24 stories)**
 
 **Blokery rozwiazane:**
 - Epic 05 (Warehouse) - Inventory allocation UNBLOCKED
 - Epic 03 (Planning) - Sales orders can reference products/BOMs
 - Epic 02 (Technical) - Products, allergens available
 
-**Szacowany effort calosci:** 108-143 dni sequential | ~70-90 dni with parallelization
+**Szacowany effort calosci:** 93-125 dni sequential | ~55-75 dni with parallelization
 
 ---
 
@@ -690,7 +671,21 @@ Kolejnosc implementacji:
 3. 04.7d   - Multiple Outputs (2 dni)
 ```
 
-### Priorytet 3: Epic 05 Phase 2 (25-36 dni remaining)
+### Priorytet 3: Epic 07 Shipping (46-61 dni remaining)
+
+```
+07.1 Customers CRUD DEPLOYED (2026-01-22)
+07.2 Sales Orders Core DEPLOYED (2026-01-22)
+07.4 SO Line Pricing DEPLOYED (2026-01-22)
+07.5 SO Clone/Import DEPLOYED (2026-01-22)
+
+Kolejnosc implementacji:
+1. 07.3 - SO Status Workflow (3 dni) - NEXT
+2. 07.6 - SO Allergen Validation (2-3 dni)
+3. 07.7-07.16 - remaining stories (41-55 dni)
+```
+
+### Priorytet 4: Epic 05 Phase 2 (25-36 dni remaining)
 
 ```
 05.20 + 05.21 Scanner Move + Putaway DEPLOYED (2026-01-21)
@@ -700,18 +695,17 @@ Kolejnosc implementacji:
 2. 05.23-05.28 - pozostale (20-29 dni)
 ```
 
-### Priorytet 4: Epic 06-07 (100-120 dni)
+### Priorytet 5: Epic 06 Quality (78-98 dni remaining)
 
 ```
-Epic 06 (Quality): 52-68 dni
-Epic 07 (Shipping): 50-60 dni (07.7 unblocked!)
+Epic 06 (Quality): 78-98 dni (Phase 2B-4)
 ```
 
-### Priorytet 5: Premium Modules (115-145 dni)
+### Priorytet 6: Premium Modules (115-145 dni)
 
 ```
-Najpierw: Napisac stories dla Epic 08-11
-Potem: Implementacja
+Wszystkie stories 100% defined
+Ready for implementation
 ```
 
 ---
@@ -722,24 +716,23 @@ Potem: Implementacja
 |------|-------|-----|--------|
 | Immediate | 03.13 + Epic 02 deploy | 3-5 | Styczen 2026 |
 | Phase 1 | Epic 04 Phase 1 (remaining) | 7-9 | Luty 2026 |
-| Phase 2 | Epic 06 Quality | 52-68 | Marzec-Kwiecien 2026 |
-| Phase 3 | Epic 07 Shipping | 50-60 | Maj-Czerwiec 2026 |
+| Phase 2 | Epic 07 Shipping | 46-61 | Luty-Marzec 2026 |
+| Phase 3 | Epic 06 Quality | 78-98 | Kwiecien-Czerwiec 2026 |
 | Phase 4 | Epic 04 Phase 2 (OEE) | 25-32 | Lipiec 2026 |
-| Premium | Epic 08-11 stories | 30-40 | Sierpien 2026 |
-| Premium | Epic 08-11 impl | 115-145 | Q4 2026 |
+| Premium | Epic 08-11 impl | 115-145 | Q3-Q4 2026 |
 
-**TOTAL do MVP (Epic 01-07):** ~178-228 dni remaining
-**TOTAL do Enterprise (Epic 01-11):** ~328-428 dni remaining
+**TOTAL do MVP (Epic 01-07):** ~160-205 dni remaining
+**TOTAL do Enterprise (Epic 01-11):** ~310-405 dni remaining
 
 ---
 
 ## CHECKSUM
 
 ```
-Wygenerowano: 2026-01-21 (updated)
+Wygenerowano: 2026-01-22 (updated)
 Zrodlo: .claude/checkpoints/*.yaml + Epic 01-11 COMPLETE gap analysis + ORCHESTRATOR story generation
-Stories zaimplementowane: 112/283 (Epic 01-07) ~40%
-Stories do implementacji: 171 total across Epic 01-11 (all Phase 2+ features + Premium modules)
+Stories zaimplementowane: 116/283 (Epic 01-07) ~41%
+Stories do implementacji: 167 total across Epic 01-11 (all Phase 2+ features + Premium modules)
 Stories do napisania: 0 (100% STORY DEFINITION COMPLETE!)
 Epic 01 story definition: 100% complete (26 stories: 16 MVP + 10 Phase 1B-3)
 Epic 01 implementation: 62% (16/26 MVP done, 10 Phase 1B-3 pending)
@@ -754,7 +747,7 @@ Epic 05 implementation: 76% (22/29 Phase 1 + 05.20 + 05.21 done, 7 Phase 2 pendi
 Epic 06 story definition: 100% complete (41 stories: 12 Phase 1-2A + 29 Phase 2B-4)
 Epic 06 implementation: 29% (12/41 Phase 1-2A done, 29 Phase 2B-4 pending)
 Epic 07 story definition: 100% complete (24 stories: 16 Phase 1 + 8 Phase 2-3)
-Epic 07 implementation: 0% (0/24 all pending - epic not started)
+Epic 07 implementation: 17% (4/24 - 07.1 + 07.2 + 07.4 + 07.5 DEPLOYED 2026-01-22, 20 remaining)
 Epic 08 story definition: 100% complete (18 stories: 8 Phase 1 + 7 Phase 2 + 3 Phase 3)
 Epic 08 implementation: 0% (0/18 all pending - premium module)
 Epic 09 story definition: 100% complete (26 stories: 10 Phase 1 + 10 Phase 2 + 6 Phase 3)
@@ -763,6 +756,6 @@ Epic 10 story definition: 100% complete (20 stories: 5 Phase 1A + 4 Phase 1B + 6
 Epic 10 implementation: 0% (0/20 all pending - premium module)
 Epic 11 story definition: 100% complete (18 stories: 6 Phase 1 + 8 Phase 2 + 4 Phase 3)
 Epic 11 implementation: 0% (0/18 all pending - premium module)
-LATEST: Story 05.21 Scanner Putaway - DEPLOYED 2026-01-21 (P1-P7 complete, 189 tests, 11/11 AC)
+LATEST: Story 07.1 Customers CRUD - DEPLOYED 2026-01-22 (P1-P7 complete, 136 tests, 10/10 AC)
 MONOPILOT: 100% STORY DEFINITION COMPLETE - ALL 11 EPIC MODULES FULLY DEFINED!
 ```
