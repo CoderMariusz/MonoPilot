@@ -525,13 +525,13 @@
 
 ### Phase 1 - MVP Core (IN PROGRESS)
 
-**Status:** UNBLOCKED (Epic 05 complete!) | **07.1 + 07.2 + 07.4 + 07.5 DEPLOYED** | Stories ready for implementation
+**Status:** UNBLOCKED (Epic 05 complete!) | **07.1 + 07.2 + 07.3 + 07.4 + 07.5 DEPLOYED (5/16 MVP)** | 11 stories remaining for MVP
 
 | Story | Nazwa | FR | Complexity | Status | Uwagi |
 |-------|-------|-----|------------|--------|-------|
 | **07.1** | **Customers CRUD** | **3 FR** | **M (3-4d)** | **DEPLOYED** | **Customers, contacts, addresses - P1-P7 COMPLETE 2026-01-22** |
 | **07.2** | **Sales Orders Core** | **10 FR** | **L (5-7d)** | **DEPLOYED** | **SO CRUD, lines, status - P1-P7 COMPLETE 2026-01-22** |
-| 07.3 | SO Status Workflow | 3 FR | M (3d) | NOT STARTED | Hold, cancel, confirmation |
+| **07.3** | **SO Status Workflow** | **3 FR** | **M (3d)** | **DEPLOYED** | **Hold, cancel, confirmation - P1-P7 COMPLETE 2026-01-22** |
 | **07.4** | **SO Line Pricing** | **1 FR** | **M (3d)** | **DEPLOYED** | **Line-level pricing, discounts - P1-P7 COMPLETE 2026-01-22** |
 | **07.5** | **SO Clone/Import** | **2 FR** | **M (3-4d)** | **DEPLOYED** | **Clone template, CSV import - P1-P7 COMPLETE 2026-01-22** |
 | 07.6 | SO Allergen Validation | 1 FR | M (2-3d) | NOT STARTED | Customer allergen restrictions |
