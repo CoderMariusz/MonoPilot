@@ -108,10 +108,29 @@ export interface BatchStatus {
 }
 
 // ============================================================================
-// Approval Roles Constant
+// Constants
 // ============================================================================
 
 const APPROVAL_ROLES = ['QA_MANAGER', 'QUALITY_DIRECTOR', 'ADMIN'] as const
+
+// Release decision statuses
+const RELEASE_DECISIONS = {
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  CONDITIONAL: 'conditional',
+  PENDING: 'pending',
+} as const
+
+// LP release statuses
+const LP_RELEASE_STATUSES = {
+  RELEASED: 'released',
+  PENDING: 'pending',
+  REJECTED: 'rejected',
+  HOLD: 'hold',
+} as const
+
+// Minimum checklist items required for approval
+const MIN_CHECKLIST_ITEMS_FOR_APPROVAL = 4
 
 // ============================================================================
 // Private Helper Methods
@@ -212,10 +231,10 @@ async function getOutputLpsForWO(woId: string) {
 function countLpStatusDistribution(lps: Array<{ release_status: string }>) {
   return {
     total: lps.length,
-    released: lps.filter((lp) => lp.release_status === 'released').length,
-    pending: lps.filter((lp) => lp.release_status === 'pending').length,
-    rejected: lps.filter((lp) => lp.release_status === 'rejected').length,
-    hold: lps.filter((lp) => lp.release_status === 'hold').length,
+    released: lps.filter((lp) => lp.release_status === LP_RELEASE_STATUSES.RELEASED).length,
+    pending: lps.filter((lp) => lp.release_status === LP_RELEASE_STATUSES.PENDING).length,
+    rejected: lps.filter((lp) => lp.release_status === LP_RELEASE_STATUSES.REJECTED).length,
+    hold: lps.filter((lp) => lp.release_status === LP_RELEASE_STATUSES.HOLD).length,
   }
 }
 
@@ -443,23 +462,23 @@ export class BatchReleaseService {
     }
 
     // 2. Validate checklist minimum for approval
-    if (input.release_decision === 'approved') {
+    if (input.release_decision === RELEASE_DECISIONS.APPROVED) {
       const checklistValues = Object.values(input.checklist)
       const trueCount = checklistValues.filter(Boolean).length
-      if (trueCount < 4) {
-        throw new Error('400: At least 4 checklist items must be confirmed')
+      if (trueCount < MIN_CHECKLIST_ITEMS_FOR_APPROVAL) {
+        throw new Error(`400: At least ${MIN_CHECKLIST_ITEMS_FOR_APPROVAL} checklist items must be confirmed`)
       }
     }
 
     // 3. Validate conditional fields
-    if (input.release_decision === 'conditional') {
+    if (input.release_decision === RELEASE_DECISIONS.CONDITIONAL) {
       if (!input.conditional_reason || !input.conditional_restrictions) {
         throw new Error('400: Conditional reason and restrictions required')
       }
     }
 
     // 4. Validate rejection reason
-    if (input.release_decision === 'rejected') {
+    if (input.release_decision === RELEASE_DECISIONS.REJECTED) {
       if (!input.rejection_reason) {
         throw new Error('400: Rejection reason required')
       }
@@ -492,7 +511,7 @@ export class BatchReleaseService {
         checklist_ncr_review: input.checklist.ncr_review,
         release_decision: input.release_decision,
         release_reason:
-          input.release_decision === 'rejected' ? input.rejection_reason : null,
+          input.release_decision === RELEASE_DECISIONS.REJECTED ? input.rejection_reason : null,
         conditional_reason: input.conditional_reason || null,
         conditional_restrictions: input.conditional_restrictions || null,
         conditional_expires_at: input.conditional_expires_at || null,
@@ -523,13 +542,13 @@ export class BatchReleaseService {
         lp_id: lp.id,
         quantity: lp.quantity,
         release_status:
-          input.release_decision === 'rejected' ? 'rejected' : 'released',
+          input.release_decision === RELEASE_DECISIONS.REJECTED ? LP_RELEASE_STATUSES.REJECTED : LP_RELEASE_STATUSES.RELEASED,
       }))
 
       await supabase.from('batch_release_lps').insert(lpRecords)
 
       // Count based on decision
-      if (input.release_decision === 'rejected') {
+      if (input.release_decision === RELEASE_DECISIONS.REJECTED) {
         lpsRejected = lps.length
       } else {
         lpsReleased = lps.length
@@ -541,14 +560,14 @@ export class BatchReleaseService {
       .from('batch_release_records')
       .update({
         released_quantity:
-          input.release_decision === 'rejected' ? 0 : wo.produced_quantity,
+          input.release_decision === RELEASE_DECISIONS.REJECTED ? 0 : wo.produced_quantity,
         rejected_quantity:
-          input.release_decision === 'rejected' ? wo.produced_quantity : 0,
+          input.release_decision === RELEASE_DECISIONS.REJECTED ? wo.produced_quantity : 0,
       })
       .eq('id', release.id)
 
     const message =
-      input.release_decision === 'rejected'
+      input.release_decision === RELEASE_DECISIONS.REJECTED
         ? `Batch ${batchNumber} rejected - LPs blocked from shipping`
         : `Batch ${batchNumber} released for shipping`
 
@@ -622,7 +641,7 @@ export class BatchReleaseService {
         checklist_label_verify: checklist.label_verify,
         checklist_spec_review: checklist.spec_review,
         checklist_ncr_review: checklist.ncr_review,
-        release_decision: 'pending',
+        release_decision: RELEASE_DECISIONS.PENDING,
         total_quantity: wo.produced_quantity,
         submitted_by: userId,
         submitted_at: new Date().toISOString(),
@@ -665,7 +684,7 @@ export class BatchReleaseService {
       updated_at: new Date().toISOString(),
     }
 
-    if (status === 'released') {
+    if (status === LP_RELEASE_STATUSES.RELEASED) {
       updateData.released_by = userId
       updateData.released_at = new Date().toISOString()
     }
@@ -709,7 +728,7 @@ export class BatchReleaseService {
       lp_number: lp.lp_number,
       product_id: lp.product_id,
       quantity: lp.quantity,
-      release_status: lp.release_status || 'pending',
+      release_status: lp.release_status || LP_RELEASE_STATUSES.PENDING,
       released_by: lp.released_by,
       released_at: lp.released_at,
     }))
