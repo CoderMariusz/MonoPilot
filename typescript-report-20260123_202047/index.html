@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScript Error Report - MonoPilot</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #22c55e;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-500: #6b7280;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+
+        .header-meta {
+            display: flex;
+            gap: 24px;
+            color: var(--gray-500);
+            font-size: 14px;
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-card .label {
+            font-size: 14px;
+            color: var(--gray-500);
+            margin-top: 8px;
+        }
+
+        .stat-card .change {
+            font-size: 12px;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+
+        .stat-card.total .value { color: var(--primary); }
+        .stat-card.high .value { color: var(--danger); }
+        .stat-card.medium .value { color: var(--warning); }
+        .stat-card.low .value { color: var(--success); }
+
+        .change.positive { color: var(--danger); }
+        .change.negative { color: var(--success); }
+        .change.neutral { color: var(--gray-500); }
+
+        /* Progress Bar */
+        .progress-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+
+        .progress-bar {
+            height: 24px;
+            background: var(--gray-200);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .progress-segment {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            min-width: 40px;
+        }
+
+        .progress-segment.high { background: var(--danger); }
+        .progress-segment.medium { background: var(--warning); color: var(--gray-900); }
+        .progress-segment.low { background: var(--success); }
+
+        .progress-legend {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.high { background: var(--danger); }
+        .legend-dot.medium { background: var(--warning); }
+        .legend-dot.low { background: var(--success); }
+
+        /* Toolbar */
+        .toolbar {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 16px 10px 40px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+        }
+
+        .search-box::before {
+            content: "Search";
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-500);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            background: white;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: var(--gray-50);
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .export-btn {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .export-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Sections */
+        .section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 16px 20px;
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+            font-weight: 600;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-content {
+            padding: 20px;
+        }
+
+        /* Trend Chart */
+        .chart-container {
+            height: 200px;
+            position: relative;
+        }
+
+        .chart-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .no-data {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--gray-500);
+            font-size: 14px;
+        }
+
+        /* Error Table */
+        .error-table-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .error-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .error-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .error-table th:hover {
+            background: var(--gray-100);
+        }
+
+        .error-table th .sort-indicator {
+            margin-left: 4px;
+            opacity: 0.5;
+        }
+
+        .error-table th.sorted .sort-indicator {
+            opacity: 1;
+        }
+
+        .error-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gray-100);
+            font-size: 13px;
+        }
+
+        .error-table tr:hover {
+            background: var(--gray-50);
+        }
+
+        .error-table tr.new-error {
+            background: #fef3c7;
+        }
+
+        .error-table tr.new-error:hover {
+            background: #fde68a;
+        }
+
+        .file-path {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 12px;
+            color: var(--primary);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-path:hover {
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        .error-message {
+            color: var(--gray-700);
+            max-width: 400px;
+        }
+
+        .location {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 11px;
+            color: var(--gray-500);
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .priority-badge.high {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .priority-badge.medium {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .priority-badge.low {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .new-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #dbeafe;
+            color: var(--primary);
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        /* Category List */
+        .category-list {
+            list-style: none;
+        }
+
+        .category-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .category-item:last-child {
+            border-bottom: none;
+        }
+
+        .category-name {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .category-count {
+            background: var(--gray-100);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* File List */
+        .file-list {
+            list-style: none;
+        }
+
+        .file-item {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-name {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 12px;
+            color: var(--gray-700);
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        .file-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 12px;
+        }
+
+        .file-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .file-stat.high { color: var(--danger); }
+        .file-stat.medium { color: var(--warning); }
+        .file-stat.low { color: var(--success); }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--gray-500);
+        }
+
+        .empty-state h2 {
+            font-size: 24px;
+            color: var(--success);
+            margin-bottom: 8px;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            color: var(--gray-500);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--gray-200);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error Alert */
+        .error-alert {
+            background: #fee2e2;
+            color: var(--danger);
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="app">
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Safe data loading via fetch (no injection vulnerability)
+        async function loadData() {
+            try {
+                const [errorsRes, trendsRes, previousRes] = await Promise.all([
+                    fetch('errors.json'),
+                    fetch('trends.json'),
+                    fetch('previous.json')
+                ]);
+
+                const errors = await errorsRes.json();
+                const trends = await trendsRes.json();
+                const previous = await previousRes.json();
+
+                return { errors, trends, previous };
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                return { errors: [], trends: [], previous: [] };
+            }
+        }
+
+        // State
+        let allErrors = [];
+        let filteredErrors = [];
+        let previousErrors = [];
+        let trends = [];
+        let currentFilter = 'all';
+        let searchQuery = '';
+        let sortColumn = 'file';
+        let sortDirection = 'asc';
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function shortenPath(path) {
+            return path
+                .replace(/.*apps[\/\\]frontend[\/\\]/, '')
+                .replace(/.*MonoPilot[\/\\]apps[\/\\]frontend[\/\\]/, '');
+        }
+
+        function getErrorKey(error) {
+            return `${error.file}:${error.line}:${error.code}`;
+        }
+
+        function isNewError(error, previousSet) {
+            return !previousSet.has(getErrorKey(error));
+        }
+
+        // Render functions
+        function renderHeader(errors, previous) {
+            const totalChange = errors.length - previous.length;
+            const changeClass = totalChange > 0 ? 'positive' : totalChange < 0 ? 'negative' : 'neutral';
+            const changeText = totalChange > 0 ? `+${totalChange}` : totalChange < 0 ? `${totalChange}` : 'No change';
+
+            return `
+                <div class="header">
+                    <h1>TypeScript Error Report</h1>
+                    <div class="header-meta">
+                        <span><strong>Generated:</strong> ${new Date().toLocaleString()}</span>
+                        <span><strong>Source:</strong> errors.json</span>
+                        <span class="change ${changeClass}"><strong>Change:</strong> ${changeText} from previous run</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSummary(errors, previous) {
+            const high = errors.filter(e => e.priority === 'HIGH').length;
+            const medium = errors.filter(e => e.priority === 'MEDIUM').length;
+            const low = errors.filter(e => e.priority === 'LOW').length;
+
+            const prevHigh = previous.filter(e => e.priority === 'HIGH').length;
+            const prevMedium = previous.filter(e => e.priority === 'MEDIUM').length;
+            const prevLow = previous.filter(e => e.priority === 'LOW').length;
+
+            function getChangeHtml(current, prev) {
+                const diff = current - prev;
+                if (diff === 0) return '<span class="change neutral">-</span>';
+                const cls = diff > 0 ? 'positive' : 'negative';
+                return `<span class="change ${cls}">${diff > 0 ? '+' : ''}${diff}</span>`;
+            }
+
+            return `
+                <div class="summary-grid">
+                    <div class="stat-card total">
+                        <div class="value">${errors.length}</div>
+                        <div class="label">Total Errors</div>
+                        ${getChangeHtml(errors.length, previous.length)}
+                    </div>
+                    <div class="stat-card high">
+                        <div class="value">${high}</div>
+                        <div class="label">High Priority</div>
+                        ${getChangeHtml(high, prevHigh)}
+                    </div>
+                    <div class="stat-card medium">
+                        <div class="value">${medium}</div>
+                        <div class="label">Medium Priority</div>
+                        ${getChangeHtml(medium, prevMedium)}
+                    </div>
+                    <div class="stat-card low">
+                        <div class="value">${low}</div>
+                        <div class="label">Low Priority</div>
+                        ${getChangeHtml(low, prevLow)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderProgressBar(errors) {
+            if (errors.length === 0) return '';
+
+            const high = errors.filter(e => e.priority === 'HIGH').length;
+            const medium = errors.filter(e => e.priority === 'MEDIUM').length;
+            const low = errors.filter(e => e.priority === 'LOW').length;
+            const total = errors.length;
+
+            const highPct = (high / total * 100).toFixed(1);
+            const mediumPct = (medium / total * 100).toFixed(1);
+            const lowPct = (low / total * 100).toFixed(1);
+
+            return `
+                <div class="progress-section">
+                    <div class="progress-bar">
+                        ${high > 0 ? `<div class="progress-segment high" style="width: ${highPct}%">${high}</div>` : ''}
+                        ${medium > 0 ? `<div class="progress-segment medium" style="width: ${mediumPct}%">${medium}</div>` : ''}
+                        ${low > 0 ? `<div class="progress-segment low" style="width: ${lowPct}%">${low}</div>` : ''}
+                    </div>
+                    <div class="progress-legend">
+                        <div class="legend-item"><div class="legend-dot high"></div> High (${highPct}%)</div>
+                        <div class="legend-item"><div class="legend-dot medium"></div> Medium (${mediumPct}%)</div>
+                        <div class="legend-item"><div class="legend-dot low"></div> Low (${lowPct}%)</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderToolbar() {
+            return `
+                <div class="toolbar">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="file, message, or category..."
+                               value="${escapeHtml(searchQuery)}">
+                    </div>
+                    <div class="filter-group">
+                        <button class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+                        <button class="filter-btn ${currentFilter === 'HIGH' ? 'active' : ''}" data-filter="HIGH">High</button>
+                        <button class="filter-btn ${currentFilter === 'MEDIUM' ? 'active' : ''}" data-filter="MEDIUM">Medium</button>
+                        <button class="filter-btn ${currentFilter === 'LOW' ? 'active' : ''}" data-filter="LOW">Low</button>
+                        <button class="filter-btn ${currentFilter === 'new' ? 'active' : ''}" data-filter="new">New</button>
+                    </div>
+                    <button class="export-btn" id="export-csv">Export CSV</button>
+                </div>
+            `;
+        }
+
+        function renderTrendChart(trends) {
+            if (trends.length < 2) {
+                return `
+                    <div class="section">
+                        <div class="section-header">Error Trends</div>
+                        <div class="section-content">
+                            <div class="no-data">Not enough data for trend chart (need at least 2 runs)</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Take last 10 runs
+            const recentTrends = trends.slice(-10);
+            const maxTotal = Math.max(...recentTrends.map(t => t.total), 1);
+
+            const chartHtml = recentTrends.map((t, i) => {
+                const height = (t.total / maxTotal * 150);
+                const date = new Date(t.timestamp).toLocaleDateString();
+                return `
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                        <div style="font-size: 11px; color: var(--gray-500);">${t.total}</div>
+                        <div style="width: 30px; height: ${height}px; background: var(--primary); border-radius: 4px 4px 0 0;"></div>
+                        <div style="font-size: 10px; color: var(--gray-500); transform: rotate(-45deg); white-space: nowrap;">${date}</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="section">
+                    <div class="section-header">Error Trends (Last ${recentTrends.length} Runs)</div>
+                    <div class="section-content">
+                        <div style="display: flex; gap: 16px; align-items: flex-end; justify-content: center; height: 200px; padding-bottom: 40px;">
+                            ${chartHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCategoryBreakdown(errors) {
+            const byCategory = {};
+            errors.forEach(e => {
+                if (!byCategory[e.category]) byCategory[e.category] = [];
+                byCategory[e.category].push(e);
+            });
+
+            const sorted = Object.entries(byCategory)
+                .sort((a, b) => b[1].length - a[1].length)
+                .slice(0, 10);
+
+            if (sorted.length === 0) {
+                return `
+                    <div class="section">
+                        <div class="section-header">By Category</div>
+                        <div class="section-content">
+                            <div class="no-data">No errors</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const listHtml = sorted.map(([cat, errs]) => `
+                <li class="category-item">
+                    <span class="category-name">${escapeHtml(cat)}</span>
+                    <span class="category-count">${errs.length}</span>
+                </li>
+            `).join('');
+
+            return `
+                <div class="section">
+                    <div class="section-header">
+                        <span>By Category</span>
+                        <span style="font-size: 12px; color: var(--gray-500);">Top 10</span>
+                    </div>
+                    <div class="section-content">
+                        <ul class="category-list">${listHtml}</ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFileBreakdown(errors) {
+            const byFile = {};
+            errors.forEach(e => {
+                const shortFile = shortenPath(e.file);
+                if (!byFile[shortFile]) byFile[shortFile] = [];
+                byFile[shortFile].push(e);
+            });
+
+            const sorted = Object.entries(byFile)
+                .sort((a, b) => b[1].length - a[1].length)
+                .slice(0, 15);
+
+            if (sorted.length === 0) {
+                return `
+                    <div class="section">
+                        <div class="section-header">Top Files</div>
+                        <div class="section-content">
+                            <div class="no-data">No errors</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const listHtml = sorted.map(([file, errs]) => {
+                const high = errs.filter(e => e.priority === 'HIGH').length;
+                const medium = errs.filter(e => e.priority === 'MEDIUM').length;
+                const low = errs.filter(e => e.priority === 'LOW').length;
+
+                return `
+                    <li class="file-item">
+                        <div class="file-name">${escapeHtml(file)}</div>
+                        <div class="file-stats">
+                            <span class="file-stat"><strong>${errs.length}</strong> total</span>
+                            ${high > 0 ? `<span class="file-stat high">${high} H</span>` : ''}
+                            ${medium > 0 ? `<span class="file-stat medium">${medium} M</span>` : ''}
+                            ${low > 0 ? `<span class="file-stat low">${low} L</span>` : ''}
+                        </div>
+                    </li>
+                `;
+            }).join('');
+
+            return `
+                <div class="section">
+                    <div class="section-header">
+                        <span>Top Files</span>
+                        <span style="font-size: 12px; color: var(--gray-500);">Top 15</span>
+                    </div>
+                    <div class="section-content">
+                        <ul class="file-list">${listHtml}</ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderErrorTable(errors, previousSet) {
+            const sortIndicator = dir => dir === 'asc' ? ' ^' : ' v';
+
+            const tableHead = `
+                <thead>
+                    <tr>
+                        <th data-sort="file" class="${sortColumn === 'file' ? 'sorted' : ''}">
+                            File<span class="sort-indicator">${sortColumn === 'file' ? sortIndicator(sortDirection) : ''}</span>
+                        </th>
+                        <th data-sort="line" class="${sortColumn === 'line' ? 'sorted' : ''}">
+                            Line<span class="sort-indicator">${sortColumn === 'line' ? sortIndicator(sortDirection) : ''}</span>
+                        </th>
+                        <th data-sort="category" class="${sortColumn === 'category' ? 'sorted' : ''}">
+                            Category<span class="sort-indicator">${sortColumn === 'category' ? sortIndicator(sortDirection) : ''}</span>
+                        </th>
+                        <th data-sort="priority" class="${sortColumn === 'priority' ? 'sorted' : ''}">
+                            Priority<span class="sort-indicator">${sortColumn === 'priority' ? sortIndicator(sortDirection) : ''}</span>
+                        </th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+            `;
+
+            // Sort errors
+            const sorted = [...errors].sort((a, b) => {
+                let cmp = 0;
+                switch (sortColumn) {
+                    case 'file':
+                        cmp = shortenPath(a.file).localeCompare(shortenPath(b.file));
+                        break;
+                    case 'line':
+                        cmp = (a.line || 0) - (b.line || 0);
+                        break;
+                    case 'category':
+                        cmp = (a.category || '').localeCompare(b.category || '');
+                        break;
+                    case 'priority':
+                        const order = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+                        cmp = (order[a.priority] || 99) - (order[b.priority] || 99);
+                        break;
+                }
+                return sortDirection === 'asc' ? cmp : -cmp;
+            });
+
+            const rows = sorted.map(error => {
+                const isNew = isNewError(error, previousSet);
+                return `
+                    <tr class="${isNew ? 'new-error' : ''}">
+                        <td>
+                            <div class="file-path" title="${escapeHtml(error.file)}">${escapeHtml(shortenPath(error.file))}</div>
+                        </td>
+                        <td class="location">${error.line || '-'}:${error.column || '-'}</td>
+                        <td>${escapeHtml(error.category || 'Unknown')}</td>
+                        <td>
+                            <span class="priority-badge ${(error.priority || 'low').toLowerCase()}">${error.priority || 'LOW'}</span>
+                            ${isNew ? '<span class="new-badge">NEW</span>' : ''}
+                        </td>
+                        <td class="error-message">${escapeHtml(error.message || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (sorted.length === 0) {
+                return `
+                    <div class="section">
+                        <div class="section-header">
+                            <span>Error Details</span>
+                            <span style="font-size: 12px; color: var(--gray-500);">0 errors</span>
+                        </div>
+                        <div class="section-content">
+                            <div class="empty-state">
+                                <h2>No Errors Found!</h2>
+                                <p>Great job! Your code is type-safe.</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="section">
+                    <div class="section-header">
+                        <span>Error Details</span>
+                        <span style="font-size: 12px; color: var(--gray-500);">${sorted.length} errors</span>
+                    </div>
+                    <div class="error-table-container">
+                        <table class="error-table" id="error-table">
+                            ${tableHead}
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function applyFilters() {
+            filteredErrors = allErrors.filter(error => {
+                // Priority filter
+                if (currentFilter !== 'all' && currentFilter !== 'new') {
+                    if (error.priority !== currentFilter) return false;
+                }
+
+                // New errors filter
+                if (currentFilter === 'new') {
+                    const previousSet = new Set(previousErrors.map(getErrorKey));
+                    if (!isNewError(error, previousSet)) return false;
+                }
+
+                // Search filter
+                if (searchQuery) {
+                    const q = searchQuery.toLowerCase();
+                    const file = (error.file || '').toLowerCase();
+                    const message = (error.message || '').toLowerCase();
+                    const category = (error.category || '').toLowerCase();
+                    if (!file.includes(q) && !message.includes(q) && !category.includes(q)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        }
+
+        function render() {
+            applyFilters();
+
+            const previousSet = new Set(previousErrors.map(getErrorKey));
+
+            let html = '';
+            html += renderHeader(allErrors, previousErrors);
+            html += renderSummary(allErrors, previousErrors);
+            html += renderProgressBar(allErrors);
+            html += renderToolbar();
+
+            html += '<div class="main-grid">';
+            html += '<div class="main-column">';
+            html += renderErrorTable(filteredErrors, previousSet);
+            html += '</div>';
+            html += '<div class="sidebar">';
+            html += renderTrendChart(trends);
+            html += renderCategoryBreakdown(allErrors);
+            html += renderFileBreakdown(allErrors);
+            html += '</div>';
+            html += '</div>';
+
+            document.getElementById('app').innerHTML = html;
+
+            // Attach event listeners
+            attachEventListeners();
+        }
+
+        function attachEventListeners() {
+            // Search input
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    searchQuery = e.target.value;
+                    render();
+                    // Restore focus and cursor position
+                    const newInput = document.getElementById('search-input');
+                    if (newInput) {
+                        newInput.focus();
+                        newInput.setSelectionRange(searchQuery.length, searchQuery.length);
+                    }
+                });
+            }
+
+            // Filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    currentFilter = btn.dataset.filter;
+                    render();
+                });
+            });
+
+            // Export CSV
+            const exportBtn = document.getElementById('export-csv');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', exportToCsv);
+            }
+
+            // Sort columns
+            document.querySelectorAll('.error-table th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => {
+                    const col = th.dataset.sort;
+                    if (sortColumn === col) {
+                        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortColumn = col;
+                        sortDirection = 'asc';
+                    }
+                    render();
+                });
+            });
+        }
+
+        function exportToCsv() {
+            const headers = ['File', 'Line', 'Column', 'Category', 'Priority', 'Code', 'Message'];
+            const rows = filteredErrors.map(e => [
+                shortenPath(e.file || ''),
+                e.line || '',
+                e.column || '',
+                e.category || '',
+                e.priority || '',
+                e.code || '',
+                (e.message || '').replace(/"/g, '""')
+            ]);
+
+            let csv = headers.join(',') + '\n';
+            csv += rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `typescript-errors-${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+        }
+
+        // Initialize
+        async function init() {
+            const data = await loadData();
+            allErrors = data.errors;
+            previousErrors = data.previous;
+            trends = data.trends;
+
+            render();
+        }
+
+        init();
+    </script>
+</body>
+</html>

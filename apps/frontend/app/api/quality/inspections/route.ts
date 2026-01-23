@@ -1,16 +1,17 @@
 /**
  * Quality Inspections API Routes
- * Story: 06.5 - Incoming Inspection
+ * Story: 06.5 - Incoming Inspection / Story: 06.10 - In-Process Inspection
  * Phase: P4 - Refactoring (GREEN)
  *
  * Routes:
  * - GET /api/quality/inspections - List inspections with filters
- * - POST /api/quality/inspections - Create new inspection
+ * - POST /api/quality/inspections - Create new inspection (incoming or in-process)
  *
- * Refactored to use auth-middleware and error-handler utilities
- * to reduce code duplication across API routes.
+ * Supports both incoming and in-process inspection types.
+ * In-process inspections require wo_id and wo_operation_id.
  *
  * @see {@link docs/2-MANAGEMENT/epics/current/06-quality/06.5.incoming-inspection.md}
+ * @see {@link docs/2-MANAGEMENT/epics/current/06-quality/06.10.in-process-inspection.md}
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,7 +20,9 @@ import {
   createInspectionSchema,
   inspectionListQuerySchema,
 } from '@/lib/validation/inspection';
+import { createInProcessInspectionSchema } from '@/lib/validation/in-process-inspection';
 import * as InspectionService from '@/lib/services/inspection-service';
+import * as InProcessInspectionService from '@/lib/services/in-process-inspection-service';
 import { getAuthContext, checkAdminPermission } from '@/lib/api/auth-middleware';
 import { handleApiError, forbiddenResponse } from '@/lib/api/error-handler';
 
@@ -129,8 +132,27 @@ export async function POST(request: NextRequest) {
       return forbiddenResponse('Insufficient permissions to create inspections');
     }
 
-    // Parse and validate request body
+    // Parse request body
     const body = await request.json();
+
+    // Check if this is an in-process inspection (has wo_id and wo_operation_id)
+    if (body.wo_id && body.wo_operation_id) {
+      // Validate with in-process schema
+      const validatedData = createInProcessInspectionSchema.parse(body);
+
+      // Create in-process inspection
+      const inspection = await InProcessInspectionService.createInProcess(
+        auth.orgId,
+        validatedData
+      );
+
+      return NextResponse.json(
+        { success: true, data: { inspection } },
+        { status: 201 }
+      );
+    }
+
+    // Otherwise, validate as incoming inspection
     const validatedData = createInspectionSchema.parse(body);
 
     // Check if LP has active inspection (warning)
@@ -154,7 +176,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create inspection
+    // Create incoming inspection
     const inspection = await InspectionService.create(validatedData);
 
     return NextResponse.json(

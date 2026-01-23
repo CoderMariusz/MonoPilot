@@ -17,6 +17,47 @@ import { updateSamplingPlanSchema } from '@/lib/validation/sampling-plan-schemas
 import { ZodError } from 'zod';
 import * as SamplingPlanService from '@/lib/services/sampling-plan-service';
 
+/**
+ * Helper to check authentication
+ */
+async function checkAuth(): Promise<{ error?: NextResponse }> {
+  const supabase = await createServerSupabase();
+  const { data: { session }, error: authError } = await supabase.auth.getSession();
+
+  if (authError || !session) {
+    return {
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Helper to handle service errors
+ */
+function handleServiceError(error: unknown, defaultStatus = 500) {
+  if (error instanceof ZodError) {
+    return NextResponse.json(
+      { error: 'Invalid request data', details: error.errors },
+      { status: 400 }
+    );
+  }
+
+  if (error instanceof SamplingPlanService.ValidationError) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (error instanceof SamplingPlanService.NotFoundError) {
+    return NextResponse.json({ error: error.message }, { status: 404 });
+  }
+
+  return NextResponse.json(
+    { error: error instanceof Error ? error.message : 'Internal server error' },
+    { status: defaultStatus }
+  );
+}
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -33,18 +74,13 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const supabase = await createServerSupabase();
-    const { id } = await params;
-
     // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
-
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await checkAuth();
+    if (authResult.error) {
+      return authResult.error;
     }
+
+    const { id } = await params;
 
     // Get sampling plan
     const result = await SamplingPlanService.getSamplingPlanById(id);
@@ -56,15 +92,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error in GET /api/quality/sampling-plans/:id:', error);
-
-    if (error instanceof SamplingPlanService.NotFoundError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
-
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return handleServiceError(error);
   }
 }
 
@@ -83,18 +111,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const supabase = await createServerSupabase();
-    const { id } = await params;
-
     // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
-
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await checkAuth();
+    if (authResult.error) {
+      return authResult.error;
     }
+
+    const { id } = await params;
 
     // Parse and validate request body
     const body = await request.json();
@@ -106,26 +129,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ sampling_plan: samplingPlan });
   } catch (error) {
     console.error('Error in PUT /api/quality/sampling-plans/:id:', error);
-
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    if (error instanceof SamplingPlanService.NotFoundError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
-
-    if (error instanceof SamplingPlanService.ValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return handleServiceError(error);
   }
 }
 
@@ -141,18 +145,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const supabase = await createServerSupabase();
-    const { id } = await params;
-
     // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
-
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await checkAuth();
+    if (authResult.error) {
+      return authResult.error;
     }
+
+    const { id } = await params;
 
     // Delete (deactivate) sampling plan
     const result = await SamplingPlanService.deleteSamplingPlan(id);
@@ -160,14 +159,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error in DELETE /api/quality/sampling-plans/:id:', error);
-
-    if (error instanceof SamplingPlanService.NotFoundError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
-
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return handleServiceError(error);
   }
 }

@@ -1,0 +1,5 @@
+P2: ✓ test-writer 21:42 files:3 tests:119 status:red
+P3: ✓ backend-dev 10:18 files:8 tests:233/252 migration:143
+P4: ✓ senior-dev 19:58 tests:94/104 refactors:3
+P5: ✗ code-reviewer 20:12 issues:19-failed decision:REQUEST_CHANGES
+6→P3-FIX: ✓ backend-dev 20:30 blocker:fixed org-id-hardcoded tests:pending

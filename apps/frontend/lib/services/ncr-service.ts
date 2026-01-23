@@ -217,7 +217,7 @@ export class NCRService {
   /**
    * Create new NCR
    */
-  static async create(input: Partial<CreateNCRInput>, userId: string): Promise<NCRReport> {
+  static async create(input: Partial<CreateNCRInput>, userId: string, orgId?: string): Promise<NCRReport> {
     // Validate input
     const validationResult = createNCRSchema.safeParse(input)
     if (!validationResult.success) {
@@ -259,18 +259,18 @@ export class NCRService {
 
     const validated = validationResult.data
 
-    // Extract org_id from a hypothetical user lookup (for testing, use a default)
-    const orgId = '550e8400-e29b-41d4-a716-446655440000'
+    // Use provided org_id or fall back to test default
+    const finalOrgId = orgId || '550e8400-e29b-41d4-a716-446655440000'
 
     // Generate NCR number
-    const ncrNumber = await NCRService.generateNCRNumber(orgId)
+    const ncrNumber = await NCRService.generateNCRNumber(finalOrgId)
 
     const now = new Date().toISOString()
     const status: NCRStatus = validated.submit_immediately ? 'open' : 'draft'
 
     const ncr: NCRReport = {
       id: crypto.randomUUID(),
-      org_id: orgId,
+      org_id: finalOrgId,
       ncr_number: ncrNumber,
       title: validated.title,
       description: validated.description,

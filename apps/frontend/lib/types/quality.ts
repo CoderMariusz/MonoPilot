@@ -724,3 +724,155 @@ export interface DeleteSamplingPlanResponse {
   message: string;
   warning?: string;
 }
+
+// ============================================
+// In-Process Inspection Types (Story 06.10)
+// ============================================
+
+/**
+ * WO Operation QA Status
+ * - pending: Awaiting inspection
+ * - passed: QA inspection passed
+ * - failed: QA inspection failed
+ * - conditional: Approved with restrictions
+ * - not_required: No QA check needed for this operation
+ */
+export type WOOperationQAStatus = 'pending' | 'passed' | 'failed' | 'conditional' | 'not_required';
+
+/**
+ * WO Operation Info for In-Process Inspection
+ */
+export interface WOOperationInfo {
+  id: string;
+  sequence: number;
+  name: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  operator_name?: string | null;
+  qa_status: WOOperationQAStatus;
+  qa_inspection_id?: string | null;
+}
+
+/**
+ * Create In-Process Inspection Input
+ */
+export interface CreateInProcessInspectionInput {
+  wo_id: string;
+  wo_operation_id: string;
+  product_id?: string;
+  spec_id?: string;
+  batch_number?: string;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  scheduled_date?: string;
+  inspector_id?: string;
+  notes?: string;
+}
+
+/**
+ * Complete In-Process Inspection Input
+ */
+export interface CompleteInProcessInspectionInput {
+  result: 'pass' | 'fail' | 'conditional';
+  result_notes?: string;
+  defects_found?: number;
+  major_defects?: number;
+  minor_defects?: number;
+  critical_defects?: number;
+  conditional_reason?: string;
+  conditional_restrictions?: string;
+  conditional_expires_at?: string;
+  create_ncr?: boolean;
+  block_next_operation?: boolean;
+  process_parameters?: Array<{
+    parameter_name: string;
+    measured_value: string;
+    within_spec: boolean;
+  }>;
+}
+
+/**
+ * Complete In-Process Inspection Response
+ */
+export interface CompleteInProcessResult {
+  inspection: QualityInspection;
+  wo_operation_updated: boolean;
+  wo_operation_qa_status: string;
+  next_operation_blocked: boolean;
+  ncr_id?: string;
+  alert_sent_to?: string[];
+}
+
+/**
+ * In-Process List Query Parameters
+ */
+export interface InProcessListParams {
+  wo_id?: string;
+  wo_operation_id?: string;
+  status?: InspectionStatus;
+  priority?: InspectionPriority;
+  inspector_id?: string;
+  product_id?: string;
+  date_from?: string;
+  date_to?: string;
+  search?: string;
+  sort_by?: 'inspection_number' | 'scheduled_date' | 'created_at' | 'priority';
+  sort_order?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * WO Inspections Response
+ */
+export interface WOInspectionsResponse {
+  wo: {
+    id: string;
+    wo_number: string;
+    status: string;
+    product_name: string;
+    batch_number: string;
+  };
+  inspections: QualityInspection[];
+  summary: {
+    total_operations: number;
+    inspections_completed: number;
+    inspections_passed: number;
+    inspections_failed: number;
+    inspections_pending: number;
+  };
+}
+
+/**
+ * Operation Inspection Response
+ */
+export interface OperationInspectionResponse {
+  operation: WOOperationInfo;
+  inspection: QualityInspection | null;
+  previous_operation_qa: {
+    operation_name: string;
+    result: string;
+  } | null;
+}
+
+/**
+ * WO Quality Summary
+ */
+export interface WOQualitySummary {
+  total_operations: number;
+  qa_required: number;
+  passed: number;
+  failed: number;
+  pending: number;
+  conditional: number;
+  overall_status: 'pass' | 'fail' | 'pending' | 'conditional';
+}
+
+/**
+ * Can Start Next Operation Response
+ */
+export interface CanStartNextOperationResponse {
+  canStart: boolean;
+  blockedReason?: string;
+  requiredAction?: string;
+}
