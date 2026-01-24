@@ -1,5 +1,5 @@
-<testsuites id="" name="" tests="6" failures="1" skipped="3" errors="0" time="24.801258999999998">
-<testsuite name="..\auth.cleanup.ts" timestamp="2026-01-24T19:56:46.015Z" hostname="auth-cleanup" tests="1" failures="0" skipped="0" time="0.003" errors="0">
+<testsuites id="" name="" tests="32" failures="19" skipped="3" errors="0" time="211.921095">
+<testsuite name="..\auth.cleanup.ts" timestamp="2026-01-24T19:58:30.146Z" hostname="auth-cleanup" tests="1" failures="0" skipped="0" time="0.003" errors="0">
 <testcase name="cleanup auth state" classname="..\auth.cleanup.ts" time="0.003">
 <system-out>
 <![CDATA[ℹ️  Auth files preserved for faster subsequent runs
@@ -8,8 +8,8 @@
 </system-out>
 </testcase>
 </testsuite>
-<testsuite name="..\auth.setup.ts" timestamp="2026-01-24T19:56:46.015Z" hostname="auth-setup" tests="4" failures="0" skipped="3" time="1.782" errors="0">
-<testcase name="authenticate admin" classname="..\auth.setup.ts" time="1.782">
+<testsuite name="..\auth.setup.ts" timestamp="2026-01-24T19:58:30.146Z" hostname="auth-setup" tests="4" failures="0" skipped="3" time="1.974" errors="0">
+<testcase name="authenticate admin" classname="..\auth.setup.ts" time="1.974">
 <system-out>
 <![CDATA[✅ Authenticated: admin@monopilot.com -> .auth/admin.json
 ]]>
@@ -40,28 +40,38 @@
 </skipped>
 </testcase>
 </testsuite>
-<testsuite name="technical\routings.spec.ts" timestamp="2026-01-24T19:56:46.015Z" hostname="chromium" tests="1" failures="1" skipped="0" time="18.806" errors="0">
-<testcase name="Routings Module (Suite 4) › Create Routing › TC-RTG-006: validates routing code uniqueness" classname="technical\routings.spec.ts" time="18.806">
+<testsuite name="technical\routings.spec.ts" timestamp="2026-01-24T19:58:30.146Z" hostname="chromium" tests="27" failures="19" skipped="0" time="368.829" errors="0">
+<testcase name="Routings Module (Suite 4) › List View › TC-RTG-001: displays table with correct columns" classname="technical\routings.spec.ts" time="3.028">
+</testcase>
+<testcase name="Routings Module (Suite 4) › List View › TC-RTG-002: search by code/name filters correctly" classname="technical\routings.spec.ts" time="4.543">
+</testcase>
+<testcase name="Routings Module (Suite 4) › List View › TC-RTG-003: filter by is_reusable flag" classname="technical\routings.spec.ts" time="2.427">
+</testcase>
+<testcase name="Routings Module (Suite 4) › List View › TC-RTG-004: filter by status" classname="technical\routings.spec.ts" time="3.613">
+</testcase>
+<testcase name="Routings Module (Suite 4) › Create Routing › TC-RTG-005: opens create form" classname="technical\routings.spec.ts" time="3.982">
+</testcase>
+<testcase name="Routings Module (Suite 4) › Create Routing › TC-RTG-006: validates routing code uniqueness" classname="technical\routings.spec.ts" time="19.849">
 <failure message="routings.spec.ts:135:9 TC-RTG-006: validates routing code uniqueness" type="FAILURE">
 <![CDATA[  [chromium] › technical\routings.spec.ts:135:9 › Routings Module (Suite 4) › Create Routing › TC-RTG-006: validates routing code uniqueness 
 
     Error: expect(locator).toBeVisible() failed
 
-    Locator: locator('table tbody tr').filter({ hasText: 'RTG-612801' }).first()
+    Locator: locator('table tbody tr').filter({ hasText: 'RTG-725342' }).first()
     Expected: visible
     Timeout: 15000ms
     Error: element(s) not found
 
     Call log:
       - Expect "toBeVisible" with timeout 15000ms
-      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-612801' }).first()
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-725342' }).first()
 
 
        at ..\pages\DataTablePage.ts:245
 
       243 |    */
       244 |   async expectRowWithText(text: string) {
-    > 245 |     await expect(this.getRowByText(text)).toBeVisible();
+    > 245 |     await expect(this.getRowByText(text)).toBeVisible({ timeout: 15000 });
           |                                           ^
       246 |   }
       247 |
@@ -70,15 +80,17 @@
         at RoutingsPage.expectRoutingInList (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:204:26)
         at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:147:26
 
-    Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, open 'C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\test-results\.playwright-artifacts-1\traces\99e8834fcbec1b71ecc9-2d18640bf1af193a2891.trace'
-
     attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
     ..\..\test-results\technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\test-failed-1.png
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
     Error Context: ..\..\test-results\technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\error-context.md
 
-    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
     ..\..\test-results\technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\trace.zip
     Usage:
 
@@ -87,12 +99,1003 @@
     ────────────────────────────────────────────────────────────────────────────────────────────────
 ]]>
 </failure>
-<system-err>
+<system-out>
 <![CDATA[
-Warning: attachment technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\test-failed-1.png is missing
-Warning: attachment technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\error-context.md is missing
-Warning: attachment technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\trace.zip is missing]]>
-</system-err>
+[[ATTACHMENT|technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-ec670-tes-routing-code-uniqueness-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Create Routing › TC-RTG-007: sets is_reusable flag" classname="technical\routings.spec.ts" time="4.056">
+<failure message="routings.spec.ts:165:9 TC-RTG-007: sets is_reusable flag" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:165:9 › Routings Module (Suite 4) › Create Routing › TC-RTG-007: sets is_reusable flag 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText(/reusable|multi-bom/i)
+    Expected: visible
+    Error: strict mode violation: getByText(/reusable|multi-bom/i) resolved to 6 elements:
+        1) <td class="p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-semibold">Non-Reusable Routing 1769284233551</td> aka getByRole('cell', { name: 'Non-Reusable Routing' })
+        2) <td class="p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-semibold">Reusable Routing 1769284132899</td> aka getByRole('cell', { name: 'Reusable Routing 1769284132899' })
+        3) <td class="p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-mono text-sm">RTG-REUSABLE-223245</td> aka getByRole('cell', { name: 'RTG-REUSABLE-' })
+        4) <td class="p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-semibold">Reusable Routing 1769284223245</td> aka getByRole('cell', { name: 'Reusable Routing 1769284223245' })
+        5) <td class="p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-semibold">Reusable Routing 1769284324380</td> aka getByRole('cell', { name: 'Reusable Routing 1769284324380' })
+        6) <td class="p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] font-semibold">Reusable Routing 1769284726573</td> aka getByRole('cell', { name: 'Reusable Routing 1769284726573' })
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for getByText(/reusable|multi-bom/i)
+
+
+       at ..\pages\RoutingsPage.ts:648
+
+      646 |   async expectReusableRouting() {
+      647 |     const badge = this.page.getByText(/reusable|multi-bom/i);
+    > 648 |     await expect(badge).toBeVisible();
+          |                         ^
+      649 |   }
+      650 |
+      651 |   /**
+        at RoutingsPage.expectReusableRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:648:25)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:181:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-3f1d4-G-007-sets-is-reusable-flag-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Create Routing › TC-RTG-008: sets cost fields (ADR-009)" classname="technical\routings.spec.ts" time="3.742">
+</testcase>
+<testcase name="Routings Module (Suite 4) › Create Routing › TC-RTG-009: validates code format (uppercase, alphanumeric, hyphens)" classname="technical\routings.spec.ts" time="3.282">
+</testcase>
+<testcase name="Routings Module (Suite 4) › Create Routing › TC-RTG-010: creates routing successfully" classname="technical\routings.spec.ts" time="18.268">
+<failure message="routings.spec.ts:228:9 TC-RTG-010: creates routing successfully" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:228:9 › Routings Module (Suite 4) › Create Routing › TC-RTG-010: creates routing successfully 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('table tbody tr').filter({ hasText: 'RTG-738895' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-738895' }).first()
+
+
+       at ..\pages\DataTablePage.ts:245
+
+      243 |    */
+      244 |   async expectRowWithText(text: string) {
+    > 245 |     await expect(this.getRowByText(text)).toBeVisible({ timeout: 15000 });
+          |                                           ^
+      246 |   }
+      247 |
+      248 |   /**
+        at DataTablePage.expectRowWithText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:245:43)
+        at RoutingsPage.expectRoutingInList (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:204:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:248:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-6f0ab-reates-routing-successfully-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-011: navigates to routing detail" classname="technical\routings.spec.ts" time="4.122">
+<failure message="routings.spec.ts:255:9 TC-RTG-011: navigates to routing detail" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:255:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-011: navigates to routing detail 
+
+    Error: expect(received).toContain(expected) // indexOf
+
+    Expected substring: "/technical/routings/"
+    Received string:    "http://localhost:3000/technical/routings"
+
+      271 |       // ASSERT - Detail page loads
+      272 |       await page.waitForLoadState('networkidle');
+    > 273 |       expect(page.url()).toContain('/technical/routings/');
+          |                          ^
+      274 |     });
+      275 |
+      276 |     test('TC-RTG-012: adds operation with time and cost fields', async ({ page }) => {
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:273:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-3e84d-navigates-to-routing-detail-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-012: adds operation with time and cost fields" classname="technical\routings.spec.ts" time="19.608">
+<failure message="routings.spec.ts:276:9 TC-RTG-012: adds operation with time and cost fields" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:276:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-012: adds operation with time and cost fields 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /add operation/i })
+
+
+       at ..\pages\BasePage.ts:83
+
+      81 |    */
+      82 |   async clickButton(name: string | RegExp) {
+    > 83 |     await this.page.getByRole('button', { name }).click();
+         |                                                   ^
+      84 |   }
+      85 |
+      86 |   /**
+        at RoutingsPage.clickButton (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\BasePage.ts:83:51)
+        at RoutingsPage.clickAddOperation (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:332:16)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:292:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-c49e5-n-with-time-and-cost-fields-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-013: sets time fields (setup_time, duration, cleanup_time)" classname="technical\routings.spec.ts" time="19.662">
+<failure message="routings.spec.ts:312:9 TC-RTG-013: sets time fields (setup_time, duration, cleanup_time)" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:312:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-013: sets time fields (setup_time, duration, cleanup_time) 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-TIME-758965' }).first()
+
+
+       at ..\pages\DataTablePage.ts:121
+
+      119 |    */
+      120 |   async clickRowByText(text: string) {
+    > 121 |     await this.getRowByText(text).click();
+          |                                   ^
+      122 |   }
+      123 |
+      124 |   // ==================== Row Actions ====================
+        at DataTablePage.clickRowByText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:121:35)
+        at RoutingsPage.clickRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:196:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:324:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-c23bc-time-duration-cleanup-time--chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-014: sets labor_cost_per_hour" classname="technical\routings.spec.ts" time="19.577">
+<failure message="routings.spec.ts:346:9 TC-RTG-014: sets labor_cost_per_hour" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:346:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-014: sets labor_cost_per_hour 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /add operation/i })
+
+
+       at ..\pages\BasePage.ts:83
+
+      81 |    */
+      82 |   async clickButton(name: string | RegExp) {
+    > 83 |     await this.page.getByRole('button', { name }).click();
+         |                                                   ^
+      84 |   }
+      85 |
+      86 |   /**
+        at RoutingsPage.clickButton (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\BasePage.ts:83:51)
+        at RoutingsPage.clickAddOperation (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:332:16)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:362:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-42508-14-sets-labor-cost-per-hour-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-015: adds instructions (max 2000 chars)" classname="technical\routings.spec.ts" time="19.471">
+<failure message="routings.spec.ts:380:9 TC-RTG-015: adds instructions (max 2000 chars)" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:380:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-015: adds instructions (max 2000 chars) 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /add operation/i })
+
+
+       at ..\pages\BasePage.ts:83
+
+      81 |    */
+      82 |   async clickButton(name: string | RegExp) {
+    > 83 |     await this.page.getByRole('button', { name }).click();
+         |                                                   ^
+      84 |   }
+      85 |
+      86 |   /**
+        at RoutingsPage.clickButton (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\BasePage.ts:83:51)
+        at RoutingsPage.clickAddOperation (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:332:16)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:396:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-4d413-nstructions-max-2000-chars--chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-016: validates unique sequence numbers" classname="technical\routings.spec.ts" time="19.035">
+<failure message="routings.spec.ts:418:9 TC-RTG-016: validates unique sequence numbers" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:418:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-016: validates unique sequence numbers 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-SEQ-794608' }).first()
+
+
+       at ..\pages\DataTablePage.ts:121
+
+      119 |    */
+      120 |   async clickRowByText(text: string) {
+    > 121 |     await this.getRowByText(text).click();
+          |                                   ^
+      122 |   }
+      123 |
+      124 |   // ==================== Row Actions ====================
+        at DataTablePage.clickRowByText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:121:35)
+        at RoutingsPage.clickRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:196:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:430:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-84909-tes-unique-sequence-numbers-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-017: reorders operations" classname="technical\routings.spec.ts" time="19.497">
+<failure message="routings.spec.ts:463:9 TC-RTG-017: reorders operations" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:463:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-017: reorders operations 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-REORDER-801639' }).first()
+
+
+       at ..\pages\DataTablePage.ts:121
+
+      119 |    */
+      120 |   async clickRowByText(text: string) {
+    > 121 |     await this.getRowByText(text).click();
+          |                                   ^
+      122 |   }
+      123 |
+      124 |   // ==================== Row Actions ====================
+        at DataTablePage.clickRowByText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:121:35)
+        at RoutingsPage.clickRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:196:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:475:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-95ba4-RTG-017-reorders-operations-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Operations Management › TC-RTG-018: deletes operation" classname="technical\routings.spec.ts" time="19.598">
+<failure message="routings.spec.ts:500:9 TC-RTG-018: deletes operation" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:500:9 › Routings Module (Suite 4) › Operations Management › TC-RTG-018: deletes operation 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /add operation/i })
+
+
+       at ..\pages\BasePage.ts:83
+
+      81 |    */
+      82 |   async clickButton(name: string | RegExp) {
+    > 83 |     await this.page.getByRole('button', { name }).click();
+         |                                                   ^
+      84 |   }
+      85 |
+      86 |   /**
+        at RoutingsPage.clickButton (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\BasePage.ts:83:51)
+        at RoutingsPage.clickAddOperation (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:332:16)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:516:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-27ba6-C-RTG-018-deletes-operation-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Routing Assignment to BOM › TC-RTG-019: assigns routing to BOM (FR-2.42)" classname="technical\routings.spec.ts" time="19.854">
+<failure message="routings.spec.ts:542:9 TC-RTG-019: assigns routing to BOM (FR-2.42)" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:542:9 › Routings Module (Suite 4) › Routing Assignment to BOM › TC-RTG-019: assigns routing to BOM (FR-2.42) 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('button', { name: /assign|attach|link.*BOM/i })
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for getByRole('button', { name: /assign|attach|link.*BOM/i })
+
+
+       at ..\pages\RoutingsPage.ts:482
+
+      480 |       name: /assign|attach|link.*BOM/i,
+      481 |     });
+    > 482 |     await expect(assignButton).toBeVisible();
+          |                                ^
+      483 |   }
+      484 |
+      485 |   /**
+        at RoutingsPage.expectAssignableTosBOM (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:482:32)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:559:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-da528-gns-routing-to-BOM-FR-2-42--chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Routing Assignment to BOM › TC-RTG-020: verifies routing displayed in BOM detail" classname="technical\routings.spec.ts" time="4.992">
+</testcase>
+<testcase name="Routings Module (Suite 4) › Routing Clone › TC-RTG-021: clones routing with -COPY suffix" classname="technical\routings.spec.ts" time="19.648">
+<failure message="routings.spec.ts:587:9 TC-RTG-021: clones routing with -COPY suffix" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:587:9 › Routings Module (Suite 4) › Routing Clone › TC-RTG-021: clones routing with -COPY suffix 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /clone|copy/i })
+
+
+       at ..\pages\BasePage.ts:83
+
+      81 |    */
+      82 |   async clickButton(name: string | RegExp) {
+    > 83 |     await this.page.getByRole('button', { name }).click();
+         |                                                   ^
+      84 |   }
+      85 |
+      86 |   /**
+        at RoutingsPage.clickButton (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\BasePage.ts:83:51)
+        at RoutingsPage.clickCloneRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:509:16)
+        at RoutingsPage.cloneRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:526:16)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:603:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-bfbfa-s-routing-with--COPY-suffix-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Routing Versioning › TC-RTG-022: auto-increments version on edit (FR-2.46)" classname="technical\routings.spec.ts" time="19.599">
+<failure message="routings.spec.ts:613:9 TC-RTG-022: auto-increments version on edit (FR-2.46)" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:613:9 › Routings Module (Suite 4) › Routing Versioning › TC-RTG-022: auto-increments version on edit (FR-2.46) 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-VERSION-844106' }).first()
+
+
+       at ..\pages\DataTablePage.ts:121
+
+      119 |    */
+      120 |   async clickRowByText(text: string) {
+    > 121 |     await this.getRowByText(text).click();
+          |                                   ^
+      122 |   }
+      123 |
+      124 |   // ==================== Row Actions ====================
+        at DataTablePage.clickRowByText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:121:35)
+        at RoutingsPage.clickRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:196:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:625:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-92465-ts-version-on-edit-FR-2-46--chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Routing Cost Calculation › TC-RTG-023: displays cost summary (ADR-009)" classname="technical\routings.spec.ts" time="19.868">
+<failure message="routings.spec.ts:648:9 TC-RTG-023: displays cost summary (ADR-009)" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:648:9 › Routings Module (Suite 4) › Routing Cost Calculation › TC-RTG-023: displays cost summary (ADR-009) 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-testid="cost-summary"], .cost-summary')
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for locator('[data-testid="cost-summary"], .cost-summary')
+
+
+       at ..\pages\RoutingsPage.ts:573
+
+      571 |   async expectCostSummary() {
+      572 |     const costCard = this.page.locator('[data-testid="cost-summary"], .cost-summary');
+    > 573 |     await expect(costCard).toBeVisible();
+          |                            ^
+      574 |   }
+      575 |
+      576 |   /**
+        at RoutingsPage.expectCostSummary (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:573:28)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:665:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-74bc2-plays-cost-summary-ADR-009--chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Routing Cost Calculation › TC-RTG-024: total cost calculation (setup + working + overhead)" classname="technical\routings.spec.ts" time="19.602">
+<failure message="routings.spec.ts:668:9 TC-RTG-024: total cost calculation (setup + working + overhead)" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:668:9 › Routings Module (Suite 4) › Routing Cost Calculation › TC-RTG-024: total cost calculation (setup + working + overhead) 
+
+    TimeoutError: locator.textContent: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByText(/setup cost:?\s+\$[\d.]+/i)
+
+
+       at ..\pages\RoutingsPage.ts:581
+
+      579 |   async getSetupCost(): Promise<number> {
+      580 |     const cost = this.page.getByText(/setup cost:?\s+\$[\d.]+/i);
+    > 581 |     const text = await cost.textContent();
+          |                             ^
+      582 |     return parseFloat(text?.match(/\$?([\d.]+)/)?.[1] || '0');
+      583 |   }
+      584 |
+        at RoutingsPage.getSetupCost (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:581:29)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:696:50
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-bcbbc-ion-setup-working-overhead--chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Parallel Operations › TC-RTG-025: adds operations with duplicate sequence (FR-2.48)" classname="technical\routings.spec.ts" time="19.289">
+<failure message="routings.spec.ts:713:9 TC-RTG-025: adds operations with duplicate sequence (FR-2.48)" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:713:9 › Routings Module (Suite 4) › Parallel Operations › TC-RTG-025: adds operations with duplicate sequence (FR-2.48) 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-PARALLEL-883142' }).first()
+
+
+       at ..\pages\DataTablePage.ts:121
+
+      119 |    */
+      120 |   async clickRowByText(text: string) {
+    > 121 |     await this.getRowByText(text).click();
+          |                                   ^
+      122 |   }
+      123 |
+      124 |   // ==================== Row Actions ====================
+        at DataTablePage.clickRowByText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:121:35)
+        at RoutingsPage.clickRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:196:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:725:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-f585d-duplicate-sequence-FR-2-48--chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Reusable vs Non-Reusable › TC-RTG-026: assigns reusable routing to multiple BOMs" classname="technical\routings.spec.ts" time="19.253">
+<failure message="routings.spec.ts:768:9 TC-RTG-026: assigns reusable routing to multiple BOMs" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:768:9 › Routings Module (Suite 4) › Reusable vs Non-Reusable › TC-RTG-026: assigns reusable routing to multiple BOMs 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-REUSABLE-885757' }).first()
+
+
+       at ..\pages\DataTablePage.ts:121
+
+      119 |    */
+      120 |   async clickRowByText(text: string) {
+    > 121 |     await this.getRowByText(text).click();
+          |                                   ^
+      122 |   }
+      123 |
+      124 |   // ==================== Row Actions ====================
+        at DataTablePage.clickRowByText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:121:35)
+        at RoutingsPage.clickRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:196:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:780:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-741cc-le-routing-to-multiple-BOMs-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Routings Module (Suite 4) › Reusable vs Non-Reusable › TC-RTG-027: non-reusable routing can only assign to one BOM" classname="technical\routings.spec.ts" time="19.364">
+<failure message="routings.spec.ts:789:9 TC-RTG-027: non-reusable routing can only assign to one BOM" type="FAILURE">
+<![CDATA[  [chromium] › technical\routings.spec.ts:789:9 › Routings Module (Suite 4) › Reusable vs Non-Reusable › TC-RTG-027: non-reusable routing can only assign to one BOM 
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('table tbody tr').filter({ hasText: 'RTG-NONREUSE-903601' }).first()
+
+
+       at ..\pages\DataTablePage.ts:121
+
+      119 |    */
+      120 |   async clickRowByText(text: string) {
+    > 121 |     await this.getRowByText(text).click();
+          |                                   ^
+      122 |   }
+      123 |
+      124 |   // ==================== Row Actions ====================
+        at DataTablePage.clickRowByText (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\DataTablePage.ts:121:35)
+        at RoutingsPage.clickRouting (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\RoutingsPage.ts:196:26)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\routings.spec.ts:801:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\video.webm]]
+
+[[ATTACHMENT|technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\error-context.md]]
+
+[[ATTACHMENT|technical-routings-Routing-e3bd7--can-only-assign-to-one-BOM-chromium\trace.zip]]
+]]>
+</system-out>
 </testcase>
 </testsuite>
 </testsuites>

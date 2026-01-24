@@ -19,6 +19,12 @@ function show_help {
     echo -e "  \033[1;32mdb:seed\033[0m    Seed the database with E2E test data."
     echo -e "  \033[1;32mdb:verify\033[0m  Verify database connection and schema."
     echo ""
+    echo -e "\033[1;34mE2E Test Helpers:\033[0m"
+    echo -e "  \033[1;32me2e:scaffold\033[0m <module/feature> <type> - Generate E2E test template"
+    echo -e "  \033[1;32me2e:extract-selectors\033[0m <file>       - Extract testable selectors from component"
+    echo -e "  \033[1;32me2e:detect-type\033[0m <file>            - Auto-detect test type (crud/form/flow/auth)"
+    echo -e "  \033[1;32me2e:run\033[0m <module>                  - Run E2E tests for module"
+    echo ""
     echo "Agent Guidelines:"
     echo "  - Code changes (.ts/.tsx): Run './ops check' before completing"
     echo "  - Docs only (.md): Skip './ops check'"
@@ -68,7 +74,27 @@ case "$COMMAND" in
            echo "Verification script not found."
         fi
         ;;
-        
+
+    e2e:extract-selectors)
+        echo -e "\n\033[1;34m🔍 Extracting Selectors...\033[0m"
+        bash scripts/extract-selectors.sh "$2"
+        ;;
+
+    e2e:detect-type)
+        echo -e "\n\033[1;34m🤖 Detecting Test Type...\033[0m"
+        bash scripts/detect-test-type.sh "$2"
+        ;;
+
+    e2e:scaffold)
+        echo -e "\n\033[1;34m📝 Scaffolding E2E Test...\033[0m"
+        pnpm test:gen "$2" "$3" "${@:4}"
+        ;;
+
+    e2e:run)
+        echo -e "\n\033[1;34m🧪 Running E2E Tests...\033[0m"
+        pnpm test:e2e "e2e/tests/$2" "${@:3}"
+        ;;
+
     *)
         show_help
         exit 1

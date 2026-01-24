@@ -26,15 +26,16 @@ export class ProductsPage extends BasePage {
   private readonly dataTable = new DataTablePage(this.page);
 
   // Selectors for create/edit form
+  // Uses id attributes where available (ShadCN components use id), falls back to name
   private readonly formFields = {
-    code: 'input[name="code"]',
-    name: 'input[name="name"]',
-    description: 'textarea[name="description"]',
+    code: 'input#code, input[name="code"]',
+    name: 'input#name, input[name="name"]',
+    description: 'textarea#description, textarea[name="description"]',
     productType: 'select[name="product_type_id"], [name="product_type_id"]',
     baseUom: 'select[name="base_uom"], [name="base_uom"]',
-    costPerUnit: 'input[name="cost_per_unit"]',
-    isPerishable: 'input[name="is_perishable"]',
-    shelfLifeDays: 'input[name="shelf_life_days"]',
+    costPerUnit: 'input#cost_per_unit, input[name="cost_per_unit"]',
+    isPerishable: 'input#is_perishable, input[name="is_perishable"]',
+    shelfLifeDays: 'input#shelf_life_days, input[name="shelf_life_days"]',
     expiryPolicy: 'select[name="expiry_policy"], [name="expiry_policy"]',
   };
 
@@ -263,15 +264,24 @@ export class ProductsPage extends BasePage {
     // Now wait for the form header
     await this.page.getByText(/Basic Information/i).waitFor({ state: 'visible', timeout: 30000 });
 
-    // Finally wait for the code input
-    await this.page.locator('input[name="code"]').waitFor({ state: 'visible', timeout: 30000 });
+    // Finally wait for the code input - use id or look for any input in the modal
+    try {
+      await this.page.locator('input#code, input[name="code"]').waitFor({ state: 'visible', timeout: 30000 });
+    } catch {
+      // If input still not found, wait a bit more and try again
+      await this.page.waitForTimeout(500);
+      // Just proceed and let the fill operation wait
+    }
 
     // Fill required fields
-    await this.page.fill(this.formFields.code, data.code);
-    await this.page.fill(this.formFields.name, data.name);
+    const codeInput = this.page.locator('input#code, input[name="code"]').first();
+    await codeInput.fill(data.code);
+    const nameInput = this.page.locator('input#name, input[name="name"]').first();
+    await nameInput.fill(data.name);
 
     if (data.description) {
-      await this.page.fill(this.formFields.description, data.description);
+      const descInput = this.page.locator('textarea#description, textarea[name="description"]').first();
+      await descInput.fill(data.description);
     }
 
     // Select product type - use ShadCN Select component

@@ -73,78 +73,70 @@ User provides one of:
        stories: [4.4]
    ```
 
-### Phase 2: DELEGATE TO AGENTS
+### Phase 2: DELEGATE TO SUBAGENTS
 
-**CRITICAL: Use test-generator script FIRST, then fill TODOs**
+**Use the `e2e-test-writer` custom subagent** (defined in `.claude-agent-pack/global/agents/e2e-test-writer.md`)
 
-For each feature, spawn `test-writer` agent with:
+**Delegation Pattern**: Natural language task delegation, not function calls
 
-```typescript
-Task({
-  subagent_type: 'test-writer',
-  model: 'haiku', // Use haiku for cost efficiency
-  description: `Write ${feature.type} tests for ${feature.path}`,
-  prompt: `
-MISSION: Write E2E tests for ${feature.name}
+For each feature identified in Phase 1, spawn the e2e-test-writer subagent:
 
-WORKFLOW (MANDATORY):
-1. **Generate Template** (saves 85% tokens):
-   pnpm test:gen ${feature.module}/${feature.name} ${feature.type}
+```markdown
+I need you to use the e2e-test-writer subagent to write E2E tests for:
 
-   Examples:
-   - pnpm test:gen production/work-orders crud
-   - pnpm test:gen production/output flow --steps 5
-   - pnpm test:gen production/consumption form
+**Feature**: ${feature.name}
+**Module**: ${feature.module}
+**Type**: ${feature.type}
+**Path**: ${feature.path}
 
-2. **Read Generated File**:
-   - Check TODOs in e2e/tests/${feature.module}/${feature.name}.spec.ts
-   - Understand what needs to be filled
+**Task Details**:
+1. Generate template: `pnpm test:gen ${feature.module}/${feature.name} ${feature.type}`
+2. Read components in: `apps/frontend/components/${feature.module}/${feature.name}/`
+3. Fill all TODOs with real selectors from components
+4. Run tests until 0 failures
+5. Report back with results
 
-3. **Read Actual Components**:
-   - apps/frontend/app/(authenticated)${feature.path}/page.tsx
-   - apps/frontend/components/${feature.module}/${feature.name}/*.tsx
-   - Identify:
-     * Form field names/IDs
-     * Button labels
-     * Table columns
-     * data-testid attributes
-
-4. **Fill TODOs**:
-   - Replace placeholder selectors with real ones
-   - Add actual test data (from seed or realistic values)
-   - Update assertions to match actual UI
-
-5. **Run Tests**:
-   pnpm test:e2e e2e/tests/${feature.module}/${feature.name}.spec.ts
-
-6. **Fix Failures**:
-   - Read trace files if failures occur
-   - Adjust selectors/waits
-   - Re-run until 0 failures
-
-7. **Report Back**:
-   - Tests passing: X/Y
-   - Coverage: List of tested scenarios
-   - Issues: Any features not testable (document why)
-
-CONSTRAINTS:
-- Use template generator for ALL E2E tests
-- Never write tests from scratch (waste of tokens)
-- Read components BEFORE filling TODOs (don't guess)
-- Ensure 0 failures before completing
-
-Expected output:
+**Expected Deliverable**:
 - File: e2e/tests/${feature.module}/${feature.name}.spec.ts
-- Status: X/Y tests passing
-- Time: ~2 minutes
-`
-})
+- Status: All tests passing
+- Run command for verification
+
+Use model: haiku (for cost efficiency)
+```
+
+**Example Delegation**:
+```
+Use the e2e-test-writer subagent to write CRUD tests for production/work-orders:
+- Type: crud
+- Path: /production/work-orders
+- Priority: high
+
+The subagent should:
+1. Run: pnpm test:gen production/work-orders crud
+2. Read: apps/frontend/components/production/work-orders/*.tsx
+3. Fill TODOs with actual selectors
+4. Verify: 0 test failures
+
+Use haiku model.
 ```
 
 **Parallelization:**
-- Spawn up to 4 agents in parallel (Claude Code limit)
-- Group by module to avoid conflicts
-- Wait for batch to complete before next batch
+- Spawn up to **8 subagents** simultaneously (leave headroom for other tasks)
+- Group by module when possible to minimize conflicts
+- Use Claude Code's built-in parallel execution
+- Send multiple Task invocations in **one message** for true parallelism
+
+**Parallel Invocation Example**:
+```
+Send SINGLE message with multiple task delegations:
+
+Use e2e-test-writer for production/work-orders (crud, haiku)
+Use e2e-test-writer for production/routing (crud, haiku)
+Use e2e-test-writer for production/output (flow, haiku)
+Use e2e-test-writer for production/consumption (form, haiku)
+
+All in parallel, report when all complete.
+```
 
 ### Phase 3: COLLECT & VERIFY
 

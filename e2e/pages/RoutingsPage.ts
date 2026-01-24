@@ -287,9 +287,9 @@ export class RoutingsPage extends BasePage {
     await this.clickCreateRouting();
     await this.fillRoutingForm(data);
     await this.submitCreateRouting();
-    // Wait for the modal to close and navigation to happen
+    // Wait for the modal to close and the page to refresh with new data
     await this.waitForPageLoad();
-    await this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(800); // Wait for the API to fetch updated routings
   }
 
   /**

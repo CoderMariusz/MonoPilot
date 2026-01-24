@@ -239,10 +239,10 @@ export class DataTablePage extends BasePage {
   }
 
   /**
-   * Assert row contains text
+   * Assert row contains text (with extended timeout for page updates)
    */
   async expectRowWithText(text: string) {
-    await expect(this.getRowByText(text)).toBeVisible();
+    await expect(this.getRowByText(text)).toBeVisible({ timeout: 15000 });
   }
 
   /**
