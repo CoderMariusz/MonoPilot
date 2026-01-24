@@ -296,24 +296,31 @@ export class ProductsPage extends BasePage {
     };
     const typeDisplayName = typeMap[data.type] || data.type;
 
-    // Click the product type Select trigger
-    const typeSelect = this.page.locator('[name="product_type_id"]').first();
-    await typeSelect.click();
-    await this.page.waitForTimeout(200);
-
-    // Find and click the option
-    const typeOption = this.page.getByRole('option', { name: new RegExp(typeDisplayName, 'i') }).first();
-    await typeOption.click();
-    await this.page.waitForTimeout(100);
+    // Click the product type Select trigger - look for the button/div that opens the select
+    // ShadCN SelectTrigger is a button with aria-expanded
+    const typeSelectTrigger = this.page.locator('button[role="combobox"]:has-text("Select type")').first();
+    if ((await typeSelectTrigger.count()) === 0) {
+      // If not found, try more general selector
+      await this.selectCombobox('[name="product_type_id"]', typeDisplayName);
+    } else {
+      await typeSelectTrigger.click();
+      await this.page.waitForTimeout(200);
+      const typeOption = this.page.getByRole('option', { name: new RegExp(typeDisplayName, 'i') }).first();
+      await typeOption.click();
+      await this.page.waitForTimeout(100);
+    }
 
     // Select base UOM - similar approach
-    const baseUomSelect = this.page.locator('[name="base_uom"]').first();
-    await baseUomSelect.click();
-    await this.page.waitForTimeout(200);
-
-    const uomOption = this.page.getByRole('option', { name: new RegExp(data.base_uom, 'i') }).first();
-    await uomOption.click();
-    await this.page.waitForTimeout(100);
+    const baseUomTrigger = this.page.locator('button[role="combobox"]:has-text("Select UoM")').first();
+    if ((await baseUomTrigger.count()) === 0) {
+      await this.selectCombobox('[name="base_uom"]', data.base_uom);
+    } else {
+      await baseUomTrigger.click();
+      await this.page.waitForTimeout(200);
+      const uomOption = this.page.getByRole('option', { name: new RegExp(data.base_uom, 'i') }).first();
+      await uomOption.click();
+      await this.page.waitForTimeout(100);
+    }
 
     // Fill optional fields
     if (data.cost_per_unit !== undefined) {
