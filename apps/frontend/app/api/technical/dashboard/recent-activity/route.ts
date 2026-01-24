@@ -1,8 +1,8 @@
-// GET /api/technical/dashboard/recent-activity - Recent Activity API (Story 2.23 AC-2.23.6)
+// GET /api/technical/dashboard/recent-activity - Recent Activity API
+// Story 02.12 (AC-12.17 to AC-12.19): Products, BOMs, Routings activity
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { recentActivityQuerySchema } from '@/lib/validation/dashboard-schemas'
-import { getRecentActivity } from '@/lib/services/dashboard-service'
+import { fetchRecentActivity } from '@/lib/services/dashboard-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,27 +25,27 @@ export async function GET(request: NextRequest) {
       .eq('id', session.user.id)
       .single()
 
-    if (userError || !currentUser) {
+    if (userError || !currentUser?.org_id) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const orgId = currentUser.org_id
 
+    // Get limit from query params
     const searchParams = request.nextUrl.searchParams
-    const query = recentActivityQuerySchema.parse({
-      days: parseInt(searchParams.get('days') || '7'),
-      limit: parseInt(searchParams.get('limit') || '10')
-    })
+    const limit = parseInt(searchParams.get('limit') || '10')
 
-    const result = await getRecentActivity(orgId, query)
+    // Fetch Story 02.12 activity format
+    const result = await fetchRecentActivity(orgId, limit)
 
     const response = NextResponse.json(result)
     response.headers.set('Cache-Control', 'private, max-age=30')
     return response
   } catch (error: any) {
+    console.error('Recent activity error:', error)
     return NextResponse.json(
-      { error: error.message },
-      { status: 400 }
+      { error: error.message || 'Failed to fetch recent activity' },
+      { status: 500 }
     )
   }
 }
