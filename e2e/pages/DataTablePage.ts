@@ -22,9 +22,9 @@ export class DataTablePage extends BasePage {
   private readonly filterButton = 'button:has-text("Filter")';
 
   // Pagination selectors
-  private readonly pagination = '[data-testid="pagination"], nav[aria-label="pagination"]';
-  private readonly nextPage = 'button:has-text("Next"), button[aria-label="Go to next page"]';
-  private readonly prevPage = 'button:has-text("Previous"), button[aria-label="Go to previous page"]';
+  private readonly pagination = '[data-testid="pagination"], nav[aria-label="Pagination navigation"], div[aria-label="Pagination navigation"]';
+  private readonly nextPage = 'button[aria-label="Next page"], button:has-text("Next")';
+  private readonly prevPage = 'button[aria-label="Previous page"], button:has-text("Previous")';
 
   constructor(page: Page) {
     super(page);
@@ -191,6 +191,10 @@ export class DataTablePage extends BasePage {
    */
   async hasNextPage(): Promise<boolean> {
     const button = this.page.locator(this.nextPage);
+    // Check if button exists first
+    if ((await button.count()) === 0) {
+      return false;
+    }
     return !(await button.isDisabled());
   }
 

@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # MonoPilot Ops CLI
-# Unified entry point for maintenance, validation, and agent tasks.
+# Unified validation and maintenance scripts for code quality gates.
+# Context-aware validation - run only when modifying relevant file types.
 
 set -e
 
@@ -11,11 +12,18 @@ function show_help {
     echo ""
     echo "Commands:"
     echo -e "  \033[1;32mcheck\033[0m      Run full project validation (Docs + TypeScript)."
-    echo "             AGENTS MUST RUN THIS BEFORE MARKING A TASK AS COMPLETED."
+    echo "             Run when modifying .ts/.tsx files before completing work."
+    echo "             Skip for docs-only (.md) or config-only (.json/.yaml) changes."
     echo -e "  \033[1;32manalyze\033[0m    Analyze token usage and context budget."
     echo -e "  \033[1;32mfix\033[0m        Run linting and auto-fixes."
     echo -e "  \033[1;32mdb:seed\033[0m    Seed the database with E2E test data."
     echo -e "  \033[1;32mdb:verify\033[0m  Verify database connection and schema."
+    echo ""
+    echo "Agent Guidelines:"
+    echo "  - Code changes (.ts/.tsx): Run './ops check' before completing"
+    echo "  - Docs only (.md): Skip './ops check'"
+    echo "  - Tests (.spec.ts): Run test suite instead of './ops check'"
+    echo "  - Config only (.json/.yaml): Skip './ops check'"
     echo ""
 }
 

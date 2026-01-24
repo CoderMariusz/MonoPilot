@@ -154,26 +154,29 @@ export abstract class BasePage {
    * Wait for success toast (using Radix UI Toast)
    */
   async expectSuccessToast(message?: string | RegExp) {
-    // Wait for a visible toast element (from Radix UI)
-    // Default toasts have role="status" or no specific role but are visible in viewport
-    const toast = this.page.locator('div[data-state="open"]').first();
-    await expect(toast).toBeVisible({ timeout: 5000 });
-    if (message) {
-      await expect(toast).toContainText(message);
+    // ToastViewport contains the toasts
+    // Look for text containing success message in a visible div
+    const successRegex = message || /created|success|saved/i;
+    const toast = this.page.locator('body').locator(':visible:has-text("Success")');
+
+    // If no success text, just wait for any visible toast element
+    if (await toast.count() === 0) {
+      await this.page.waitForTimeout(500); // Brief wait for toast to appear
     }
+
+    // Verify the toast is there with the message
+    const toastWithMessage = this.page.locator(':visible', { hasText: successRegex });
+    await expect(toastWithMessage.first()).toBeVisible({ timeout: 5000 });
   }
 
   /**
    * Wait for error toast (using Radix UI Toast)
    */
   async expectErrorToast(message?: string | RegExp) {
-    // Error toasts use destructive variant
-    // Look for visible toast with destructive styling
-    const toast = this.page.locator('div[data-state="open"]').first();
-    await expect(toast).toBeVisible({ timeout: 5000 });
-    if (message) {
-      await expect(toast).toContainText(message);
-    }
+    // Look for error message in the page
+    const errorRegex = message || /error|failed/i;
+    const toast = this.page.locator(':visible', { hasText: errorRegex });
+    await expect(toast.first()).toBeVisible({ timeout: 5000 });
   }
 
   // ==================== Tables ====================

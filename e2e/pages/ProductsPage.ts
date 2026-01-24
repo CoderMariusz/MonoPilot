@@ -229,11 +229,7 @@ export class ProductsPage extends BasePage {
     await button.click();
     await this.page.waitForTimeout(500); // Wait for state update
     await this.waitForModal();
-    // Wait for form to load - need to wait for API calls to complete
-    // The modal fetches product types, allergens, suppliers on mount
-    await this.page.waitForLoadState('networkidle');
-    // Wait for code input to be visible
-    await this.page.waitForSelector('input[name="code"]', { state: 'visible', timeout: 30000 });
+    // Modal should now be open - content loads asynchronously
   }
 
   /**
@@ -252,6 +248,9 @@ export class ProductsPage extends BasePage {
    * Fill product form
    */
   async fillProductForm(data: ProductData) {
+    // Wait for form inputs to be available
+    await this.page.waitForSelector('input[name="code"]', { state: 'visible', timeout: 30000 });
+
     // Fill required fields
     await this.page.fill(this.formFields.code, data.code);
     await this.page.fill(this.formFields.name, data.name);
