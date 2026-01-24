@@ -1,19 +1,21 @@
 /**
  * In-Process Inspections Queue API Route
  * Story: 06.10 - In-Process Inspection
- * Phase: P3 - Backend Implementation (GREEN)
+ * Phase: P4 - Refactoring (GREEN)
  *
  * Routes:
  * - GET /api/quality/inspections/in-process - List in-process inspections with filters
+ *
+ * Refactored to use auth-middleware for DRY auth handling.
  *
  * @see {@link docs/2-MANAGEMENT/epics/current/06-quality/06.10.in-process-inspection.md}
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase/server';
 import { inProcessListQuerySchema } from '@/lib/validation/in-process-inspection';
 import * as InProcessInspectionService from '@/lib/services/in-process-inspection-service';
-import { ZodError } from 'zod';
+import { getAuthContext } from '@/lib/api/auth-middleware';
+import { handleApiError } from '@/lib/api/error-handler';
 
 /**
  * GET /api/quality/inspections/in-process
@@ -25,33 +27,16 @@ import { ZodError } from 'zod';
  *
  * Response:
  * - 200: { data: [], total: number, page: number, limit: number }
- * - 400: { error: string }
- * - 401: { error: 'Unauthorized' }
- * - 500: { error: string }
+ * - 400: { success: false, error: { code, message, details } }
+ * - 401: { success: false, error: { code: 'UNAUTHORIZED', message } }
+ * - 500: { success: false, error: { code, message } }
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerSupabase();
-
     // Check authentication
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
-
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Get user's org_id
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('org_id')
-      .eq('id', session.user.id)
-      .single();
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 401 });
+    const auth = await getAuthContext();
+    if (auth instanceof NextResponse) {
+      return auth;
     }
 
     // Parse and validate query params
@@ -75,25 +60,10 @@ export async function GET(request: NextRequest) {
     const validatedParams = inProcessListQuerySchema.parse(queryParams);
 
     // Get inspections
-    const result = await InProcessInspectionService.listInProcess(
-      userData.org_id,
-      validatedParams
-    );
+    const result = await InProcessInspectionService.listInProcess(auth.orgId, validatedParams);
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in GET /api/quality/inspections/in-process:', error);
-
-    if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid query parameters', details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'GET /api/quality/inspections/in-process');
   }
 }

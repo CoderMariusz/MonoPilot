@@ -57,6 +57,43 @@ export interface LPLookupResult {
 const MAX_QUEUE_SIZE = 50
 const MAX_SYNC_ACTIONS = 100
 
+// Inspection statuses
+const INSPECTION_STATUS = {
+  SCHEDULED: 'scheduled',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+} as const
+
+// LP QA statuses
+const LP_QA_STATUS = {
+  PENDING: 'pending',
+  PASSED: 'passed',
+  FAILED: 'failed',
+} as const
+
+// Sync statuses
+const SYNC_STATUS = {
+  SYNCED: 'synced',
+  FAILED: 'failed',
+  DUPLICATE: 'duplicate',
+} as const
+
+// Audit actions
+const AUDIT_ACTION = {
+  SCANNER_COMPLETE: 'scanner_complete',
+} as const
+
+// Error messages
+const ERROR_MESSAGES = {
+  LP_NOT_FOUND: 'LP not found',
+  INSPECTION_NOT_FOUND: 'Inspection not found',
+  INSPECTION_ALREADY_COMPLETED: 'Inspection already completed',
+  FAILED_TO_UPDATE_INSPECTION: 'Failed to update inspection',
+  FAILED_TO_UPDATE_LP_STATUS: 'Failed to update LP status',
+  QUEUE_LIMIT_EXCEEDED: 'Queue limit exceeded',
+  INDEXEDDB_NOT_AVAILABLE: 'IndexedDB not available',
+} as const
+
 // =============================================================================
 // IndexedDB Queue Management (Client-side)
 // =============================================================================
@@ -72,7 +109,7 @@ async function openDB(): Promise<IDBDatabase> {
 
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB not available'))
+      reject(new Error(ERROR_MESSAGES.INDEXEDDB_NOT_AVAILABLE))
       return
     }
 
@@ -115,7 +152,7 @@ export async function lookupLPForInspection(barcode: string): Promise<LPLookupRe
     .single()
 
   if (lpError || !lp) {
-    throw new Error('LP not found')
+    throw new Error(ERROR_MESSAGES.LP_NOT_FOUND)
   }
 
   // Lookup pending inspection for LP
@@ -123,7 +160,7 @@ export async function lookupLPForInspection(barcode: string): Promise<LPLookupRe
     .from('quality_inspections')
     .select('*')
     .eq('lp_id', lp.id)
-    .in('status', ['scheduled', 'in_progress'])
+    .in('status', [INSPECTION_STATUS.SCHEDULED, INSPECTION_STATUS.IN_PROGRESS])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -153,21 +190,21 @@ export async function quickInspection(input: QuickInspectionInput): Promise<Quic
     .single()
 
   if (lookupError || !existingInspection) {
-    throw new Error('Inspection not found')
+    throw new Error(ERROR_MESSAGES.INSPECTION_NOT_FOUND)
   }
 
-  if (existingInspection.status === 'completed') {
-    throw new Error('Inspection already completed')
+  if (existingInspection.status === INSPECTION_STATUS.COMPLETED) {
+    throw new Error(ERROR_MESSAGES.INSPECTION_ALREADY_COMPLETED)
   }
 
   // Map result to LP QA status
-  const lpQAStatus = input.result === 'pass' ? 'passed' : 'failed'
+  const lpQAStatus = input.result === 'pass' ? LP_QA_STATUS.PASSED : LP_QA_STATUS.FAILED
 
   // Update inspection
   const { data: updatedInspection, error: updateError } = await supabase
     .from('quality_inspections')
     .update({
-      status: 'completed',
+      status: INSPECTION_STATUS.COMPLETED,
       result: input.result,
       result_notes: input.result_notes,
       defects_found: input.defects_found,
@@ -182,7 +219,7 @@ export async function quickInspection(input: QuickInspectionInput): Promise<Quic
     .single()
 
   if (updateError) {
-    throw new Error('Failed to update inspection')
+    throw new Error(ERROR_MESSAGES.FAILED_TO_UPDATE_INSPECTION)
   }
 
   // Update LP QA status
@@ -195,20 +232,20 @@ export async function quickInspection(input: QuickInspectionInput): Promise<Quic
     .eq('id', existingInspection.lp_id)
 
   if (lpUpdateError) {
-    throw new Error('Failed to update LP status')
+    throw new Error(ERROR_MESSAGES.FAILED_TO_UPDATE_LP_STATUS)
   }
 
   // Log audit trail
   await supabase.from('quality_audit_log').insert({
     entity_type: 'inspection',
     entity_id: input.inspection_id,
-    action: 'scanner_complete',
+    action: AUDIT_ACTION.SCANNER_COMPLETE,
     old_value: JSON.stringify({
       status: existingInspection.status,
       result: existingInspection.result,
     }),
     new_value: JSON.stringify({
-      status: 'completed',
+      status: INSPECTION_STATUS.COMPLETED,
       result: input.result,
     }),
     change_reason: input.result === 'pass' ? 'Scanner quick pass' : 'Scanner quick fail',
@@ -231,6 +268,28 @@ export async function quickInspection(input: QuickInspectionInput): Promise<Quic
 // =============================================================================
 
 /**
+ * Helper to log sync queue entry
+ */
+async function logSyncQueueEntry(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string | undefined,
+  userId: string | undefined,
+  action: OfflineAction,
+  syncStatus: typeof SYNC_STATUS[keyof typeof SYNC_STATUS],
+  errorMessage?: string
+): Promise<void> {
+  await supabase.from('scanner_offline_queue').insert({
+    org_id: orgId,
+    user_id: userId,
+    action_type: action.type,
+    action_payload: action.payload,
+    created_at_local: action.timestamp,
+    sync_status: syncStatus,
+    error_message: errorMessage,
+  })
+}
+
+/**
  * Sync offline actions in bulk
  * AC-8.9: Auto-Sync When Online
  */
@@ -248,6 +307,12 @@ export async function syncOfflineActions(
   )
 
   const supabase = createClient()
+
+  // Get user info once at the start
+  const { data: { user } } = await supabase.auth.getUser()
+  const orgId = user?.user_metadata?.org_id
+  const userId = user?.id
+
   let success = 0
   let failed = 0
   const errors: { action_id: string; error: string }[] = []
@@ -264,23 +329,22 @@ export async function syncOfflineActions(
           .eq('id', payload.inspection_id)
           .single()
 
-        if (existing?.status === 'completed') {
+        if (existing?.status === INSPECTION_STATUS.COMPLETED) {
           errors.push({
             action_id: action.id,
-            error: 'Inspection already completed',
+            error: ERROR_MESSAGES.INSPECTION_ALREADY_COMPLETED,
           })
           failed++
 
           // Log duplicate attempt
-          await supabase.from('scanner_offline_queue').insert({
-            org_id: (await supabase.auth.getUser()).data.user?.user_metadata?.org_id,
-            user_id: (await supabase.auth.getUser()).data.user?.id,
-            action_type: action.type,
-            action_payload: action.payload,
-            created_at_local: action.timestamp,
-            sync_status: 'duplicate',
-            error_message: 'Inspection already completed',
-          })
+          await logSyncQueueEntry(
+            supabase,
+            orgId,
+            userId,
+            action,
+            SYNC_STATUS.DUPLICATE,
+            ERROR_MESSAGES.INSPECTION_ALREADY_COMPLETED
+          )
 
           continue
         }
@@ -289,34 +353,27 @@ export async function syncOfflineActions(
         await quickInspection(payload)
 
         // Log successful sync
-        await supabase.from('scanner_offline_queue').insert({
-          org_id: (await supabase.auth.getUser()).data.user?.user_metadata?.org_id,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          action_type: action.type,
-          action_payload: action.payload,
-          created_at_local: action.timestamp,
-          sync_status: 'synced',
-        })
+        await logSyncQueueEntry(supabase, orgId, userId, action, SYNC_STATUS.SYNCED)
 
         success++
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       failed++
       errors.push({
         action_id: action.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorMessage,
       })
 
       // Log failed sync
-      await supabase.from('scanner_offline_queue').insert({
-        org_id: (await supabase.auth.getUser()).data.user?.user_metadata?.org_id,
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: action.type,
-        action_payload: action.payload,
-        created_at_local: action.timestamp,
-        sync_status: 'failed',
-        error_message: error instanceof Error ? error.message : 'Unknown error',
-      })
+      await logSyncQueueEntry(
+        supabase,
+        orgId,
+        userId,
+        action,
+        SYNC_STATUS.FAILED,
+        errorMessage
+      )
     }
   }
 
@@ -348,7 +405,7 @@ export async function queueOfflineAction(
   // Check queue size
   const queue = await getOfflineQueue()
   if (queue.length >= MAX_QUEUE_SIZE) {
-    throw new Error('Queue limit exceeded')
+    throw new Error(ERROR_MESSAGES.QUEUE_LIMIT_EXCEEDED)
   }
 
   return new Promise((resolve, reject) => {

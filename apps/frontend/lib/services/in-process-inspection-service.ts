@@ -40,6 +40,44 @@ import type {
 } from '@/lib/types/quality';
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+/** Inspection type for in-process inspections */
+export const INSPECTION_TYPE_IN_PROCESS = 'in_process' as const;
+
+/** Inspection status values */
+const INSPECTION_STATUS = {
+  SCHEDULED: 'scheduled',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+} as const;
+
+/** QA status values for WO operations */
+const QA_STATUS = {
+  PENDING: 'pending',
+  PASSED: 'passed',
+  FAILED: 'failed',
+  CONDITIONAL: 'conditional',
+  NOT_REQUIRED: 'not_required',
+} as const;
+
+/** Inspection result values */
+const INSPECTION_RESULT = {
+  PASS: 'pass',
+  FAIL: 'fail',
+  CONDITIONAL: 'conditional',
+} as const;
+
+/** WO status values */
+const WO_STATUS = {
+  IN_PROGRESS: 'in_progress',
+  PAUSED: 'paused',
+  CANCELLED: 'cancelled',
+} as const;
+
+// =============================================================================
 // Error Classes
 // =============================================================================
 
@@ -96,6 +134,16 @@ async function getUserOrgId(): Promise<{ userId: string; orgId: string }> {
   }
 
   return { userId: user.id, orgId: userData.org_id };
+}
+
+/**
+ * Generate timestamp metadata for updates
+ */
+function updateTimestampFields(userId: string): { updated_by: string; updated_at: string } {
+  return {
+    updated_by: userId,
+    updated_at: new Date().toISOString(),
+  };
 }
 
 /**
@@ -191,7 +239,7 @@ export async function listInProcess(
     .from('quality_inspections')
     .select('*', { count: 'exact' })
     .eq('org_id', orgId)
-    .eq('inspection_type', 'in_process');
+    .eq('inspection_type', INSPECTION_TYPE_IN_PROCESS);
 
   if (wo_id) {
     query = query.eq('wo_id', wo_id);
@@ -272,7 +320,7 @@ export async function getByWorkOrder(
     .select('*')
     .eq('org_id', orgId)
     .eq('wo_id', woId)
-    .eq('inspection_type', 'in_process')
+    .eq('inspection_type', INSPECTION_TYPE_IN_PROCESS)
     .order('created_at', { ascending: true });
 
   if (inspError) {
@@ -290,11 +338,11 @@ export async function getByWorkOrder(
   );
 
   // Calculate summary
-  const completed = enrichedInspections.filter((i) => i.status === 'completed').length;
-  const passed = enrichedInspections.filter((i) => i.result === 'pass').length;
-  const failed = enrichedInspections.filter((i) => i.result === 'fail').length;
+  const completed = enrichedInspections.filter((i) => i.status === INSPECTION_STATUS.COMPLETED).length;
+  const passed = enrichedInspections.filter((i) => i.result === INSPECTION_RESULT.PASS).length;
+  const failed = enrichedInspections.filter((i) => i.result === INSPECTION_RESULT.FAIL).length;
   const pending = enrichedInspections.filter(
-    (i) => i.status === 'scheduled' || i.status === 'in_progress'
+    (i) => i.status === INSPECTION_STATUS.SCHEDULED || i.status === INSPECTION_STATUS.IN_PROGRESS
   ).length;
 
   return {
@@ -361,7 +409,7 @@ export async function getByOperation(
       .eq('sequence', operation.sequence - 1)
       .single();
 
-    if (prevOp && prevOp.qa_status && prevOp.qa_status !== 'not_required') {
+    if (prevOp && prevOp.qa_status && prevOp.qa_status !== QA_STATUS.NOT_REQUIRED) {
       previousQA = {
         operation_name: prevOp.operation_name,
         result: prevOp.qa_status,
@@ -418,7 +466,7 @@ export async function createInProcess(
     throw new ValidationError('Invalid Work Order');
   }
 
-  if (wo.status !== 'in_progress') {
+  if (wo.status !== WO_STATUS.IN_PROGRESS) {
     throw new ValidationError('Work Order must be in progress for in-process inspection');
   }
 
@@ -452,7 +500,7 @@ export async function createInProcess(
 
   const newInspection = {
     org_id: orgId,
-    inspection_type: 'in_process',
+    inspection_type: INSPECTION_TYPE_IN_PROCESS,
     reference_type: 'wo_operation',
     reference_id: input.wo_operation_id,
     product_id: productId,
@@ -463,7 +511,7 @@ export async function createInProcess(
     priority: input.priority || 'normal',
     scheduled_date: input.scheduled_date || new Date().toISOString().split('T')[0],
     inspector_id: input.inspector_id || null,
-    status: 'scheduled',
+    status: INSPECTION_STATUS.SCHEDULED,
     created_by: userId,
   };
 
@@ -511,17 +559,17 @@ export async function startInspection(
     throw new NotFoundError('Inspection not found');
   }
 
-  if (existing.status !== 'scheduled') {
+  if (existing.status !== INSPECTION_STATUS.SCHEDULED) {
     throw new ValidationError('Only scheduled inspections can be started');
   }
 
   // Check WO status
   if (existing.wo_id) {
     const woStatus = (existing.wo as any)?.status;
-    if (woStatus === 'paused') {
+    if (woStatus === WO_STATUS.PAUSED) {
       throw new ValidationError('Cannot inspect - Work Order is paused');
     }
-    if (woStatus === 'cancelled') {
+    if (woStatus === WO_STATUS.CANCELLED) {
       throw new ValidationError('Cannot inspect - Work Order is cancelled');
     }
   }
@@ -529,13 +577,12 @@ export async function startInspection(
   const { data, error } = await supabase
     .from('quality_inspections')
     .update({
-      status: 'in_progress',
+      status: INSPECTION_STATUS.IN_PROGRESS,
       started_at: new Date().toISOString(),
       inspector_id: existing.inspector_id || userId,
       assigned_by: existing.assigned_by || userId,
       assigned_at: existing.assigned_at || new Date().toISOString(),
-      updated_by: userId,
-      updated_at: new Date().toISOString(),
+      ...updateTimestampFields(userId),
     })
     .eq('id', inspectionId)
     .select()
@@ -552,7 +599,7 @@ export async function startInspection(
     action: 'start',
     user_id: userId,
     old_value: { status: existing.status },
-    new_value: { status: 'in_progress' },
+    new_value: { status: INSPECTION_STATUS.IN_PROGRESS },
   });
 
   return enrichInspection(data, supabase);
@@ -581,19 +628,19 @@ export async function completeInProcess(
     throw new NotFoundError('Inspection not found');
   }
 
-  if (existing.status !== 'in_progress') {
+  if (existing.status !== INSPECTION_STATUS.IN_PROGRESS) {
     throw new ValidationError('Only in-progress inspections can be completed');
   }
 
   // Validate conditional requirements
-  if (input.result === 'conditional') {
+  if (input.result === INSPECTION_RESULT.CONDITIONAL) {
     if (!input.conditional_reason || !input.conditional_restrictions) {
       throw new ValidationError('Conditional reason and restrictions required for conditional result');
     }
   }
 
   const updateData: any = {
-    status: 'completed',
+    status: INSPECTION_STATUS.COMPLETED,
     result: input.result,
     result_notes: input.result_notes || null,
     defects_found: input.defects_found || 0,
@@ -602,11 +649,10 @@ export async function completeInProcess(
     critical_defects: input.critical_defects || 0,
     completed_at: new Date().toISOString(),
     completed_by: userId,
-    updated_by: userId,
-    updated_at: new Date().toISOString(),
+    ...updateTimestampFields(userId),
   };
 
-  if (input.result === 'conditional') {
+  if (input.result === INSPECTION_RESULT.CONDITIONAL) {
     updateData.conditional_reason = input.conditional_reason;
     updateData.conditional_restrictions = input.conditional_restrictions;
     updateData.conditional_expires_at = input.conditional_expires_at || null;
@@ -626,16 +672,16 @@ export async function completeInProcess(
 
   // WO operation status is updated via trigger, but track if it happened
   let woOperationUpdated = false;
-  let woOperationQaStatus = 'pending';
+  let woOperationQaStatus = QA_STATUS.PENDING;
   let nextOperationBlocked = false;
 
   if (existing.wo_operation_id) {
     woOperationUpdated = true;
-    woOperationQaStatus = input.result === 'pass' ? 'passed' :
-                          input.result === 'fail' ? 'failed' : 'conditional';
+    woOperationQaStatus = input.result === INSPECTION_RESULT.PASS ? QA_STATUS.PASSED :
+                          input.result === INSPECTION_RESULT.FAIL ? QA_STATUS.FAILED : QA_STATUS.CONDITIONAL;
 
     // Check if next operation should be blocked
-    if (input.result === 'fail') {
+    if (input.result === INSPECTION_RESULT.FAIL) {
       const { data: settings } = await supabase
         .from('quality_settings')
         .select('block_next_operation_on_fail')
@@ -654,15 +700,14 @@ export async function completeInProcess(
     action: 'complete',
     user_id: userId,
     old_value: { status: existing.status },
-    new_value: { status: 'completed', result: input.result },
-    metadata: { wo_id: existing.wo_id, wo_operation_id: existing.wo_operation_id },
+    new_value: { status: INSPECTION_STATUS.COMPLETED, result: input.result },
   });
 
   const enrichedInspection = await enrichInspection(data, supabase);
 
   // NCR creation placeholder
   let ncrId: string | undefined;
-  if (input.create_ncr && input.result === 'fail') {
+  if (input.create_ncr && input.result === INSPECTION_RESULT.FAIL) {
     // NCR creation will be implemented in story 06.9
   }
 
@@ -709,7 +754,7 @@ export async function assignInspector(
     throw new NotFoundError('Inspection not found');
   }
 
-  if (existing.status === 'completed' || existing.status === 'cancelled') {
+  if (existing.status === INSPECTION_STATUS.COMPLETED || existing.status === INSPECTION_STATUS.CANCELLED) {
     throw new ValidationError('Cannot assign inspector to completed or cancelled inspection');
   }
 
@@ -719,8 +764,7 @@ export async function assignInspector(
       inspector_id: inspectorId,
       assigned_by: userId,
       assigned_at: new Date().toISOString(),
-      updated_by: userId,
-      updated_at: new Date().toISOString(),
+      ...updateTimestampFields(userId),
     })
     .eq('id', inspectionId)
     .select()
@@ -759,9 +803,9 @@ export async function updateOperationQAStatus(
   const supabase = await createServerSupabase();
 
   const qaStatusMap: Record<string, string> = {
-    pass: 'passed',
-    fail: 'failed',
-    conditional: 'conditional',
+    [INSPECTION_RESULT.PASS]: QA_STATUS.PASSED,
+    [INSPECTION_RESULT.FAIL]: QA_STATUS.FAILED,
+    [INSPECTION_RESULT.CONDITIONAL]: QA_STATUS.CONDITIONAL,
   };
 
   const { error } = await supabase
@@ -814,21 +858,21 @@ export async function canStartNextOperation(
   const qaStatus = operation.qa_status;
 
   // If not required, allow
-  if (qaStatus === 'not_required') {
+  if (qaStatus === QA_STATUS.NOT_REQUIRED) {
     return { canStart: true };
   }
 
   // If passed or conditional, allow
-  if (qaStatus === 'passed') {
+  if (qaStatus === QA_STATUS.PASSED) {
     return { canStart: true };
   }
 
-  if (qaStatus === 'conditional') {
+  if (qaStatus === QA_STATUS.CONDITIONAL) {
     return { canStart: true };
   }
 
   // If failed and blocking is enabled, block
-  if (qaStatus === 'failed' && blockOnFail) {
+  if (qaStatus === QA_STATUS.FAILED && blockOnFail) {
     return {
       canStart: false,
       blockedReason: `Previous operation QA failed - resolve before continuing`,
@@ -836,7 +880,7 @@ export async function canStartNextOperation(
   }
 
   // If pending and require pass is enabled, block
-  if (qaStatus === 'pending' && requirePass) {
+  if (qaStatus === QA_STATUS.PENDING && requirePass) {
     return {
       canStart: false,
       blockedReason: `Previous operation QA pending - awaiting inspection`,
@@ -867,11 +911,11 @@ export async function getWOQualitySummary(
   }
 
   const totalOperations = operations?.length || 0;
-  const qaRequired = operations?.filter((o) => o.qa_status !== 'not_required').length || 0;
-  const passed = operations?.filter((o) => o.qa_status === 'passed').length || 0;
-  const failed = operations?.filter((o) => o.qa_status === 'failed').length || 0;
-  const pending = operations?.filter((o) => o.qa_status === 'pending').length || 0;
-  const conditional = operations?.filter((o) => o.qa_status === 'conditional').length || 0;
+  const qaRequired = operations?.filter((o) => o.qa_status !== QA_STATUS.NOT_REQUIRED).length || 0;
+  const passed = operations?.filter((o) => o.qa_status === QA_STATUS.PASSED).length || 0;
+  const failed = operations?.filter((o) => o.qa_status === QA_STATUS.FAILED).length || 0;
+  const pending = operations?.filter((o) => o.qa_status === QA_STATUS.PENDING).length || 0;
+  const conditional = operations?.filter((o) => o.qa_status === QA_STATUS.CONDITIONAL).length || 0;
 
   // Determine overall status
   let overallStatus: 'pass' | 'fail' | 'pending' | 'conditional' = 'pass';
@@ -1041,7 +1085,7 @@ export async function checkAndAlertOverdueInspections(orgId: string): Promise<vo
     .from('quality_inspections')
     .select('id, inspection_number')
     .eq('org_id', orgId)
-    .eq('inspection_type', 'in_process')
+    .eq('inspection_type', INSPECTION_TYPE_IN_PROCESS)
     .eq('status', 'scheduled')
     .lt('created_at', cutoffTime.toISOString());
 
