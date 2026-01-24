@@ -7,6 +7,13 @@
 
 'use client'
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { COUNTRY_OPTIONS } from '@/lib/types/tax-code'
 
 interface CountryFilterProps {
@@ -16,18 +23,18 @@ interface CountryFilterProps {
 
 export function CountryFilter({ value, onChange }: CountryFilterProps) {
   return (
-    <select
-      aria-label="Filter by country"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-[180px] h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-    >
-      <option value="">All countries</option>
-      {COUNTRY_OPTIONS.map((country) => (
-        <option key={country.code} value={country.code}>
-          {country.code} - {country.name}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-[180px]" aria-label="Filter by country">
+        <SelectValue placeholder="All countries" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="">All countries</SelectItem>
+        {COUNTRY_OPTIONS.map((country) => (
+          <SelectItem key={country.code} value={country.code}>
+            {country.code} - {country.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
