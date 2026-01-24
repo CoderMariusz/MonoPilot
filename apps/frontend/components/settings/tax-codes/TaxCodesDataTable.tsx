@@ -70,7 +70,7 @@ export function TaxCodesDataTable({
   readOnly = false,
 }: TaxCodesDataTableProps) {
   const [searchValue, setSearchValue] = useState('')
-  const [countryFilter, setCountryFilterValue] = useState('')
+  const [countryFilter, setCountryFilterValue] = useState('all')
   const [statusFilter, setStatusFilterValue] = useState<TaxCodeStatus | 'all'>('all')
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -94,7 +94,8 @@ export function TaxCodesDataTable({
   // Handle filter changes
   const handleCountryChange = (value: string) => {
     setCountryFilterValue(value)
-    onCountryFilter(value)
+    // Convert "all" to empty string for API
+    onCountryFilter(value === 'all' ? '' : value)
   }
 
   const handleStatusChange = (value: TaxCodeStatus | 'all') => {

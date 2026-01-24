@@ -32,7 +32,7 @@ export function CountryFilter({ value, onChange }: CountryFilterProps) {
         <SelectValue placeholder="All countries" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="">All countries</SelectItem>
+        <SelectItem value="all">All countries</SelectItem>
         {COUNTRY_OPTIONS.map((country) => (
           <SelectItem key={country.code} value={country.code}>
             {country.code} - {country.name}

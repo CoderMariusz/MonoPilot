@@ -71,3 +71,9 @@ typescript-errors-*.json
 
 # Auto Claude data directory
 .auto-claude/
+
+# Playwright
+.auth/
+playwright-report/
+test-results/
+playwright/.cache/

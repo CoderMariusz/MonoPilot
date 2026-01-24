@@ -8,14 +8,14 @@
 
 'use client'
 
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Barcode } from 'lucide-react'
 
 export interface LPBarcodeDisplayProps {
   lp_number: string
 }
 
-export function LPBarcodeDisplay({ lp_number }: LPBarcodeDisplayProps): JSX.Element {
+export function LPBarcodeDisplay({ lp_number }: LPBarcodeDisplayProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {

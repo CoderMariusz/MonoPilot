@@ -216,6 +216,25 @@ async function seedTestData() {
     await createDefaultPOStatuses(org.id);
     console.log('   ✅ Default PO statuses created\n');
 
+    // Step 9: Create tax codes
+    console.log('9️⃣  Creating tax codes...');
+    // Get first user if none created (for created_by field)
+    let userId = users.length > 0 ? users[0].id : null;
+    if (!userId) {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .limit(1)
+        .single();
+      userId = existingUser?.id || null;
+    }
+    if (!userId) {
+      console.log('   ⚠️  No user found, skipping tax codes');
+    } else {
+      const taxCodes = await createTaxCodes(org.id, userId);
+      console.log(`   ✅ Created ${taxCodes.length} tax codes\n`);
+    }
+
     // Summary
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ E2E TEST DATA SEED COMPLETED');
@@ -546,6 +565,99 @@ async function createDefaultPOStatuses(orgId: string) {
     console.error('   ⚠️  Warning: Could not create default PO statuses:', error);
     // Don't throw - this is not critical for basic tests
   }
+}
+
+/**
+ * Create tax codes
+ */
+async function createTaxCodes(orgId: string, userId: string) {
+  const createdTaxCodes = [];
+
+  const TEST_TAX_CODES = [
+    {
+      code: 'VAT23',
+      name: 'VAT 23%',
+      country_code: 'PL',
+      rate: 23.00,
+      valid_from: '2024-01-01',
+      valid_to: null,
+      is_default: true
+    },
+    {
+      code: 'VAT8',
+      name: 'VAT 8% (Reduced)',
+      country_code: 'PL',
+      rate: 8.00,
+      valid_from: '2024-01-01',
+      valid_to: null,
+      is_default: false
+    },
+    {
+      code: 'VAT5',
+      name: 'VAT 5% (Food)',
+      country_code: 'PL',
+      rate: 5.00,
+      valid_from: '2024-01-01',
+      valid_to: null,
+      is_default: false
+    },
+    {
+      code: 'VAT0',
+      name: 'VAT 0% (Export)',
+      country_code: 'PL',
+      rate: 0.00,
+      valid_from: '2024-01-01',
+      valid_to: null,
+      is_default: false
+    },
+    {
+      code: 'GST10',
+      name: 'GST 10%',
+      country_code: 'AU',
+      rate: 10.00,
+      valid_from: '2024-01-01',
+      valid_to: null,
+      is_default: false
+    }
+  ];
+
+  for (const taxCodeData of TEST_TAX_CODES) {
+    // Check if tax code exists
+    const { data: existingTaxCode } = await supabase
+      .from('tax_codes')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('code', taxCodeData.code)
+      .eq('country_code', taxCodeData.country_code)
+      .single();
+
+    if (existingTaxCode) {
+      console.log(`   ℹ️  Tax code already exists: ${taxCodeData.code} (${taxCodeData.country_code})`);
+      createdTaxCodes.push(existingTaxCode);
+      continue;
+    }
+
+    // Create tax code
+    const { data, error } = await supabase
+      .from('tax_codes')
+      .insert([{
+        ...taxCodeData,
+        org_id: orgId,
+        created_by: userId
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`   ❌ Failed to create tax code ${taxCodeData.code}:`, error);
+      continue;
+    }
+
+    console.log(`   ✓ Created tax code: ${data.code} (${data.name})`);
+    createdTaxCodes.push(data);
+  }
+
+  return createdTaxCodes;
 }
 
 // Run seed

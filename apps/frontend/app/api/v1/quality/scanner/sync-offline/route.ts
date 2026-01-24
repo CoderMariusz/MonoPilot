@@ -10,6 +10,43 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { syncOfflineSchema, type QuickInspectionInput } from '@/lib/validation/scanner-qa'
 import { ZodError } from 'zod'
 
+// =============================================================================
+// Constants
+// =============================================================================
+
+const INSPECTION_STATUS = {
+  COMPLETED: 'completed',
+} as const
+
+const LP_QA_STATUS = {
+  PASSED: 'passed',
+  FAILED: 'failed',
+} as const
+
+const AUDIT_ACTION = {
+  SCANNER_COMPLETE: 'scanner_complete',
+} as const
+
+const SYNC_STATUS = {
+  SYNCED: 'synced',
+  FAILED: 'failed',
+  DUPLICATE: 'duplicate',
+} as const
+
+const ALLOWED_ROLES = ['qa_inspector', 'qa_manager', 'admin', 'owner'] as const
+
+const ERROR_MESSAGES = {
+  UNAUTHORIZED: 'Unauthorized',
+  USER_NOT_FOUND: 'User not found',
+  PERMISSION_DENIED: 'Scanner access requires QA Inspector role',
+  VALIDATION_FAILED: 'Validation failed',
+  INSPECTION_NOT_FOUND: 'Inspection not found',
+  INSPECTION_ALREADY_COMPLETED: 'Inspection already completed',
+  FAILED_TO_UPDATE_INSPECTION: 'Failed to update inspection',
+  MISSING_INSPECTION_ID: 'Missing inspection_id',
+  INTERNAL_SERVER_ERROR: 'Internal server error',
+} as const
+
 /**
  * POST /api/v1/quality/scanner/sync-offline
  * Bulk sync offline actions
@@ -32,7 +69,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: ERROR_MESSAGES.UNAUTHORIZED }, { status: 401 })
     }
 
     // Get user's org_id and role
@@ -43,17 +80,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 401 })
+      return NextResponse.json({ error: ERROR_MESSAGES.USER_NOT_FOUND }, { status: 401 })
     }
 
     // Check permissions - QA_INSPECTOR or QA_MANAGER role required
     const roleData = userData.role as { code?: string } | { code?: string }[] | null
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
-    const allowedRoles = ['qa_inspector', 'qa_manager', 'admin', 'owner']
 
-    if (!allowedRoles.includes(userRole?.toLowerCase() || '')) {
+    if (!ALLOWED_ROLES.includes(userRole?.toLowerCase() as typeof ALLOWED_ROLES[number])) {
       return NextResponse.json(
-        { error: 'Scanner access requires QA Inspector role' },
+        { error: ERROR_MESSAGES.PERMISSION_DENIED },
         { status: 403 }
       )
     }
@@ -68,7 +104,7 @@ export async function POST(request: NextRequest) {
       if (error instanceof ZodError) {
         return NextResponse.json(
           {
-            error: 'Validation failed',
+            error: ERROR_MESSAGES.VALIDATION_FAILED,
             details: error.errors.map((e) => ({
               field: e.path.join('.'),
               message: e.message,
@@ -97,7 +133,7 @@ export async function POST(request: NextRequest) {
 
           // Validate required fields
           if (!payload.inspection_id) {
-            throw new Error('Missing inspection_id')
+            throw new Error(ERROR_MESSAGES.MISSING_INSPECTION_ID)
           }
 
           // Check if inspection exists and not already completed
@@ -109,11 +145,11 @@ export async function POST(request: NextRequest) {
             .single()
 
           if (inspectionError || !inspection) {
-            throw new Error('Inspection not found')
+            throw new Error(ERROR_MESSAGES.INSPECTION_NOT_FOUND)
           }
 
           // Check for duplicate completion
-          if (inspection.status === 'completed') {
+          if (inspection.status === INSPECTION_STATUS.COMPLETED) {
             // Log duplicate attempt
             await supabase.from('scanner_offline_queue').insert({
               org_id: userData.org_id,
@@ -122,26 +158,27 @@ export async function POST(request: NextRequest) {
               action_payload: action.payload,
               device_id: payload.scanner_device_id || null,
               created_at_local: action.timestamp,
-              sync_status: 'duplicate',
-              error_message: 'Inspection already completed',
+              sync_status: SYNC_STATUS.DUPLICATE,
+              error_message: ERROR_MESSAGES.INSPECTION_ALREADY_COMPLETED,
             })
 
-            throw new Error('Inspection already completed')
+            throw new Error(ERROR_MESSAGES.INSPECTION_ALREADY_COMPLETED)
           }
 
           // Map result to LP QA status
-          const lpQAStatus = payload.result === 'pass' ? 'passed' : 'failed'
+          const lpQAStatus = payload.result === 'pass' ? LP_QA_STATUS.PASSED : LP_QA_STATUS.FAILED
 
           // Calculate sync delay
           const localTime = new Date(action.timestamp)
           const syncTime = new Date()
           const syncDelaySeconds = Math.round((syncTime.getTime() - localTime.getTime()) / 1000)
+          const now = syncTime.toISOString()
 
           // Update inspection
           const { error: updateError } = await supabase
             .from('quality_inspections')
             .update({
-              status: 'completed',
+              status: INSPECTION_STATUS.COMPLETED,
               result: payload.result,
               result_notes: payload.result_notes,
               defects_found: payload.defects_found,
@@ -150,13 +187,13 @@ export async function POST(request: NextRequest) {
               scanner_location: payload.scanner_location,
               completed_at: action.timestamp, // Use local timestamp
               completed_by: user.id,
-              updated_at: new Date().toISOString(),
+              updated_at: now,
               updated_by: user.id,
             })
             .eq('id', payload.inspection_id)
 
           if (updateError) {
-            throw new Error('Failed to update inspection')
+            throw new Error(ERROR_MESSAGES.FAILED_TO_UPDATE_INSPECTION)
           }
 
           // Update LP QA status
@@ -165,7 +202,7 @@ export async function POST(request: NextRequest) {
               .from('license_plates')
               .update({
                 qa_status: lpQAStatus,
-                updated_at: new Date().toISOString(),
+                updated_at: now,
               })
               .eq('id', inspection.lp_id)
           }
@@ -175,14 +212,14 @@ export async function POST(request: NextRequest) {
             org_id: userData.org_id,
             entity_type: 'inspection',
             entity_id: payload.inspection_id,
-            action: 'scanner_complete',
+            action: AUDIT_ACTION.SCANNER_COMPLETE,
             user_id: user.id,
             old_value: JSON.stringify({
               status: inspection.status,
               result: inspection.result,
             }),
             new_value: JSON.stringify({
-              status: 'completed',
+              status: INSPECTION_STATUS.COMPLETED,
               result: payload.result,
             }),
             change_reason: payload.result === 'pass' ? 'Scanner quick pass' : 'Scanner quick fail',
@@ -202,7 +239,7 @@ export async function POST(request: NextRequest) {
             action_payload: action.payload,
             device_id: payload.scanner_device_id || null,
             created_at_local: action.timestamp,
-            sync_status: 'synced',
+            sync_status: SYNC_STATUS.SYNCED,
           })
 
           success++
@@ -215,28 +252,29 @@ export async function POST(request: NextRequest) {
             action_type: action.type,
             action_payload: action.payload,
             created_at_local: action.timestamp,
-            sync_status: 'synced',
+            sync_status: SYNC_STATUS.SYNCED,
           })
 
           success++
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         failed++
         errors.push({
           action_id: action.id,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMessage,
         })
 
         // Log failed sync (if not already logged as duplicate)
-        if (!errors.some((e) => e.error === 'Inspection already completed' && e.action_id === action.id)) {
+        if (errorMessage !== ERROR_MESSAGES.INSPECTION_ALREADY_COMPLETED) {
           await supabase.from('scanner_offline_queue').insert({
             org_id: userData.org_id,
             user_id: user.id,
             action_type: action.type,
             action_payload: action.payload,
             created_at_local: action.timestamp,
-            sync_status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown error',
+            sync_status: SYNC_STATUS.FAILED,
+            error_message: errorMessage,
           })
         }
       }
@@ -249,6 +287,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error in POST /api/v1/quality/scanner/sync-offline:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: ERROR_MESSAGES.INTERNAL_SERVER_ERROR }, { status: 500 })
   }
 }

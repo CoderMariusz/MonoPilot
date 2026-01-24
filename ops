@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# MonoPilot Ops CLI
+# Unified entry point for maintenance, validation, and agent tasks.
+
+set -e
+
+function show_help {
+    echo -e "\033[1;34mMonoPilot Ops CLI\033[0m"
+    echo "Usage: ./ops [command]"
+    echo ""
+    echo "Commands:"
+    echo -e "  \033[1;32mcheck\033[0m      Run full project validation (Docs + TypeScript)."
+    echo "             AGENTS MUST RUN THIS BEFORE MARKING A TASK AS COMPLETED."
+    echo -e "  \033[1;32manalyze\033[0m    Analyze token usage and context budget."
+    echo -e "  \033[1;32mfix\033[0m        Run linting and auto-fixes."
+    echo -e "  \033[1;32mdb:seed\033[0m    Seed the database with E2E test data."
+    echo -e "  \033[1;32mdb:verify\033[0m  Verify database connection and schema."
+    echo ""
+}
+
+COMMAND=$1
+
+case "$COMMAND" in
+    check)
+        echo -e "\n\033[1;34m🔍 Running Pre-Commit/Task Validation...\033[0m"
+        
+        echo -e "\n\033[1;36m1. Validating Documentation & Structure...\033[0m"
+        bash scripts/validate-docs.sh
+        
+        echo -e "\n\033[1;36m2. Checking TypeScript Status...\033[0m"
+        bash scripts/type-check-status.sh
+        
+        echo -e "\n\033[1;32m✅ All Checks Passed. You are ready to commit/finish.\033[0m"
+        ;;
+        
+    analyze)
+        echo -e "\n\033[1;34m📊 Analyzing Project Context...\033[0m"
+        bash scripts/token-counter.sh --verbose
+        ;;
+        
+    fix)
+        echo -e "\n\033[1;34m🔧 Running Auto-Fixes...\033[0m"
+        echo "Running lint fix..."
+        cd apps/frontend && pnpm lint --fix
+        echo -e "\n\033[1;32m✅ Fixes applied.\033[0m"
+        ;;
+        
+    db:seed)
+        echo -e "\n\033[1;34m🌱 Seeding E2E Data...\033[0m"
+        npx ts-node scripts/seed-e2e-test-data.ts
+        ;;
+        
+    db:verify)
+        echo -e "\n\033[1;34m🐘 Verifying Database...\033[0m"
+        # Using a simple check script if available, or just listing tables as a check
+        if [ -f "scripts/check-tables.mjs" ]; then
+            node scripts/check-tables.mjs
+        else
+           echo "Verification script not found."
+        fi
+        ;;
+        
+    *)
+        show_help
+        exit 1
+        ;;
+esac

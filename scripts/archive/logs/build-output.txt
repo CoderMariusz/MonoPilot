@@ -1,0 +1,56 @@
+
+> monopilot@0.1.0 build C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\apps\frontend
+> next build
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+▲ Next.js 16.1.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./apps/frontend/lib/supabase/server.ts:3:1
+Ecmascript file had an error
+[0m [90m 1 |[39m [36mimport[39m { createServerClient } [36mfrom[39m [32m'@supabase/ssr'[39m
+ [90m 2 |[39m [36mimport[39m { createClient [36mas[39m createSupabaseClient } [36mfrom[39m [32m'@supabase/supabase-js'[39m
+[31m[1m>[22m[39m[90m 3 |[39m [36mimport[39m { cookies } [36mfrom[39m [32m'next/headers'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 4 |[39m
+ [90m 5 |[39m [90m// Alias for backward compatibility with routes using createClient[39m
+ [90m 6 |[39m [36mexport[39m { createServerSupabase [36mas[39m createClient }[0m
+
+You're importing a component that needs "next/headers". That only works in a Server Component which is not supported in the pages/ directory. Read more: https://nextjs.org/docs/app/building-your-application/rendering/server-components
+
+
+
+Import traces:
+  App Route:
+    ./apps/frontend/lib/supabase/server.ts
+    ./apps/frontend/app/api/planning/dashboard/activity/route.ts
+
+  Server Component:
+    ./apps/frontend/lib/supabase/server.ts
+    ./apps/frontend/app/page.tsx
+
+  Client Component Browser:
+    ./apps/frontend/lib/supabase/server.ts [Client Component Browser]
+    ./apps/frontend/lib/services/quality-settings-service.ts [Client Component Browser]
+    ./apps/frontend/lib/hooks/use-quality-settings.ts [Client Component Browser]
+    ./apps/frontend/components/settings/quality/QualitySettingsForm.tsx [Client Component Browser]
+    ./apps/frontend/components/settings/quality/QualitySettingsForm.tsx [Server Component]
+    ./apps/frontend/app/(authenticated)/quality/settings/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./apps/frontend/lib/supabase/server.ts [Client Component SSR]
+    ./apps/frontend/lib/services/quality-settings-service.ts [Client Component SSR]
+    ./apps/frontend/lib/hooks/use-quality-settings.ts [Client Component SSR]
+    ./apps/frontend/components/settings/quality/QualitySettingsForm.tsx [Client Component SSR]
+    ./apps/frontend/components/settings/quality/QualitySettingsForm.tsx [Server Component]
+    ./apps/frontend/app/(authenticated)/quality/settings/page.tsx [Server Component]
+
+
+    at <unknown> (./apps/frontend/lib/supabase/server.ts:3:1)
+ ELIFECYCLE  Command failed with exit code 1.

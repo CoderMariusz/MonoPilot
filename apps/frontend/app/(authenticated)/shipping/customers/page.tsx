@@ -88,7 +88,7 @@ export default function CustomersPage() {
   const deleteMutation = useDeleteCustomer()
 
   const customers = data?.data || []
-  const allergens: Allergen[] = (allergensData || []).map((a: { id: string; code: string; name: string }) => ({
+  const allergens: Allergen[] = (allergensData || []).map((a: any) => ({
     id: a.id,
     code: a.code,
     name: a.name,

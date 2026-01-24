@@ -1,0 +1,30 @@
+app/(authenticated)/shipping/customers/page.tsx(91,59): error TS2345: Argument of type '(a: { id: string; code: string; name: string; }) => { id: string; code: string; name: string; }' is not assignable to parameter of type '(value: Allergen, index: number, array: Allergen[]) => { id: string; code: string; name: string; }'.
+app/(authenticated)/shipping/sales-orders/page.tsx(191,9): error TS2322: Type 'import("C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/apps/frontend/lib/services/sales-order-service").SalesOrder[]' is not assignable to type 'import("C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/apps/frontend/components/shipping/sales-orders/SODataTable").SalesOrder[]'.
+app/api/quality/inspections/[id]/assign/route.ts(51,45): error TS2345: Argument of type 'string' is not assignable to parameter of type 'RoleCode'.
+app/api/quality/inspections/[id]/route.ts(140,45): error TS2345: Argument of type 'string' is not assignable to parameter of type 'RoleCode'.
+app/api/quality/inspections/[id]/start/route.ts(51,49): error TS2345: Argument of type 'string' is not assignable to parameter of type 'RoleCode'.
+app/api/quality/inspections/[id]/start/route.ts(67,34): error TS2345: Argument of type 'string' is not assignable to parameter of type 'RoleCode'.
+components/scanner/putaway/ScannerPutawayWizard.tsx(488,11): error TS2322: Type '{ lp: LPDetails | null; fromLocation: string; toLocation: SuggestedLocation | ScannedLocation | null | undefined; override: boolean; }' is not assignable to type 'FormData'.
+components/shipping/pick-lists/PickListDataTable.tsx(124,56): error TS2322: Type '{ className: string; title: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+components/shipping/pick-lists/PickListDataTable.tsx(126,53): error TS2322: Type '{ className: string; title: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+components/shipping/rma/RMADataTable.tsx(334,16): error TS2322: Type '{ children: (string | Element | null)[]; className: string; onClick: () => void; role: "columnheader"; "aria-sort": "asc" | "desc" | undefined; }' is not assignable to type 'ThHTMLAttributes<HTMLTableCellElement>'.
+components/shipping/rma/RMADataTable.tsx(343,16): error TS2322: Type '{ children: (string | Element | null)[]; className: string; onClick: () => void; role: "columnheader"; "aria-sort": "asc" | "desc" | undefined; }' is not assignable to type 'ThHTMLAttributes<HTMLTableCellElement>'.
+components/shipping/rma/RMADataTable.tsx(355,16): error TS2322: Type '{ children: (string | Element | null)[]; className: string; onClick: () => void; role: "columnheader"; "aria-sort": "asc" | "desc" | undefined; }' is not assignable to type 'ThHTMLAttributes<HTMLTableCellElement>'.
+components/shipping/sales-orders/SOModal.tsx(563,32): error TS18048: 'newLine.quantity_ordered' is possibly 'undefined'.
+components/technical/bom/BOMDetailModal.tsx(85,11): error TS2430: Interface 'BOMDetail' incorrectly extends interface 'BOMWithProduct'.
+components/technical/bom/BOMDetailModal.tsx(319,50): error TS2322: Type 'string | Date' is not assignable to type 'ReactNode'.
+components/technical/bom/BOMDetailModal.tsx(323,50): error TS2322: Type 'string | Date' is not assignable to type 'ReactNode'.
+components/ui/calendar.tsx(25,9): error TS2353: Object literal may only specify known properties, and 'month_caption' does not exist in type 'Partial<StyledElement<string>>'.
+components/ui/calendar.tsx(59,9): error TS2353: Object literal may only specify known properties, and 'Chevron' does not exist in type 'CustomComponents'.
+components/ui/calendar.tsx(59,21): error TS7031: Binding element 'orientation' implicitly has an 'any' type.
+components/ui/calendar.tsx(59,34): error TS7031: Binding element 'className' implicitly has an 'any' type.
+lib/cache/redis.ts(17,32): error TS2345: Argument of type '(redis: Redis) => Promise<T | null>' is not assignable to parameter of type '(redis: Redis) => Promise<T>'.
+lib/services/batch-release-service.ts(456,11): error TS2451: Cannot redeclare block-scoped variable 'supabase'.
+lib/services/batch-release-service.ts(497,11): error TS2451: Cannot redeclare block-scoped variable 'supabase'.
+lib/services/in-process-inspection-service.ts(658,5): error TS2353: Object literal may only specify known properties, and 'metadata' does not exist in type 'AuditLogEntry'.
+lib/services/inventory-allocation-service.ts(273,67): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+lib/services/quality-hold-service.ts(559,45): error TS2345: Argument of type '{ id: any; hold_number: any; status: any; priority: any; hold_type: any; reason: any; held_at: any; held_by_user: { id: any; name: any; }[]; }[]' is not assignable to parameter of type '{ id: string; hold_number: string; status: string; priority: string; hold_type: string; reason: string; held_at: string; held_by_user?: { id: string; name: string; } | null | undefined; }[]'.
+lib/services/quality-hold-service.ts(624,45): error TS2345: Argument of type '{ id: any; hold_number: any; status: any; priority: any; hold_type: any; reason: any; held_at: any; held_by_user: { id: any; name: any; }[]; }[]' is not assignable to parameter of type '{ id: string; hold_number: string; status: string; priority: string; hold_type: string; reason: string; held_at: string; held_by_user?: { id: string; name: string; } | null | undefined; }[]'.
+lib/services/scanner-output-service.ts(305,24): error TS7006: Parameter 'item' implicitly has an 'any' type.
+lib/services/scanner-output-service.ts(449,48): error TS7006: Parameter 'c' implicitly has an 'any' type.
+lib/services/test-results-service.ts(533,43): error TS2345: Argument of type '{}' is not assignable to parameter of type 'string'.

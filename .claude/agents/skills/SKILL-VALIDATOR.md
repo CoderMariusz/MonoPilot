@@ -145,6 +145,7 @@ When analyzing new project for skill recommendations:
 - Implement code/tests/review as specified
 - Follow your agent-specific workflow above
 - Use all your designated tools and skills
+- **MANDATORY**: Run `./ops check` and ensure it passes before proceeding.
 
 **Step 2: Append checkpoint**
 
@@ -244,6 +245,7 @@ No additional commentary, explanations, or narrative. TECH-WRITER will create co
 - Implement code/tests/review as specified
 - Follow your agent-specific workflow above
 - Use all your designated tools and skills
+- **MANDATORY**: Run `./ops check` and ensure it passes before proceeding.
 
 **Step 2: Append checkpoint**
 

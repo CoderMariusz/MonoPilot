@@ -1,2 +1,235 @@
-<testsuites id="" name="" tests="0" failures="0" skipped="0" errors="0" time="6.8213289999999995">
+<testsuites id="" name="" tests="13" failures="3" skipped="6" errors="0" time="40.358042000000005">
+<testsuite name="..\auth.cleanup.ts" timestamp="2026-01-24T19:46:41.788Z" hostname="auth-cleanup" tests="1" failures="0" skipped="0" time="0.007" errors="0">
+<testcase name="cleanup auth state" classname="..\auth.cleanup.ts" time="0.007">
+<system-out>
+<![CDATA[ℹ️  Auth files preserved for faster subsequent runs
+   Set CLEANUP_AUTH=true to remove them
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="..\auth.setup.ts" timestamp="2026-01-24T19:46:41.788Z" hostname="auth-setup" tests="4" failures="0" skipped="3" time="2.499" errors="0">
+<testcase name="authenticate admin" classname="..\auth.setup.ts" time="2.499">
+<system-out>
+<![CDATA[✅ Authenticated: admin@monopilot.com -> .auth/admin.json
+]]>
+</system-out>
+</testcase>
+<testcase name="authenticate manager" classname="..\auth.setup.ts" time="0">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="authenticate planner" classname="..\auth.setup.ts" time="0">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="authenticate operator" classname="..\auth.setup.ts" time="0">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="technical\product-types.spec.ts" timestamp="2026-01-24T19:46:41.788Z" hostname="chromium" tests="8" failures="3" skipped="3" time="50.984" errors="0">
+<testcase name="Product Types Module › 2.1 List View › [TC-TYPE-001] Displays table with correct columns" classname="technical\product-types.spec.ts" time="2.745">
+</testcase>
+<testcase name="Product Types Module › 2.1 List View › [TC-TYPE-002] Search by code/name filters correctly" classname="technical\product-types.spec.ts" time="2.646">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Product Types Module › 2.2 Create Product Type › [TC-TYPE-003] Opens create modal" classname="technical\product-types.spec.ts" time="2.594">
+</testcase>
+<testcase name="Product Types Module › 2.2 Create Product Type › [TC-TYPE-004] Creates custom product type" classname="technical\product-types.spec.ts" time="12.772">
+<failure message="product-types.spec.ts:112:9 [TC-TYPE-004] Creates custom product type" type="FAILURE">
+<![CDATA[  [chromium] › technical\product-types.spec.ts:112:9 › Product Types Module › 2.2 Create Product Type › [TC-TYPE-004] Creates custom product type 
+
+    Error: expect(locator).not.toBeVisible() failed
+
+    Locator:  locator('[role="dialog"]')
+    Expected: not visible
+    Received: visible
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "not toBeVisible" with timeout 10000ms
+      - waiting for locator('[role="dialog"]')
+        13 × locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_2inebnabmqkndlb_" aria-labelledby="radix-_R_2inebnabmqkndlbH1_" aria-describedby="radix-_R_2inebnabmqkndlbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-i…>…</div>
+           - unexpected value "visible"
+
+
+       at ..\pages\ProductTypesPage.ts:160
+
+      158 |     // Wait for modal to close
+      159 |     const modal = this.page.locator('[role="dialog"]');
+    > 160 |     await expect(modal).not.toBeVisible({ timeout: 10000 });
+          |                             ^
+      161 |     // Wait for page data to reload
+      162 |     await this.page.waitForLoadState('networkidle');
+      163 |   }
+        at ProductTypesPage.submitCreateForm (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\ProductTypesPage.ts:160:29)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\product-types.spec.ts:127:7
+
+    Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, open 'C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\test-results\.playwright-artifacts-2\traces\1932aaac292fe1e12dce-75acf3301ae82970e2d5-recording1.trace'
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-product-types-Pr-e5469-Creates-custom-product-type-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-product-types-Pr-e5469-Creates-custom-product-type-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-product-types-Pr-e5469-Creates-custom-product-type-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-product-types-Pr-e5469-Creates-custom-product-type-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-err>
+<![CDATA[
+Warning: attachment technical-product-types-Pr-e5469-Creates-custom-product-type-chromium\test-failed-1.png is missing
+Warning: attachment technical-product-types-Pr-e5469-Creates-custom-product-type-chromium\error-context.md is missing
+Warning: attachment technical-product-types-Pr-e5469-Creates-custom-product-type-chromium\trace.zip is missing]]>
+</system-err>
+</testcase>
+<testcase name="Product Types Module › 2.2 Create Product Type › [TC-TYPE-005] Prevents duplicate codes" classname="technical\product-types.spec.ts" time="12.568">
+<failure message="product-types.spec.ts:138:9 [TC-TYPE-005] Prevents duplicate codes" type="FAILURE">
+<![CDATA[  [chromium] › technical\product-types.spec.ts:138:9 › Product Types Module › 2.2 Create Product Type › [TC-TYPE-005] Prevents duplicate codes 
+
+    Error: expect(locator).not.toBeVisible() failed
+
+    Locator:  locator('[role="dialog"]')
+    Expected: not visible
+    Received: visible
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "not toBeVisible" with timeout 10000ms
+      - waiting for locator('[role="dialog"]')
+        14 × locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_2inebnabmqkndlb_" aria-labelledby="radix-_R_2inebnabmqkndlbH1_" aria-describedby="radix-_R_2inebnabmqkndlbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-i…>…</div>
+           - unexpected value "visible"
+
+
+       at ..\pages\ProductTypesPage.ts:160
+
+      158 |     // Wait for modal to close
+      159 |     const modal = this.page.locator('[role="dialog"]');
+    > 160 |     await expect(modal).not.toBeVisible({ timeout: 10000 });
+          |                             ^
+      161 |     // Wait for page data to reload
+      162 |     await this.page.waitForLoadState('networkidle');
+      163 |   }
+        at ProductTypesPage.submitCreateForm (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\ProductTypesPage.ts:160:29)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\product-types.spec.ts:149:7
+
+    Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, open 'C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\test-results\.playwright-artifacts-1\traces\1932aaac292fe1e12dce-7f6fb8c7efa4b4d9d73a-recording2.trace'
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-product-types-Pr-3e3f3-05-Prevents-duplicate-codes-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-product-types-Pr-3e3f3-05-Prevents-duplicate-codes-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-product-types-Pr-3e3f3-05-Prevents-duplicate-codes-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-product-types-Pr-3e3f3-05-Prevents-duplicate-codes-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-err>
+<![CDATA[
+Warning: attachment technical-product-types-Pr-3e3f3-05-Prevents-duplicate-codes-chromium\test-failed-1.png is missing
+Warning: attachment technical-product-types-Pr-3e3f3-05-Prevents-duplicate-codes-chromium\error-context.md is missing
+Warning: attachment technical-product-types-Pr-3e3f3-05-Prevents-duplicate-codes-chromium\trace.zip is missing]]>
+</system-err>
+</testcase>
+<testcase name="Product Types Module › 2.3 Edit Product Type › [TC-TYPE-006] Updates name and is_default flag" classname="technical\product-types.spec.ts" time="12.767">
+<failure message="product-types.spec.ts:179:9 [TC-TYPE-006] Updates name and is_default flag" type="FAILURE">
+<![CDATA[  [chromium] › technical\product-types.spec.ts:179:9 › Product Types Module › 2.3 Edit Product Type › [TC-TYPE-006] Updates name and is_default flag 
+
+    Error: expect(locator).not.toBeVisible() failed
+
+    Locator:  locator('[role="dialog"]')
+    Expected: not visible
+    Received: visible
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "not toBeVisible" with timeout 10000ms
+      - waiting for locator('[role="dialog"]')
+        13 × locator resolved to <div role="dialog" tabindex="-1" data-state="open" id="radix-_R_2inebnabmqkndlb_" aria-labelledby="radix-_R_2inebnabmqkndlbH1_" aria-describedby="radix-_R_2inebnabmqkndlbH2_" class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-i…>…</div>
+           - unexpected value "visible"
+
+
+       at ..\pages\ProductTypesPage.ts:160
+
+      158 |     // Wait for modal to close
+      159 |     const modal = this.page.locator('[role="dialog"]');
+    > 160 |     await expect(modal).not.toBeVisible({ timeout: 10000 });
+          |                             ^
+      161 |     // Wait for page data to reload
+      162 |     await this.page.waitForLoadState('networkidle');
+      163 |   }
+        at ProductTypesPage.submitCreateForm (C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\pages\ProductTypesPage.ts:160:29)
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\technical\product-types.spec.ts:190:7
+
+    Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, open 'C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\test-results\.playwright-artifacts-3\traces\1932aaac292fe1e12dce-31ac3248263e43ecf600.network'
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\..\test-results\technical-product-types-Pr-59106-es-name-and-is-default-flag-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\..\test-results\technical-product-types-Pr-59106-es-name-and-is-default-flag-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\technical-product-types-Pr-59106-es-name-and-is-default-flag-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ..\..\test-results\technical-product-types-Pr-59106-es-name-and-is-default-flag-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-err>
+<![CDATA[
+Warning: attachment technical-product-types-Pr-59106-es-name-and-is-default-flag-chromium\test-failed-1.png is missing
+Warning: attachment technical-product-types-Pr-59106-es-name-and-is-default-flag-chromium\error-context.md is missing
+Warning: attachment technical-product-types-Pr-59106-es-name-and-is-default-flag-chromium\trace.zip is missing]]>
+</system-err>
+</testcase>
+<testcase name="Product Types Module › 2.3 Edit Product Type › [TC-TYPE-007] Code field is read-only for system types" classname="technical\product-types.spec.ts" time="2.585">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Product Types Module › 2.4 Product Count Link › [TC-TYPE-008] Product count link navigates to filtered products" classname="technical\product-types.spec.ts" time="2.307">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
 </testsuites>

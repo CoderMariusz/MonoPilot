@@ -34,6 +34,7 @@ export interface ConsumptionMaterial {
   uom: string
   sequence: number
   consume_whole_lp: boolean
+  is_by_product?: boolean
   product?: {
     id: string
     code: string

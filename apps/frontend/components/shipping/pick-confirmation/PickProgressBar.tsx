@@ -8,6 +8,8 @@
 
 'use client'
 
+import React from 'react'
+
 export interface PickProgressBarProps {
   pickedLines: number
   shortLines: number
@@ -18,7 +20,7 @@ export function PickProgressBar({
   pickedLines,
   shortLines,
   totalLines,
-}: PickProgressBarProps): JSX.Element {
+}: PickProgressBarProps): React.JSX.Element {
   const completedLines = pickedLines + shortLines
   const percentage = totalLines > 0 ? Math.round((completedLines / totalLines) * 100) : 0
 

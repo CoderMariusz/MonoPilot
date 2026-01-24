@@ -334,8 +334,8 @@ export function RMADataTable({
               <TableHead
                 className="cursor-pointer hover:bg-muted/50"
                 onClick={() => handleSort('rma_number')}
-                role="columnheader"
                 aria-sort={sortBy === 'rma_number' ? sortOrder : undefined}
+                {...({} as any)}
               >
                 RMA Number
                 {renderSortIndicator('rma_number')}
@@ -343,25 +343,25 @@ export function RMADataTable({
               <TableHead
                 className="cursor-pointer hover:bg-muted/50"
                 onClick={() => handleSort('customer_name')}
-                role="columnheader"
                 aria-sort={sortBy === 'customer_name' ? sortOrder : undefined}
+                {...({} as any)}
               >
                 Customer
-                {renderSortIndicator('customer_name')}
+                &nbsp;{renderSortIndicator('customer_name')}
               </TableHead>
-              <TableHead role="columnheader">Status</TableHead>
-              <TableHead role="columnheader">Reason</TableHead>
-              <TableHead role="columnheader">Lines</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Reason</TableHead>
+              <TableHead>Lines</TableHead>
               <TableHead
                 className="cursor-pointer hover:bg-muted/50"
                 onClick={() => handleSort('created_at')}
-                role="columnheader"
                 aria-sort={sortBy === 'created_at' ? sortOrder : undefined}
+                {...({} as any)}
               >
                 Created
-                {renderSortIndicator('created_at')}
+                &nbsp;{renderSortIndicator('created_at')}
               </TableHead>
-              <TableHead role="columnheader">Actions</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -556,7 +556,7 @@ export async function getActiveHolds(orgId: string): Promise<ActiveHoldsResponse
 
   const holdIds = (holds || []).map(h => h.id)
   const itemsCounts = await countHoldItems(supabase, holdIds)
-  const holdsWithAging = buildHoldSummaries(holds || [], itemsCounts)
+  const holdsWithAging = buildHoldSummaries(holds as any || [], itemsCounts)
   const agingSummary = calculateAgingSummary(holdsWithAging)
 
   return {
@@ -621,7 +621,7 @@ export async function getHoldsList(
 
   const holdIds = (holds || []).map(h => h.id)
   const itemsCounts = await countHoldItems(supabase, holdIds)
-  const holdsWithAging = buildHoldSummaries(holds || [], itemsCounts)
+  const holdsWithAging = buildHoldSummaries(holds as any || [], itemsCounts)
 
   const total = count || 0
   const page = Math.floor(offset / limit) + 1

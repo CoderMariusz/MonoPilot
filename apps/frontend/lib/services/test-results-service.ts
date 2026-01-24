@@ -514,7 +514,7 @@ export async function update(id: string, data: Partial<TestResultUpdate>): Promi
   // Remove id from update data (it's in the where clause)
   delete updateData.id;
 
-  if (data.measured_value) {
+  if ('measured_value' in data && data.measured_value) {
     // Get parameter for re-validation
     const { data: result } = await supabase
       .from('quality_test_results')
@@ -529,7 +529,7 @@ export async function update(id: string, data: Partial<TestResultUpdate>): Promi
         .eq('id', result.parameter_id)
         .single();
 
-      if (parameter) {
+      if (parameter && data.measured_value && typeof data.measured_value === 'string') {
         const validation = validateResult(data.measured_value, parameter);
         updateData = {
           ...updateData,

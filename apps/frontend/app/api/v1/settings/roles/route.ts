@@ -26,10 +26,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch all system roles
+    // Fetch all system roles with permissions
     const { data: roles, error } = await supabase
       .from('roles')
-      .select('id, code, name, description, display_order')
+      .select('id, code, name, description, permissions, is_system, display_order, created_at')
       .eq('is_system', true)
       .order('display_order', { ascending: true })
 

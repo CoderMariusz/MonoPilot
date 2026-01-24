@@ -5,15 +5,26 @@ import path from 'path';
 // Load .env.test for E2E tests
 dotenv.config({ path: path.resolve(__dirname, '.env.test') });
 
+// Auth storage paths
+const STORAGE_STATE = {
+  admin: '.auth/admin.json',
+  manager: '.auth/manager.json',
+  planner: '.auth/planner.json',
+  operator: '.auth/operator.json',
+};
+
 /**
  * Playwright Test Configuration
  * See https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './e2e/tests',
 
-  /* Run tests sequentially to avoid Supabase Auth rate limiting */
-  fullyParallel: false,
+  /* Global setup for authentication */
+  globalSetup: './e2e/global-setup.ts',
+
+  /* Run tests in parallel - enabled with auth caching */
+  fullyParallel: true,
 
   /* Fail the build on CI if you accidentally left test.only in the source code */
   forbidOnly: !!process.env.CI,
@@ -21,27 +32,31 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
 
-  /* Use single worker to prevent auth rate limiting */
-  workers: 1,
+  /* Parallel workers - more workers with cached auth */
+  workers: process.env.CI ? 4 : 2,
 
-  /* Test timeout: 120 seconds */
-  timeout: 120 * 1000,
+  /* Test timeout: 60 seconds */
+  timeout: 60 * 1000,
 
-  /* Assertion timeout: 30 seconds */
+  /* Assertion timeout: 15 seconds */
   expect: {
-    timeout: 30 * 1000,
+    timeout: 15 * 1000,
+    /* Visual comparison settings */
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+    },
   },
 
   /* Reporter configuration */
   reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
-    ['list'],
+    process.env.CI ? ['github'] : ['list'],
   ],
 
   /* Shared settings for all projects */
   use: {
-    /* Base URL from environment or default to localhost:3000 (Next.js default port) */
+    /* Base URL from environment or default to localhost:3000 */
     baseURL: process.env.BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 
     /* Collect trace on first retry */
@@ -53,27 +68,73 @@ export default defineConfig({
     /* Video only on failure */
     video: 'retain-on-failure',
 
-    /* Action timeout: 30 seconds */
-    actionTimeout: 30 * 1000,
+    /* Action timeout: 15 seconds */
+    actionTimeout: 15 * 1000,
 
-    /* Navigation timeout: 60 seconds */
-    navigationTimeout: 60 * 1000,
+    /* Navigation timeout: 30 seconds */
+    navigationTimeout: 30 * 1000,
+
+    /* Viewport */
+    viewport: { width: 1280, height: 720 },
+
+    /* Ignore HTTPS errors */
+    ignoreHTTPSErrors: true,
   },
 
-  /* Configure projects for major browsers */
+  /* Configure projects */
   projects: [
+    /* Authentication setup - runs first */
+    {
+      name: 'auth-setup',
+      testDir: './e2e',
+      testMatch: /auth\.setup\.ts/,
+      teardown: 'auth-cleanup',
+    },
+    {
+      name: 'auth-cleanup',
+      testDir: './e2e',
+      testMatch: /auth\.cleanup\.ts/,
+    },
+
+    /* Main test projects - use cached auth */
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: STORAGE_STATE.admin,
+      },
+      dependencies: ['auth-setup'],
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+
+    /* Firefox - optional, uncomment for cross-browser testing */
+    // {
+    //   name: 'firefox',
+    //   use: {
+    //     ...devices['Desktop Firefox'],
+    //     storageState: STORAGE_STATE.admin,
+    //   },
+    //   dependencies: ['auth-setup'],
+    // },
+
+    /* WebKit - optional, uncomment for Safari testing */
+    // {
+    //   name: 'webkit',
+    //   use: {
+    //     ...devices['Desktop Safari'],
+    //     storageState: STORAGE_STATE.admin,
+    //   },
+    //   dependencies: ['auth-setup'],
+    // },
+
+    /* Mobile viewport tests */
+    // {
+    //   name: 'mobile-chrome',
+    //   use: {
+    //     ...devices['Pixel 5'],
+    //     storageState: STORAGE_STATE.admin,
+    //   },
+    //   dependencies: ['auth-setup'],
+    // },
   ],
 
   /* Run local dev server before starting tests */
@@ -86,3 +147,5 @@ export default defineConfig({
     stderr: 'pipe',
   },
 });
+
+export { STORAGE_STATE };

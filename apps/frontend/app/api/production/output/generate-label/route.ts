@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'LP not found', success: false }, { status: 404 })
     }
 
-    const product = lp.products as { id: string; name: string; code: string }
+    const product = lp.products as unknown as { id: string; name: string; code: string }
     const qtyValue = lp.current_qty || lp.quantity
     const qtyWithUom = `${qtyValue} ${lp.uom}`
     const expiryDate = lp.expiry_date

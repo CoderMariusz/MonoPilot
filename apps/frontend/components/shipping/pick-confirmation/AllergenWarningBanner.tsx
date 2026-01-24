@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -45,7 +45,7 @@ export function AllergenWarningBanner({
   product,
   customerRestrictions,
   onAcknowledge,
-}: AllergenWarningBannerProps): JSX.Element | null {
+}: AllergenWarningBannerProps): React.JSX.Element | null {
   const [acknowledged, setAcknowledged] = useState(false)
 
   const conflictingAllergens = findConflictingAllergens(product.allergens, customerRestrictions)

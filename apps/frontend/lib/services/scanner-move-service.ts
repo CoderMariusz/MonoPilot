@@ -155,7 +155,7 @@ export class ScannerMoveService {
         lp_number: updatedLP.lp_number,
         location_id: updatedLP.location_id,
         location_path: locationPath?.full_path || '',
-        product_name: (updatedLP.product as { name: string } | null)?.name || '',
+        product_name: (updatedLP.product as unknown as { name: string } | null)?.name || '',
         quantity: Number(updatedLP.quantity),
         uom: updatedLP.uom,
       },
@@ -189,15 +189,15 @@ export class ScannerMoveService {
       lp_number: lp.lp_number,
       product: {
         id: lp.product_id,
-        name: (lp.product as { name: string; code: string } | null)?.name || '',
-        sku: (lp.product as { name: string; code: string } | null)?.code || '',
+        name: (lp.product as unknown as { name: string; code: string } | null)?.name || '',
+        sku: (lp.product as unknown as { name: string; code: string } | null)?.code || '',
       },
       quantity: Number(lp.quantity),
       uom: lp.uom,
       location: {
         id: lp.location_id,
-        code: (lp.location as { location_code: string; full_path: string } | null)?.location_code || '',
-        path: (lp.location as { location_code: string; full_path: string } | null)?.full_path || '',
+        code: (lp.location as unknown as { location_code: string; full_path: string } | null)?.location_code || '',
+        path: (lp.location as unknown as { location_code: string; full_path: string } | null)?.full_path || '',
       },
       status: lp.status as 'available' | 'reserved' | 'consumed' | 'blocked',
       qa_status: lp.qa_status as 'pending' | 'passed' | 'failed' | 'on_hold',
@@ -224,7 +224,7 @@ export class ScannerMoveService {
       id: destination.id,
       location_code: destination.location_code,
       location_path: destination.full_path || '',
-      warehouse_name: (destination.warehouse as { name: string } | null)?.name || '',
+      warehouse_name: (destination.warehouse as unknown as { name: string } | null)?.name || '',
       is_active: destination.is_active,
       capacity_pct: null, // Capacity tracking not implemented in this story
     }
@@ -282,8 +282,8 @@ export class ScannerMoveService {
       return null
     }
 
-    const product = data.product as { id: string; name: string; code: string } | null
-    const location = data.location as { id: string; location_code: string; full_path: string } | null
+    const product = data.product as unknown as { id: string; name: string; code: string } | null
+    const location = data.location as unknown as { id: string; location_code: string; full_path: string } | null
 
     return {
       id: data.id,
@@ -357,9 +357,9 @@ export class ScannerMoveService {
     }
 
     return data.map((move) => {
-      const lpData = move.lp as { lp_number: string } | null
-      const fromLoc = move.from_location as { location_code: string } | null
-      const toLoc = move.to_location as { location_code: string } | null
+      const lpData = move.lp as unknown as { lp_number: string } | null
+      const fromLoc = move.from_location as unknown as { location_code: string } | null
+      const toLoc = move.to_location as unknown as { location_code: string } | null
 
       return {
         id: move.id,

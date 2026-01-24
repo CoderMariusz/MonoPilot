@@ -90,7 +90,6 @@ interface BOMDetail extends BOMWithProduct {
     name: string
     code: string
   } | null
-  yield_percent?: number
 }
 
 export function BOMDetailModal({
@@ -316,11 +315,11 @@ export function BOMDetailModal({
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Effective From</label>
-                      <p className="font-medium">{bom.effective_from}</p>
+                      <p className="font-medium">{typeof bom.effective_from === 'string' ? bom.effective_from : bom.effective_from.toISOString().split('T')[0]}</p>
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Effective To</label>
-                      <p className="font-medium">{bom.effective_to || 'No end date'}</p>
+                      <p className="font-medium">{bom.effective_to ? (typeof bom.effective_to === 'string' ? bom.effective_to : bom.effective_to.toISOString().split('T')[0]) : 'No end date'}</p>
                     </div>
                   </div>
                 </div>

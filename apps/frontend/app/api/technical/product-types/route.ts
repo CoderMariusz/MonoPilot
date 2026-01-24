@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      data: productTypes || [],
+      types: productTypes || [],
       total: productTypes?.length || 0
     })
 

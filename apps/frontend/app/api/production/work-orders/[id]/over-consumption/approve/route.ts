@@ -61,7 +61,7 @@ export async function POST(
     }
 
     // 3. Role-based authorization - Only managers can approve
-    const roleCode = (currentUser.role as { code: string } | null)?.code?.toLowerCase() ?? ''
+    const roleCode = (currentUser.role as unknown as { code: string } | null)?.code?.toLowerCase() ?? ''
     if (!ALLOWED_ROLES.includes(roleCode)) {
       return NextResponse.json(
         { error: 'Only Managers and Admins can approve/reject', code: ERROR_CODES.FORBIDDEN },

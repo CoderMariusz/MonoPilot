@@ -223,6 +223,23 @@ export class ProductionLineService {
         throw new Error('Line code must be unique')
       }
 
+      // If warehouse_id not provided, use first available warehouse for the org
+      let warehouse_id = input.warehouse_id
+      if (!warehouse_id) {
+        const { data: warehouses } = await supabase
+          .from('warehouses')
+          .select('id')
+          .eq('org_id', org_id)
+          .limit(1)
+          .single()
+
+        if (!warehouses) {
+          throw new Error('No warehouses found. Please create a warehouse first.')
+        }
+
+        warehouse_id = warehouses.id
+      }
+
       // Create line
       const { data: lineData, error: lineError } = await supabase
         .from('production_lines')
@@ -231,7 +248,7 @@ export class ProductionLineService {
           code: input.code.toUpperCase(),
           name: input.name,
           description: input.description || null,
-          warehouse_id: input.warehouse_id,
+          warehouse_id,
           default_output_location_id: input.default_output_location_id || null,
           status: input.status || 'active',
           created_by: user.id,

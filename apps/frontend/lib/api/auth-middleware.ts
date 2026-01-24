@@ -18,13 +18,20 @@ import { unauthorizedResponse, forbiddenResponse, userNotFoundResponse } from '.
 // Types
 // =============================================================================
 
+export type RoleCode = 'viewer' | 'qa_inspector' | 'qa_manager' | 'admin' | 'owner';
+
 export interface AuthContext {
   userId: string;
   orgId: string;
-  roleCode: string;
+  roleCode: RoleCode;
 }
 
-export type RoleCode = 'viewer' | 'qa_inspector' | 'qa_manager' | 'admin' | 'owner';
+// =============================================================================
+// Constants
+// =============================================================================
+
+/** UUID v4 regex pattern for validation */
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // =============================================================================
 // Role Constants
@@ -113,4 +120,11 @@ export function isAdminRole(roleCode: RoleCode): boolean {
  */
 export function isInspectorRole(roleCode: RoleCode): boolean {
   return INSPECTOR_ROLES.has(roleCode);
+}
+
+/**
+ * Validate UUID format
+ */
+export function isValidUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
 }

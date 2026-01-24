@@ -104,14 +104,14 @@ export async function POST(request: NextRequest) {
     // Get by-products from BOM
     const byProducts = await getByProductsFromBOM(supabase, wo.product_id, wo.planned_qty)
 
-    const products = wo.products as {
+    const products = wo.products as unknown as {
       id: string
       name: string
       code: string
       base_uom: string
       shelf_life_days: number
     }
-    const productionLine = wo.production_lines as { id: string; name: string } | null
+    const productionLine = wo.production_lines as unknown as { id: string; name: string } | null
 
     const registeredQty = Number(wo.output_qty) || 0
     const plannedQty = Number(wo.planned_qty)
@@ -177,7 +177,7 @@ async function getByProductsFromBOM(
   if (!bomItems) return []
 
   return bomItems.map((item) => {
-    const product = item.products as { id: string; name: string; code: string; base_uom: string }
+    const product = item.products as unknown as { id: string; name: string; code: string; base_uom: string }
     const yieldPercent = Number(item.yield_percent) || 0
     const expectedQty = Math.round(((plannedQty * yieldPercent) / 100) * 100) / 100
 

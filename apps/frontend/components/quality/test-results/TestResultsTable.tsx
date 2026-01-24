@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils/format';
 import type { TestResult } from '@/lib/validation/quality-test-results-schema';
 
 interface TestResultsTableProps {

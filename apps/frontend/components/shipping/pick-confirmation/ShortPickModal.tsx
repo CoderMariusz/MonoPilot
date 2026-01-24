@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -59,7 +59,7 @@ export function ShortPickModal({
   quantity_picked,
   onConfirm,
   onCancel,
-}: ShortPickModalProps): JSX.Element | null {
+}: ShortPickModalProps): React.JSX.Element | null {
   const [selectedReason, setSelectedReason] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)

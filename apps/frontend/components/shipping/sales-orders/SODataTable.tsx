@@ -62,12 +62,12 @@ import { SalesOrderService, type SOStatus } from '@/lib/services/sales-order-ser
 export interface SalesOrder {
   id: string
   order_number: string
-  customer_name: string
+  customer_name?: string
   status: SOStatus
   order_date: string
   required_delivery_date: string
-  total_amount: number
-  line_count: number
+  total_amount?: number
+  line_count?: number
 }
 
 interface SODataTableProps {
@@ -203,7 +203,7 @@ export function SODataTable({
     const matchesSearch =
       !searchTerm ||
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+      (order.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter
 
@@ -439,7 +439,7 @@ export function SODataTable({
                     {SalesOrderService.formatDate(order.required_delivery_date)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {SalesOrderService.formatCurrency(order.total_amount)}
+                    {SalesOrderService.formatCurrency(order.total_amount || 0)}
                   </TableCell>
                   <TableCell className="text-right">{order.line_count}</TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>

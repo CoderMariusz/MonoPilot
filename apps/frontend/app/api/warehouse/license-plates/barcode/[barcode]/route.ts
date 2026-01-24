@@ -111,13 +111,13 @@ export async function GET(
         .single()
 
       if (material) {
-        materialProduct = material.products as { name: string } | null
+        materialProduct = material.products as unknown as { name: string } | null
         productMatch = licensePlate.product_id === material.product_id
         uomMatch = licensePlate.uom === material.uom
 
         if (!productMatch) {
           errorCode = ERROR_CODES.PRODUCT_MISMATCH
-          const lpProduct = licensePlate.products as { name: string } | null
+          const lpProduct = licensePlate.products as unknown as { name: string } | null
           errorMessage = `Product mismatch: LP contains ${lpProduct?.name || 'Unknown'}, material requires ${materialProduct?.name || 'Unknown'}`
         } else if (!uomMatch) {
           errorCode = ERROR_CODES.UOM_MISMATCH
@@ -133,8 +133,8 @@ export async function GET(
     }
 
     // Transform response
-    const products = licensePlate.products as { id: string; name: string; sku: string } | null
-    const locations = licensePlate.locations as { name: string; code: string } | null
+    const products = licensePlate.products as unknown as { id: string; name: string; sku: string } | null
+    const locations = licensePlate.locations as unknown as { name: string; code: string } | null
 
     const lpResponse = {
       id: licensePlate.id,

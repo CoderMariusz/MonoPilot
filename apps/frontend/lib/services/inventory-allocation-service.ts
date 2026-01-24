@@ -270,7 +270,7 @@ export class InventoryAllocationService {
       : 0
 
     // Get threshold and determine new status
-    const threshold = await this.getAllocationThreshold(supabase, orgId)
+    const threshold = await this.getAllocationThreshold(supabase, orgId || '')
     let newStatus = oldStatus
 
     if (actualRequest.hold_if_insufficient && fulfillmentPct < threshold) {
@@ -718,7 +718,7 @@ export class InventoryAllocationService {
       result.push({
         license_plate_id: lp.id,
         lp_number: lp.lp_number,
-        location_code: (lp.locations as { code: string })?.code || '',
+        location_code: (lp.locations as unknown as { code: string })?.code || '',
         on_hand_quantity: Number(lp.quantity),
         allocated_quantity: allocated,
         available_quantity: available,

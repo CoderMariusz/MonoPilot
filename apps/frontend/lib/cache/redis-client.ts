@@ -79,7 +79,7 @@ export function isRedisAvailable(): boolean {
  * @returns Result of operation or null
  */
 export async function safeRedisOperation<T>(
-  operation: (redis: Redis) => Promise<T>
+  operation: (redis: Redis) => Promise<T | null>
 ): Promise<T | null> {
   const redis = getRedis()
 

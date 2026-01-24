@@ -1,0 +1,391 @@
+
+> monopilot@1.0.0 test:e2e C:\Users\Mariusz K\Documents\Programowanie\MonoPilot
+> playwright test "e2e/tests/settings/production-lines.spec.ts"
+
+[dotenv@17.2.3] injecting env (11) from .env.test -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+✅ Global setup complete
+
+Running 24 tests using 2 workers
+
+  -   1 [auth-setup] › e2e\auth.setup.ts:68:7 › authenticate manager
+  -   2 [auth-setup] › e2e\auth.setup.ts:73:7 › authenticate planner
+  -   3 [auth-setup] › e2e\auth.setup.ts:78:7 › authenticate operator
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+✅ Authenticated: admin@monopilot.com -> .auth/admin.json
+  ✓   4 [auth-setup] › e2e\auth.setup.ts:61:6 › authenticate admin (3.3s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: ⚙️  suppress all logs with { quiet: true }
+  ✓   6 [chromium] › e2e\tests\settings\production-lines.spec.ts:31:9 › Production Lines CRUD › List View › displays production lines table (13.4s)
+  ✓   5 [chromium] › e2e\tests\settings\production-lines.spec.ts:45:9 › Production Lines CRUD › List View › can search production lines by code (13.9s)
+  ✓   8 [chromium] › e2e\tests\settings\production-lines.spec.ts:99:9 › Production Lines CRUD › List View › can sort by code column (3.7s)
+  ✓   9 [chromium] › e2e\tests\settings\production-lines.spec.ts:119:9 › Production Lines CRUD › List View › can sort by name column (5.0s)
+  ✘   7 [chromium] › e2e\tests\settings\production-lines.spec.ts:65:9 › Production Lines CRUD › List View › can search production lines by name (10.9s)
+  ✓  10 [chromium] › e2e\tests\settings\production-lines.spec.ts:135:9 › Production Lines CRUD › Create › opens create modal (4.0s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+  ✓  11 [chromium] › e2e\tests\settings\production-lines.spec.ts:168:9 › Production Lines CRUD › Create › validates required name field (3.6s)
+  ✓  12 [chromium] › e2e\tests\settings\production-lines.spec.ts:148:9 › Production Lines CRUD › Create › validates required code field (3.1s)
+  ✓  14 [chromium] › e2e\tests\settings\production-lines.spec.ts:239:9 › Production Lines CRUD › Create › prevents duplicate production line codes (3.9s)
+  ✘  15 [chromium] › e2e\tests\settings\production-lines.spec.ts:276:9 › Production Lines CRUD › Edit › opens edit modal with existing data (8.5s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+  ✘  16 [chromium] › e2e\tests\settings\production-lines.spec.ts:319:9 › Production Lines CRUD › Edit › updates production line successfully (2.7s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+  ✘  17 [chromium] › e2e\tests\settings\production-lines.spec.ts:381:9 › Production Lines CRUD › Edit › code field is disabled in edit mode (2.7s)
+  ✓  13 [chromium] › e2e\tests\settings\production-lines.spec.ts:190:9 › Production Lines CRUD › Create › creates new production line successfully (22.0s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: ⚙️  override existing env vars with { override: true }
+  ✘  18 [chromium] › e2e\tests\settings\production-lines.spec.ts:463:9 › Production Lines CRUD › Delete › cancels delete without removing item (2.7s)
+  ✘  19 [chromium] › e2e\tests\settings\production-lines.spec.ts:421:9 › Production Lines CRUD › Delete › shows delete confirmation dialog (2.7s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+  ✘  20 [chromium] › e2e\tests\settings\production-lines.spec.ts:510:9 › Production Lines CRUD › Delete › deletes production line after confirmation (2.7s)
+  ✘  21 [chromium] › e2e\tests\settings\production-lines.spec.ts:559:9 › Production Lines CRUD › Delete › shows warning when deleting line with machines (2.7s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+  ✘  22 [chromium] › e2e\tests\settings\production-lines.spec.ts:611:9 › Production Lines CRUD › Modal Tabs › displays all three tabs in create modal (2.6s)
+  ✘  23 [chromium] › e2e\tests\settings\production-lines.spec.ts:625:9 › Production Lines CRUD › Modal Tabs › can navigate between tabs (2.7s)
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+ℹ️  Auth files preserved for faster subsequent runs
+   Set CLEANUP_AUTH=true to remove them
+  ✓  24 [auth-cleanup] › e2e\auth.cleanup.ts:12:9 › cleanup auth state (3ms)
+
+
+  1) [chromium] › e2e\tests\settings\production-lines.spec.ts:65:9 › Production Lines CRUD › List View › can search production lines by name 
+
+    TimeoutError: locator.waitFor: Timeout 5000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('table tbody tr').first().locator('td').nth(1) to be visible[22m
+
+
+      83 |       // Get name from second column - cells structure varies, just get text
+      84 |       const nameCell = firstRow.locator('td').nth(1);
+    > 85 |       await nameCell.waitFor({ state: 'visible', timeout: 5000 });
+         |                      ^
+      86 |       const firstRowName = await nameCell.textContent();
+      87 |
+      88 |       // Perform search
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:85:22
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--3c674-ch-production-lines-by-name-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--3c674-ch-production-lines-by-name-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\settings-production-lines--3c674-ch-production-lines-by-name-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--3c674-ch-production-lines-by-name-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--3c674-ch-production-lines-by-name-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e\tests\settings\production-lines.spec.ts:276:9 › Production Lines CRUD › Edit › opens edit modal with existing data 
+
+    TimeoutError: locator.waitFor: Timeout 5000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('table tbody tr').first().locator('td').last().locator('button').first() to be visible[22m
+
+
+      295 |       const actionsCell = firstRow.locator('td').last();
+      296 |       const editButton = actionsCell.locator('button').first();
+    > 297 |       await editButton.waitFor({ state: 'visible', timeout: 5000 });
+          |                        ^
+      298 |       await editButton.click();
+      299 |
+      300 |       // Wait for modal to open
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:297:24
+
+    Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, open 'C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\test-results\.playwright-artifacts-3\traces\b29930140c3bfd2413df-89152b6f7ab62403740a-recording2.trace'
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--6347c-it-modal-with-existing-data-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\settings-production-lines--6347c-it-modal-with-existing-data-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--6347c-it-modal-with-existing-data-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--6347c-it-modal-with-existing-data-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e\tests\settings\production-lines.spec.ts:319:9 › Production Lines CRUD › Edit › updates production line successfully 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--fa27d-roduction-line-successfully-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--fa27d-roduction-line-successfully-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--fa27d-roduction-line-successfully-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--fa27d-roduction-line-successfully-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e\tests\settings\production-lines.spec.ts:381:9 › Production Lines CRUD › Edit › code field is disabled in edit mode 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--f13d4-ld-is-disabled-in-edit-mode-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--f13d4-ld-is-disabled-in-edit-mode-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--f13d4-ld-is-disabled-in-edit-mode-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--f13d4-ld-is-disabled-in-edit-mode-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › e2e\tests\settings\production-lines.spec.ts:421:9 › Production Lines CRUD › Delete › shows delete confirmation dialog 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--abea1--delete-confirmation-dialog-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--abea1--delete-confirmation-dialog-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--abea1--delete-confirmation-dialog-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--abea1--delete-confirmation-dialog-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e\tests\settings\production-lines.spec.ts:463:9 › Production Lines CRUD › Delete › cancels delete without removing item 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--e78e5-elete-without-removing-item-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--e78e5-elete-without-removing-item-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--e78e5-elete-without-removing-item-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--e78e5-elete-without-removing-item-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › e2e\tests\settings\production-lines.spec.ts:510:9 › Production Lines CRUD › Delete › deletes production line after confirmation 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--1917c-ion-line-after-confirmation-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--1917c-ion-line-after-confirmation-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--1917c-ion-line-after-confirmation-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--1917c-ion-line-after-confirmation-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [chromium] › e2e\tests\settings\production-lines.spec.ts:559:9 › Production Lines CRUD › Delete › shows warning when deleting line with machines 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--46035-deleting-line-with-machines-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--46035-deleting-line-with-machines-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--46035-deleting-line-with-machines-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--46035-deleting-line-with-machines-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [chromium] › e2e\tests\settings\production-lines.spec.ts:611:9 › Production Lines CRUD › Modal Tabs › displays all three tabs in create modal 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--64c20--three-tabs-in-create-modal-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--64c20--three-tabs-in-create-modal-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--64c20--three-tabs-in-create-modal-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--64c20--three-tabs-in-create-modal-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [chromium] › e2e\tests\settings\production-lines.spec.ts:625:9 › Production Lines CRUD › Modal Tabs › can navigate between tabs 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/settings/production-lines
+    Call log:
+    [2m  - navigating to "http://localhost:3000/settings/production-lines", waiting until "load"[22m
+
+
+      24 | test.describe('Production Lines CRUD', () => {
+      25 |   test.beforeEach(async ({ page }) => {
+    > 26 |     await page.goto(ROUTE);
+         |                ^
+      27 |     await page.waitForLoadState('networkidle');
+      28 |   });
+      29 |
+        at C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\e2e\tests\settings\production-lines.spec.ts:26:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\settings-production-lines--a5b00-s-can-navigate-between-tabs-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\settings-production-lines--a5b00-s-can-navigate-between-tabs-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\settings-production-lines--a5b00-s-can-navigate-between-tabs-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results\settings-production-lines--a5b00-s-can-navigate-between-tabs-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10 failed
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:65:9 › Production Lines CRUD › List View › can search production lines by name 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:276:9 › Production Lines CRUD › Edit › opens edit modal with existing data 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:319:9 › Production Lines CRUD › Edit › updates production line successfully 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:381:9 › Production Lines CRUD › Edit › code field is disabled in edit mode 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:421:9 › Production Lines CRUD › Delete › shows delete confirmation dialog 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:463:9 › Production Lines CRUD › Delete › cancels delete without removing item 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:510:9 › Production Lines CRUD › Delete › deletes production line after confirmation 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:559:9 › Production Lines CRUD › Delete › shows warning when deleting line with machines 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:611:9 › Production Lines CRUD › Modal Tabs › displays all three tabs in create modal 
+    [chromium] › e2e\tests\settings\production-lines.spec.ts:625:9 › Production Lines CRUD › Modal Tabs › can navigate between tabs 
+  3 skipped
+  11 passed (1.3m)
+
+To open last HTML report run:
+[36m[39m
+[36m  pnpm exec playwright show-report[39m
+[36m[39m
+ ELIFECYCLE  Command failed with exit code 1.

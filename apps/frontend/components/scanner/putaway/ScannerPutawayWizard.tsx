@@ -408,7 +408,7 @@ export function ScannerPutawayWizard({ onComplete, isLoading, error: propError }
   const formData = {
     lp: state.lpDetails,
     fromLocation: state.lpDetails?.current_location || '',
-    toLocation: state.override ? state.scannedLocation : state.suggestion?.suggestedLocation,
+    toLocation: state.override ? state.scannedLocation : (state.suggestion?.suggestedLocation || null),
     override: state.override,
   }
 

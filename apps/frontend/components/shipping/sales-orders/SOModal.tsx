@@ -560,7 +560,7 @@ export function SOModal({
                             <p className="text-xs text-gray-500 mt-1">
                               Available:{' '}
                               {products.find((p) => p.id === newLine.product_id)?.available_qty || 0}
-                              {newLine.quantity_ordered >
+                              {(newLine.quantity_ordered || 0) >
                                 (products.find((p) => p.id === newLine.product_id)?.available_qty || 0) && (
                                 <span className="text-amber-600 ml-2">
                                   <AlertTriangle className="h-3 w-3 inline mr-1" />

@@ -302,7 +302,7 @@ async function getByProductsFromBOM(productId: string, plannedQty: number): Prom
 
   if (!bomItems) return []
 
-  return bomItems.map((item) => {
+  return bomItems.map((item: any) => {
     const product = item.products as { id: string; name: string; code: string; base_uom: string }
     const yieldPercent = Number(item.yield_percent) || 0
     const expectedQty = Math.round((plannedQty * yieldPercent) / 100 * 100) / 100
@@ -446,7 +446,7 @@ export async function registerOutput(input: ScannerRegisterInput): Promise<Regis
   // Create genealogy records
   let parentCount = 0
   if (consumptions && consumptions.length > 0) {
-    const genealogyRecords = consumptions.map((c) => ({
+    const genealogyRecords = consumptions.map((c: any) => ({
       parent_lp_id: c.lp_id,
       child_lp_id: lp.id,
       relationship_type: 'production',

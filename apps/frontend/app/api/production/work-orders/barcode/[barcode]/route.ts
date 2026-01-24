@@ -102,8 +102,8 @@ export async function GET(
     }
 
     // Transform response to match expected format
-    const products = workOrder.products as { name: string; sku: string } | null
-    const productionLines = workOrder.production_lines as { name: string } | null
+    const products = workOrder.products as unknown as { name: string; sku: string } | null
+    const productionLines = workOrder.production_lines as unknown as { name: string } | null
 
     const woResponse = {
       id: workOrder.id,
@@ -118,7 +118,7 @@ export async function GET(
     }
 
     const materialsResponse = (materials || []).map((mat) => {
-      const matProduct = mat.products as { name: string; sku: string } | null
+      const matProduct = mat.products as unknown as { name: string; sku: string } | null
       const requiredQty = Number(mat.required_qty) || 0
       const consumedQty = Number(mat.consumed_qty) || 0
       const progressPercent = requiredQty > 0 ? Math.round((consumedQty / requiredQty) * 100) : 0

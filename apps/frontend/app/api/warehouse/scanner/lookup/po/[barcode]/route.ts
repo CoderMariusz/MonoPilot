@@ -48,9 +48,9 @@ export async function GET(request: Request, props: { params: Promise<{ barcode: 
       id: line.id,
       product_code: line.product?.code || '',
       product_name: line.product?.name || '',
-      ordered_qty: line.ordered_qty,
+      ordered_qty: line.quantity,
       received_qty: line.received_qty,
-      remaining_qty: line.ordered_qty - line.received_qty,
+      remaining_qty: line.quantity - line.received_qty,
       uom: line.uom,
     }))
 
@@ -60,7 +60,7 @@ export async function GET(request: Request, props: { params: Promise<{ barcode: 
         id: po.id,
         po_number: po.po_number,
         supplier_name: po.supplier?.name || 'Unknown',
-        expected_date: po.expected_date,
+        expected_date: po.expected_delivery_date,
         status: po.status,
         lines,
       },

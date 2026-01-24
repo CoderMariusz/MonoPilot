@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,7 +43,7 @@ export function PickLineCard({
   customerAllergens,
   onPickConfirm,
   onShortPick,
-}: PickLineCardProps): JSX.Element {
+}: PickLineCardProps): React.JSX.Element {
   const [quantity, setQuantity] = useState(line.quantity_to_pick)
   const [allergenAcknowledged, setAllergenAcknowledged] = useState(false)
   const [isLoading, setIsLoading] = useState(false)

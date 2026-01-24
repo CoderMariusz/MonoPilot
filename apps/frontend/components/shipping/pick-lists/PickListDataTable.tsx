@@ -121,9 +121,9 @@ function PriorityBadge({ priority }: { priority: PickListPriority }) {
 
 function PickTypeIcon({ pickType }: { pickType: 'single_order' | 'wave' }) {
   if (pickType === 'wave') {
-    return <Layers className="h-4 w-4 text-purple-600" title="Wave Pick" />
+    return <Layers className="h-4 w-4 text-purple-600" aria-label="Wave Pick" />
   }
-  return <Package className="h-4 w-4 text-blue-600" title="Single Order Pick" />
+  return <Package className="h-4 w-4 text-blue-600" aria-label="Single Order Pick" />
 }
 
 // =============================================================================

@@ -92,7 +92,7 @@ async function getByProductsFromBOM(
   if (!bomItems) return []
 
   return bomItems.map((item) => {
-    const product = item.products as { id: string; name: string; code: string; base_uom: string }
+    const product = item.products as unknown as { id: string; name: string; code: string; base_uom: string }
     const yieldPercent = Number(item.yield_percent) || 0
     const expectedQty = Math.round(((plannedQty * yieldPercent) / 100) * 100) / 100
 

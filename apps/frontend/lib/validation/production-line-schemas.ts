@@ -23,6 +23,10 @@ export const createProductionLineSchema = z.object({
     .max(500, 'Description must be 500 characters or less')
     .optional()
     .nullable(),
+  warehouse_id: z
+    .string()
+    .uuid('Invalid warehouse ID format')
+    .optional(),
   default_output_location_id: z
     .string()
     .uuid('Invalid location ID format')

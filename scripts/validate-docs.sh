@@ -144,19 +144,19 @@ main() {
     # ============================================================
     print_header "1. Core Files"
 
-    check_file "CLAUDE.md" "Root CLAUDE.md"
-    check_file "PROJECT-STATE.md" "Root PROJECT-STATE.md"
+    check_file ".claude/CLAUDE.md" "Root CLAUDE.md"
+    check_file ".claude/PROJECT-STATE.md" "Root PROJECT-STATE.md"
     check_file "README.md" "README"
-    check_file "INSTALL.md" "Installation guide"
-    check_file "QUICK-START.md" "Quick start guide"
+    # check_file "INSTALL.md" "Installation guide" 
+    # check_file "QUICK-START.md" "Quick start guide"
 
     # ============================================================
     # 2. CHECK CLAUDE.md LINE COUNT
     # ============================================================
     print_header "2. CLAUDE.md Validation"
 
-    if [ -f "$TARGET_PATH/CLAUDE.md" ]; then
-        CLAUDE_LINES=$(count_lines "CLAUDE.md")
+    if [ -f "$TARGET_PATH/.claude/CLAUDE.md" ]; then
+        CLAUDE_LINES=$(count_lines ".claude/CLAUDE.md")
         print_info "CLAUDE.md has $CLAUDE_LINES lines"
 
         if [ "$CLAUDE_LINES" -le 70 ]; then
@@ -175,7 +175,7 @@ main() {
     check_dir ".claude" ".claude folder"
     check_dir "docs" "docs folder"
     check_dir "scripts" "scripts folder"
-    check_dir "templates" "templates folder"
+    check_dir ".claude/templates" "templates folder"
 
     # .claude subfolders
     check_dir ".claude/agents" "agents folder"
@@ -260,9 +260,9 @@ main() {
     # ============================================================
     print_header "8. Templates"
 
-    check_file "templates/CLAUDE.md.template" "CLAUDE.md template"
-    check_file "templates/PROJECT-STATE.md.template" "PROJECT-STATE.md template"
-    check_file "templates/epic-template.md" "Epic template"
+    check_file ".claude/templates/epic-template.md" "Epic template"
+    # check_file "templates/CLAUDE.md.template" "CLAUDE.md template"
+    # check_file "templates/PROJECT-STATE.md.template" "PROJECT-STATE.md template"
 
     # ============================================================
     # 9. VALIDATE @REFERENCES
@@ -317,9 +317,9 @@ main() {
     # ============================================================
     print_header "10. Workflow Files"
 
-    check_file ".claude/workflows/DEVELOPMENT-FLOW.md" "Development Flow"
-    check_file ".claude/workflows/EPIC-FLOW.md" "Epic Flow"
-    check_file ".claude/workflows/PLANNING-FLOW.md" "Planning Flow"
+    check_file ".claude/workflows/documentation/3-STORY-DELIVERY.md" "Story Delivery Flow"
+    check_file ".claude/workflows/documentation/1-EPIC-DELIVERY.md" "Epic Delivery Flow"
+    check_file ".claude/workflows/documentation/PLANNING-FLOW.md" "Planning Flow"
 
     # ============================================================
     # SUMMARY

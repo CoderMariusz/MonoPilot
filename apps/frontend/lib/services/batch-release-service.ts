@@ -494,7 +494,6 @@ export class BatchReleaseService {
     const orgId = await getUserOrgContext(userId)
 
     // 8. Create batch release record
-    const supabase = createClient()
     const { data: release, error: releaseError } = await supabase
       .from('batch_release_records')
       .insert({

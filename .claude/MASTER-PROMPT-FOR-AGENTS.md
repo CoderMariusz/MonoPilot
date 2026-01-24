@@ -2,8 +2,8 @@
 
 ## 🎯 TARGET
 ```yaml
-Stories: {{STORY_IDS}}  04.6a 04.6b
-Epic: {{EPIC_ID}}        04-PRODUCTION
+Stories: {{STORY_IDS}}  07.8 07.9 07.10 07.11 03.13
+Epic: {{EPIC_ID}}        07-shipping
 ```
    e
 ## 📋 7-PHASE FLOW
@@ -72,6 +72,7 @@ Exit: {condition}
 7. **check context make sure you dont runout if there is posibility /compact context or close subagent and run next after short handover**
 8. **Aways one soties per Agent!**
 9. **update Roadmaps files**
+10. **Validation**: Always run `./ops check` before marking a task as COMPLETED.
 
 ---
 

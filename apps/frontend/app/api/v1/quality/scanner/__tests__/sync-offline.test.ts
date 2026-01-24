@@ -9,6 +9,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * Tests bulk offline action sync, error handling, and conflict prevention
  */
 
+// Mock RPC function
+const mockRpcFn = vi.fn()
+
 // Mock Supabase auth
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: vi.fn(() => ({
@@ -34,7 +37,7 @@ vi.mock('@/lib/supabase/server', () => ({
       order: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn(),
     })),
-    rpc: vi.fn(),
+    rpc: vi.fn(() => mockRpcFn),
   })),
 }))
 
@@ -89,10 +92,12 @@ describe('POST /api/quality/scanner/sync-offline - Successful Sync (AC-8.9)', ()
       errors: [],
     }
 
-    ;(supabase.rpc as any)('sync_offline_inspections').mockResolvedValue({
+    mockRpcFn.mockResolvedValue({
       data: mockResponse,
       error: null,
     })
+
+    const result = await supabase.rpc('sync_offline_inspections', { actions: payload.actions })
 
     expect(mockResponse.success).toBe(3)
     expect(mockResponse.failed).toBe(0)
@@ -255,10 +260,12 @@ describe('POST /api/quality/scanner/sync-offline - Partial Failures', () => {
       ],
     }
 
-    ;(supabase.rpc as any)('sync_offline_inspections').mockResolvedValue({
+    mockRpcFn.mockResolvedValue({
       data: mockResponse,
       error: null,
     })
+
+    const result = await supabase.rpc('sync_offline_inspections', { actions: payload.actions })
 
     expect(mockResponse.success).toBe(2)
     expect(mockResponse.failed).toBe(1)
@@ -324,10 +331,12 @@ describe('POST /api/quality/scanner/sync-offline - Conflict Prevention', () => {
       ],
     }
 
-    ;(supabase.rpc as any)('sync_offline_inspections').mockResolvedValue({
+    mockRpcFn.mockResolvedValue({
       data: mockResponse,
       error: null,
     })
+
+    const result = await supabase.rpc('sync_offline_inspections', { actions: [action] })
 
     expect(mockResponse.errors[0].error).toContain('already completed')
   })
@@ -498,7 +507,7 @@ describe('POST /api/quality/scanner/sync-offline - Performance (AC-8.13)', () =>
     const { createServerSupabase } = await import('@/lib/supabase/server')
     const supabase = createServerSupabase()
 
-    ;(supabase.rpc as any)('sync_offline_inspections').mockResolvedValue({
+    mockRpcFn.mockResolvedValue({
       data: {
         success: 50,
         failed: 0,

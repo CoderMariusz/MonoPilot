@@ -9,7 +9,12 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QualitySettings, UpdateQualitySettingsInput } from '@/lib/validation/quality-settings';
-import { QUALITY_SETTINGS_UPDATE_ROLES } from '@/lib/services/quality-settings-service';
+
+/**
+ * Roles that are allowed to update quality settings
+ * Duplicated from service to avoid importing server-side code in client components
+ */
+const QUALITY_SETTINGS_UPDATE_ROLES = ['admin', 'owner', 'quality_manager'];
 
 /**
  * Query key for quality settings
