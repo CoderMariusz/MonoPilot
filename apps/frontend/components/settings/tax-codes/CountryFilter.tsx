@@ -24,7 +24,11 @@ interface CountryFilterProps {
 export function CountryFilter({ value, onChange }: CountryFilterProps) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-[180px]" aria-label="Filter by country">
+      <SelectTrigger
+        className="w-[180px]"
+        aria-label="Filter by country"
+        data-testid="country-filter"
+      >
         <SelectValue placeholder="All countries" />
       </SelectTrigger>
       <SelectContent>

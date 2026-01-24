@@ -24,7 +24,11 @@ interface StatusFilterProps {
 export function StatusFilter({ value, onChange }: StatusFilterProps) {
   return (
     <Select value={value} onValueChange={(val) => onChange(val as TaxCodeStatus | 'all')}>
-      <SelectTrigger className="w-[180px]" aria-label="Filter by status">
+      <SelectTrigger
+        className="w-[180px]"
+        aria-label="Filter by status"
+        data-testid="status-filter"
+      >
         <SelectValue placeholder="All statuses" />
       </SelectTrigger>
       <SelectContent>
