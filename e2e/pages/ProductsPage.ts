@@ -248,8 +248,23 @@ export class ProductsPage extends BasePage {
    * Fill product form
    */
   async fillProductForm(data: ProductData) {
-    // Wait for form inputs to be available
-    await this.page.waitForSelector('input[name="code"]', { state: 'visible', timeout: 30000 });
+    // Wait for form to be ready - ProductFormModal loads data via useEffect
+    // First, wait for the modal content header to appear
+    try {
+      await this.page.getByText(/Create New Product|Edit Product/i).waitFor({ state: 'visible', timeout: 30000 });
+    } catch (e) {
+      console.error('Modal title not found');
+      // Log what's on the page
+      const html = await this.page.content();
+      console.error('Page HTML length:', html.length);
+      throw e;
+    }
+
+    // Now wait for the form header
+    await this.page.getByText(/Basic Information/i).waitFor({ state: 'visible', timeout: 30000 });
+
+    // Finally wait for the code input
+    await this.page.locator('input[name="code"]').waitFor({ state: 'visible', timeout: 30000 });
 
     // Fill required fields
     await this.page.fill(this.formFields.code, data.code);
