@@ -73,7 +73,7 @@ export function CostSummary({ bomId, onRecalculate }: CostSummaryProps) {
   }
 
   return (
-    <Card>
+    <Card data-testid="cost-summary">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Cost Summary</CardTitle>
         <RecalculateButton onClick={handleRecalculate} disabled={false} />
@@ -88,7 +88,7 @@ export function CostSummary({ bomId, onRecalculate }: CostSummaryProps) {
             <p className="text-xs text-muted-foreground uppercase tracking-wider">
               Total Cost per Batch ({cost.batch_size} {cost.batch_uom})
             </p>
-            <p className="text-2xl font-bold mt-1">
+            <p data-testid="total-cost" className="text-2xl font-bold mt-1">
               {formatCurrency(cost.total_cost, cost.currency)}
             </p>
           </div>
