@@ -17,8 +17,15 @@ export { FormPage } from './FormPage';
 export { ProductsPage } from './ProductsPage';
 export { BOMsPage } from './BOMsPage';
 export { TraceabilityPage } from './TraceabilityPage';
+export { RoutingsPage } from './RoutingsPage';
 
-// Module-specific pages can be added here:
-// export { SettingsPage } from './modules/SettingsPage';
-// export { WorkOrdersPage } from './modules/WorkOrdersPage';
-// etc.
+// Planning Module
+export { WorkOrdersPage } from './WorkOrdersPage';
+
+// Production Module
+export { ProductionDashboardPage } from './production/ProductionDashboardPage';
+export { WorkOrderExecutionPage } from './production/WorkOrderExecutionPage';
+export { MaterialConsumptionPage } from './production/MaterialConsumptionPage';
+export { OutputRegistrationPage } from './production/OutputRegistrationPage';
+
+// Module-specific pages can be added here as they're created
