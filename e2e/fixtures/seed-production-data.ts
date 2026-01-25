@@ -198,6 +198,8 @@ async function seedRoles(client: SupabaseClient) {
 
 /**
  * Create users if not exist
+ * Note: User IDs must match auth.users.id from Supabase auth
+ * For E2E tests, users should already exist in auth or use test user fixture
  */
 async function seedUsers(client: SupabaseClient) {
   console.log('📋 Seeding users...');
@@ -213,82 +215,9 @@ async function seedUsers(client: SupabaseClient) {
     return;
   }
 
-  // Get admin role ID
-  let adminRoleId = TEST_UUIDS.roleAdmin;
-  const { data: adminRole } = await client
-    .from('roles')
-    .select('id')
-    .eq('id', TEST_UUIDS.roleAdmin)
-    .single();
-
-  if (!adminRole) {
-    console.warn('  ⚠️ Admin role not found, creating on-the-fly');
-    const { data: created } = await client
-      .from('roles')
-      .insert({
-        id: TEST_UUIDS.roleAdmin,
-        code: 'ADMIN',
-        name: 'Administrator',
-        permissions: { all: true },
-        is_system: true,
-      })
-      .select('id')
-      .single();
-    if (created) adminRoleId = created.id;
-  }
-
-  // Get operator role ID
-  let operatorRoleId = TEST_UUIDS.roleOperator;
-  const { data: operatorRole } = await client
-    .from('roles')
-    .select('id')
-    .eq('id', TEST_UUIDS.roleOperator)
-    .single();
-
-  if (!operatorRole) {
-    console.warn('  ⚠️ Operator role not found, creating on-the-fly');
-    const { data: created } = await client
-      .from('roles')
-      .insert({
-        id: TEST_UUIDS.roleOperator,
-        code: 'PRODUCTION_OPERATOR',
-        name: 'Production Operator',
-        permissions: { production: true },
-        is_system: true,
-      })
-      .select('id')
-      .single();
-    if (created) operatorRoleId = created.id;
-  }
-
-  // Insert users
-  const { error } = await client.from('users').insert([
-    {
-      id: TEST_UUIDS.adminUser,
-      org_id: TEST_UUIDS.org,
-      role_id: adminRoleId,
-      email: 'admin@monopilot.com',
-      first_name: 'Admin',
-      last_name: 'User',
-      is_active: true,
-    },
-    {
-      id: TEST_UUIDS.operatorUser,
-      org_id: TEST_UUIDS.org,
-      role_id: operatorRoleId,
-      email: 'operator@monopilot.com',
-      first_name: 'Operator',
-      last_name: 'User',
-      is_active: true,
-    },
-  ]);
-
-  if (error) {
-    console.warn(`⚠️ Failed to seed users: ${error.message}`);
-    // Don't throw - allow tests to continue
-    return;
-  }
-  console.log('  ✓ Users created');
+  console.warn('  ⚠️ Skipping user seeding - requires auth.users entries');
+  console.warn('     Ensure test users exist in Supabase auth before running E2E tests');
+  // Don't fail - tests can run with seeded data without users
 }
 
 /**
@@ -496,14 +425,18 @@ async function seedBOM(client: SupabaseClient) {
     return;
   }
 
+  const today = new Date().toISOString().split('T')[0];
+
   const { error: bomError } = await client.from('boms').insert({
     id: TEST_UUIDS.bomBread,
     org_id: TEST_UUIDS.org,
     product_id: TEST_UUIDS.productBread,
-    bom_number: 'BOM-BREAD-001',
     version: 1,
+    bom_type: 'standard',
     status: 'active',
-    is_active: true,
+    effective_from: today,
+    output_qty: 1.0,
+    output_uom: 'EA',
   });
 
   if (bomError) throw new Error(`Failed to seed BOM: ${bomError.message}`);
@@ -512,23 +445,19 @@ async function seedBOM(client: SupabaseClient) {
   const { error: itemsError } = await client.from('bom_items').insert([
     {
       id: TEST_UUIDS.bomItemFlour,
-      org_id: TEST_UUIDS.org,
       bom_id: TEST_UUIDS.bomBread,
       product_id: TEST_UUIDS.productFlour,
       sequence: 1,
       quantity: 5.0,
-      unit: 'KG',
-      is_critical: true,
+      uom: 'kg',
     },
     {
       id: TEST_UUIDS.bomItemYeast,
-      org_id: TEST_UUIDS.org,
       bom_id: TEST_UUIDS.bomBread,
       product_id: TEST_UUIDS.productYeast,
       sequence: 2,
       quantity: 0.1,
-      unit: 'KG',
-      is_critical: true,
+      uom: 'kg',
     },
   ]);
 
@@ -632,16 +561,18 @@ async function seedWorkOrder(client: SupabaseClient) {
     return;
   }
 
+  const today = new Date().toISOString().split('T')[0];
   const { error } = await client.from('work_orders').insert({
     id: TEST_UUIDS.workOrderReleased,
     org_id: TEST_UUIDS.org,
     wo_number: 'wo-id-123',
     product_id: TEST_UUIDS.productBread,
     bom_id: TEST_UUIDS.bomBread,
-    quantity_planned: 100.0,
-    quantity_produced: 0.0,
+    planned_quantity: 100.0,
+    produced_quantity: 0.0,
+    uom: 'EA',
     status: 'released',
-    scheduled_start: new Date().toISOString(),
+    planned_start_date: today,
   });
 
   if (error) throw new Error(`Failed to seed work order: ${error.message}`);
