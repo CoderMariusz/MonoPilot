@@ -35,16 +35,17 @@ export class WorkOrderExecutionPage extends BasePage {
 
   /**
    * Navigate to WO execution page
+   * TODO: Verify if /production/work-orders list page exists
    */
   async goto() {
-    await super.goto('/production/execution');
+    await super.goto('/planning/work-orders');
   }
 
   /**
    * Navigate to specific WO detail
    */
   async gotoWODetail(woId: string) {
-    await super.goto(`/production/execution/${woId}`);
+    await super.goto(`/planning/work-orders/${woId}`);
   }
 
   // ==================== WO Start (FR-PROD-002) ====================
