@@ -36,7 +36,7 @@ export async function GET(
     // Get WO and verify it belongs to org
     const { data: wo, error: woError } = await supabase
       .from('work_orders')
-      .select('id, org_id, product_id, planned_qty')
+      .select('id, org_id, product_id, planned_quantity')
       .eq('id', woId)
       .single()
 
@@ -49,7 +49,7 @@ export async function GET(
     }
 
     // Get by-products from BOM
-    const byProducts = await getByProductsFromBOM(supabase, wo.product_id, wo.planned_qty)
+    const byProducts = await getByProductsFromBOM(supabase, wo.product_id, wo.planned_quantity)
 
     return NextResponse.json({ by_products: byProducts })
   } catch (error) {

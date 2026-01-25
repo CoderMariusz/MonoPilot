@@ -50,7 +50,7 @@ const mockWOData = {
   id: 'wo-123',
   wo_number: 'WO-2025-0156',
   product_id: 'prod-123',
-  planned_qty: 1000,
+  planned_quantity: 1000,
   actual_qty: 0,
   status: 'in_progress',
   batch_number: 'BATCH-2025-001',

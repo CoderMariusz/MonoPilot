@@ -136,8 +136,8 @@ export async function getOutputPageData(woId: string): Promise<OutputPageData> {
       status,
       product_id,
       batch_number,
-      planned_qty,
-      output_qty,
+      planned_quantity,
+      produced_quantity,
       uom,
       production_line_id,
       products!inner(id, name, product_code, shelf_life_days)
@@ -169,8 +169,8 @@ export async function getOutputPageData(woId: string): Promise<OutputPageData> {
   }
 
   // 3. Calculate progress
-  const plannedQty = Number(wo.planned_qty) || 0
-  const outputQty = Number(wo.output_qty) || 0
+  const plannedQty = Number(wo.planned_quantity) || 0
+  const outputQty = Number(wo.produced_quantity) || 0
   const progressPercent =
     plannedQty > 0 ? Math.round((outputQty / plannedQty) * 100 * 10) / 10 : 0
   const remainingQty = Math.max(0, plannedQty - outputQty)
@@ -368,7 +368,7 @@ export async function registerOutput(
   // 1. Validate WO
   const { data: wo, error: woError } = await supabase
     .from('work_orders')
-    .select('id, status, product_id, wo_number, uom, output_qty, batch_number')
+    .select('id, status, product_id, wo_number, uom, produced_quantity, batch_number')
     .eq('id', input.wo_id)
     .single()
 
@@ -480,25 +480,25 @@ export async function registerOutput(
     warnings.push('No consumed materials for genealogy')
   }
 
-  // 10. Update WO output_qty and progress
-  const newOutputQty = Number(wo.output_qty || 0) + input.quantity
+  // 10. Update WO produced_quantity and progress
+  const newOutputQty = Number(wo.produced_quantity || 0) + input.quantity
 
   await supabase
     .from('work_orders')
     .update({
-      output_qty: newOutputQty,
+      produced_quantity: newOutputQty,
       updated_at: new Date().toISOString(),
     })
     .eq('id', input.wo_id)
 
-  // Get planned_qty for progress calculation
+  // Get planned_quantity for progress calculation
   const { data: woFull } = await supabase
     .from('work_orders')
-    .select('planned_qty, status')
+    .select('planned_quantity, status')
     .eq('id', input.wo_id)
     .single()
 
-  const plannedQty = Number(woFull?.planned_qty) || 0
+  const plannedQty = Number(woFull?.planned_quantity) || 0
   const progressPercent =
     plannedQty > 0 ? Math.round((newOutputQty / plannedQty) * 100) : 0
 

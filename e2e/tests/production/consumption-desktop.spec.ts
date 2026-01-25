@@ -22,7 +22,7 @@ test.describe('Material Consumption - Desktop', () => {
   });
 
   test.describe('TC-PROD-046: Consumption Happy Path', () => {
-    test.skip('should consume 40 kg from LP with qty=100, leaving qty=60', async () => {
+    test('should consume 40 kg from LP with qty=100, leaving qty=60', async () => {
       await consumptionPage.gotoWOConsumption('wo-id-123');
 
       await consumptionPage.consumeMaterial('Flour', 'LP-001', 40);

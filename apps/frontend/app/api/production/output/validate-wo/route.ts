@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
         wo_number,
         status,
         product_id,
-        planned_qty,
-        output_qty,
+        planned_quantity,
+        produced_quantity,
         uom,
         batch_number,
         production_line_id,
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get by-products from BOM
-    const byProducts = await getByProductsFromBOM(supabase, wo.product_id, wo.planned_qty)
+    const byProducts = await getByProductsFromBOM(supabase, wo.product_id, wo.planned_quantity)
 
     const products = wo.products as unknown as {
       id: string
@@ -113,8 +113,8 @@ export async function POST(request: NextRequest) {
     }
     const productionLine = wo.production_lines as unknown as { id: string; name: string } | null
 
-    const registeredQty = Number(wo.output_qty) || 0
-    const plannedQty = Number(wo.planned_qty)
+    const registeredQty = Number(wo.produced_quantity) || 0
+    const plannedQty = Number(wo.planned_quantity)
     const remainingQty = plannedQty - registeredQty
 
     return NextResponse.json({

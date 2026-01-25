@@ -1,0 +1,1 @@
+[dotenv@17.2.3] injecting env (11) from .env.test -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }

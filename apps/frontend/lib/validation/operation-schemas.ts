@@ -74,7 +74,11 @@ export const operationFormSchema = z.object({
     .optional(),
 })
 
+// Output type (after Zod transformations like .default())
 export type OperationFormValues = z.infer<typeof operationFormSchema>
+
+// Input type (before Zod transformations - for form defaults)
+export type OperationFormInput = z.input<typeof operationFormSchema>
 
 // ============================================================================
 // ATTACHMENT VALIDATION

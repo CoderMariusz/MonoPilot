@@ -363,7 +363,9 @@ export async function createOperation(
         machine_id: data.machine_id || null,
         expected_duration_minutes: data.duration,
         setup_time_minutes: data.setup_time || 0,
+        cleanup_time_minutes: data.cleanup_time || 0,
         labor_cost: data.labor_cost_per_hour || 0,
+        instructions: data.instructions || null,
       })
       .select(`
         id,
@@ -373,7 +375,9 @@ export async function createOperation(
         machine_id,
         expected_duration_minutes,
         setup_time_minutes,
+        cleanup_time_minutes,
         labor_cost,
+        instructions,
         created_at,
         updated_at,
         machines:machine_id(id, code, name)
@@ -401,9 +405,9 @@ export async function createOperation(
         machine_code: (operation.machines as unknown as { code: string } | null)?.code || null,
         setup_time: operation.setup_time_minutes || 0,
         duration: operation.expected_duration_minutes || 0,
-        cleanup_time: 0,
+        cleanup_time: operation.cleanup_time_minutes || 0,
         labor_cost_per_hour: operation.labor_cost || 0,
-        instructions: null,
+        instructions: operation.instructions || null,
         attachment_count: 0,
         created_at: operation.created_at,
         updated_at: operation.updated_at,
@@ -473,7 +477,9 @@ export async function updateOperation(
     if (data.machine_id !== undefined) updateData.machine_id = data.machine_id
     if (data.duration !== undefined) updateData.expected_duration_minutes = data.duration
     if (data.setup_time !== undefined) updateData.setup_time_minutes = data.setup_time
+    if (data.cleanup_time !== undefined) updateData.cleanup_time_minutes = data.cleanup_time
     if (data.labor_cost_per_hour !== undefined) updateData.labor_cost = data.labor_cost_per_hour
+    if (data.instructions !== undefined) updateData.instructions = data.instructions
 
     const { data: operation, error } = await supabase
       .from('routing_operations')
@@ -488,7 +494,9 @@ export async function updateOperation(
         machine_id,
         expected_duration_minutes,
         setup_time_minutes,
+        cleanup_time_minutes,
         labor_cost,
+        instructions,
         created_at,
         updated_at,
         machines:machine_id(id, code, name)
@@ -516,9 +524,9 @@ export async function updateOperation(
         machine_code: (operation.machines as unknown as { code: string } | null)?.code || null,
         setup_time: operation.setup_time_minutes || 0,
         duration: operation.expected_duration_minutes || 0,
-        cleanup_time: 0,
+        cleanup_time: operation.cleanup_time_minutes || 0,
         labor_cost_per_hour: operation.labor_cost || 0,
-        instructions: null,
+        instructions: operation.instructions || null,
         attachment_count: 0,
         created_at: operation.created_at,
         updated_at: operation.updated_at,

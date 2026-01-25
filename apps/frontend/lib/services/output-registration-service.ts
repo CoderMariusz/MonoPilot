@@ -171,7 +171,7 @@ export async function registerOutput(
   // 1. Validate WO status (AC-4.12.8)
   const { data: wo, error: woError } = await supabase
     .from('work_orders')
-    .select('id, status, product_id, wo_number, uom, output_qty, production_line_id')
+    .select('id, status, product_id, wo_number, uom, produced_quantity, production_line_id')
     .eq('id', input.woId)
     .single()
 
@@ -432,8 +432,8 @@ export async function registerOutput(
   }
 
   // 11. Update WO output tracking (AC-4.12.4, AC-4.12.5)
-  const newOutputQty = Number(wo.output_qty || 0) + input.qty
-  const woUpdate: Record<string, unknown> = { output_qty: newOutputQty }
+  const newOutputQty = Number(wo.produced_quantity || 0) + input.qty
+  const woUpdate: Record<string, unknown> = { produced_quantity: newOutputQty }
 
   if (input.isOverProduction) {
     const { data: currentWo } = await supabase

@@ -19,15 +19,19 @@ export abstract class BasePage {
    * Navigate to a specific URL
    */
   async goto(path: string) {
-    await this.page.goto(path);
+    await this.page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await this.waitForPageLoad();
   }
 
   /**
    * Wait for page to fully load
+   * Uses domcontentloaded + short delay instead of networkidle for reliability
    */
   async waitForPageLoad() {
-    await this.page.waitForLoadState('networkidle');
+    // Wait for DOM to be ready
+    await this.page.waitForLoadState('domcontentloaded');
+    // Brief wait for React hydration
+    await this.page.waitForTimeout(500);
   }
 
   /**

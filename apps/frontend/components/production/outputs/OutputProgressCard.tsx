@@ -109,8 +109,8 @@ export function OutputProgressCard({
   }
 
   const {
-    planned_qty,
-    output_qty,
+    planned_quantity,
+    produced_quantity,
     progress_percent,
     remaining_qty,
     outputs_count,
@@ -155,7 +155,7 @@ export function OutputProgressCard({
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Planned</p>
             <p className="text-lg font-mono font-semibold" data-testid="planned-qty">
-              {formatNumber(planned_qty)} <span className="text-sm font-normal">{uom}</span>
+              {formatNumber(planned_quantity)} <span className="text-sm font-normal">{uom}</span>
             </p>
           </div>
           <div>
@@ -167,7 +167,7 @@ export function OutputProgressCard({
               )}
               data-testid="output-qty"
             >
-              {formatNumber(output_qty)} <span className="text-sm font-normal">{uom}</span>
+              {formatNumber(produced_quantity)} <span className="text-sm font-normal">{uom}</span>
             </p>
           </div>
           <div>

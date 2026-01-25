@@ -72,8 +72,8 @@ export interface OutputsListResponse {
 export interface WOProgressResponse {
   wo_id: string
   wo_number: string
-  planned_qty: number
-  output_qty: number
+  planned_quantity: number
+  produced_quantity: number
   progress_percent: number
   remaining_qty: number
   outputs_count: number
@@ -308,7 +308,7 @@ export async function getWOProgress(woId: string): Promise<WOProgressResponse> {
       id,
       wo_number,
       planned_quantity,
-      output_qty,
+      produced_quantity,
       status,
       org_id
     `)
@@ -320,7 +320,7 @@ export async function getWOProgress(woId: string): Promise<WOProgressResponse> {
   }
 
   const plannedQty = Number(wo.planned_quantity) || 0
-  const outputQty = Number(wo.output_qty) || 0
+  const outputQty = Number(wo.produced_quantity) || 0
   const progressPercent = calculateProgress(outputQty, plannedQty)
   const remainingQty = Math.max(0, plannedQty - outputQty)
 
@@ -345,7 +345,7 @@ export async function getWOProgress(woId: string): Promise<WOProgressResponse> {
     wo_id: wo.id,
     wo_number: wo.wo_number,
     planned_qty: plannedQty,
-    output_qty: outputQty,
+    produced_qty: outputQty,
     progress_percent: progressPercent,
     remaining_qty: remainingQty,
     outputs_count: outputsCount || 0,

@@ -21,7 +21,7 @@ test.describe('Work Order Lifecycle', () => {
   });
 
   test.describe('TC-PROD-011: WO Start - Happy Path', () => {
-    test.skip('should start WO with status Released', async ({ page }) => {
+    test('should start WO with status Released', async ({ page }) => {
       // Assumes WO-2025-001 exists with status = Released
       await woPage.gotoWODetail('wo-id-123');
 

@@ -452,7 +452,7 @@ export interface ConsumeReport {
   wo_id?: number;
   material_id?: number;
   material?: Product;
-  planned_qty?: number;
+  planned_quantity?: number;
   actual_qty?: number;
   variance_qty?: number;
   variance_pct?: number;
@@ -479,7 +479,7 @@ export interface YieldReportDetail {
   wo_id: number;
   work_order_id?: number;
   material_id: number;
-  planned_qty: number;
+  planned_quantity: number;
   actual_qty: number;
   variance: number;
   created_at: string;
@@ -497,7 +497,7 @@ export interface YieldReportDetail {
 export interface YieldReportMaterial {
   material_id: number;
   material_name: string;
-  planned_qty: number;
+  planned_quantity: number;
   actual_qty: number;
   variance: number;
   item_code?: string;

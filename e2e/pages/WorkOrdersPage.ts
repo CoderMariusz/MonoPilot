@@ -36,7 +36,13 @@ export class WorkOrdersPage extends BasePage {
    * Click "Create Work Order" button
    */
   async clickCreateButton() {
-    await this.clickButton(/create work order|new work order|\+ add|add work order/i);
+    const button = this.getByTestId('add-work-order-button');
+    if (!(await button.isVisible())) {
+      // Fallback for older components using role-based selector
+      await this.clickButton(/create work order|new work order|\+ add|add work order/i);
+    } else {
+      await button.click();
+    }
   }
 
   /**
@@ -103,7 +109,8 @@ export class WorkOrdersPage extends BasePage {
    * Search for a WO by number or product name
    */
   async search(query: string) {
-    const searchInput = this.page.getByPlaceholder(/search|find/i);
+    const searchInput = this.getByTestId('search-work-orders') ||
+                       this.page.getByPlaceholder('Search by WO number or product...').first();
     await searchInput.fill(query);
     await this.page.waitForTimeout(500); // Wait for search debounce
   }
@@ -112,7 +119,8 @@ export class WorkOrdersPage extends BasePage {
    * Clear search
    */
   async clearSearch() {
-    const searchInput = this.page.getByPlaceholder(/search|find/i);
+    const searchInput = this.getByTestId('search-work-orders') ||
+                       this.page.getByPlaceholder('Search by WO number or product...').first();
     await searchInput.clear();
     await this.page.waitForTimeout(500);
   }
@@ -164,8 +172,10 @@ export class WorkOrdersPage extends BasePage {
    * Filter by date range
    */
   async filterByDateRange(startDate: string, endDate: string) {
-    const dateFromInput = this.page.getByPlaceholder(/from|start/i);
-    const dateToInput = this.page.getByPlaceholder(/to|end/i);
+    const dateFromInput = this.getByTestId('filter-start-date') ||
+                         this.page.getByPlaceholder(/from|start/i).first();
+    const dateToInput = this.getByTestId('filter-end-date') ||
+                       this.page.getByPlaceholder(/to|end/i).first();
 
     await dateFromInput.fill(startDate);
     await dateToInput.fill(endDate);

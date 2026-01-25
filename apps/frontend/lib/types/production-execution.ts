@@ -23,7 +23,7 @@ export interface WorkOrder {
   status: WorkOrderStatus;
   production_line_id: UUID | null;
   machine_id: UUID | null;
-  planned_qty: number;
+  planned_quantity: number;
   started_at: string | null;
   started_by: UUID | null;
   completed_at: string | null;

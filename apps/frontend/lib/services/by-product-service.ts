@@ -282,7 +282,7 @@ export async function autoCreateByProducts(
   // Get WO info for expected qty calculation
   const { data: wo, error: woError } = await supabase
     .from('work_orders')
-    .select('id, planned_quantity, output_qty, org_id')
+    .select('id, planned_quantity, produced_quantity, org_id')
     .eq('id', woId)
     .single()
 
@@ -351,7 +351,7 @@ export async function getByProductsForWO(woId: string): Promise<ByProductStatus[
   // Get WO info
   const { data: wo } = await supabase
     .from('work_orders')
-    .select('id, planned_quantity, output_qty')
+    .select('id, planned_quantity, produced_quantity')
     .eq('id', woId)
     .single()
 
@@ -402,9 +402,9 @@ export async function getByProductsForWO(woId: string): Promise<ByProductStatus[
       .limit(1)
       .single()
 
-    // Calculate expected qty based on output_qty (current output)
+    // Calculate expected qty based on produced_quantity (current output)
     const expectedQty = calculateExpectedByProductQty(
-      wo.output_qty || 0,
+      wo.produced_quantity || 0,
       material.yield_percent || 0
     )
 

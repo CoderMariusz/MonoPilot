@@ -23,9 +23,9 @@ export interface OperationData {
   sequence: number;
   name: string;
   machine_id?: string;
-  setup_time: number;
-  duration: number;
-  cleanup_time: number;
+  setup_time: number;        // Maps to setup_time_minutes in form
+  duration: number;          // Maps to estimated_duration_minutes in form
+  cleanup_time: number;      // Maps to cleanup_time_minutes in form
   labor_cost_per_hour: number;
   instructions?: string;
 }
@@ -47,17 +47,27 @@ export class RoutingsPage extends BasePage {
     currency: 'select[name="currency"]',
   };
 
-  // Operation form fields - match create-operation-modal.tsx
+  // Operation form fields - match create-operation-modal.tsx (using operationFormSchema)
+  // Form uses react-hook-form with these field names:
+  // - sequence (number)
+  // - name (text, placeholder "e.g., Mixing")
+  // - description (textarea, optional)
+  // - machine_id (Select dropdown)
+  // - duration (number, required)
+  // - labor_cost_per_hour (number, step="0.01")
+  // - setup_time (number)
+  // - cleanup_time (number)
+  // - instructions (textarea, maxLength=2000)
   private readonly operationFields = {
-    sequence: '[role="dialog"] input[type="number"]:first-of-type',
-    name: '[role="dialog"] input[placeholder*="Mixing"]',
+    sequence: '[role="dialog"] input[name="sequence"]',
+    name: '[role="dialog"] input[name="name"]',
+    description: '[role="dialog"] textarea[name="description"]',
     machineId: '[role="dialog"] button[role="combobox"]',
-    setupTime: '[role="dialog"] input[type="number"]',
-    duration: '[role="dialog"] input[type="number"]',
-    cleanupTime: '[role="dialog"] input[type="number"]',
-    laborCostPerHour: '[role="dialog"] input[type="number"][step="0.01"]',
-    instructions: '[role="dialog"] textarea[placeholder*="instructions"]',
-    description: '[role="dialog"] textarea[placeholder*="Describe"]',
+    duration: '[role="dialog"] input[name="duration"]',
+    laborCostPerHour: '[role="dialog"] input[name="labor_cost_per_hour"]',
+    setupTime: '[role="dialog"] input[name="setup_time"]',
+    cleanupTime: '[role="dialog"] input[name="cleanup_time"]',
+    instructions: '[role="dialog"] textarea[name="instructions"]',
   };
 
   // Modal and drawer selectors
@@ -71,10 +81,15 @@ export class RoutingsPage extends BasePage {
   // ==================== Navigation ====================
 
   /**
-   * Navigate to routings page
+   * Navigate to routings page with extended timeout for reliable loading
    */
   async goto() {
-    await super.goto('/technical/routings');
+    await this.page.goto('/technical/routings', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    // Wait for page to hydrate
+    await this.page.waitForTimeout(1000);
+    // Wait for table container or heading to be visible
+    const heading = this.page.locator('h1:has-text("Routings")');
+    await heading.waitFor({ state: 'visible', timeout: 15000 });
   }
 
   /**
@@ -191,7 +206,7 @@ export class RoutingsPage extends BasePage {
 
   /**
    * Click routing row to navigate to detail
-   * The Eye icon button navigates to the detail page
+   * The Eye icon button navigates to the detail page via router.push()
    */
   async clickRouting(text: string) {
     // First search for the routing to ensure it's visible
@@ -199,27 +214,33 @@ export class RoutingsPage extends BasePage {
     if (await searchInput.count() > 0) {
       await searchInput.clear();
       await searchInput.fill(text);
-      await this.page.waitForTimeout(500);
-      await this.waitForPageLoad();
+      await this.page.waitForTimeout(800);
     }
+
+    // Wait for table body to have rows
+    const tableBody = this.page.locator('table tbody');
+    await tableBody.waitFor({ state: 'visible', timeout: 15000 });
 
     // Find the row containing the routing code/name
     const row = this.page.locator('table tbody tr').filter({ hasText: text }).first();
-    await row.waitFor({ state: 'visible', timeout: 10000 });
+    await row.waitFor({ state: 'visible', timeout: 15000 });
 
     // Click the View (Eye) button in the row - it has title="View details"
     const viewButton = row.locator('button[title="View details"]');
     if (await viewButton.count() > 0) {
-      // Use click with force: true to ensure the click registers
-      await viewButton.click({ force: true });
-      // Wait for navigation to complete
-      await this.page.waitForURL(/\/technical\/routings\/[a-zA-Z0-9-]+/, { timeout: 10000 });
+      // Click and wait for navigation
+      await viewButton.click();
+      // Wait for URL to change to routing detail
+      await this.page.waitForURL(/\/technical\/routings\/[a-f0-9-]+/, { timeout: 30000, waitUntil: 'domcontentloaded' });
     } else {
-      // Fallback: click on the routing code cell which might be a link
+      // Fallback: click on the routing code cell which might trigger row click handler
       const codeCell = row.locator('td').first();
       await codeCell.click();
+      // Wait for potential navigation
+      await this.page.waitForURL(/\/technical\/routings\/[a-f0-9-]+/, { timeout: 30000, waitUntil: 'domcontentloaded' });
     }
-    await this.waitForPageLoad();
+    // Wait for detail page to load
+    await this.page.waitForTimeout(1000);
   }
 
   /**
@@ -233,8 +254,18 @@ export class RoutingsPage extends BasePage {
       await searchInput.clear();
       await searchInput.fill(routingCode);
       await this.page.waitForTimeout(500); // Wait for search debounce
-      await this.waitForPageLoad();
     }
+
+    // Wait for table to finish loading
+    const loadingText = this.page.getByText(/loading routings/i);
+    try {
+      await loadingText.waitFor({ state: 'hidden', timeout: 15000 });
+    } catch {
+      // Loading text might not appear at all
+    }
+
+    await this.waitForPageLoad();
+
     // Now verify the routing appears in the filtered table
     await this.dataTable.expectRowWithText(routingCode);
   }
@@ -242,10 +273,18 @@ export class RoutingsPage extends BasePage {
   // ==================== Create Routing ====================
 
   /**
-   * Click "Add Routing" button
+   * Click "Add Routing" button and wait for dialog
    */
   async clickCreateRouting() {
-    await this.clickButton(/add routing/i);
+    // Find and click the Add Routing button
+    const addButton = this.page.getByRole('button', { name: /add routing/i });
+    await addButton.waitFor({ state: 'visible', timeout: 10000 });
+    await addButton.click();
+
+    // Wait for dialog to open - try multiple selector approaches
+    const dialog = this.page.locator('[role="dialog"]');
+    await dialog.waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.waitForTimeout(500); // Allow form to initialize
   }
 
   /**
@@ -261,6 +300,10 @@ export class RoutingsPage extends BasePage {
    * Fill routing form
    */
   async fillRoutingForm(data: RoutingData) {
+    // Ensure dialog is open
+    const dialog = this.page.locator('[role="dialog"]');
+    await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
     // Fill required fields
     await this.page.fill(this.formFields.code, data.code);
     await this.page.fill(this.formFields.name, data.name);
@@ -447,35 +490,45 @@ export class RoutingsPage extends BasePage {
   /**
    * Fill operation form
    * The CreateOperationModal (create-operation-modal.tsx) has fields:
-   * - Sequence (number input, auto-filled with next sequence)
-   * - Operation Name (text input, placeholder "e.g., Mixing")
-   * - Description (textarea)
-   * - Machine (Select dropdown)
-   * - Expected Duration (number input in minutes)
-   * - Labor Cost Per Hour (number input, step="0.01")
-   * - Setup Time (number input)
-   * - Cleanup Time (number input)
-   * - Instructions (textarea, maxLength=2000)
+   * - sequence (number input, auto-filled with next sequence)
+   * - name (text input, placeholder "e.g., Mixing")
+   * - description (textarea, optional)
+   * - machine_id (Select dropdown)
+   * - estimated_duration_minutes (number input, required)
+   * - labor_cost_per_hour (number input, step="0.01")
+   * - setup_time_minutes (number input)
+   * - cleanup_time_minutes (number input)
+   * - instructions (textarea, maxLength=2000, optional)
    */
   async fillOperationForm(data: OperationData) {
     const dialog = this.page.locator('[role="dialog"]');
-    await dialog.waitFor({ state: 'visible' });
+    await dialog.waitFor({ state: 'visible', timeout: 10000 });
 
-    // 1. Fill sequence - it's the first FormField with label "Sequence"
-    const sequenceLabel = dialog.getByText('Sequence', { exact: false }).first();
-    const sequenceContainer = sequenceLabel.locator('xpath=ancestor::*[contains(@class, "space-y")]').first();
-    const sequenceInput = dialog.locator('input[type="number"]').first();
+    // 1. Fill sequence using name attribute
+    const sequenceInput = dialog.locator('input[name="sequence"]');
     if (await sequenceInput.count() > 0) {
       await sequenceInput.clear();
       await sequenceInput.fill(data.sequence.toString());
+    } else {
+      // Fallback: first number input
+      const firstNumberInput = dialog.locator('input[type="number"]').first();
+      await firstNumberInput.clear();
+      await firstNumberInput.fill(data.sequence.toString());
     }
     await this.page.waitForTimeout(100);
 
-    // 2. Fill operation name - input with placeholder "e.g., Mixing"
-    const nameInput = dialog.locator('input[placeholder*="Mixing"]');
+    // 2. Fill operation name using name attribute
+    const nameInput = dialog.locator('input[name="name"]');
     if (await nameInput.count() > 0) {
       await nameInput.clear();
       await nameInput.fill(data.name);
+    } else {
+      // Fallback: input with placeholder "e.g., Mixing"
+      const fallbackNameInput = dialog.locator('input[placeholder*="Mixing"]');
+      if (await fallbackNameInput.count() > 0) {
+        await fallbackNameInput.clear();
+        await fallbackNameInput.fill(data.name);
+      }
     }
     await this.page.waitForTimeout(100);
 
@@ -483,64 +536,71 @@ export class RoutingsPage extends BasePage {
 
     // 4. Machine selection (optional) - ShadCN Select dropdown
     if (data.machine_id) {
-      const machineSelect = dialog.locator('button[role="combobox"]').filter({ hasText: /select machine|none/i });
+      const machineSelect = dialog.locator('button[role="combobox"]');
       if (await machineSelect.count() > 0) {
         await machineSelect.click();
-        await this.page.waitForTimeout(100);
+        await this.page.waitForTimeout(200);
+        // Look for machine option containing the machine_id text
         const machineOption = this.page.getByRole('option').filter({ hasText: new RegExp(data.machine_id, 'i') });
         if (await machineOption.count() > 0) {
           await machineOption.first().click();
         } else {
+          // Close dropdown if no match
           await this.page.keyboard.press('Escape');
         }
+        await this.page.waitForTimeout(100);
       }
     }
 
-    // 5. Fill Expected Duration - look by label or by position
-    // The form has grid layout with Duration and Labor Cost side by side
-    const allNumberInputs = dialog.locator('input[type="number"]');
-    const inputCount = await allNumberInputs.count();
-
-    // Duration is typically the 2nd number input (after sequence)
-    if (inputCount >= 2) {
-      const durationInput = allNumberInputs.nth(1);
+    // 5. Fill Duration - required field
+    const durationInput = dialog.locator('input[name="duration"]');
+    if (await durationInput.count() > 0) {
       await durationInput.clear();
       await durationInput.fill(data.duration.toString());
     }
+    await this.page.waitForTimeout(100);
 
-    // 6. Fill Labor Cost Per Hour - has step="0.01" attribute
-    const laborCostInput = dialog.locator('input[type="number"][step="0.01"]');
+    // 6. Fill Labor Cost Per Hour
+    const laborCostInput = dialog.locator('input[name="labor_cost_per_hour"]');
     if (await laborCostInput.count() > 0) {
       await laborCostInput.clear();
       await laborCostInput.fill(data.labor_cost_per_hour.toString());
+    } else {
+      // Fallback: input with step="0.01"
+      const fallbackLaborInput = dialog.locator('input[type="number"][step="0.01"]');
+      if (await fallbackLaborInput.count() > 0) {
+        await fallbackLaborInput.clear();
+        await fallbackLaborInput.fill(data.labor_cost_per_hour.toString());
+      }
     }
+    await this.page.waitForTimeout(100);
 
-    // 7. Fill Setup Time - typically 4th number input
-    // Setup time and Cleanup time are in a 2-column grid after Duration/Labor Cost
-    if (inputCount >= 4) {
-      const setupTimeInput = allNumberInputs.nth(3);
+    // 7. Fill Setup Time
+    const setupTimeInput = dialog.locator('input[name="setup_time"]');
+    if (await setupTimeInput.count() > 0) {
       await setupTimeInput.clear();
       await setupTimeInput.fill(data.setup_time.toString());
     }
+    await this.page.waitForTimeout(100);
 
-    // 8. Fill Cleanup Time - typically 5th number input
-    if (inputCount >= 5) {
-      const cleanupTimeInput = allNumberInputs.nth(4);
+    // 8. Fill Cleanup Time
+    const cleanupTimeInput = dialog.locator('input[name="cleanup_time"]');
+    if (await cleanupTimeInput.count() > 0) {
       await cleanupTimeInput.clear();
       await cleanupTimeInput.fill(data.cleanup_time.toString());
     }
+    await this.page.waitForTimeout(100);
 
-    // 9. Fill instructions if provided - textarea with maxLength="2000"
+    // 9. Fill instructions if provided
     if (data.instructions) {
-      const instructionsTextarea = dialog.locator('textarea[maxlength="2000"]');
+      const instructionsTextarea = dialog.locator('textarea[name="instructions"]');
       if (await instructionsTextarea.count() > 0) {
         await instructionsTextarea.fill(data.instructions);
       } else {
-        // Fallback: last textarea in the dialog
-        const allTextareas = dialog.locator('textarea');
-        const lastTextarea = allTextareas.last();
-        if (await lastTextarea.count() > 0) {
-          await lastTextarea.fill(data.instructions);
+        // Fallback: textarea with maxLength="2000"
+        const fallbackInstructions = dialog.locator('textarea[maxlength="2000"]');
+        if (await fallbackInstructions.count() > 0) {
+          await fallbackInstructions.fill(data.instructions);
         }
       }
     }
@@ -548,19 +608,77 @@ export class RoutingsPage extends BasePage {
 
   /**
    * Submit operation form
+   * Clicks the "Add Operation" submit button and waits for modal to close on success
    */
   async submitAddOperation() {
-    // Click the submit button in dialog - it says "Add Operation" or "Adding..."
     const dialog = this.page.locator('[role="dialog"]');
-    const submitButton = dialog.locator('button[type="submit"]');
-    await submitButton.click();
-    // Wait for the dialog to close (success) or stay open (error)
-    await this.page.waitForTimeout(500);
-    // Check if dialog closed
-    const dialogStillOpen = await dialog.isVisible();
-    if (!dialogStillOpen) {
-      await this.waitForPageLoad();
+
+    // Find the submit button - look for button with type="submit" or text "Add Operation"
+    const submitButton = dialog.locator('button[type="submit"]').first();
+
+    // Ensure button is visible
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Check if button is disabled
+    const isDisabled = await submitButton.isDisabled();
+    if (isDisabled) {
+      // Check for validation messages
+      const messages = await dialog.locator('[data-slot="form-message"], .text-destructive, p.text-destructive').allTextContents();
+      const filteredMessages = messages.filter(m => m.trim());
+      if (filteredMessages.length > 0) {
+        throw new Error(`Form has validation errors: ${filteredMessages.join(', ')}`);
+      }
     }
+
+    // Setup response waiter for the API call
+    const responsePromise = this.page.waitForResponse(
+      response => response.url().includes('/api/v1/technical/routings/') &&
+                  response.url().includes('/operations') &&
+                  response.request().method() === 'POST',
+      { timeout: 30000 }
+    );
+
+    // Click the submit button
+    await submitButton.click();
+
+    // Wait for the API response
+    try {
+      const response = await responsePromise;
+      const status = response.status();
+
+      if (status >= 400) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(`API returned ${status}: ${body.error || body.message || 'Unknown error'}`);
+      }
+    } catch (e) {
+      // If timeout waiting for response, the form might not have submitted
+      if (e instanceof Error && e.message.includes('Timeout')) {
+        throw new Error('Form submission did not trigger API call - form may not have submitted');
+      }
+      throw e;
+    }
+
+    // Wait for dialog to close (onSuccess closes the dialog)
+    try {
+      await dialog.waitFor({ state: 'hidden', timeout: 10000 });
+    } catch {
+      // Dialog still visible - might be slow but API succeeded
+      // Check if dialog eventually closes
+      await this.page.waitForTimeout(2000);
+      const stillVisible = await dialog.isVisible();
+      if (stillVisible) {
+        // Check for error messages
+        const formErrors = await dialog.locator('p.text-destructive, [data-slot="form-message"]').allTextContents();
+        const filteredErrors = formErrors.filter(m => m.trim());
+        if (filteredErrors.length > 0) {
+          throw new Error(`Form validation failed: ${filteredErrors.join(', ')}`);
+        }
+        throw new Error('Operation form did not close after successful API call');
+      }
+    }
+
+    // Give time for the operations table to refresh
+    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -574,10 +692,18 @@ export class RoutingsPage extends BasePage {
 
   /**
    * Assert operation appears in list
+   * Looks for the operation name in the Operations table on the routing detail page
    */
   async expectOperationInList(operationName: string) {
-    const operation = this.page.getByText(operationName);
-    await expect(operation).toBeVisible();
+    // Wait for page to be ready
+    await this.page.waitForTimeout(1000);
+
+    // Look for the operation name in a table row
+    // The operations table shows: Seq, Name, Machine, Duration, Setup, Yield, Labor Cost, Actions
+    const operationRow = this.page.locator('table tbody tr').filter({ hasText: operationName });
+
+    // Wait and verify the operation appears
+    await expect(operationRow.first()).toBeVisible({ timeout: 15000 });
   }
 
   /**
@@ -593,32 +719,33 @@ export class RoutingsPage extends BasePage {
 
   /**
    * Delete operation
-   * The delete button has aria-label="Delete operation" or title="Delete operation"
+   * The delete button has title="Delete operation" and aria-label="Delete operation"
    */
   async deleteOperation(operationName: string) {
     const row = this.page
       .locator('table tbody tr')
       .filter({ hasText: operationName });
 
-    // Find the delete button in the row - it has a Trash2 icon
+    // Wait for row to be visible
+    await row.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Find the delete button in the row
+    // From operations-table.tsx: title="Delete operation" aria-label="Delete operation"
     const deleteButton = row.locator(
-      'button[aria-label*="Delete"], button[title*="Delete"], button:has(svg.lucide-trash-2)',
+      'button[title="Delete operation"], button[aria-label="Delete operation"]',
     );
 
     if (await deleteButton.count() > 0) {
+      // Click delete - this triggers window.confirm() in the component
+      // Playwright automatically accepts confirm dialogs by default
+      this.page.once('dialog', async dialog => {
+        await dialog.accept();
+      });
+
       await deleteButton.first().click();
 
-      // Wait for confirmation dialog if it appears
-      await this.page.waitForTimeout(300);
-
-      // Confirm deletion if dialog appeared
-      const confirmButton = this.page.locator(
-        '[role="alertdialog"] button:has-text("Delete"), [role="dialog"] button:has-text("Confirm"), button:has-text("Yes")',
-      );
-      if ((await confirmButton.count()) > 0) {
-        await confirmButton.click();
-      }
-
+      // Wait for the operation to be removed from DOM
+      await this.page.waitForTimeout(500);
       await this.waitForPageLoad();
     }
   }
@@ -640,16 +767,31 @@ export class RoutingsPage extends BasePage {
   }
 
   /**
-   * Reorder operations
+   * Reorder operations using up/down buttons
+   * The operations table has ArrowUp and ArrowDown buttons for reordering
+   * title="Move operation up/down", aria-label="Move operation up/down"
    */
   async reorderOperations(fromIndex: number, toIndex: number) {
     const rows = this.page.locator('table tbody tr');
     const fromRow = rows.nth(fromIndex);
-    const toRow = rows.nth(toIndex);
 
-    // Drag and drop
-    await fromRow.dragTo(toRow);
-    await this.waitForPageLoad();
+    // Determine direction
+    const direction = toIndex > fromIndex ? 'down' : 'up';
+    const steps = Math.abs(toIndex - fromIndex);
+
+    // Click the appropriate button multiple times
+    for (let i = 0; i < steps; i++) {
+      const buttonSelector = direction === 'up'
+        ? 'button[title="Move operation up"], button[aria-label="Move operation up"]'
+        : 'button[title="Move operation down"], button[aria-label="Move operation down"]';
+
+      const reorderButton = fromRow.locator(buttonSelector);
+      if (await reorderButton.count() > 0 && await reorderButton.isEnabled()) {
+        await reorderButton.click();
+        await this.page.waitForTimeout(300);
+        await this.waitForPageLoad();
+      }
+    }
   }
 
   // ==================== Routing Assignment to BOM ====================

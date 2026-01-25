@@ -11,7 +11,9 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createOperationSchema, type CreateOperationInput } from '@/lib/validation/routing-schemas'
+// Import shared schema from validation layer to ensure frontend/backend alignment
+// This ensures form validation matches API validation exactly
+import { operationFormSchema, OperationFormInput } from '@/lib/validation/operation-schemas'
 import {
   Dialog,
   DialogContent,
@@ -60,12 +62,6 @@ interface Machine {
   name: string
 }
 
-// Extended schema to include setup_time, cleanup_time, instructions
-interface ExtendedCreateOperationInput extends CreateOperationInput {
-  setup_time_minutes?: number
-  cleanup_time_minutes?: number
-  instructions?: string
-}
 
 export function CreateOperationModal({
   routingId,
@@ -80,18 +76,18 @@ export function CreateOperationModal({
   const [showParallelInfo, setShowParallelInfo] = useState(false)
   const { toast } = useToast()
 
-  const form = useForm<ExtendedCreateOperationInput>({
-    resolver: zodResolver(createOperationSchema),
+  const form = useForm<OperationFormInput>({
+    resolver: zodResolver(operationFormSchema),
     defaultValues: {
       sequence: nextSequence,
       name: '',
-      description: '',
-      machine_id: undefined,
-      estimated_duration_minutes: undefined,
-      labor_cost_per_hour: undefined,
-      setup_time_minutes: 0,
-      cleanup_time_minutes: 0,
-      instructions: '',
+      description: null,
+      machine_id: null,
+      duration: 1,  // Required, min 1
+      labor_cost_per_hour: 0,
+      setup_time: 0,
+      cleanup_time: 0,
+      instructions: null,
     },
   })
 
@@ -112,13 +108,13 @@ export function CreateOperationModal({
       form.reset({
         sequence: nextSequence,
         name: '',
-        description: '',
-        machine_id: undefined,
-        estimated_duration_minutes: undefined,
-        labor_cost_per_hour: undefined,
-        setup_time_minutes: 0,
-        cleanup_time_minutes: 0,
-        instructions: '',
+        description: null,
+        machine_id: null,
+        duration: 1,  // Required, min 1
+        labor_cost_per_hour: 0,
+        setup_time: 0,
+        cleanup_time: 0,
+        instructions: null,
       })
     }
   }, [open, nextSequence, form])
@@ -142,11 +138,13 @@ export function CreateOperationModal({
     }
   }, [open])
 
-  const onSubmit = async (data: CreateOperationInput) => {
+  const onSubmit = async (data: OperationFormInput) => {
     try {
       setSubmitting(true)
 
-      const response = await fetch(`/api/technical/routings/${routingId}/operations`, {
+      // Send directly to v1 API - data is already in correct format
+      // operationFormSchema uses: sequence, name, duration, setup_time, cleanup_time, labor_cost_per_hour, instructions
+      const response = await fetch(`/api/v1/technical/routings/${routingId}/operations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -261,6 +259,7 @@ export function CreateOperationModal({
                   <FormControl>
                     <Textarea
                       {...field}
+                      value={field.value ?? ''}
                       placeholder="Describe the operation..."
                       rows={3}
                     />
@@ -302,10 +301,10 @@ export function CreateOperationModal({
             />
 
             <div className="grid grid-cols-2 gap-4">
-              {/* Estimated Duration */}
+              {/* Duration */}
               <FormField
                 control={form.control}
-                name="estimated_duration_minutes"
+                name="duration"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Expected Duration (min) *</FormLabel>
@@ -352,7 +351,7 @@ export function CreateOperationModal({
               {/* Setup Time */}
               <FormField
                 control={form.control}
-                name="setup_time_minutes"
+                name="setup_time"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Setup Time (min)</FormLabel>
@@ -373,7 +372,7 @@ export function CreateOperationModal({
               {/* Cleanup Time */}
               <FormField
                 control={form.control}
-                name="cleanup_time_minutes"
+                name="cleanup_time"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cleanup Time (min)</FormLabel>

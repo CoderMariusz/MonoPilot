@@ -29,7 +29,7 @@ export interface ActiveWO {
   wo_number: string;
   product_name: string;
   status: 'Released' | 'In Progress' | 'Paused' | 'Completed' | 'Cancelled';
-  planned_qty: number;
+  planned_quantity: number;
   actual_qty: number;
   /** Progress percentage (0-100), capped at 100 */
   progress_percent: number;

@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
         wo_number,
         org_id,
         product_id,
-        planned_qty,
-        output_qty,
+        planned_quantity,
+        produced_quantity,
         uom,
         status,
         products!inner(id, name, base_uom)
@@ -155,15 +155,15 @@ export async function POST(request: NextRequest) {
       parentCount = genealogyRecords.length
     }
 
-    // Update WO output_qty
-    const newOutputQty = Number(wo.output_qty || 0) + input.quantity
-    const plannedQty = Number(wo.planned_qty)
+    // Update WO produced_quantity
+    const newOutputQty = Number(wo.produced_quantity || 0) + input.quantity
+    const plannedQty = Number(wo.planned_quantity)
     const progressPercent = plannedQty > 0 ? Math.round((newOutputQty / plannedQty) * 100) : 0
 
     await supabase
       .from('work_orders')
       .update({
-        output_qty: newOutputQty,
+        produced_quantity: newOutputQty,
         progress_percent: progressPercent,
       })
       .eq('id', wo.id)

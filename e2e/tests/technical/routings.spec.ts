@@ -35,7 +35,7 @@ test.describe('Routings Module (Suite 4)', () => {
   test.beforeEach(async ({ page }) => {
     routingsPage = new RoutingsPage(page);
     await routingsPage.goto();
-    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
   });
 
   // ==================== 4.1 List View (4 tests) ====================
@@ -94,7 +94,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       // ACT - Filter by reusable
       await routingsPage.filterByReusable(true);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ASSERT - Filtered results displayed
       const reusableCount = await routingsPage.getRowCount();
@@ -112,7 +112,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       // ACT - Filter by active status
       await routingsPage.filterByStatus('Active');
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ASSERT - Filtered results displayed
       const activeCount = await routingsPage.getRowCount();
@@ -269,7 +269,7 @@ test.describe('Routings Module (Suite 4)', () => {
       await routingsPage.clickRouting(routingData.code);
 
       // ASSERT - Detail page loads
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
       expect(page.url()).toContain('/technical/routings/');
     });
 
@@ -286,7 +286,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Add operation
       await routingsPage.clickAddOperation();
@@ -322,7 +322,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Add operation with time fields
       await routingsPage.clickAddOperation();
@@ -356,7 +356,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Add operation with labor cost
       await routingsPage.clickAddOperation();
@@ -390,7 +390,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Add operation with instructions
       await routingsPage.clickAddOperation();
@@ -428,7 +428,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // Add first operation
       await routingsPage.clickAddOperation();
@@ -473,7 +473,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // Add two operations
       for (let i = 1; i <= 2; i++) {
@@ -510,7 +510,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // Add operation
       await routingsPage.clickAddOperation();
@@ -552,7 +552,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Check if assignment option visible
       // ASSERT - Assign button available
@@ -572,7 +572,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Navigate to routing detail to verify structure
       // ASSERT - Routing section visible
@@ -597,7 +597,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Clone routing
       await routingsPage.cloneRouting();
@@ -623,14 +623,14 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // Get initial version
       const initialVersion = await routingsPage.getRoutingVersion();
 
       // ACT - Update routing name
       await routingsPage.updateRoutingName(`Updated ${Date.now()}`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ASSERT - Version incremented
       const newVersion = await routingsPage.getRoutingVersion();
@@ -658,7 +658,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Navigate to cost summary
       // ASSERT - Cost summary visible
@@ -690,7 +690,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Get cost values
       const setupCostActual = await routingsPage.getSetupCost();
@@ -723,7 +723,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Add first operation
       await routingsPage.clickAddOperation();
@@ -778,7 +778,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Check if reusable
       // ASSERT - Reusable routing can be assigned to multiple BOMs
@@ -799,7 +799,7 @@ test.describe('Routings Module (Suite 4)', () => {
 
       await routingsPage.createRouting(routingData);
       await routingsPage.clickRouting(routingData.code);
-      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(1000);
 
       // ACT - Check if non-reusable
       // ASSERT - Non-reusable routing marked appropriately

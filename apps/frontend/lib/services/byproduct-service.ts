@@ -53,7 +53,7 @@ export async function getWOByProducts(woId: string): Promise<ByProductInfo[]> {
   // Get WO info for expected qty calculation
   const { data: wo, error: woError } = await supabase
     .from('work_orders')
-    .select('output_qty, planned_quantity')
+    .select('produced_quantity, planned_quantity')
     .eq('id', woId)
     .single()
 
@@ -82,7 +82,7 @@ export async function getWOByProducts(woId: string): Promise<ByProductInfo[]> {
   }
 
   // Calculate expected qty for each by-product based on latest main output
-  const lastOutputQty = wo.output_qty || 0
+  const lastOutputQty = wo.produced_quantity || 0
 
   return byProducts.map(bp => ({
     id: bp.id,

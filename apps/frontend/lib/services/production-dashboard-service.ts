@@ -17,8 +17,8 @@ export interface ActiveWorkOrder {
   id: string
   wo_number: string
   product_name: string
-  planned_qty: number
-  output_qty: number
+  planned_quantity: number
+  produced_quantity: number
   status: string
   progress_percent: number
   started_at: string
@@ -66,10 +66,10 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     if (outputError) throw outputError
     const units_produced_today = outputs?.reduce((sum, o) => sum + (o.qty || 0), 0) || 0
 
-    // 3. Average yield today (weighted: SUM(actual_output) / SUM(planned_qty))
+    // 3. Average yield today (weighted: SUM(actual_output) / SUM(planned_quantity))
     const { data: yieldData, error: yieldError } = await supabase
       .from('work_orders')
-      .select('planned_qty, output_qty')
+      .select('planned_quantity, produced_quantity')
       .eq('org_id', orgId)
       .eq('status', 'completed')
       .gte('completed_at', `${today}T00:00:00Z`)
@@ -79,8 +79,8 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
 
     let avg_yield_today = 0
     if (yieldData && yieldData.length > 0) {
-      const totalPlanned = yieldData.reduce((sum, wo) => sum + (wo.planned_qty || 0), 0)
-      const totalActual = yieldData.reduce((sum, wo) => sum + (wo.output_qty || 0), 0)
+      const totalPlanned = yieldData.reduce((sum, wo) => sum + (wo.planned_quantity || 0), 0)
+      const totalActual = yieldData.reduce((sum, wo) => sum + (wo.produced_quantity || 0), 0)
       avg_yield_today = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0
     }
 
@@ -133,8 +133,8 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         id,
         wo_number,
         product_id,
-        planned_qty,
-        output_qty,
+        planned_quantity,
+        produced_quantity,
         status,
         started_at,
         production_line_id,
@@ -158,10 +158,10 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         id: wo.id,
         wo_number: wo.wo_number,
         product_name: wo.products?.name || 'Unknown',
-        planned_qty: wo.planned_qty || 0,
-        output_qty: wo.output_qty || 0,
+        planned_qty: wo.planned_quantity || 0,
+        output_qty: wo.produced_quantity || 0,
         status: wo.status,
-        progress_percent: wo.planned_qty ? (wo.output_qty / wo.planned_qty) * 100 : 0,
+        progress_percent: wo.planned_quantity ? (wo.produced_quantity / wo.planned_quantity) * 100 : 0,
         started_at: wo.started_at,
         line_name: wo.production_lines?.name || 'Unassigned',
       })) || []

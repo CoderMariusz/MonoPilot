@@ -237,13 +237,13 @@ export async function validateWO(barcode: string): Promise<WOValidationResult> {
   }
 
   // Get by-products from BOM
-  const byProducts = await getByProductsFromBOM(wo.product_id, wo.planned_qty)
+  const byProducts = await getByProductsFromBOM(wo.product_id, wo.planned_quantity)
 
   const products = wo.products as { id: string; name: string; code: string; base_uom: string; shelf_life_days: number }
   const productionLine = wo.production_lines as { id: string; name: string } | null
 
-  const registeredQty = Number(wo.output_qty) || 0
-  const plannedQty = Number(wo.planned_qty)
+  const registeredQty = Number(wo.produced_quantity) || 0
+  const plannedQty = Number(wo.planned_quantity)
   const remainingQty = plannedQty - registeredQty
 
   return {
@@ -457,15 +457,15 @@ export async function registerOutput(input: ScannerRegisterInput): Promise<Regis
     parentCount = genealogyRecords.length
   }
 
-  // Update WO output_qty
-  const newOutputQty = Number(wo.output_qty || 0) + input.quantity
-  const plannedQty = Number(wo.planned_qty)
+  // Update WO produced_quantity
+  const newOutputQty = Number(wo.produced_quantity || 0) + input.quantity
+  const plannedQty = Number(wo.planned_quantity)
   const progressPercent = plannedQty > 0 ? Math.round((newOutputQty / plannedQty) * 100) : 0
 
   await supabase
     .from('work_orders')
     .update({
-      output_qty: newOutputQty,
+      produced_quantity: newOutputQty,
       progress_percent: progressPercent,
     })
     .eq('id', wo.id)
@@ -526,13 +526,13 @@ export async function getByProducts(woId: string): Promise<ByProductInfo[]> {
   // Get WO info
   const { data: wo } = await supabase
     .from('work_orders')
-    .select('product_id, planned_qty')
+    .select('product_id, planned_quantity')
     .eq('id', woId)
     .single()
 
   if (!wo) return []
 
-  return getByProductsFromBOM(wo.product_id, wo.planned_qty)
+  return getByProductsFromBOM(wo.product_id, wo.planned_quantity)
 }
 
 /**
