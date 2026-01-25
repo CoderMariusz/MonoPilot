@@ -26,7 +26,7 @@ BEGIN
 
     -- Total inventory value (at cost)
     COALESCE(
-      SUM(lp.quantity * COALESCE(p.unit_cost, 0)) FILTER (WHERE lp.status != 'consumed'),
+      SUM(lp.quantity * COALESCE(p.cost_per_unit, 0)) FILTER (WHERE lp.status != 'consumed'),
       0
     ) AS total_value,
 

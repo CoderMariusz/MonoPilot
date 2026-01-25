@@ -143,7 +143,7 @@ export class AgingReportService {
         product_id,
         quantity,
         created_at,
-        products!inner(id, name, code, base_uom, unit_cost, category_id)
+        products!inner(id, name, code, base_uom, cost_per_unit, category_id)
       `)
       .eq('org_id', orgId)
       .eq('status', 'available')
@@ -198,7 +198,7 @@ export class AgingReportService {
 
       const productData = productMap.get(productId)!
       const qty = parseFloat(lp.quantity.toString())
-      const unitCost = parseFloat(product.unit_cost?.toString() || '0')
+      const unitCost = parseFloat(product.cost_per_unit?.toString() || '0')
       const value = qty * unitCost
 
       // Determine bucket
@@ -267,7 +267,7 @@ export class AgingReportService {
         product_id,
         quantity,
         expiry_date,
-        products!inner(id, name, code, base_uom, unit_cost, category_id)
+        products!inner(id, name, code, base_uom, cost_per_unit, category_id)
       `)
       .eq('org_id', orgId)
       .eq('status', 'available')
@@ -323,7 +323,7 @@ export class AgingReportService {
 
       const productData = productMap.get(productId)!
       const qty = parseFloat(lp.quantity.toString())
-      const unitCost = parseFloat(product.unit_cost?.toString() || '0')
+      const unitCost = parseFloat(product.cost_per_unit?.toString() || '0')
       const value = qty * unitCost
 
       // Determine bucket (same logic but based on days until expiry)

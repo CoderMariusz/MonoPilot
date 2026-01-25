@@ -137,7 +137,7 @@ async function getInventoryByProduct(
       status,
       location_id,
       created_at,
-      products!inner(name, code, unit_cost)
+      products!inner(name, code, cost_per_unit)
     `, { count: 'exact' })
     .neq('status', 'consumed')
 
@@ -207,7 +207,7 @@ async function getInventoryByProduct(
 
     const item = productMap.get(productId)!
     const qty = parseFloat(row.quantity) || 0
-    const unitCost = parseFloat(product?.unit_cost) || 0
+    const unitCost = parseFloat(product?.cost_per_unit) || 0
 
     item.lp_count++
     item.total_qty += qty
@@ -284,7 +284,7 @@ async function getInventoryByLocation(
       quantity,
       product_id,
       locations!inner(code, warehouse_id, warehouses(name)),
-      products(unit_cost)
+      products(cost_per_unit)
     `, { count: 'exact' })
     .neq('status', 'consumed')
 
@@ -336,7 +336,7 @@ async function getInventoryByLocation(
 
     const item = locationMap.get(locationId)!
     const qty = parseFloat(row.quantity) || 0
-    const unitCost = parseFloat(row.products?.unit_cost) || 0
+    const unitCost = parseFloat(row.products?.cost_per_unit) || 0
 
     item.total_lps++
     item.total_qty += qty
@@ -399,7 +399,7 @@ async function getInventoryByWarehouse(
       location_id,
       expiry_date,
       warehouses!inner(name),
-      products(unit_cost)
+      products(cost_per_unit)
     `, { count: 'exact' })
     .neq('status', 'consumed')
 
@@ -455,7 +455,7 @@ async function getInventoryByWarehouse(
 
     const item = warehouseMap.get(warehouseId)!
     const qty = parseFloat(row.quantity) || 0
-    const unitCost = parseFloat(row.products?.unit_cost) || 0
+    const unitCost = parseFloat(row.products?.cost_per_unit) || 0
 
     item.total_lps++
     item.total_value += qty * unitCost
@@ -553,7 +553,7 @@ function calculateSummary(rawData: any[]): InventorySummary {
 
   for (const row of rawData) {
     const qty = parseFloat(row.quantity) || 0
-    const unitCost = parseFloat(row.products?.unit_cost || row.unit_cost) || 0
+    const unitCost = parseFloat(row.products?.cost_per_unit || row.cost_per_unit) || 0
     total_qty += qty
     total_value += qty * unitCost
   }
@@ -574,7 +574,7 @@ export async function calculateInventorySummary(
 ): Promise<InventorySummary> {
   let query = supabase
     .from('license_plates')
-    .select('quantity, products(unit_cost)')
+    .select('quantity, products(cost_per_unit)')
     .neq('status', 'consumed')
 
   query = applyFilters(query, filters)

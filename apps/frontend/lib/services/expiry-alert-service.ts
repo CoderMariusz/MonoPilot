@@ -96,7 +96,7 @@ export async function getExpiringWithPagination(
         warehouse_id,
         batch_number,
         expiry_date,
-        products!inner(name, sku, unit_cost),
+        products!inner(name, sku, cost_per_unit),
         locations!inner(code),
         warehouses!inner(name)
       `)
@@ -161,7 +161,7 @@ export async function getExpiringWithPagination(
       const product = lp.products as any
       const location = lp.locations as any
       const warehouse = lp.warehouses as any
-      const unitCost = product?.unit_cost ?? 0
+      const unitCost = product?.cost_per_unit ?? 0
       const value = lp.quantity * unitCost
 
       return {
@@ -234,7 +234,7 @@ export async function getExpirySummary(
       .select(`
         expiry_date,
         quantity,
-        products!inner(unit_cost)
+        products!inner(cost_per_unit)
       `)
       .eq('org_id', orgId)
       .eq('status', 'available')
@@ -255,7 +255,7 @@ export async function getExpirySummary(
     for (const lp of lpData || []) {
       const daysUntilExpiry = calculateDaysUntilExpiry(lp.expiry_date!)
       const tier = calculateExpiryTier(daysUntilExpiry)
-      const unitCost = (lp.products as any)?.unit_cost ?? 0
+      const unitCost = (lp.products as any)?.cost_per_unit ?? 0
       const value = lp.quantity * unitCost
 
       totalValue += value
@@ -322,7 +322,7 @@ export async function getExpiredLPs(
         warehouse_id,
         batch_number,
         expiry_date,
-        products!inner(name, sku, unit_cost),
+        products!inner(name, sku, cost_per_unit),
         locations!inner(code),
         warehouses!inner(name)
       `)
@@ -342,7 +342,7 @@ export async function getExpiredLPs(
       const product = lp.products as any
       const location = lp.locations as any
       const warehouse = lp.warehouses as any
-      const unitCost = product?.unit_cost ?? 0
+      const unitCost = product?.cost_per_unit ?? 0
       const value = lp.quantity * unitCost
 
       return {
