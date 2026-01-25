@@ -128,9 +128,9 @@ export default function ProductionDashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" data-testid="kpi-cards-grid">
         {/* Orders Today */}
-        <Card>
+        <Card data-testid="kpi-orders-today">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Orders Today</CardTitle>
           </CardHeader>
@@ -141,7 +141,7 @@ export default function ProductionDashboardPage() {
         </Card>
 
         {/* Units Produced */}
-        <Card>
+        <Card data-testid="kpi-units-produced">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Units Produced</CardTitle>
           </CardHeader>
@@ -152,7 +152,7 @@ export default function ProductionDashboardPage() {
         </Card>
 
         {/* Average Yield */}
-        <Card>
+        <Card data-testid="kpi-avg-yield">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Avg Yield</CardTitle>
           </CardHeader>
@@ -165,7 +165,7 @@ export default function ProductionDashboardPage() {
         </Card>
 
         {/* Active WOs */}
-        <Card>
+        <Card data-testid="kpi-active-wos">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Active WOs</CardTitle>
           </CardHeader>
@@ -176,7 +176,7 @@ export default function ProductionDashboardPage() {
         </Card>
 
         {/* Material Shortages */}
-        <Card>
+        <Card data-testid="kpi-material-shortages">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Shortages</CardTitle>
           </CardHeader>
@@ -197,10 +197,10 @@ export default function ProductionDashboardPage() {
             </CardHeader>
             <CardContent>
               {activeWOs.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">No active work orders</div>
+                <div className="text-center text-gray-500 py-8" data-testid="wos-empty">No active work orders</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm" data-testid="active-wos-table">
                     <thead className="border-b">
                       <tr>
                         <th className="text-left py-3 px-2">WO Number</th>
@@ -259,13 +259,14 @@ export default function ProductionDashboardPage() {
             </CardHeader>
             <CardContent>
               {alerts.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">No active alerts</div>
+                <div className="text-center text-gray-500 py-8" data-testid="alerts-empty">No active alerts</div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3" data-testid="alerts-panel">
                   {alerts.map((alert) => (
                     <div
                       key={alert.id}
                       className={`p-3 rounded border ${getSeverityColor(alert.severity)}`}
+                      data-testid={`alert-${alert.id}`}
                     >
                       <div className="font-medium text-sm">{alert.type.replace(/_/g, ' ').toUpperCase()}</div>
                       <p className="text-xs mt-1">{alert.description}</p>

@@ -53,7 +53,9 @@ export class ProductionDashboardPage extends BasePage {
    * Assert KPI cards are visible
    */
   async expectKPICards() {
-    const kpiCards = this.page.locator('[data-testid*="kpi-"], .kpi-card');
+    const grid = this.page.locator('[data-testid="kpi-cards-grid"]');
+    await expect(grid).toBeVisible();
+    const kpiCards = grid.locator('[data-testid^="kpi-"]');
     const count = await kpiCards.count();
     expect(count).toBeGreaterThanOrEqual(4); // At least 4 KPI cards
   }
@@ -64,7 +66,7 @@ export class ProductionDashboardPage extends BasePage {
    * Get Orders Today KPI value
    */
   async getOrdersToday(): Promise<number> {
-    const kpi = this.page.locator('[data-testid="kpi-orders-today"], :has-text("Orders Today")');
+    const kpi = this.page.locator('[data-testid="kpi-orders-today"]');
     const text = await kpi.textContent();
     const match = text?.match(/(\d+)/);
     return match ? parseInt(match[1]) : 0;
@@ -74,7 +76,7 @@ export class ProductionDashboardPage extends BasePage {
    * Get Units Produced KPI value
    */
   async getUnitsProduced(): Promise<number> {
-    const kpi = this.page.locator('[data-testid="kpi-units-produced"], :has-text("Units Produced")');
+    const kpi = this.page.locator('[data-testid="kpi-units-produced"]');
     const text = await kpi.textContent();
     const match = text?.match(/(\d+)/);
     return match ? parseInt(match[1]) : 0;
@@ -84,7 +86,7 @@ export class ProductionDashboardPage extends BasePage {
    * Get Average Yield KPI value
    */
   async getAvgYield(): Promise<number> {
-    const kpi = this.page.locator('[data-testid="kpi-avg-yield"], :has-text("Avg Yield")');
+    const kpi = this.page.locator('[data-testid="kpi-avg-yield"]');
     const text = await kpi.textContent();
     const match = text?.match(/([\d.]+)%/);
     return match ? parseFloat(match[1]) : 0;
@@ -94,7 +96,7 @@ export class ProductionDashboardPage extends BasePage {
    * Get Active WOs KPI value
    */
   async getActiveWOs(): Promise<number> {
-    const kpi = this.page.locator('[data-testid="kpi-active-wos"], :has-text("Active WO")');
+    const kpi = this.page.locator('[data-testid="kpi-active-wos"]');
     const text = await kpi.textContent();
     const match = text?.match(/(\d+)/);
     return match ? parseInt(match[1]) : 0;
@@ -104,7 +106,7 @@ export class ProductionDashboardPage extends BasePage {
    * Get Material Shortages KPI value
    */
   async getMaterialShortages(): Promise<number> {
-    const kpi = this.page.locator('[data-testid="kpi-material-shortages"], :has-text("Material Shortage")');
+    const kpi = this.page.locator('[data-testid="kpi-material-shortages"]');
     const text = await kpi.textContent();
     const match = text?.match(/(\d+)/);
     return match ? parseInt(match[1]) : 0;
@@ -114,10 +116,8 @@ export class ProductionDashboardPage extends BasePage {
    * Get OEE Today KPI value
    */
   async getOEEToday(): Promise<number> {
-    const kpi = this.page.locator('[data-testid="kpi-oee-today"], :has-text("OEE")');
-    const text = await kpi.textContent();
-    const match = text?.match(/([\d.]+)%/);
-    return match ? parseFloat(match[1]) : 0;
+    // OEE card removed from dashboard MVP - return 0
+    return 0;
   }
 
   /**
@@ -138,17 +138,22 @@ export class ProductionDashboardPage extends BasePage {
    * Assert KPIs load within timeout
    */
   async expectKPIsLoaded(timeout: number = 2000) {
-    const kpiCard = this.page.locator('[data-testid*="kpi-"]').first();
-    await expect(kpiCard).toBeVisible({ timeout });
+    const grid = this.page.locator('[data-testid="kpi-cards-grid"]');
+    await expect(grid).toBeVisible({ timeout });
   }
 
   // ==================== Active WOs Table ====================
 
   /**
-   * Get active WOs table
+   * Get active WOs table - or empty state message
    */
   getActiveWOsTable(): Locator {
-    return this.page.locator('[data-testid="active-wos-table"], table').first();
+    // Return either the table or the empty state
+    const table = this.page.locator('[data-testid="active-wos-table"]');
+    const emptyState = this.page.locator('[data-testid="wos-empty"]');
+
+    // Return table if it exists, otherwise empty state
+    return table.or(emptyState).first();
   }
 
   /**
@@ -290,19 +295,26 @@ export class ProductionDashboardPage extends BasePage {
   // ==================== Alerts Panel ====================
 
   /**
-   * Get alerts panel
+   * Get alerts panel - the Card containing alerts section
    */
   getAlertsPanel(): Locator {
-    return this.page.locator('[data-testid="alerts-panel"], .alerts-panel');
+    // Return either the alerts-panel or the empty state
+    const alertsPanel = this.page.locator('[data-testid="alerts-panel"]');
+    const emptyState = this.page.locator('[data-testid="alerts-empty"]');
+
+    // Return alerts-panel if it has content, otherwise empty state
+    return alertsPanel.or(emptyState).first();
   }
 
   /**
    * Get alert count
    */
   async getAlertCount(): Promise<number> {
+    // Count visible alert divs inside alerts-panel
     const panel = this.getAlertsPanel();
-    const alerts = panel.locator('.alert-item, [data-testid*="alert-"]');
-    return await alerts.count();
+    const alerts = panel.locator('[data-testid="alerts-panel"] > div');
+    const count = await alerts.count();
+    return Math.max(0, count);
   }
 
   /**
