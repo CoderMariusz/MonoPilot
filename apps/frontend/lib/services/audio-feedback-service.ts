@@ -17,10 +17,10 @@ const MUTE_KEY = 'scanner_audio_muted'
 // =============================================================================
 
 function getAudioContext(): AudioContext | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const g = typeof globalThis !== 'undefined' ? globalThis : (global as any)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const AudioCtx = (g as any).AudioContext || (g as any).webkitAudioContext
 
   if (!AudioCtx) {

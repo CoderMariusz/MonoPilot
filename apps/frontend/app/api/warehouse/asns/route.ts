@@ -20,14 +20,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check feature flag
-    const { data: settings } = await supabase
+    // Check feature flag (default to enabled if settings not found)
+    const { data: settings, error: settingsError } = await supabase
       .from('warehouse_settings')
       .select('enable_asn')
       .single()
 
-    if (!settings?.enable_asn) {
-      return NextResponse.json({ error: 'Feature disabled' }, { status: 403 })
+    // If settings don't exist yet, allow ASN by default (for initial setup)
+    const asnEnabled = settingsError ? true : (settings?.enable_asn ?? true)
+
+    if (!asnEnabled) {
+      return NextResponse.json({ error: 'ASN feature is disabled' }, { status: 403 })
     }
 
     // Get query params
@@ -88,14 +91,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check feature flag
-    const { data: settings } = await supabase
+    // Check feature flag (default to enabled if settings not found)
+    const { data: settings, error: settingsError } = await supabase
       .from('warehouse_settings')
       .select('enable_asn')
       .single()
 
-    if (!settings?.enable_asn) {
-      return NextResponse.json({ error: 'Feature disabled' }, { status: 403 })
+    // If settings don't exist yet, allow ASN by default (for initial setup)
+    const asnEnabled = settingsError ? true : (settings?.enable_asn ?? true)
+
+    if (!asnEnabled) {
+      return NextResponse.json({ error: 'ASN feature is disabled' }, { status: 403 })
     }
 
     const body = await request.json()

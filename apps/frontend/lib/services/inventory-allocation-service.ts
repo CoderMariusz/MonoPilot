@@ -782,7 +782,7 @@ export class InventoryAllocationService {
     ]
 
     // Filter by product_id
-    let filtered = mockLPs.filter(lp => lp.product_id === productId)
+    const filtered = mockLPs.filter(lp => lp.product_id === productId)
 
     // Sort based on strategy
     if (strategy === 'FEFO') {

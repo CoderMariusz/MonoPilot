@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const expiryWarningDays = settings?.expiry_warning_days || 30;
 
     // Query inventory KPIs
-    const { data: kpis, error: kpisError } = await supabase.rpc('get_inventory_kpis', {
+    const { data: kpisArray, error: kpisError } = await supabase.rpc('get_inventory_kpis', {
       p_org_id: org_id,
       p_expiry_warning_days: expiryWarningDays,
     });
@@ -64,13 +64,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Return KPIs
+    // RPC returns an array with one row (Supabase RETURNS TABLE behavior)
+    const kpis = Array.isArray(kpisArray) ? kpisArray[0] : kpisArray;
+
+    // Return KPIs with proper type conversions
     return NextResponse.json(
       {
-        total_lps: kpis?.total_lps || 0,
-        total_value: kpis?.total_value || 0,
-        expiring_soon: kpis?.expiring_soon || 0,
-        expired: kpis?.expired || 0,
+        total_lps: Number(kpis?.total_lps) || 0,
+        total_value: Number(kpis?.total_value) || 0,
+        expiring_soon: Number(kpis?.expiring_soon) || 0,
+        expired: Number(kpis?.expired) || 0,
       },
       {
         status: 200,

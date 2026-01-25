@@ -29,6 +29,9 @@ test.describe('Production Dashboard', () => {
     });
 
     test('should display active WOs section (table or empty state)', async ({ page }) => {
+      // Wait for dashboard to finish loading (KPIs appear means loading is done)
+      await dashboardPage.expectKPIsLoaded(10000);
+
       // Dashboard should show either the table or empty state
       const table = page.locator('[data-testid="active-wos-table"]');
       const empty = page.locator('[data-testid="wos-empty"]');
@@ -37,6 +40,9 @@ test.describe('Production Dashboard', () => {
     });
 
     test('should display alerts section (alerts or empty state)', async ({ page }) => {
+      // Wait for dashboard to finish loading (KPIs appear means loading is done)
+      await dashboardPage.expectKPIsLoaded(10000);
+
       // Dashboard should show either alerts or empty state
       const alerts = page.locator('[data-testid="alerts-panel"]');
       const empty = page.locator('[data-testid="alerts-empty"]');

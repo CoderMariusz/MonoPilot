@@ -15,7 +15,7 @@ import { formatSSCC } from './sscc-service'
 
 // Lazy import to support test env detection
 function getAdminClient() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const { createAdminClient } = require('../supabase/admin-client')
   return createAdminClient()
 }

@@ -187,7 +187,7 @@ export class FinalInspectionService {
     }
 
     // Get WO details if not provided
-    let woId = input.wo_id
+    const woId = input.wo_id
     let productId = input.product_id
     let batchNumber = input.batch_number
     let producedQty = input.produced_qty

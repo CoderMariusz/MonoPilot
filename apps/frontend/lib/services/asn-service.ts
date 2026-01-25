@@ -557,18 +557,29 @@ export class ASNService {
   }
 
   /**
-   * List ASNs with filters
+   * List ASNs with filters - Optimized with joins for list view
    */
   static async listASNs(
     supabase: SupabaseClient,
     filters: ASNFilters
-  ): Promise<ASN[]> {
-    let query = supabase.from('asns').select('*')
+  ): Promise<any[]> {
+    // Build query with joins for supplier and PO data
+    let query = supabase
+      .from('asns')
+      .select(`
+        *,
+        supplier:suppliers!supplier_id(name),
+        po:purchase_orders!po_id(po_number),
+        items:asn_items(id)
+      `)
 
     if (filters.status) {
       query = query.eq('status', filters.status)
     }
 
+    // Optimized search: Search across asn_number only (main search field)
+    // Note: PostgREST doesn't support OR across joined tables easily
+    // We filter on asn_number with index support, frontend can expand if needed
     if (filters.search) {
       query = query.ilike('asn_number', `%${filters.search}%`)
     }
@@ -602,7 +613,14 @@ export class ASNService {
     const { data, error } = await query
 
     if (error) throw error
-    return data || []
+
+    // Transform response to include flattened joined data
+    return (data || []).map((asn: any) => ({
+      ...asn,
+      supplier_name: asn.supplier?.name || '',
+      po_number: asn.po?.po_number || '',
+      items_count: asn.items?.length || 0,
+    }))
   }
 
   /**

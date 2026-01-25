@@ -145,6 +145,13 @@ export default defineConfig({
     timeout: 180 * 1000,
     stdout: 'pipe',
     stderr: 'pipe',
+    // Pass .env.test vars to the dev server process
+    env: {
+      ...process.env,
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    },
   },
 });
 

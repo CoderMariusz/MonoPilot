@@ -92,7 +92,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: result.data,
-      pagination: result.pagination,
+      meta: {
+        total: result.pagination.total,
+        page: result.pagination.page,
+        limit: result.pagination.limit,
+        pages: result.pagination.total_pages,
+      },
     })
   } catch (error) {
     console.error('License plates GET error:', error)

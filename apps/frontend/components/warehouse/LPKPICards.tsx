@@ -41,7 +41,7 @@ export function LPKPICards({ onCardClick }: LPKPICardsProps) {
     {
       testId: 'kpi-total-lps',
       type: 'total' as const,
-      title: 'Total LPs',
+      title: 'Total LP',
       value: summary?.total_count || 0,
       description: `${(summary?.total_quantity || 0).toLocaleString()} KG total`,
       icon: Package,

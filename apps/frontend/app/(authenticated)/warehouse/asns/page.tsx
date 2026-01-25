@@ -102,46 +102,8 @@ export default function ASNsPage() {
     }))
   }, [])
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">ASNs</h1>
-            <p className="text-muted-foreground text-sm">Advance Shipping Notices</p>
-          </div>
-          <Button disabled>
-            <Plus className="h-4 w-4 mr-2" />
-            New ASN
-          </Button>
-        </div>
-        <Skeleton className="h-[400px] w-full" />
-      </div>
-    )
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">ASNs</h1>
-            <p className="text-muted-foreground text-sm">Advance Shipping Notices</p>
-          </div>
-        </div>
-        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-          <h3 className="text-lg font-semibold mb-2">Error Loading ASNs</h3>
-          <p className="text-muted-foreground max-w-md mb-6">{error.message}</p>
-          <Button onClick={() => refetch()}>Retry</Button>
-        </div>
-      </div>
-    )
-  }
-
-  // Empty state
-  const isEmpty = asns.length === 0 && !filters.search && !filters.status
+  // Render page structure immediately (show loading state inline)
+  const isEmpty = !isLoading && asns.length === 0 && !filters.search && !filters.status
 
   return (
     <div className="p-6 space-y-6">
@@ -151,7 +113,7 @@ export default function ASNsPage() {
           <h1 className="text-2xl font-bold">ASNs</h1>
           <p className="text-muted-foreground text-sm">Advance Shipping Notices</p>
         </div>
-        <Button onClick={() => router.push('/warehouse/asns/new')}>
+        <Button onClick={() => router.push('/warehouse/asns/new')} disabled={isLoading}>
           <Plus className="h-4 w-4 mr-2" />
           New ASN
         </Button>
@@ -165,8 +127,9 @@ export default function ASNsPage() {
           value={filters.search || ''}
           onChange={(e) => handleSearch(e.target.value)}
           className="max-w-md"
+          disabled={isLoading}
         />
-        <Select value={filters.status || 'all'} onValueChange={handleStatusFilter}>
+        <Select value={filters.status || 'all'} onValueChange={handleStatusFilter} disabled={isLoading}>
           <SelectTrigger name="status_filter" className="w-[200px]">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
@@ -180,8 +143,24 @@ export default function ASNsPage() {
         </Select>
       </div>
 
-      {/* Content */}
-      {isEmpty ? (
+      {/* Loading State */}
+      {isLoading && (
+        <div className="border rounded-lg p-8">
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+          <h3 className="text-lg font-semibold mb-2">Error Loading ASNs</h3>
+          <p className="text-muted-foreground max-w-md mb-6">{error.message}</p>
+          <Button onClick={() => refetch()}>Retry</Button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && isEmpty && (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
           <h3 className="text-lg font-semibold mb-2">No Advance Shipping Notices</h3>
           <p className="text-muted-foreground max-w-md mb-6">
@@ -192,7 +171,10 @@ export default function ASNsPage() {
             Create your first ASN
           </Button>
         </div>
-      ) : (
+      )}
+
+      {/* Data Table */}
+      {!isLoading && !error && !isEmpty && (
         <>
           <div className="border rounded-lg">
             <Table>

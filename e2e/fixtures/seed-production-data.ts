@@ -16,8 +16,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 // Use v5 UUIDs derived from fixed strings for consistency
 
 export const TEST_UUIDS = {
-  // Organization
-  org: '550e8400-e29b-41d4-a716-446655440001',
+  // Organization - MUST match the test user's org_id
+  // Test user admin@monopilot.com belongs to MonoPilot Demo org
+  org: 'a0000000-0000-0000-0000-000000000001',
 
   // Users
   adminUser: '550e8400-e29b-41d4-a716-446655440002',
@@ -41,8 +42,8 @@ export const TEST_UUIDS = {
   productYeast: '550e8400-e29b-41d4-a716-446655440402',
   productBread: '550e8400-e29b-41d4-a716-446655440403',
 
-  // Production Settings
-  productionSettings: '550e8400-e29b-41d4-a716-446655440501',
+  // Production Settings - use unique UUID for the demo org
+  productionSettings: 'e2e00000-0000-0000-0000-000000000501',
 
   // Production Lines
   lineA: '550e8400-e29b-41d4-a716-446655440601',
@@ -62,11 +63,11 @@ export const TEST_UUIDS = {
   // Routings
   routingBread: '550e8400-e29b-41d4-a716-446655440a01',
 
-  // Work Orders
-  workOrderReleased: 'wo-id-123',
+  // Work Orders - Use valid UUID format
+  workOrderReleased: 'e2e00000-0000-0000-0000-000000000001',
 
-  // License Plates
-  lpFlour: 'lp-001',
+  // License Plates - Use valid UUID format
+  lpFlour: 'e2e00000-0000-0000-0000-000000000002',
 };
 
 // ==================== Seeding Functions ====================
@@ -547,11 +548,11 @@ async function seedMachines(client: SupabaseClient) {
 async function seedWorkOrder(client: SupabaseClient) {
   console.log('📋 Seeding work order...');
 
-  // Check if WO already exists using the literal ID from tests
+  // Check if WO already exists by ID
   const result = await client
     .from('work_orders')
     .select('id')
-    .eq('wo_number', 'wo-id-123')
+    .eq('id', TEST_UUIDS.workOrderReleased)
     .single();
 
   const existing = result.data;
@@ -565,7 +566,7 @@ async function seedWorkOrder(client: SupabaseClient) {
   const { error } = await client.from('work_orders').insert({
     id: TEST_UUIDS.workOrderReleased,
     org_id: TEST_UUIDS.org,
-    wo_number: 'wo-id-123',
+    wo_number: 'WO-E2E-001',
     product_id: TEST_UUIDS.productBread,
     bom_id: TEST_UUIDS.bomBread,
     planned_quantity: 100.0,
@@ -585,36 +586,76 @@ async function seedWorkOrder(client: SupabaseClient) {
 async function seedLicensePlates(client: SupabaseClient) {
   console.log('📋 Seeding license plates...');
 
+  // Check by ID instead of LP number
   const result = await client
     .from('license_plates')
     .select('id')
-    .eq('lp_number', 'LP-001')
+    .eq('id', TEST_UUIDS.lpFlour)
     .single();
 
   const existing = result.data;
 
   if (existing) {
-    console.log('  ✓ License plate already exists');
+    console.log('  ✓ License plates already exist');
     return;
   }
 
-  const { error } = await client.from('license_plates').insert({
-    id: TEST_UUIDS.lpFlour,
-    org_id: TEST_UUIDS.org,
-    lp_number: 'LP-001',
-    product_id: TEST_UUIDS.productFlour,
-    quantity: 100.0,
-    unit: 'KG',
-    lot_number: 'LOT-2025-001',
-    production_date: new Date().toISOString().split('T')[0],
-    expiry_date: new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0],
-    location_id: TEST_UUIDS.locationRaw,
-    status: 'available',
-    qa_status: 'pending',
-  });
+  // Create multiple license plates for testing
+  const licensePlates = [
+    {
+      id: TEST_UUIDS.lpFlour,
+      org_id: TEST_UUIDS.org,
+      lp_number: 'LP-E2E-001',
+      product_id: TEST_UUIDS.productFlour,
+      quantity: 100.0,
+      uom: 'KG',
+      batch_number: 'LOT-2025-001',
+      manufacture_date: new Date().toISOString().split('T')[0],
+      expiry_date: new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0],
+      location_id: TEST_UUIDS.locationRaw,
+      warehouse_id: TEST_UUIDS.mainWarehouse,
+      status: 'available',
+      qa_status: 'passed',
+      source: 'manual',
+    },
+    {
+      id: crypto.randomUUID(),
+      org_id: TEST_UUIDS.org,
+      lp_number: 'LP-E2E-002',
+      product_id: TEST_UUIDS.productFlour,
+      quantity: 50.0,
+      uom: 'KG',
+      batch_number: 'LOT-2025-002',
+      manufacture_date: new Date().toISOString().split('T')[0],
+      expiry_date: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
+      location_id: TEST_UUIDS.locationRaw,
+      warehouse_id: TEST_UUIDS.mainWarehouse,
+      status: 'reserved',
+      qa_status: 'passed',
+      source: 'manual',
+    },
+    {
+      id: crypto.randomUUID(),
+      org_id: TEST_UUIDS.org,
+      lp_number: 'LP-E2E-003',
+      product_id: TEST_UUIDS.productFlour,
+      quantity: 75.0,
+      uom: 'KG',
+      batch_number: 'LOT-2025-003',
+      manufacture_date: new Date().toISOString().split('T')[0],
+      expiry_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0], // Expiring in 7 days
+      location_id: TEST_UUIDS.locationRaw,
+      warehouse_id: TEST_UUIDS.mainWarehouse,
+      status: 'available',
+      qa_status: 'passed',
+      source: 'manual',
+    },
+  ];
 
-  if (error) throw new Error(`Failed to seed license plate: ${error.message}`);
-  console.log('  ✓ License plate created');
+  const { error } = await client.from('license_plates').insert(licensePlates);
+
+  if (error) throw new Error(`Failed to seed license plates: ${error.message}`);
+  console.log(`  ✓ ${licensePlates.length} license plates created`);
 }
 
 // ==================== Main Seeding Function ====================
@@ -789,13 +830,13 @@ export const PRODUCTION_TEST_DATA = {
   },
   workOrder: {
     id: TEST_UUIDS.workOrderReleased,
-    number: 'wo-id-123',
+    number: 'WO-E2E-001',
     status: 'released',
     quantity: 100.0,
   },
   licensePlate: {
     id: TEST_UUIDS.lpFlour,
-    number: 'LP-001',
+    number: 'LP-E2E-001',
     quantity: 100.0,
     unit: 'KG',
     status: 'available',

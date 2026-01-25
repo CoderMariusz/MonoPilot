@@ -110,8 +110,8 @@ export function LPDataTable({ data, isLoading, onRowClick, onBlock, onUnblock, o
               <TableCell>
                 <div>
                   <div className="font-medium">{lp.location?.full_path || '—'}</div>
-                  {lp.location?.bin_code && (
-                    <div className="text-xs text-muted-foreground">Bin: {lp.location.bin_code}</div>
+                  {lp.location?.code && (
+                    <div className="text-xs text-muted-foreground">Code: {lp.location.code}</div>
                   )}
                 </div>
               </TableCell>

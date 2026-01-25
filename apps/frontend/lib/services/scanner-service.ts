@@ -18,7 +18,7 @@ function createAudioContext(): AudioContext | null {
   }
 
   // Get AudioContext from window (supports both standard and webkit prefixed)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext
 
   if (!AudioCtx) {

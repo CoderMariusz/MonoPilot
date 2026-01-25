@@ -48,13 +48,17 @@ export function useASNs(filters: ASNFilters): UseQueryResult<PaginatedResult<ASN
       if (filters.page) params.append('page', filters.page.toString())
       if (filters.limit) params.append('limit', filters.limit.toString())
 
-      const response = await fetch(`/api/warehouse/asns?${params.toString()}`)
+      const response = await fetch(`/api/warehouse/asns?${params.toString()}`, {
+        signal: AbortSignal.timeout(10000), // 10 second timeout
+      })
       if (!response.ok) {
-        const error = await response.json()
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch ASNs' }))
         throw new Error(error.message || 'Failed to fetch ASNs')
       }
       return response.json()
     },
+    retry: 2,
+    staleTime: 30000, // 30 seconds
   })
 }
 

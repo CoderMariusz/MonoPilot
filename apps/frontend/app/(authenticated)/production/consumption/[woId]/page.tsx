@@ -104,19 +104,21 @@ export default function MaterialConsumptionPage() {
           return
         }
 
-        const data = await response.json()
+        const result = await response.json()
+        // API returns { success: true, data: workOrder } envelope
+        const data = result.data || result
 
         setWorkOrder({
           id: data.id,
           wo_number: data.wo_number,
           status: data.status,
-          product_name: data.products?.name || data.product_name || 'Unknown',
-          product_code: data.products?.code || data.product_code || 'N/A',
+          product_name: data.products?.name || data.product?.name || data.product_name || 'Unknown',
+          product_code: data.products?.code || data.product?.code || data.product_code || 'N/A',
           batch_number: data.batch_number,
           planned_quantity: data.planned_quantity || 0,
           actual_quantity: data.actual_quantity || 0,
-          uom: data.products?.uom || data.uom || 'units',
-          production_line_name: data.production_lines?.name || null,
+          uom: data.products?.uom || data.product?.base_uom || data.uom || 'units',
+          production_line_name: data.production_lines?.name || data.production_line?.name || null,
         })
         setWoError(null)
       } catch (error) {

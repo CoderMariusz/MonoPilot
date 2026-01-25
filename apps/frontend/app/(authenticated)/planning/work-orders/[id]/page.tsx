@@ -165,7 +165,8 @@ export default function WorkOrderDetailsPage(
       }
 
       const data = await response.json()
-      setWO(data.work_order || data)
+      // API returns { success: true, data: workOrder } envelope
+      setWO(data.data || data.work_order || data)
     } catch (error) {
       console.error('Error fetching work order:', error)
       toast({

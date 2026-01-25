@@ -106,14 +106,21 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
 
     // 5. Material shortages (simplified: count materials where available < required)
     // Note: This is a simplified calculation - may need adjustment based on actual schema
-    const { data: shortages, error: shortageError } = await supabase
-      .from('wo_materials')
-      .select('id')
-      .eq('org_id', orgId)
+    // Note: wo_materials uses organization_id, not org_id
+    let material_shortages = 0
+    try {
+      const { data: shortages, error: shortageError } = await supabase
+        .from('wo_materials')
+        .select('id')
+        .eq('organization_id', orgId)
 
-    if (shortageError) throw shortageError
-    // Placeholder - actual shortage detection logic would be more complex
-    const material_shortages = 0
+      if (shortageError) {
+        console.warn('wo_materials query failed:', shortageError.message)
+      }
+      // Placeholder - actual shortage detection logic would be more complex
+    } catch (err) {
+      console.warn('Failed to fetch wo_materials:', err)
+    }
 
     return {
       orders_today,
@@ -193,10 +200,11 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
   try {
     // 1. Material shortage alerts
     // Placeholder implementation - actual logic depends on schema structure
+    // Note: wo_materials uses organization_id, not org_id
     const { data: shortageData, error: shortageError } = await supabase
       .from('wo_materials')
-      .select('id, wo_id, material_id, required_qty')
-      .eq('org_id', orgId)
+      .select('id, wo_id, product_id, required_qty')
+      .eq('organization_id', orgId)
       .limit(10)
 
     if (!shortageError && shortageData) {

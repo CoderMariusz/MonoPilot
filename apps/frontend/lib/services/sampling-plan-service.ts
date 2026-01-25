@@ -491,7 +491,7 @@ export async function selectSamplingPlanForInspection(
   const supabase = await createServerSupabase();
 
   // Build query to find matching plans
-  let query = supabase
+  const query = supabase
     .from('sampling_plans')
     .select('*')
     .eq('org_id', orgId)

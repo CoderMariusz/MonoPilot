@@ -64,7 +64,7 @@ export interface LicensePlate {
   updated_at: string
   // Joined fields
   product?: { name: string; code: string }
-  location?: { full_path: string }
+  location?: { id: string; full_path: string; code: string }
   warehouse?: { name: string; code: string }
 }
 
@@ -202,10 +202,15 @@ export async function list(
   // Validation: enforce max limit of 200
   const effectiveLimit = Math.min(limit, 200)
 
-  // Build query
+  // Build query with joined tables
   let query = supabase
     .from('license_plates')
-    .select('*', { count: 'exact' })
+    .select(`
+      *,
+      product:products(name, code),
+      location:locations(id, full_path, code),
+      warehouse:warehouses(name, code)
+    `, { count: 'exact' })
 
   // Apply search filters
   if (search) {

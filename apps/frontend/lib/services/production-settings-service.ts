@@ -7,7 +7,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Accept any UUID format (not just v4) - supports test UUIDs like a0000000-0000-0000-0000-000000000001
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Production Settings type (15 settings + metadata)
