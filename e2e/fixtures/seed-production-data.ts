@@ -88,6 +88,13 @@ async function seedOrganization(client: SupabaseClient) {
 
   if (existing) {
     console.log('  ✓ Organization already exists');
+    // Ensure modules are enabled
+    await client.from('organizations')
+      .update({
+        modules_enabled: ['settings', 'technical', 'planning', 'production', 'warehouse', 'quality', 'shipping', 'scanner'],
+      })
+      .eq('id', TEST_UUIDS.org);
+    console.log('  ✓ Modules enabled');
     return;
   }
 
@@ -96,6 +103,7 @@ async function seedOrganization(client: SupabaseClient) {
     name: 'E2E Test Org',
     slug: 'e2e-test-org',
     is_active: true,
+    modules_enabled: ['settings', 'technical', 'planning', 'production', 'warehouse', 'quality', 'shipping', 'scanner'],
   });
 
   if (error) throw new Error(`Failed to seed organization: ${error.message}`);
