@@ -3,6 +3,8 @@
  *
  * Encapsulates all interactions with /technical/products page
  * including list, create, edit, search, filter, and detail views.
+ *
+ * Updated: 2026-01-24 - Fixed ShadCN Select handling for Radix UI portals
  */
 
 import { Page, Locator, expect } from '@playwright/test';
@@ -26,26 +28,73 @@ export class ProductsPage extends BasePage {
   private readonly dataTable = new DataTablePage(this.page);
 
   // Selectors for create/edit form
-  // Uses id attributes where available (ShadCN components use id), falls back to name
   private readonly formFields = {
-    code: 'input#code, input[name="code"]',
-    name: 'input#name, input[name="name"]',
-    description: 'textarea#description, textarea[name="description"]',
-    productType: 'select[name="product_type_id"], [name="product_type_id"]',
-    baseUom: 'select[name="base_uom"], [name="base_uom"]',
-    costPerUnit: 'input#cost_per_unit, input[name="cost_per_unit"]',
-    isPerishable: 'input#is_perishable, input[name="is_perishable"]',
-    shelfLifeDays: 'input#shelf_life_days, input[name="shelf_life_days"]',
-    expiryPolicy: 'select[name="expiry_policy"], [name="expiry_policy"]',
+    code: 'input#code',
+    name: 'input#name',
+    description: 'textarea#description',
+    costPerUnit: 'input#cost_per_unit',
+    isPerishable: 'input#is_perishable',
+    shelfLifeDays: 'input#shelf_life_days',
   };
 
-  // Modal and drawer selectors
-  // ProductFormModal uses a custom div with fixed inset-0, not role="dialog"
-  private readonly modal = 'div.fixed.inset-0.bg-black\/50, [role="dialog"]';
-  private readonly drawer = '[role="presentation"], div.fixed';
+  // Modal selector - ProductFormModal uses custom fixed div
+  private readonly modalSelector = 'div.fixed.inset-0.bg-black\\/50';
 
   constructor(page: Page) {
     super(page);
+  }
+
+  // ==================== ShadCN Select Helper ====================
+
+  /**
+   * Click a ShadCN Select trigger and select an option
+   * ShadCN/Radix Select renders options in a portal at body level
+   *
+   * @param triggerLocator - Locator for the SelectTrigger button
+   * @param optionText - Text to match in the option (partial match)
+   */
+  private async selectShadcnOption(triggerLocator: Locator, optionText: string): Promise<void> {
+    // Click the trigger to open dropdown
+    await triggerLocator.waitFor({ state: 'visible', timeout: 10000 });
+    await triggerLocator.click();
+
+    // Wait for listbox to appear (portal renders at body level)
+    await this.page.waitForSelector('[role="listbox"]', {
+      state: 'visible',
+      timeout: 10000
+    });
+
+    // Wait a moment for options to render (they may load asynchronously)
+    await this.page.waitForTimeout(300);
+
+    // Find the option by text content - Radix uses role="option"
+    const option = this.page.locator('[role="listbox"] [role="option"]')
+      .filter({ hasText: new RegExp(optionText, 'i') })
+      .first();
+
+    // If option not found immediately, wait and retry
+    try {
+      await option.waitFor({ state: 'visible', timeout: 5000 });
+    } catch {
+      // Options might not have loaded - dump what's available for debugging
+      const listbox = this.page.locator('[role="listbox"]');
+      const optionCount = await listbox.locator('[role="option"]').count();
+      console.error(`selectShadcnOption: Looking for "${optionText}", found ${optionCount} options`);
+      throw new Error(`Option "${optionText}" not found in select dropdown. Found ${optionCount} options.`);
+    }
+
+    await option.click();
+
+    // Wait for dropdown to close
+    await this.page.waitForTimeout(150);
+  }
+
+  /**
+   * Find a Select trigger by its label text (for the Type field labeled "Type")
+   */
+  private getSelectTriggerByLabel(labelText: string): Locator {
+    // Find the label, then get the parent container, then find the select trigger
+    return this.page.locator(`div:has(> label:has-text("${labelText}")) button[role="combobox"]`).first();
   }
 
   // ==================== Navigation ====================
@@ -136,7 +185,6 @@ export class ProductsPage extends BasePage {
    * Filter by product type
    */
   async filterByProductType(type: 'RAW' | 'WIP' | 'FIN' | 'PKG') {
-    // Note: The ProductFilters component uses RM/WIP/FG/PKG values, but tests may use RAW/WIP/FIN/PKG
     // Map the test values to UI values
     const typeMap: Record<string, string> = {
       'RAW': 'Raw Material',
@@ -145,19 +193,9 @@ export class ProductsPage extends BasePage {
       'PKG': 'Packaging'
     };
 
-    // Click the Type filter Select trigger
+    // Click the Type filter Select trigger (uses aria-label from ProductFilters)
     const typeTrigger = this.page.locator('[aria-label="Filter by product type"]');
-    await typeTrigger.click();
-
-    // Wait for dropdown to open
-    await this.page.waitForTimeout(100);
-
-    // Select the option by its display label
-    const typeOption = this.page.getByRole('option', {
-      name: typeMap[type],
-      exact: false
-    });
-    await typeOption.click();
+    await this.selectShadcnOption(typeTrigger, typeMap[type]);
     await this.waitForPageLoad();
   }
 
@@ -167,17 +205,7 @@ export class ProductsPage extends BasePage {
   async filterByStatus(status: 'Active' | 'Inactive') {
     // Click the Status filter Select trigger
     const statusTrigger = this.page.locator('[aria-label="Filter by status"]');
-    await statusTrigger.click();
-
-    // Wait for dropdown to open
-    await this.page.waitForTimeout(100);
-
-    // Select the option - status displays as "Active" or "Inactive"
-    const statusOption = this.page.getByRole('option', {
-      name: status,
-      exact: true
-    });
-    await statusOption.click();
+    await this.selectShadcnOption(statusTrigger, status);
     await this.waitForPageLoad();
   }
 
@@ -255,32 +283,35 @@ export class ProductsPage extends BasePage {
       await this.page.getByText(/Create New Product|Edit Product/i).waitFor({ state: 'visible', timeout: 30000 });
     } catch (e) {
       console.error('Modal title not found');
-      // Log what's on the page
-      const html = await this.page.content();
-      console.error('Page HTML length:', html.length);
       throw e;
     }
 
     // Now wait for the form header
     await this.page.getByText(/Basic Information/i).waitFor({ state: 'visible', timeout: 30000 });
 
-    // Finally wait for the code input - use id or look for any input in the modal
+    // Wait for product types to load (they load via API) - check for "Loading types..." text to disappear
     try {
-      await this.page.locator('input#code, input[name="code"]').waitFor({ state: 'visible', timeout: 30000 });
+      // Wait for loading to finish - ProductFormModal shows "Loading types..." while fetching
+      await this.page.waitForFunction(() => {
+        const loadingText = document.body.textContent;
+        return !loadingText?.includes('Loading types...');
+      }, { timeout: 15000 });
     } catch {
-      // If input still not found, wait a bit more and try again
-      await this.page.waitForTimeout(500);
-      // Just proceed and let the fill operation wait
+      // If it times out, proceed anyway
     }
 
+    // Finally wait for the code input
+    await this.page.locator('input#code').waitFor({ state: 'visible', timeout: 10000 });
+
     // Fill required fields
-    const codeInput = this.page.locator('input#code, input[name="code"]').first();
+    const codeInput = this.page.locator('input#code');
     await codeInput.fill(data.code);
-    const nameInput = this.page.locator('input#name, input[name="name"]').first();
+
+    const nameInput = this.page.locator('input#name');
     await nameInput.fill(data.name);
 
     if (data.description) {
-      const descInput = this.page.locator('textarea#description, textarea[name="description"]').first();
+      const descInput = this.page.locator('textarea#description');
       await descInput.fill(data.description);
     }
 
@@ -296,59 +327,38 @@ export class ProductsPage extends BasePage {
     };
     const typeDisplayName = typeMap[data.type] || data.type;
 
-    // Click the product type Select trigger - look for the button/div that opens the select
-    // ShadCN SelectTrigger is a button with aria-expanded
-    const typeSelectTrigger = this.page.locator('button[role="combobox"]:has-text("Select type")').first();
-    if ((await typeSelectTrigger.count()) === 0) {
-      // If not found, try more general selector
-      await this.selectCombobox('[name="product_type_id"]', typeDisplayName);
-    } else {
-      await typeSelectTrigger.click();
-      await this.page.waitForTimeout(200);
-      const typeOption = this.page.getByRole('option', { name: new RegExp(typeDisplayName, 'i') }).first();
-      await typeOption.click();
-      await this.page.waitForTimeout(100);
-    }
+    // Find the Type select - it's the first VISIBLE combobox button in the modal
+    // ShadCN Select creates TWO elements: a visible button and a hidden combobox
+    // We need the visible button (SelectTrigger) which has text content
+    const modal = this.page.locator('div.fixed.inset-0');
 
-    // Select base UOM - similar approach
-    const baseUomTrigger = this.page.locator('button[role="combobox"]:has-text("Select UoM")').first();
-    if ((await baseUomTrigger.count()) === 0) {
-      await this.selectCombobox('[name="base_uom"]', data.base_uom);
-    } else {
-      await baseUomTrigger.click();
-      await this.page.waitForTimeout(200);
-      const uomOption = this.page.getByRole('option', { name: new RegExp(data.base_uom, 'i') }).first();
-      await uomOption.click();
-      await this.page.waitForTimeout(100);
-    }
+    // Get visible comboboxes only (the SelectTrigger buttons have visible text)
+    const typeSection = modal.locator('div.space-y-2:has-text("Type"):has(button[role="combobox"])').first();
+    const typeSelectTrigger = typeSection.locator('button[role="combobox"]').first();
+
+    // Wait for the type select to be ready
+    await typeSelectTrigger.waitFor({ state: 'visible', timeout: 15000 });
+
+    // Select product type - use the helper which handles Radix portal
+    await this.selectShadcnOption(typeSelectTrigger, typeDisplayName);
+
+    // Find UOM select in the same way
+    const uomSection = modal.locator('div.space-y-2:has-text("Unit of Measure"):has(button[role="combobox"])').first();
+    const uomSelectTrigger = uomSection.locator('button[role="combobox"]').first();
+
+    // Select base UOM
+    await this.selectShadcnOption(uomSelectTrigger, data.base_uom);
 
     // Fill optional fields
     if (data.cost_per_unit !== undefined) {
-      await this.page.fill(
-        this.formFields.costPerUnit,
-        data.cost_per_unit.toString(),
-      );
+      const costInput = this.page.locator('input#cost_per_unit');
+      await costInput.fill(data.cost_per_unit.toString());
     }
 
-    if (data.is_perishable !== undefined) {
-      if (data.is_perishable) {
-        await this.page.check(this.formFields.isPerishable);
-        if (data.shelf_life_days !== undefined) {
-          await this.page.fill(
-            this.formFields.shelfLifeDays,
-            data.shelf_life_days.toString(),
-          );
-        }
-        if (data.expiry_policy !== undefined) {
-          const policySelect = this.page.locator('[name="expiry_policy"]').first();
-          await policySelect.click();
-          await this.page.waitForTimeout(200);
-
-          const policyOption = this.page.getByRole('option', { name: new RegExp(data.expiry_policy, 'i') }).first();
-          await policyOption.click();
-          await this.page.waitForTimeout(100);
-        }
-      }
+    // Shelf life is optional - only fill if provided
+    if (data.shelf_life_days !== undefined) {
+      const shelfLifeInput = this.page.locator('input#shelf_life_days');
+      await shelfLifeInput.fill(data.shelf_life_days.toString());
     }
   }
 
@@ -413,22 +423,39 @@ export class ProductsPage extends BasePage {
 
   /**
    * Click edit button for first product
+   * Products table doesn't have inline edit - need to go to detail page first
    */
   async clickEditFirstProduct() {
-    await this.dataTable.editRow(0);
+    // Click first row to go to detail page
+    await this.dataTable.clickRow(0);
+    await this.waitForPageLoad();
+
+    // Wait for detail page to load, then click Edit button
+    await this.page.waitForSelector('button:has-text("Edit")', {
+      state: 'visible',
+      timeout: 15000
+    });
+    await this.page.click('button:has-text("Edit")');
+
+    // Wait for edit modal to open
     await this.waitForModal();
   }
 
   /**
-   * Open edit drawer for product
+   * Open edit modal for product by row index
    */
   async clickEditProduct(rowIndex: number) {
-    await this.dataTable.editRow(rowIndex);
+    // Click row to go to detail page
+    await this.dataTable.clickRow(rowIndex);
     await this.waitForPageLoad();
+
+    // Click Edit button on detail page
+    await this.page.click('button:has-text("Edit")');
+    await this.waitForModal();
   }
 
   /**
-   * Assert edit drawer is open
+   * Assert edit modal is open (not drawer - ProductFormModal is used)
    */
   async expectEditDrawerOpen() {
     // ProductFormModal is a fixed div, so check for it
@@ -440,10 +467,11 @@ export class ProductsPage extends BasePage {
   }
 
   /**
-   * Update product field
+   * Update product field in edit modal
    */
   async updateProductField(fieldName: keyof ProductData, value: string) {
-    const field = this.page.locator(`input[name="${fieldName}"], textarea[name="${fieldName}"]`);
+    // Use id selectors which are reliable
+    const field = this.page.locator(`input#${fieldName}, textarea#${fieldName}`);
     await field.clear();
     await field.fill(value);
   }
@@ -456,11 +484,16 @@ export class ProductsPage extends BasePage {
   }
 
   /**
-   * Update product status to inactive
+   * Update product status to inactive via ShadCN Select
    */
   async setProductStatusInactive() {
-    const statusToggle = this.page.locator('input[name="status"]');
-    await statusToggle.uncheck();
+    // Status is a ShadCN Select, not a checkbox
+    // Find the Status select in the modal
+    const modal = this.page.locator('div.fixed.inset-0');
+    const statusSection = modal.locator('div.space-y-2:has-text("Status"):has(button[role="combobox"])').first();
+    const statusTrigger = statusSection.locator('button[role="combobox"]').first();
+
+    await this.selectShadcnOption(statusTrigger, 'Inactive');
   }
 
   /**
@@ -475,18 +508,19 @@ export class ProductsPage extends BasePage {
   }
 
   /**
-   * Assert product field is read-only
+   * Assert product field is read-only (disabled)
    */
   async expectFieldReadOnly(fieldName: string) {
-    const field = this.page.locator(`input[name="${fieldName}"]`);
+    const field = this.page.locator(`input#${fieldName}`);
     const isDisabled = await field.isDisabled();
     expect(isDisabled).toBe(true);
   }
 
   /**
-   * Assert code field is read-only
+   * Assert code field is read-only in edit mode
    */
   async expectCodeFieldReadOnly() {
+    // In edit mode, the code field should be disabled
     await this.expectFieldReadOnly('code');
   }
 
@@ -536,10 +570,13 @@ export class ProductsPage extends BasePage {
   }
 
   /**
-   * Click allergens tab
+   * Ensure allergens section is visible (it's a Card in the Details tab)
+   * No separate allergens tab - it's in the Details content area
    */
   async clickAllergensTab() {
-    await this.page.getByRole('tab', { name: /allergen/i }).click();
+    // Click Details tab if not already active to ensure allergens section is visible
+    const detailsTab = this.page.getByRole('tab', { name: /details/i });
+    await detailsTab.click();
     await this.waitForPageLoad();
   }
 

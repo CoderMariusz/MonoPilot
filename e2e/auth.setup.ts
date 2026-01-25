@@ -28,26 +28,28 @@ async function authenticateUser(
   // Go to login page
   await page.goto('/login');
 
-  // Wait for login form to be ready
-  await page.waitForSelector('input[name="email"], input[type="email"]', {
+  // Wait for login form to be ready - use placeholder text which is stable
+  await page.waitForSelector('input[placeholder="name@example.com"]', {
     state: 'visible',
     timeout: 10000
   });
 
-  // Fill login form
-  await page.fill('input[name="email"], input[type="email"]', email);
-  await page.fill('input[name="password"], input[type="password"]', password);
+  // Fill login form - use placeholder as selector since name may be set by react-hook-form
+  await page.fill('input[placeholder="name@example.com"]', email);
+  await page.fill('input[placeholder="Enter your password"]', password);
 
-  // Submit login
-  await page.click('button[type="submit"]');
+  // Submit login - use getByRole for better reliability
+  const submitButton = page.getByRole('button', { name: /sign in|login|submit/i });
+  await submitButton.click();
 
   // Wait for successful redirect (dashboard or any authenticated page)
+  // Increase timeout for slow auth
   await page.waitForURL(/\/(dashboard|settings|planning|production|warehouse|quality|shipping|technical)/, {
-    timeout: 15000,
+    timeout: 30000,
   });
 
-  // Verify we're logged in by checking for user menu or sidebar
-  await expect(page.locator('[data-testid="user-menu"], [data-testid="sidebar"], nav')).toBeVisible({
+  // Verify we're logged in by checking for sidebar nav or any main content
+  await expect(page.locator('nav, aside, [role="navigation"]').first()).toBeVisible({
     timeout: 5000,
   });
 

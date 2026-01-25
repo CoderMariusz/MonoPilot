@@ -13,8 +13,12 @@ export { DashboardPage } from './DashboardPage';
 export { DataTablePage } from './DataTablePage';
 export { FormPage } from './FormPage';
 
+// Technical Module
+export { ProductsPage } from './ProductsPage';
+export { BOMsPage } from './BOMsPage';
+export { TraceabilityPage } from './TraceabilityPage';
+
 // Module-specific pages can be added here:
 // export { SettingsPage } from './modules/SettingsPage';
-// export { ProductsPage } from './modules/ProductsPage';
 // export { WorkOrdersPage } from './modules/WorkOrdersPage';
 // etc.

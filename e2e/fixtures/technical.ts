@@ -18,7 +18,7 @@ export const productFixtures = {
    * Raw material product (RAW type)
    */
   rawMaterial: () => ({
-    code: `RM-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `RM-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Raw Material ${faker.commerce.productName()}`,
     description: faker.commerce.productDescription(),
     type: 'RAW',
@@ -33,7 +33,7 @@ export const productFixtures = {
    * Work in progress product (WIP type)
    */
   wipProduct: () => ({
-    code: `WIP-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `WIP-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `WIP Product ${faker.commerce.productName()}`,
     description: faker.commerce.productDescription(),
     type: 'WIP',
@@ -48,7 +48,7 @@ export const productFixtures = {
    * Finished good product (FIN type)
    */
   finishedGood: () => ({
-    code: `FIN-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `FIN-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Finished Good ${faker.commerce.productName()}`,
     description: faker.commerce.productDescription(),
     type: 'FIN',
@@ -63,7 +63,7 @@ export const productFixtures = {
    * Packaging product (PKG type)
    */
   packaging: () => ({
-    code: `PKG-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `PKG-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Packaging ${faker.commerce.productName()}`,
     description: faker.commerce.productDescription(),
     type: 'PKG',
@@ -77,7 +77,7 @@ export const productFixtures = {
    * Non-perishable product
    */
   nonPerishable: () => ({
-    code: `NP-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `NP-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Non-Perishable ${faker.commerce.productName()}`,
     description: faker.commerce.productDescription(),
     type: 'RAW',
@@ -90,7 +90,7 @@ export const productFixtures = {
    * Product with allergens
    */
   withAllergens: () => ({
-    code: `ALG-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `ALG-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Allergen Product ${faker.commerce.productName()}`,
     description: faker.commerce.productDescription(),
     type: 'RAW',
@@ -353,7 +353,7 @@ export const routingFixtures = {
    * Standard routing with 2 operations
    */
   standardRouting: () => ({
-    code: `RTG-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `RTG-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Standard Routing ${faker.commerce.productName()}`,
     description: faker.commerce.productDescription(),
     is_reusable: true,
@@ -384,7 +384,7 @@ export const routingFixtures = {
    * Non-reusable routing
    */
   nonReusableRouting: () => ({
-    code: `RTG-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `RTG-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `One-Time Routing ${faker.commerce.productName()}`,
     description: 'Non-reusable routing for single product',
     is_reusable: false,
@@ -407,7 +407,7 @@ export const routingFixtures = {
    * Simple single-operation routing
    */
   simpleRouting: () => ({
-    code: `RTG-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `RTG-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Simple Routing`,
     description: 'Single operation routing',
     is_reusable: true,
@@ -430,7 +430,7 @@ export const routingFixtures = {
    * Complex routing with parallel operations
    */
   complexRouting: () => ({
-    code: `RTG-${faker.string.alphaNumeric(6).toUpperCase()}`,
+    code: `RTG-${faker.string.alphanumeric(6).toUpperCase()}`,
     name: `Complex Routing`,
     description: 'Complex routing with parallel operations',
     is_reusable: true,

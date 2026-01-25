@@ -31,7 +31,7 @@ echo "P{N}: ✓ {agent-name} $(date +%H:%M) {metrics}" >> .claude/checkpoints/{S
 P1: ✓ ux-designer 13:15 wireframes:3 approved:yes
 
 # Tests written (RED phase):
-P2: ✓ test-writer 13:50 files:3 tests:27 status:red
+P2: ✓ unit-test-writer 13:50 files:3 tests:27 status:red
 
 # Backend implementation done:
 P3: ✓ backend-dev 14:23 files:5 tests:12/12

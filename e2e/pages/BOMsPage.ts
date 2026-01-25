@@ -390,67 +390,184 @@ export class BOMsPage extends BasePage {
   /**
    * Click "Add Item" button
    * In BOMCreateModal, this is "Add Component" button in the Components tab
-   * In BOM detail page, this might be a different button
+   * In BOM detail page, this is "Add Item" button
    */
   async clickAddItem() {
+    // First check if we're in a modal (BOMCreateModal)
     const dialog = this.page.locator('[role="dialog"]');
+    const dialogVisible = await dialog.isVisible().catch(() => false);
 
-    // If in BOMCreateModal, switch to Components tab first
-    const componentsTab = dialog.getByRole('tab', { name: /components/i });
-    if (await componentsTab.isVisible()) {
-      await componentsTab.click();
-      await this.page.waitForTimeout(200);
-    }
+    if (dialogVisible) {
+      // BOMCreateModal context
+      const componentsTab = dialog.getByRole('tab', { name: /components/i });
+      if (await componentsTab.isVisible()) {
+        await componentsTab.click();
+        await this.page.waitForTimeout(200);
+      }
 
-    // Click Add Component button
-    const addComponentBtn = this.page.locator('button').filter({ hasText: /add component/i });
-    if (await addComponentBtn.count() > 0) {
-      await addComponentBtn.click();
-      await this.page.waitForTimeout(200);
+      // Click Add Component button
+      const addComponentBtn = this.page.locator('button').filter({ hasText: /add component/i });
+      if (await addComponentBtn.count() > 0) {
+        await addComponentBtn.click();
+        await this.page.waitForTimeout(200);
+      }
     } else {
-      // Fallback to other patterns
-      await this.clickButton(/add item|new item|add ingredient|add component/i);
+      // BOM Detail page context - click the "Add Item" button
+      const addItemBtn = this.page.locator('button').filter({ hasText: /^add item$/i });
+      if (await addItemBtn.count() > 0) {
+        await addItemBtn.click();
+        await this.page.waitForTimeout(300);
+      } else {
+        // Fallback
+        await this.clickButton(/add item|new item|add ingredient|add component/i);
+      }
     }
   }
 
   /**
    * Assert item form modal open
    * In BOMCreateModal, the item form appears inline in the Components tab
+   * In BOM Detail page, it opens as a separate dialog
    */
   async expectItemFormOpen() {
-    const dialog = this.page.locator('[role="dialog"]');
-    // The item form shows "Add Component" or "Edit Component" header
-    const formHeader = dialog.getByText(/add component|edit component/i);
-    await expect(formHeader.first()).toBeVisible({ timeout: 5000 });
+    // Wait for any dialog to be visible
+    const anyDialog = this.page.locator('[role="dialog"]');
+    await expect(anyDialog).toBeVisible({ timeout: 5000 });
+
+    // Check which type of form opened
+    // BOMItemFormModal has input#operation_seq
+    const opSeqInput = anyDialog.locator('input#operation_seq');
+    const isBOMItemFormModal = await opSeqInput.isVisible().catch(() => false);
+
+    if (isBOMItemFormModal) {
+      // BOM Detail page modal - verify it has the form title
+      const formTitle = anyDialog.getByText(/add bom item|edit bom item|add|edit/i);
+      await expect(formTitle).toBeVisible({ timeout: 2000 });
+    } else {
+      // BOMCreateModal inline form - verify it has the component form header
+      const formHeader = anyDialog.getByText(/add component|edit component/i);
+      await expect(formHeader.first()).toBeVisible({ timeout: 2000 });
+    }
   }
 
   /**
    * Fill BOM item form
-   * In BOMCreateModal, the component form has:
-   * - Component selector (combobox)
+   * Handles both:
+   * 1. BOMCreateModal (inline form in Components tab) with ShadCN components
+   * 2. BOMItemFormModal (detail page dialog) with native HTML inputs
+   *
+   * Fields:
+   * - Component selector (combobox or Select)
    * - Quantity (number input)
    * - UoM (text input)
    * - Scrap % (number input)
-   * - Sequence (number input)
+   * - Operation Sequence (number input)
    * - Is Output checkbox (for by-products)
    * - Yield % (for by-products)
    */
   async fillItemForm(data: BOMItemData) {
     const dialog = this.page.locator('[role="dialog"]');
 
+    // Determine which form we're in
+    const itemModal = dialog.filter({ has: this.page.locator('input#operation_seq') });
+    const isDetailModal = await itemModal.isVisible().catch(() => false);
+
+    if (isDetailModal) {
+      // BOMItemFormModal context (detail page)
+      await this.fillBOMItemFormModal(data, itemModal);
+    } else {
+      // BOMCreateModal context (create flow)
+      await this.fillBOMCreateModalItemForm(data, dialog);
+    }
+  }
+
+  /**
+   * Fill BOMItemFormModal form (detail page context)
+   */
+  private async fillBOMItemFormModal(data: BOMItemData, modal: Locator) {
+    // Select component from Select trigger
+    const componentSelect = modal.locator('select, button[role="combobox"]').first();
+    if (await componentSelect.count() > 0) {
+      await componentSelect.click();
+      await this.page.waitForTimeout(200);
+
+      const componentOption = this.page.getByRole('option').filter({ hasText: new RegExp(data.component_id, 'i') });
+      if (await componentOption.count() > 0) {
+        await componentOption.first().click();
+      } else {
+        const firstOption = this.page.getByRole('option').first();
+        if (await firstOption.count() > 0) {
+          await firstOption.click();
+        }
+      }
+      await this.page.waitForTimeout(200);
+    }
+
+    // Fill operation_seq
+    const opSeqInput = modal.locator('input#operation_seq');
+    if (await opSeqInput.count() > 0) {
+      await opSeqInput.clear();
+      await opSeqInput.fill(data.operation_seq.toString());
+    }
+
+    // Fill quantity
+    const qtyInput = modal.locator('input#quantity');
+    if (await qtyInput.count() > 0) {
+      await qtyInput.clear();
+      await qtyInput.fill(data.quantity.toString());
+    }
+
+    // Fill UoM
+    const uomInput = modal.locator('input#uom');
+    if (await uomInput.count() > 0) {
+      await uomInput.clear();
+      await uomInput.fill(data.uom);
+    }
+
+    // Fill scrap percent if provided
+    if (data.scrap_percent !== undefined) {
+      const scrapInput = modal.locator('input#scrap_percent');
+      if (await scrapInput.count() > 0) {
+        await scrapInput.clear();
+        await scrapInput.fill(data.scrap_percent.toString());
+      }
+    }
+
+    // Check is_output checkbox for by-products
+    if (data.is_output) {
+      const isOutputCheckbox = modal.locator('input#is_output');
+      if (await isOutputCheckbox.count() > 0) {
+        const isChecked = await isOutputCheckbox.isChecked();
+        if (!isChecked) {
+          await isOutputCheckbox.check();
+        }
+      }
+    }
+
+    // Fill yield percent if provided (by-product specific)
+    if (data.yield_percent !== undefined) {
+      const yieldInput = modal.locator('input[id*="yield"]');
+      if (await yieldInput.count() > 0) {
+        await yieldInput.first().clear();
+        await yieldInput.first().fill(data.yield_percent.toString());
+      }
+    }
+  }
+
+  /**
+   * Fill BOMCreateModal item form (create flow context)
+   */
+  private async fillBOMCreateModalItemForm(data: BOMItemData, dialog: Locator) {
     // Select component from combobox
-    // The combobox shows "Select material..." as placeholder
     const componentCombobox = dialog.locator('button[role="combobox"]').filter({ hasText: /select material/i });
     if (await componentCombobox.count() > 0) {
       await componentCombobox.click();
       await this.page.waitForTimeout(200);
 
-      // Search/select the component
       const componentOption = this.page.getByRole('option').filter({ hasText: new RegExp(data.component_id, 'i') });
       if (await componentOption.count() > 0) {
         await componentOption.first().click();
       } else {
-        // Select first available option
         const firstOption = this.page.getByRole('option').first();
         if (await firstOption.count() > 0) {
           await firstOption.click();
@@ -466,7 +583,7 @@ export class BOMsPage extends BasePage {
       await qtyInput.fill(data.quantity.toString());
     }
 
-    // Fill UoM - it's a text input with placeholder "kg"
+    // Fill UoM
     const uomInput = dialog.locator('input[placeholder="kg"]');
     if (await uomInput.count() > 0) {
       await uomInput.clear();
@@ -484,7 +601,7 @@ export class BOMsPage extends BasePage {
 
     // Check is_output checkbox for by-products
     if (data.is_output) {
-      const isOutputCheckbox = dialog.locator('input[name="is_output"], input[type="checkbox"][aria-label*="output" i]');
+      const isOutputCheckbox = dialog.locator('input[name="is_output"]');
       if (await isOutputCheckbox.count() > 0) {
         const isChecked = await isOutputCheckbox.isChecked();
         if (!isChecked) {
@@ -501,9 +618,6 @@ export class BOMsPage extends BasePage {
         await yieldInputs.first().fill(data.yield_percent.toString());
       }
     }
-
-    // Operation sequence is not typically shown in the add item form for BOMCreateModal
-    // It uses sequence field which auto-increments
   }
 
   /**

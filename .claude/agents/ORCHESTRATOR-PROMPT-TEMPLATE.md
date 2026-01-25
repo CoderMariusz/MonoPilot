@@ -11,7 +11,7 @@ Epic: {{EPIC_ID}}       # e.g., 03-planning
 | Phase | Agent | Skip When | Parallel |
 |-------|-------|-----------|----------|
 | P1 | ux-designer | Backend-only | No |
-| P2 | test-writer | Never | No |
+| P2 | unit-test-writer | Never | No |
 | P3 | backend/frontend-dev | - | ✓ Both tracks |
 | P4 | senior-dev | Clean code | No |
 | P5 | code-reviewer | Never | ✓ Multi-story |

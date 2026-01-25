@@ -85,7 +85,7 @@
 
 **Status**: **100% COMPLETE** (2026-01-09)
 **Duration**: ~8 hours (6 waves)
-**Agents Used**: 32+ agents (backend-dev, frontend-dev, test-writer, code-reviewer, qa-agent, tech-writer)
+**Agents Used**: 32+ agents (backend-dev, frontend-dev, unit-test-writer, code-reviewer, qa-agent, tech-writer)
 **Stories Completed**: 20 total
 **Total Tests Created**: 1,967 tests passing
 **Migrations Applied**: 18 (migrations 091-114)

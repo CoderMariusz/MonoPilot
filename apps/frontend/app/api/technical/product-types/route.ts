@@ -91,9 +91,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Add computed is_editable field (custom types are editable, default types are not)
+    const typesWithEditable = (productTypes || []).map(type => ({
+      ...type,
+      is_editable: !type.is_default,  // Custom types are editable
+    }))
+
     return NextResponse.json({
-      types: productTypes || [],
-      total: productTypes?.length || 0
+      types: typesWithEditable,
+      total: typesWithEditable.length
     })
 
   } catch (error) {

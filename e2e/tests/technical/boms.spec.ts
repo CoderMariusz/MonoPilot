@@ -108,7 +108,6 @@ test.describe('[Feature] BOM Module', () => {
       await bomsPage.clickCreateBOM();
       await bomsPage.expectBOMFormOpen();
 
-      const timestamp = Date.now();
       const productData = productFixtures.finishedGood();
       const dates = dateFixtures.bomDateRange(0, 365);
 
@@ -120,6 +119,17 @@ test.describe('[Feature] BOM Module', () => {
         output_qty: 10,
         output_uom: 'EA',
       });
+
+      // Add minimum 1 component before verification (required for submit to work)
+      const rm = productFixtures.rawMaterial();
+      await bomsPage.clickAddItem();
+      await bomsPage.fillItemForm({
+        component_id: rm.code,
+        quantity: 5,
+        uom: 'KG',
+        operation_seq: 1,
+      });
+      await bomsPage.submitAddItem();
 
       // THEN form populated
       const productSelect = page.locator('[name="product_id"]');
@@ -142,6 +152,17 @@ test.describe('[Feature] BOM Module', () => {
         output_qty: 10,
         output_uom: 'EA',
       });
+
+      // Add minimum 1 component before submission (required for save)
+      const rm = productFixtures.rawMaterial();
+      await bomsPage.clickAddItem();
+      await bomsPage.fillItemForm({
+        component_id: rm.code,
+        quantity: 5,
+        uom: 'KG',
+        operation_seq: 1,
+      });
+      await bomsPage.submitAddItem();
 
       await bomsPage.submitCreateBOM();
 
@@ -169,6 +190,17 @@ test.describe('[Feature] BOM Module', () => {
         output_uom: 'EA',
       });
 
+      // Add minimum 1 component before verification (required for submit to work)
+      const rm = productFixtures.rawMaterial();
+      await bomsPage.clickAddItem();
+      await bomsPage.fillItemForm({
+        component_id: rm.code,
+        quantity: 5,
+        uom: 'KG',
+        operation_seq: 1,
+      });
+      await bomsPage.submitAddItem();
+
       // THEN values set
       const qtyInput = page.locator('input[name="output_qty"]');
       await expect(qtyInput).toHaveValue('100');
@@ -191,6 +223,17 @@ test.describe('[Feature] BOM Module', () => {
         output_uom: 'EA',
         production_line_ids: ['LINE-01'],
       });
+
+      // Add minimum 1 component before verification (required for submit to work)
+      const rm = productFixtures.rawMaterial();
+      await bomsPage.clickAddItem();
+      await bomsPage.fillItemForm({
+        component_id: rm.code,
+        quantity: 5,
+        uom: 'KG',
+        operation_seq: 1,
+      });
+      await bomsPage.submitAddItem();
 
       // THEN production lines can be selected
       const lineCheckbox = page.getByLabel('LINE-01');
@@ -216,6 +259,17 @@ test.describe('[Feature] BOM Module', () => {
         routing_id: 'RTG-STANDARD-001',
       });
 
+      // Add minimum 1 component before verification (required for submit to work)
+      const rm = productFixtures.rawMaterial();
+      await bomsPage.clickAddItem();
+      await bomsPage.fillItemForm({
+        component_id: rm.code,
+        quantity: 5,
+        uom: 'KG',
+        operation_seq: 1,
+      });
+      await bomsPage.submitAddItem();
+
       // THEN routing field populated
       const routingSelect = page.locator('[name="routing_id"]');
       const value = await routingSelect.inputValue();
@@ -238,6 +292,17 @@ test.describe('[Feature] BOM Module', () => {
         output_qty: 50,
         output_uom: 'EA',
       });
+
+      // Add minimum 1 component before submission (required for save)
+      const rawMaterial = productFixtures.rawMaterial();
+      await bomsPage.clickAddItem();
+      await bomsPage.fillItemForm({
+        component_id: rawMaterial.code,
+        quantity: 5,
+        uom: 'KG',
+        operation_seq: 1,
+      });
+      await bomsPage.submitAddItem();
 
       await bomsPage.submitCreateBOM();
 
@@ -567,13 +632,25 @@ test.describe('[Feature] BOM Module', () => {
         if (bomName) {
           await bomsPage.clickBOM(bomName);
 
-          // WHEN adding by-product
-          await bomsPage.clickAddByProduct();
-          await bomsPage.fillByProductForm('[byproduct-product]', 5, 'KG');
-          await bomsPage.clickButton(/add|submit/i);
+          // WHEN adding by-product using Add Item modal with is_output checkbox
+          await bomsPage.clickAddItem();
+          await bomsPage.expectItemFormOpen();
+
+          // Fill item form with is_output flag and yield_percent
+          const byProductData = {
+            component_id: productFixtures.finishedGood.id,
+            quantity: 15,
+            uom: 'KG',
+            operation_seq: 1,
+            is_output: true,
+            yield_percent: 15,
+          };
+
+          await bomsPage.fillItemForm(byProductData);
+          await bomsPage.submitAddItem();
 
           // THEN by-product added
-          await bomsPage.expectByProductInList('[byproduct-product]');
+          await bomsPage.expectByProductInList(productFixtures.finishedGood.name);
         }
       }
     });
@@ -588,10 +665,10 @@ test.describe('[Feature] BOM Module', () => {
         if (bomName) {
           await bomsPage.clickBOM(bomName);
 
-          // WHEN viewing by-products section
-          const byProductSection = page.locator('[data-testid="by-products"], .by-products-section');
+          // WHEN viewing by-products section (items marked with is_output=true)
+          const byProductSection = page.locator('[data-testid="by-products"], .by-products-section, tr:has(input[name="is_output"])');
 
-          // THEN section visible
+          // THEN section visible or by-products identifiable by is_output checkbox
           const sectionExists = await byProductSection.count();
           expect(sectionExists).toBeGreaterThanOrEqual(0);
         }

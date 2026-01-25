@@ -12,7 +12,7 @@ Mode: Hybrid (Claude Agents + GLM Implementation)
 | Phase | Agent | Method | Model | Skip When |
 |-------|-------|--------|-------|-----------|
 | P1 | ux-designer | Task tool | Claude | Backend-only |
-| P2 | test-writer | glm_wrapper.py | GLM-4.7 | Never |
+| P2 | unit-test-writer | glm_wrapper.py | GLM-4.7 | Never |
 | P3a | backend-dev (services) | glm_wrapper.py | GLM-4.7 | Frontend-only |
 | P3b | backend-dev (routes) | glm_wrapper.py | GLM-4.7 | Frontend-only |
 | P3c | frontend-dev (components) | glm_wrapper.py | GLM-4.7 | Backend-only |
@@ -45,7 +45,7 @@ Sequential ONLY:
 **Format:**
 ```yaml
 P1: ✓ ux-designer 14:23 wireframes:3
-P2: ✓ test-writer 14:45 tests:12 files:3
+P2: ✓ unit-test-writer 14:45 tests:12 files:3
 P3: ✓ backend-dev 15:20 files:5 tests:12/12
 P5: ✗ code-reviewer issues:3 decision:request_changes
 ```
@@ -65,7 +65,7 @@ P7✓ → DONE
 
 ## GLM WRAPPER COMMANDS
 
-### P2: Tests (test-writer role)
+### P2: Tests (unit-test-writer role)
 ```bash
 python -B .experiments/claude-glm-test/scripts/glm_wrapper.py \
   --task write-tests --story {STORY_ID} \

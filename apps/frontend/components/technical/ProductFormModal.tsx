@@ -124,14 +124,16 @@ export function ProductFormModal({ product, open, onClose, onSuccess }: ProductF
         const response = await fetch('/api/technical/product-types')
         if (response.ok) {
           const data = await response.json()
-          setProductTypes(data.data || [])
+          // API returns { types: [...], total: N }
+          const types = data.types || data.data || []
+          setProductTypes(types)
           // Set default product type ONLY if not in edit mode and no type selected
           // Use functional update to check CURRENT state (avoid stale closure)
-          if (!product && data.data?.length > 0) {
+          if (!product && types.length > 0) {
             setFormData(prev => {
               // Only set default if user hasn't already selected a type
               if (!prev.product_type_id) {
-                const rmType = data.data.find((t: ProductType) => t.code === 'RM')
+                const rmType = types.find((t: ProductType) => t.code === 'RM')
                 if (rmType) {
                   return { ...prev, product_type_id: rmType.id }
                 }

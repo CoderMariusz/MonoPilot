@@ -43,19 +43,19 @@
 
 | Agent | Role | Tasks | Output |
 |-------|------|-------|--------|
-| **test-writer** (infra) | Infrastructure | 1 | 9 plików (4,686 linii) |
-| **test-writer-1** | Products tests | 1 | 30 testów |
-| **test-writer-2** | Product Types + Dashboard | 2 | 20 testów |
-| **test-writer-3** | BOMs tests | 1 | 36 testów |
-| **test-writer-4** | Routings tests | 1 | 27 testów |
-| **test-writer-5** | Traceability + Costing | 2 | 30 testów |
-| **test-writer-6** | Integration tests | 1 | 12 testów |
+| **unit-test-writer** (infra) | Infrastructure | 1 | 9 plików (4,686 linii) |
+| **unit-test-writer-1** | Products tests | 1 | 30 testów |
+| **unit-test-writer-2** | Product Types + Dashboard | 2 | 20 testów |
+| **unit-test-writer-3** | BOMs tests | 1 | 36 testów |
+| **unit-test-writer-4** | Routings tests | 1 | 27 testów |
+| **unit-test-writer-5** | Traceability + Costing | 2 | 30 testów |
+| **unit-test-writer-6** | Integration tests | 1 | 12 testów |
 | **test-engineer** | Analysis #1 | 1 | Failure report |
 | **general-purpose** | Epic 02 verification | 1 | 100% confirmation |
 | **test-engineer** | Analysis #2 | 1 | Final report |
 | **code-reviewer** | Page Object fix | 1 | Stack overflow fix |
 | **frontend-dev** | Dashboard fix | 1 | Component rendering fix |
-| **test-writer** | Selector fix | 1 | Costing selector fix |
+| **unit-test-writer** | Selector fix | 1 | Costing selector fix |
 
 **Total Agentów**: 13
 **Model użyty**: Haiku (cost-effective)

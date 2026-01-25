@@ -155,12 +155,30 @@ export class ProductTypesPage extends BasePage {
    */
   async submitCreateForm() {
     const button = this.page.getByRole('button', { name: /create type|create/i });
-    await button.click();
-    // Wait for modal to close
-    const modal = this.page.locator('[role="dialog"]');
-    await expect(modal).not.toBeVisible({ timeout: 10000 });
-    // Wait for page data to reload
-    await this.page.waitForLoadState('networkidle');
+
+    // Click and wait for API response together
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/technical/product-types') &&
+          response.request().method() === 'POST',
+        { timeout: 15000 }
+      ),
+      button.click(),
+    ]);
+
+    // If successful (2xx), wait for modal to close
+    if (response.ok()) {
+      // Wait for React state update to close modal
+      await this.page.waitForTimeout(500);
+
+      // Wait for modal to close - modal closes after successful creation
+      const modal = this.page.locator('[role="dialog"]');
+      await expect(modal).not.toBeVisible({ timeout: 10000 });
+
+      // Wait for page data to reload
+      await this.page.waitForLoadState('networkidle');
+    }
   }
 
   /**
@@ -168,7 +186,18 @@ export class ProductTypesPage extends BasePage {
    */
   async submitEditForm() {
     const button = this.page.getByRole('button', { name: /save changes|save/i });
+    await expect(button).toBeVisible({ timeout: 5000 });
     await button.click();
+
+    // Wait for modal to close (either success or error keeps it open)
+    // The handleEdit function calls setEditingType(null) which closes the modal
+    await this.page.waitForTimeout(1000);
+
+    // Wait for modal to close
+    const modal = this.page.locator('[role="dialog"]');
+    await expect(modal).not.toBeVisible({ timeout: 15000 });
+
+    // Wait for page data to reload
     await this.page.waitForLoadState('networkidle');
   }
 
@@ -187,7 +216,8 @@ export class ProductTypesPage extends BasePage {
    * Find row containing product type code
    */
   private getRowByCode(code: string): Locator {
-    return this.page.locator('tbody').getByText(code).locator('..');
+    // Use filter to find the row containing the code text
+    return this.page.locator('tbody tr').filter({ hasText: code });
   }
 
   /**
@@ -195,7 +225,11 @@ export class ProductTypesPage extends BasePage {
    */
   async clickEditButton(code: string) {
     const row = this.getRowByCode(code);
+    // Wait for the row to be visible first
+    await expect(row).toBeVisible({ timeout: 10000 });
+    // The Edit button is inside the row's Actions cell
     const editBtn = row.locator('button[title="Edit"]').first();
+    await expect(editBtn).toBeVisible({ timeout: 5000 });
     await editBtn.click();
   }
 

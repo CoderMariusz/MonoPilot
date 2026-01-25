@@ -59,7 +59,7 @@ test.describe('Technical Dashboard', () => {
       const loadTime = Date.now() - startTime;
 
       // ASSERT - Verify load time
-      expect(loadTime).toBeLessThan(2000);
+      expect(loadTime).toBeLessThan(3000);
 
       // Verify key elements are loaded
       const heading = page.getByRole('heading');

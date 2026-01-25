@@ -21,7 +21,7 @@ skills:
 ║  IF user message contains trigger → DELEGATE IMMEDIATELY:                   ║
 ║                                                                              ║
 ║  CODE → backend-dev / frontend-dev / senior-dev                             ║
-║  TEST → test-engineer → test-writer                                         ║
+║  TEST → test-engineer → unit-test-writer                                         ║
 ║  QUESTION → discovery-agent                                                 ║
 ║                                                                              ║
 ║  🎯 ACTION: See trigger? → Task() IMMEDIATELY. No analysis.                 ║
@@ -38,7 +38,7 @@ skills:
 |-----------|---------|------|
 | "implement/create" + "backend/API" | `backend-dev` | code |
 | "implement/create" + "frontend/UI" | `frontend-dev` | code |
-| "test/spec" | `test-engineer` → `test-writer` | test |
+| "test/spec" | `test-engineer` → `unit-test-writer` | test |
 | "fix/debug" | `backend-dev` / `frontend-dev` | bugfix |
 | "refactor" | `senior-dev` | refactor |
 | "review" | `code-reviewer` | quality |
@@ -173,7 +173,7 @@ When starting work:
 | Agent | Phase | Purpose |
 |-------|-------|---------|
 | test-engineer | RED | Design tests |
-| test-writer | RED | Write tests |
+| unit-test-writer | RED | Write tests |
 | backend-dev | GREEN | Backend code |
 | frontend-dev | GREEN | Frontend code |
 | senior-dev | REFACTOR | Complex tasks |
@@ -270,7 +270,7 @@ ORCHESTRATOR knows skill_index from REGISTRY.yaml (~200 tokens) for routing hint
 P1: ✓ ux-designer 13:15 wireframes:3 approved:yes
 
 # Phase 2: RED (Tests)
-P2: ✓ test-writer 13:50 files:3 tests:27 status:red
+P2: ✓ unit-test-writer 13:50 files:3 tests:27 status:red
 
 # Phase 3: GREEN (Implementation - backend/frontend/fullstack)
 P3: ✓ backend-dev 14:23 files:5 tests:12/12
@@ -300,7 +300,7 @@ cat .claude/checkpoints/03.4.yaml
 
 # Determine next action
 if [ latest = "P1✓" ]; then
-  → test-writer (P2)
+  → unit-test-writer (P2)
 elif [ latest = "P2✓" ]; then
   → backend-dev/frontend-dev (P3) # based on story type
 elif [ latest = "P3✓" ]; then
@@ -320,9 +320,9 @@ fi
 
 | Phase | Agent | Next Action | Block Condition |
 |-------|-------|-------------|-----------------|
-| P1✓ | ux-designer | → test-writer (P2) | approved≠yes |
-| P1 skip | - | → test-writer (P2) | No UX needed (backend-only) |
-| P2✓ | test-writer | → dev (P3) | status≠red |
+| P1✓ | ux-designer | → unit-test-writer (P2) | approved≠yes |
+| P1 skip | - | → unit-test-writer (P2) | No UX needed (backend-only) |
+| P2✓ | unit-test-writer | → dev (P3) | status≠red |
 | P3✓ | backend/frontend-dev | → senior-dev (P4) | tests≠X/X |
 | P4✓ | senior-dev | → code-reviewer (P5) | - |
 | P4 skip | - | → code-reviewer (P5) | No refactor needed |

@@ -24,6 +24,16 @@ import { ProductTypesPage } from '../../pages/ProductTypesPage';
 const ROUTE = '/settings/product-types';
 const SYSTEM_TYPES = ['RM', 'WIP', 'FG', 'PKG'];
 
+/**
+ * Generate random uppercase letters for type codes
+ * (validation requires uppercase letters only, no numbers)
+ */
+const generateRandomCode = (prefix: string, length: number = 3): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const randomPart = Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return `${prefix}${randomPart}`;
+};
+
 test.describe('Product Types Module', () => {
   let productTypesPage: ProductTypesPage;
 
@@ -113,11 +123,10 @@ test.describe('Product Types Module', () => {
       // ARRANGE - Open create modal
       await productTypesPage.clickAddButton();
 
-      // Generate unique type code and name (using full timestamp for uniqueness)
-      const timestamp = Date.now().toString();
+      // Generate unique type code (letters only) and name
       const typeData = {
-        code: `CUS${timestamp.slice(-5)}`,
-        name: `Custom Type ${timestamp.slice(-6)}`,
+        code: generateRandomCode('CUS'),  // e.g., CUSABC (letters only)
+        name: `Custom Type ${Date.now()}`,
       };
 
       // ACT - Fill form
@@ -137,14 +146,13 @@ test.describe('Product Types Module', () => {
 
     test('[TC-TYPE-005] Prevents duplicate codes', async ({ page }) => {
       // ARRANGE - Create first product type
-      const timestamp = Date.now().toString();
-      const duplicateCode = `DUP${timestamp.slice(-5)}`;
+      const duplicateCode = generateRandomCode('DUP');
 
       // Create first type
       await productTypesPage.clickAddButton();
       await productTypesPage.fillProductTypeForm({
         code: duplicateCode,
-        name: `Duplicate Test ${timestamp.slice(-6)}`,
+        name: `Duplicate Test ${Date.now()}`,
       });
       await productTypesPage.submitCreateForm();
 
@@ -156,7 +164,7 @@ test.describe('Product Types Module', () => {
       await productTypesPage.clickAddButton();
       await productTypesPage.fillProductTypeForm({
         code: duplicateCode,
-        name: `Another Name ${timestamp.slice(-6)}`,
+        name: `Another Name ${Date.now()}`,
       });
 
       // Submit and expect error (modal stays open)
@@ -164,9 +172,10 @@ test.describe('Product Types Module', () => {
       await button.click();
       await page.waitForLoadState('networkidle');
 
-      // ASSERT - Verify error message
-      const errorMessage = page.locator(
-        'text=/must be unique|already exists|duplicate|code already in use|already/i',
+      // ASSERT - Verify error message (look in modal only, not table)
+      const modal = page.locator('[role="dialog"]');
+      const errorMessage = modal.locator(
+        'text=/already exists|code already|This code already/i',
       );
       await expect(errorMessage).toBeVisible({ timeout: 5000 });
 
@@ -178,14 +187,13 @@ test.describe('Product Types Module', () => {
   test.describe('2.3 Edit Product Type', () => {
     test('[TC-TYPE-006] Updates name and is_default flag', async ({ page }) => {
       // ARRANGE - Create custom type
-      const timestamp = Date.now().toString();
-      const typeCode = `EDT${timestamp.slice(-5)}`;
+      const typeCode = generateRandomCode('EDT');
 
       // Create custom type first
       await productTypesPage.clickAddButton();
       await productTypesPage.fillProductTypeForm({
         code: typeCode,
-        name: `Test Type ${timestamp.slice(-6)}`,
+        name: `Test Type ${Date.now()}`,
       });
       await productTypesPage.submitCreateForm();
       await productTypesPage.expectSuccessMessage();
@@ -195,7 +203,7 @@ test.describe('Product Types Module', () => {
       await productTypesPage.expectEditModalOpen();
 
       // Update name
-      const updatedName = `Updated Type ${timestamp.slice(-6)}`;
+      const updatedName = `Updated Type ${Date.now()}`;
       const nameInput = page.locator('input[id="edit-name"]');
       await nameInput.clear();
       await nameInput.fill(updatedName);

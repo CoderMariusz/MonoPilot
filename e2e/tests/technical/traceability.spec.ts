@@ -15,55 +15,45 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { TraceabilityPage } from '../../pages/TraceabilityPage';
 
 test.describe('[Technical Module] Traceability', () => {
+  let traceabilityPage: TraceabilityPage;
+
+  test.beforeEach(async ({ page }) => {
+    traceabilityPage = new TraceabilityPage(page);
+  });
+
   // ==================== SEARCH PAGE ====================
 
   test.describe('Traceability Search Page', () => {
     test('[TC-TRC-001] Displays search interface', async ({ page }) => {
       // GIVEN user navigates to traceability page
-      await page.goto('/technical/traceability');
+      await traceabilityPage.goto();
 
       // WHEN page loads
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.waitForPageLoad();
 
       // THEN search interface is visible
-      await expect(
-        page.getByRole('heading', { name: /traceability/i })
-      ).toBeVisible();
+      await traceabilityPage.expectPageHeader();
 
       // AND search input field is visible
-      const searchInput = page.locator('input[name="lot_number"], [placeholder*="lot" i]');
-      await expect(searchInput).toBeVisible();
+      await traceabilityPage.expectLpIdInput();
 
       // AND search button is visible
-      await expect(page.getByRole('button', { name: /search|submit/i })).toBeVisible();
+      await traceabilityPage.expectSearchButton();
     });
 
     test('[TC-TRC-002] Has all action buttons (Forward, Backward, Genealogy, Recall)', async ({
       page,
     }) => {
       // GIVEN user on traceability page
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
       // WHEN page fully loaded
       // THEN all action buttons are visible
-      const forwardButton = page.getByRole('button', {
-        name: /forward.*trace|forward\s+traceability/i,
-      });
-      await expect(forwardButton).toBeVisible();
-
-      const backwardButton = page.getByRole('button', {
-        name: /backward.*trace|backward\s+traceability/i,
-      });
-      await expect(backwardButton).toBeVisible();
-
-      const genealogyButton = page.getByRole('button', { name: /genealogy/i });
-      await expect(genealogyButton).toBeVisible();
-
-      const recallButton = page.getByRole('button', { name: /recall.*simulation|recall/i });
-      await expect(recallButton).toBeVisible();
+      await traceabilityPage.expectAllModeButtons();
     });
   });
 
@@ -74,93 +64,88 @@ test.describe('[Technical Module] Traceability', () => {
       page,
     }) => {
       // GIVEN user navigates to traceability page
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
-      // WHEN entering a lot number in search field
+      // WHEN selecting forward trace mode
+      await traceabilityPage.selectForwardTrace();
+
+      // AND entering a lot number in search field
       const lotNumber = 'LP-TEST-001';
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill(lotNumber);
+      await traceabilityPage.fillLpId(lotNumber);
 
-      // AND clicks Forward Trace button
-      await page.getByRole('button', { name: /forward.*trace|forward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      // AND clicks search button
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN downstream lots section is visible
-      const downstreamSection = page.getByText(/downstream|forward\s+trace|where.*consumed/i);
-      await expect(downstreamSection).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN downstream lots section is visible OR no results message
+      try {
+        await traceabilityPage.expectForwardTraceResults();
+      } catch {
         // If no results, that's OK for test data purposes
-      });
-
-      // AND results show lot relationships
-      const resultsContainer = page.locator('[data-testid="forward-trace-results"], .results, main');
-      await expect(resultsContainer).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Results may be empty in test environment
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-004] Shows work orders where lot was consumed', async ({ page }) => {
-      // GIVEN traceability page with forward trace results
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      // GIVEN traceability page with forward trace mode
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectForwardTrace();
 
       // WHEN performing forward trace
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-001');
-      await page.getByRole('button', { name: /forward.*trace|forward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-001');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN work order column/section is visible
-      const woSection = page.getByText(/work order|wo-|wo\s+id/i);
-      await expect(woSection).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Empty result is acceptable
-      });
+      // THEN work order reference is visible OR no results
+      try {
+        await traceabilityPage.expectWorkOrderReference();
+      } catch {
+        // Empty result is acceptable for test environment
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-005] Shows quantities and dates of consumption', async ({ page }) => {
       // GIVEN forward trace results displayed
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectForwardTrace();
 
       // WHEN forward trace is executed
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-002');
-      await page.getByRole('button', { name: /forward.*trace|forward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-002');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN quantity information is displayed
-      const quantityInfo = page.getByText(/quantity|qty|consumed|kg|lb/i);
-      await expect(quantityInfo).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN quantity information is displayed OR no results
+      try {
+        await traceabilityPage.expectQuantityInfo();
+        await traceabilityPage.expectDateInfo();
+      } catch {
         // Empty result is acceptable
-      });
-
-      // AND date information is displayed
-      const dateInfo = page.getByText(/date|consumed on|consumed at/i);
-      await expect(dateInfo).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Empty result is acceptable
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-006] Shows end-product lots produced', async ({ page }) => {
       // GIVEN forward trace query
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectForwardTrace();
 
       // WHEN executing forward trace
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-003');
-      await page.getByRole('button', { name: /forward.*trace|forward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-003');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN finished lot section is visible
-      const finishedLotsSection = page.getByText(
-        /finished product|end product|produced|output lot/i
-      );
-      await expect(finishedLotsSection).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN finished lot section is visible OR no results
+      try {
+        await traceabilityPage.expectResultsVisible();
+      } catch {
         // Empty result is acceptable
-      });
-
-      // AND lot identifiers shown
-      const lotIdentifiers = page.getByText(/lp-|lot number/i);
-      await expect(lotIdentifiers).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Empty result is acceptable
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
   });
 
@@ -171,72 +156,84 @@ test.describe('[Technical Module] Traceability', () => {
       page,
     }) => {
       // GIVEN user on traceability page
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
       // WHEN entering finished product lot
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-FIN-001');
+      await traceabilityPage.selectBackwardTrace();
+      await traceabilityPage.fillLpId('LP-FIN-001');
 
       // AND clicks Backward Trace button
-      await page.getByRole('button', { name: /backward.*trace|backward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN upstream lots section visible
-      const upstreamSection = page.getByText(/upstream|backward|ingredient|raw material/i);
-      await expect(upstreamSection).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN upstream lots section visible OR no results
+      try {
+        await traceabilityPage.expectBackwardTraceResults();
+      } catch {
         // Empty result is acceptable
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-008] Shows ingredient lots consumed', async ({ page }) => {
       // GIVEN backward trace initiated
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectBackwardTrace();
 
       // WHEN tracing back
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-FIN-002');
-      await page.getByRole('button', { name: /backward.*trace|backward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-FIN-002');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN ingredient list visible
-      const ingredientInfo = page.getByText(/ingredient|component|raw material/i);
-      await expect(ingredientInfo).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN ingredient list visible OR no results
+      try {
+        await traceabilityPage.expectBackwardTraceResults();
+      } catch {
         // Empty result is acceptable
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-009] Shows work order link', async ({ page }) => {
       // GIVEN backward trace results
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectBackwardTrace();
 
       // WHEN backward trace executed
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-FIN-003');
-      await page.getByRole('button', { name: /backward.*trace|backward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-FIN-003');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN work order reference visible
-      const woReference = page.getByText(/work order|wo-/i);
-      await expect(woReference).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN work order reference visible OR no results
+      try {
+        await traceabilityPage.expectWorkOrderReference();
+      } catch {
         // Empty result is acceptable
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-010] Traces back to raw materials', async ({ page }) => {
       // GIVEN backward trace from finished product
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectBackwardTrace();
 
       // WHEN clicking through genealogy
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-FIN-004');
-      await page.getByRole('button', { name: /backward.*trace|backward\s+traceability/i }).click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-FIN-004');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN raw material level visible
-      const rawMaterialInfo = page.getByText(/raw material|rm-|ingredient/i);
-      await expect(rawMaterialInfo).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN raw material level visible OR no results
+      try {
+        await traceabilityPage.expectResultsVisible();
+      } catch {
         // Empty result is acceptable
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
   });
 
@@ -245,72 +242,64 @@ test.describe('[Technical Module] Traceability', () => {
   test.describe('Genealogy Tree', () => {
     test('[TC-TRC-011] Displays interactive tree view (FR-2.63)', async ({ page }) => {
       // GIVEN traceability page
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
-      // WHEN clicking on Genealogy button
-      const genealogyButton = page.getByRole('button', { name: /genealogy/i });
-      await genealogyButton.click();
-      await page.waitForLoadState('networkidle');
+      // WHEN performing a trace and selecting tree view
+      await traceabilityPage.selectForwardTrace();
+      await traceabilityPage.fillLpId('LP-TEST-001');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN tree view is displayed
-      const treeView = page.locator('[data-testid="genealogy-tree"], .tree-view, [role="tree"]');
-      await expect(treeView).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Alternative: tree may be shown elsewhere
-      });
+      // AND selecting tree view mode
+      await traceabilityPage.selectTreeView();
 
-      // AND tree contains nodes
-      const nodes = page.locator('[role="treeitem"], .tree-node');
-      const nodeCount = await nodes.count();
-      expect(nodeCount).toBeGreaterThanOrEqual(0); // May be empty in test data
+      // THEN tree view is displayed OR results card is shown
+      try {
+        await traceabilityPage.expectTreeView();
+      } catch {
+        // Tree may not be available if no results - check for results card instead
+        await traceabilityPage.expectResultsVisible();
+      }
     });
 
     test('[TC-TRC-012] Shows parent-child relationships', async ({ page }) => {
       // GIVEN genealogy tree view
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
       // WHEN genealogy view loaded
-      const genealogyButton = page.getByRole('button', { name: /genealogy/i });
-      await genealogyButton.click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.selectForwardTrace();
+      await traceabilityPage.fillLpId('LP-TEST-001');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
+      await traceabilityPage.selectTreeView();
 
-      // THEN relationship indicators visible
-      const relationshipMarkers = page.locator('[data-relationship], .parent-child, .connection, .line');
-      const markerCount = await relationshipMarkers.count();
-      // May be 0 if no data
-      expect(markerCount).toBeGreaterThanOrEqual(0);
+      // THEN tree nodes are present (may be 0 if no data)
+      const nodeCount = await traceabilityPage.getTreeNodeCount();
+      expect(nodeCount).toBeGreaterThanOrEqual(0);
     });
 
     test('[TC-TRC-013] Expandable/collapsible nodes', async ({ page }) => {
       // GIVEN genealogy tree displayed
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
-      // WHEN genealogy opened
-      const genealogyButton = page.getByRole('button', { name: /genealogy/i });
-      await genealogyButton.click();
-      await page.waitForLoadState('networkidle');
+      // WHEN performing trace with tree view
+      await traceabilityPage.selectForwardTrace();
+      await traceabilityPage.fillLpId('LP-TEST-001');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
+      await traceabilityPage.selectTreeView();
 
-      // THEN expand/collapse buttons visible (if tree has expandable nodes)
-      const expandButtons = page.locator('[aria-expanded], .expand-btn, button[data-toggle]');
-      const expandCount = await expandButtons.count();
-
-      if (expandCount > 0) {
-        // If expandable nodes exist, test expanding first one
-        const firstButton = expandButtons.first();
-        const isClosed = await firstButton.getAttribute('aria-expanded').then((v) => v === 'false');
-
-        if (isClosed) {
-          await firstButton.click();
-          await page.waitForTimeout(300); // Wait for animation
-
-          // Verify children are now visible
-          const childNodes = page.locator('[role="treeitem"]');
-          const childCount = await childNodes.count();
-          expect(childCount).toBeGreaterThan(0);
-        }
+      // THEN expand/collapse functionality works (if nodes exist)
+      const nodeCount = await traceabilityPage.getTreeNodeCount();
+      if (nodeCount > 0) {
+        // Test keyboard navigation in tree
+        await traceabilityPage.navigateTreeWithKeyboard('down');
+        await traceabilityPage.navigateTreeWithKeyboard('right'); // Expand
       }
+      // Test passes if no error is thrown - may have no expandable nodes in test data
     });
   });
 
@@ -319,107 +308,85 @@ test.describe('[Technical Module] Traceability', () => {
   test.describe('Recall Simulation', () => {
     test('[TC-TRC-014] Displays all affected downstream lots (FR-2.62)', async ({ page }) => {
       // GIVEN traceability page
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
-      // WHEN entering raw material lot
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-RAW-001');
+      // WHEN selecting recall simulation mode
+      await traceabilityPage.selectRecallSimulation();
 
-      // AND clicks Recall Simulation button
-      const recallButton = page.getByRole('button', { name: /recall.*simulation|recall/i });
-      await recallButton.click();
-      await page.waitForLoadState('networkidle');
+      // AND entering raw material lot
+      await traceabilityPage.fillLpId('LP-RAW-001');
 
-      // THEN affected lots section visible
-      const affectedLotsSection = page.getByText(/affected|impact|downstream|recall|quantity/i);
-      await expect(affectedLotsSection).toBeVisible({ timeout: 5000 }).catch(() => {
+      // AND clicks search button
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
+
+      // THEN affected lots section visible OR no results
+      try {
+        await traceabilityPage.expectAffectedInventorySection();
+      } catch {
         // Empty result is acceptable
-      });
-
-      // AND affected count displayed
-      const countInfo = page.getByText(/\d+\s+(?:affected|impacted|involved|total)/i);
-      await expect(countInfo).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Alternative format
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-015] Shows affected products and customers', async ({ page }) => {
-      // GIVEN recall simulation results
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      // GIVEN recall simulation mode
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectRecallSimulation();
 
       // WHEN recall simulation executed
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-RAW-002');
-      const recallButton = page.getByRole('button', { name: /recall.*simulation|recall/i });
-      await recallButton.click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-RAW-002');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN product names visible
-      const productInfo = page.getByText(/product|sku|code/i);
-      await expect(productInfo).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN customer impact section visible OR no results
+      try {
+        await traceabilityPage.expectCustomerImpactSection();
+      } catch {
         // Empty result is acceptable
-      });
-
-      // AND customer information visible
-      const customerInfo = page.getByText(/customer|shipped to|sold to|recipient/i);
-      await expect(customerInfo).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Empty result is acceptable
-      });
+        await traceabilityPage.expectNoResults();
+      }
     });
 
     test('[TC-TRC-016] Calculates total quantity affected', async ({ page }) => {
       // GIVEN recall simulation
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectRecallSimulation();
 
       // WHEN recall simulation executed
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-RAW-003');
-      const recallButton = page.getByRole('button', { name: /recall.*simulation|recall/i });
-      await recallButton.click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-RAW-003');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN total quantity displayed
-      const quantityInfo = page.getByText(/total.*quantity|total.*kg|total.*units|sum|aggregate/i);
-      await expect(quantityInfo).toBeVisible({ timeout: 5000 }).catch(() => {
+      // THEN total quantity displayed OR no results
+      try {
+        await traceabilityPage.expectTotalQuantity();
+      } catch {
         // Empty result is acceptable
-      });
-
-      // AND quantity has numeric value
-      const quantityMatch = await page
-        .getByText(/\d+\s*(?:kg|lb|units|ea|l)/, { exact: false })
-        .first()
-        .textContent()
-        .catch(() => null);
-
-      if (quantityMatch) {
-        expect(quantityMatch).toMatch(/\d+/);
+        await traceabilityPage.expectNoResults();
       }
     });
 
     test('[TC-TRC-017] Export recall report to CSV', async ({ page }) => {
       // GIVEN recall simulation completed
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectRecallSimulation();
 
       // WHEN recall simulation executed
-      await page.locator('input[name="lot_number"], [placeholder*="lot" i]').fill('LP-RAW-004');
-      const recallButton = page.getByRole('button', { name: /recall.*simulation|recall/i });
-      await recallButton.click();
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.fillLpId('LP-RAW-004');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      // THEN export button visible
-      const exportButton = page.getByRole('button', {
-        name: /export|download|csv|pdf|report/i,
-      });
-      const isExportVisible = await exportButton.isVisible().catch(() => false);
-
-      if (isExportVisible) {
-        // Click export
-        await exportButton.click();
-        await page.waitForTimeout(500);
-
-        // Verify download started (file download may occur)
-        // In Playwright, downloads are handled separately
+      // THEN export button visible (if results exist)
+      try {
+        await traceabilityPage.expectExportButton();
+      } catch {
+        // Export button may not appear if no results
+        await traceabilityPage.expectNoResults();
       }
     });
   });
@@ -429,39 +396,93 @@ test.describe('[Technical Module] Traceability', () => {
   test.describe('Traceability Matrix', () => {
     test('[TC-TRC-018] Generates traceability matrix report (FR-2.65)', async ({ page }) => {
       // GIVEN traceability page
-      await page.goto('/technical/traceability');
-      await page.waitForLoadState('networkidle');
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
 
-      // WHEN looking for matrix view/generation
-      // Try to find matrix button or tab
-      const matrixButton = page.getByRole('button', { name: /matrix|report|table/i });
-      const matrixTab = page.getByRole('tab', { name: /matrix|report/i });
+      // WHEN performing trace and selecting matrix view
+      await traceabilityPage.selectForwardTrace();
+      await traceabilityPage.fillLpId('LP-TEST-001');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
 
-      let matrixVisible = false;
+      // AND selecting matrix view
+      await traceabilityPage.selectMatrixView();
 
-      if (await matrixButton.isVisible().catch(() => false)) {
-        await matrixButton.click();
-        await page.waitForLoadState('networkidle');
-        matrixVisible = true;
-      } else if (await matrixTab.isVisible().catch(() => false)) {
-        await matrixTab.click();
-        await page.waitForLoadState('networkidle');
-        matrixVisible = true;
-      }
-
-      if (matrixVisible) {
-        // THEN matrix table is visible
-        const matrixTable = page.locator('table, [role="grid"], .matrix-table');
-        await expect(matrixTable).toBeVisible({ timeout: 5000 }).catch(() => {
-          // Matrix may not have data
-        });
-
-        // AND has rows and columns
-        const rows = page.locator('table tbody tr, [role="row"]');
-        const rowCount = await rows.count();
-        // May be 0 if no traceability data
+      // THEN matrix table is visible OR results are shown
+      try {
+        await traceabilityPage.expectMatrixTable();
+        const rowCount = await traceabilityPage.getMatrixRowCount();
         expect(rowCount).toBeGreaterThanOrEqual(0);
+      } catch {
+        // Matrix may not have data - check for results card
+        await traceabilityPage.expectResultsVisible();
       }
+    });
+  });
+
+  // ==================== ADDITIONAL TESTS ====================
+
+  test.describe('Additional Traceability Tests', () => {
+    test('[TC-TRC-019] Search by batch number works', async ({ page }) => {
+      // GIVEN traceability page
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+
+      // WHEN searching by batch number
+      await traceabilityPage.selectForwardTrace();
+      await traceabilityPage.fillBatchNumber('BATCH-2024-001');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
+
+      // THEN results are shown OR no results message
+      try {
+        await traceabilityPage.expectResultsVisible();
+      } catch {
+        await traceabilityPage.expectNoResults();
+      }
+    });
+
+    test('[TC-TRC-020] Search is disabled without input', async ({ page }) => {
+      // GIVEN traceability page with empty inputs
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.clearSearchInputs();
+
+      // THEN search button is disabled
+      await traceabilityPage.expectSearchDisabled();
+    });
+
+    test('[TC-TRC-021] Mode switching clears previous results', async ({ page }) => {
+      // GIVEN traceability page with a trace completed
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectForwardTrace();
+      await traceabilityPage.fillLpId('LP-TEST-001');
+      await traceabilityPage.clickSearch();
+      await traceabilityPage.waitForSearchComplete();
+
+      // WHEN switching to backward trace
+      await traceabilityPage.selectBackwardTrace();
+
+      // THEN previous results are cleared - page is ready for new search
+      // Search interface should be visible
+      await traceabilityPage.expectSearchInterface();
+    });
+
+    test('[TC-TRC-022] Keyboard navigation - Enter to search', async ({ page }) => {
+      // GIVEN traceability page with LP ID filled
+      await traceabilityPage.goto();
+      await traceabilityPage.waitForPageLoad();
+      await traceabilityPage.selectForwardTrace();
+      await traceabilityPage.fillLpId('LP-TEST-001');
+
+      // WHEN pressing Enter
+      await traceabilityPage.pressEnterToSearch();
+
+      // THEN search is executed
+      await traceabilityPage.waitForSearchComplete();
+      // Page should have either results or no results message
+      await traceabilityPage.expectSearchInterface();
     });
   });
 });

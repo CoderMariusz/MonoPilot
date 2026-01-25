@@ -46,7 +46,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     // Fetch product type
     const { data, error } = await supabase
-      .from('product_type_config')
+      .from('product_types')
       .select('*')
       .eq('id', id)
       .eq('org_id', orgId)
@@ -108,7 +108,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     // Check if product type exists and is not default
     const { data: existing } = await supabase
-      .from('product_type_config')
+      .from('product_types')
       .select('id, is_default')
       .eq('id', id)
       .eq('org_id', orgId)
@@ -130,7 +130,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     // Update product type
     const { data, error } = await supabase
-      .from('product_type_config')
+      .from('product_types')
       .update({
         ...validated,
         updated_by: session.user.id
@@ -200,7 +200,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
     // Check if product type exists and is not default
     const { data: existing } = await supabase
-      .from('product_type_config')
+      .from('product_types')
       .select('id, code, is_default')
       .eq('id', id)
       .eq('org_id', orgId)
@@ -234,7 +234,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     if (productCount && productCount > 0) {
       // Soft delete by deactivating
       const { error: updateError } = await supabase
-        .from('product_type_config')
+        .from('product_types')
         .update({ is_active: false, updated_by: session.user.id })
         .eq('id', id)
         .eq('org_id', orgId)
@@ -255,7 +255,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
     // Hard delete if no products use it
     const { error: deleteError } = await supabase
-      .from('product_type_config')
+      .from('product_types')
       .delete()
       .eq('id', id)
       .eq('org_id', orgId)

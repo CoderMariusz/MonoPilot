@@ -10,7 +10,7 @@ Lightweight, append-only progress tracking for multi-agent workflows.
 # .claude/checkpoints/{STORY_ID}.yaml
 
 P1: ✓ ux-designer 12:45 wireframes:2 approved:yes
-P2: ✓ test-writer 13:50 files:3 tests:27 status:red
+P2: ✓ unit-test-writer 13:50 files:3 tests:27 status:red
 P3: ✓ backend-dev 14:23 files:5 tests:12/12
 P3: ✓ frontend-dev 14:38 files:8 tests:15/15
 P4: ✓ senior-dev 14:52 refactored:2 complexity:reduced
@@ -22,7 +22,7 @@ P7: ✓ tech-writer 15:45 report:done docs:updated
 ## Phase Numbers (7-Phase Flow)
 
 - **P1**: UX Design (ux-designer) - _Optional, skip for backend-only_
-- **P2**: RED phase (test-writer) - Write failing tests
+- **P2**: RED phase (unit-test-writer) - Write failing tests
 - **P3**: GREEN phase (backend-dev, frontend-dev, or both) - Implementation
 - **P4**: REFACTOR phase (senior-dev) - _Optional, skip if not needed_
 - **P5**: REVIEW phase (code-reviewer) - Code review
@@ -62,7 +62,7 @@ P7: ✓ tech-writer 15:45 report:done docs:updated
 
 All agents EXCEPT orchestrator:
 - **ux-designer** → P1 (if needed)
-- **test-writer** → P2
+- **unit-test-writer** → P2
 - **backend-dev** → P3
 - **frontend-dev** → P3
 - **senior-dev** → P4 (if needed)
@@ -86,14 +86,14 @@ $ ls .claude/checkpoints/
 
 $ cat .claude/checkpoints/03.5a.yaml
 P1: ✓ ux-designer 09:30 wireframes:4 approved:yes
-P2: ✓ test-writer 10:15 files:4 tests:32 status:red
+P2: ✓ unit-test-writer 10:15 files:4 tests:32 status:red
 P3: ✓ backend-dev 11:30 files:6 tests:18/18
 P3: ✓ frontend-dev 11:55 files:9 tests:14/14
 # Next: P4 (senior-dev for refactor)
 
 $ cat .claude/checkpoints/03.7.yaml
 # P1 skipped - backend-only story
-P2: ✓ test-writer 14:10 files:2 tests:15 status:red
+P2: ✓ unit-test-writer 14:10 files:2 tests:15 status:red
 P3: ✓ backend-dev 14:45 files:4 tests:15/15
 # Next: P4 (senior-dev) or skip to P5 if no refactor needed
 ```
@@ -128,9 +128,9 @@ P5: ✓ code-reviewer 15:50 issues:0 decision:approved
 |--------|---------|---------|
 | `wireframes:N` | ux-designer | `wireframes:3` |
 | `approved:yes/no` | ux-designer | `approved:yes` |
-| `files:N` | test-writer, devs | `files:5` |
+| `files:N` | unit-test-writer, devs | `files:5` |
 | `tests:X/Y` | devs | `tests:12/12` |
-| `status:red` | test-writer | `status:red` |
+| `status:red` | unit-test-writer | `status:red` |
 | `refactored:N` | senior-dev | `refactored:2` |
 | `complexity:reduced/same` | senior-dev | `complexity:reduced` |
 | `issues:N` | code-reviewer | `issues:0` |

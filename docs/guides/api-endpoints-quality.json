@@ -1,0 +1,285 @@
+{
+  "metadata": {
+    "api_dir": "apps/frontend/app/api/quality",
+    "total_files": 46,
+    "generated_at": "2026-01-24T21:00:29Z"
+  },
+  "endpoints": [
+    {
+      "path": "/api/quality/holds/[id]/release",
+      "methods": ["PATCH"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/holds/[id]/release/route.ts"
+    },
+    {
+      "path": "/api/quality/holds/[id]",
+      "methods": ["DELETE", "GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/holds/[id]/route.ts"
+    },
+    {
+      "path": "/api/quality/holds/active",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/holds/active/route.ts"
+    },
+    {
+      "path": "/api/quality/holds",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/holds/route.ts"
+    },
+    {
+      "path": "/api/quality/holds/stats",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/holds/stats/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/[id]/assign",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/[id]/assign/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/[id]/cancel",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/[id]/cancel/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/[id]/complete",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/[id]/complete/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/[id]",
+      "methods": ["DELETE", "GET", "PUT"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/[id]/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/[id]/start",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/[id]/start/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/incoming",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/incoming/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/in-process",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/in-process/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/operation/[operationId]",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/operation/[operationId]/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/pending",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/pending/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/route.ts"
+    },
+    {
+      "path": "/api/quality/inspections/wo/[woId]",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/inspections/wo/[woId]/route.ts"
+    },
+    {
+      "path": "/api/quality/iso-2859-reference",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/iso-2859-reference/route.ts"
+    },
+    {
+      "path": "/api/quality/ncrs/[id]/assign",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/ncrs/[id]/assign/route.ts"
+    },
+    {
+      "path": "/api/quality/ncrs/[id]/close",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/ncrs/[id]/close/route.ts"
+    },
+    {
+      "path": "/api/quality/ncrs/[id]",
+      "methods": ["DELETE", "GET", "PUT"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/ncrs/[id]/route.ts"
+    },
+    {
+      "path": "/api/quality/ncrs/[id]/submit",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/ncrs/[id]/submit/route.ts"
+    },
+    {
+      "path": "/api/quality/ncrs",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/ncrs/route.ts"
+    },
+    {
+      "path": "/api/quality/sampling-plans/[id]",
+      "methods": ["DELETE", "GET", "PUT"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/sampling-plans/[id]/route.ts"
+    },
+    {
+      "path": "/api/quality/sampling-plans",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/sampling-plans/route.ts"
+    },
+    {
+      "path": "/api/quality/sampling-records/inspection/[inspectionId]",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/sampling-records/inspection/[inspectionId]/route.ts"
+    },
+    {
+      "path": "/api/quality/sampling-records",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/sampling-records/route.ts"
+    },
+    {
+      "path": "/api/quality/settings",
+      "methods": ["GET", "PUT"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/settings/route.ts"
+    },
+    {
+      "path": "rove",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/[id]/approve/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/[id]/clone",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/[id]/clone/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/[id]/complete-review",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/[id]/complete-review/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/[id]/parameters/[parameterId]",
+      "methods": ["DELETE", "PUT"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/[id]/parameters/[parameterId]/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/[id]/parameters/reorder",
+      "methods": ["PATCH"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/[id]/parameters/reorder/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/[id]/parameters",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/[id]/parameters/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/[id]",
+      "methods": ["DELETE", "GET", "PUT"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/[id]/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/product/[productId]/active",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/product/[productId]/active/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications/product/[productId]",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/product/[productId]/route.ts"
+    },
+    {
+      "path": "/api/quality/specifications",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/specifications/route.ts"
+    },
+    {
+      "path": "/api/quality/status/change",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/status/change/route.ts"
+    },
+    {
+      "path": "/api/quality/status/history/[entityType]/[entityId]",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/status/history/[entityType]/[entityId]/route.ts"
+    },
+    {
+      "path": "/api/quality/status/transitions",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/status/transitions/route.ts"
+    },
+    {
+      "path": "/api/quality/status/types",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/status/types/route.ts"
+    },
+    {
+      "path": "/api/quality/status/validate-transition",
+      "methods": ["POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/status/validate-transition/route.ts"
+    },
+    {
+      "path": "/api/quality/test-results/[id]",
+      "methods": ["DELETE", "PUT"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/test-results/[id]/route.ts"
+    },
+    {
+      "path": "/api/quality/test-results/inspection/[id]",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/test-results/inspection/[id]/route.ts"
+    },
+    {
+      "path": "/api/quality/test-results/inspection/[id]/summary",
+      "methods": ["GET"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/test-results/inspection/[id]/summary/route.ts"
+    },
+    {
+      "path": "/api/quality/test-results",
+      "methods": ["GET", "POST"],
+      "auth_required": true,
+      "file": "apps/frontend/app/api/quality/test-results/route.ts"
+    }
+  ]
+}
