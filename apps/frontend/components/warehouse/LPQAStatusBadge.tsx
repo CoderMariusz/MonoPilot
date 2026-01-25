@@ -44,7 +44,9 @@ const qaStatusConfig: Record<
 }
 
 export function LPQAStatusBadge({ qaStatus, size = 'md', className }: LPQAStatusBadgeProps) {
-  const config = qaStatusConfig[qaStatus]
+  // Normalize qaStatus to lowercase to handle database enum case differences
+  const normalizedStatus = qaStatus?.toLowerCase() as QAStatus
+  const config = qaStatusConfig[normalizedStatus] || qaStatusConfig.pending
 
   const sizeClasses = {
     sm: 'text-xs px-2 py-0.5',
