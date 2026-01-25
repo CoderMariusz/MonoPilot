@@ -292,7 +292,7 @@ export function TransferOrdersDataTable({
         </form>
 
         {canCreate && (
-          <Button onClick={onCreateClick}>
+          <Button onClick={onCreateClick} data-testid="add-transfer-order-button">
             <Plus className="mr-2 h-4 w-4" />
             New Transfer Order
           </Button>

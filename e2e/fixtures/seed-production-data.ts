@@ -431,33 +431,45 @@ async function seedProducts(client: SupabaseClient) {
     return;
   }
 
+  // Get product type IDs
+  const { data: productTypes } = await client
+    .from('product_types')
+    .select('id, code')
+    .in('code', ['RM', 'FG']);
+
+  const rmTypeId = productTypes?.find(pt => pt.code === 'RM')?.id;
+  const fgTypeId = productTypes?.find(pt => pt.code === 'FG')?.id;
+
   const { error } = await client.from('products').insert([
     {
       id: TEST_UUIDS.productFlour,
       org_id: TEST_UUIDS.org,
-      product_code: 'RM-FLOUR-001',
+      code: 'RM-FLOUR-001',
       name: 'All-Purpose Flour',
-      product_type: 'raw',
+      product_type_id: rmTypeId,
+      base_uom: 'kg',
       shelf_life_days: 180,
-      is_active: true,
+      status: 'active',
     },
     {
       id: TEST_UUIDS.productYeast,
       org_id: TEST_UUIDS.org,
-      product_code: 'RM-YEAST-001',
+      code: 'RM-YEAST-001',
       name: 'Active Dry Yeast',
-      product_type: 'raw',
+      product_type_id: rmTypeId,
+      base_uom: 'kg',
       shelf_life_days: 90,
-      is_active: true,
+      status: 'active',
     },
     {
       id: TEST_UUIDS.productBread,
       org_id: TEST_UUIDS.org,
-      product_code: 'FIN-BREAD-001',
+      code: 'FIN-BREAD-001',
       name: 'White Bread Loaf',
-      product_type: 'finished',
+      product_type_id: fgTypeId,
+      base_uom: 'unit',
       shelf_life_days: 7,
-      is_active: true,
+      status: 'active',
     },
   ]);
 

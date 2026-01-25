@@ -111,8 +111,8 @@ test.describe('Output Registration', () => {
   });
 
   test.describe('TC-PROD-079: Multiple Outputs per WO', () => {
-    test.skip('should show WO.output_qty=400 and progress=40% after first output', async () => {
-      // WO planned_qty = 1000
+    test.skip('should show WO.produced_quantity=400 and progress=40% after first output', async () => {
+      // WO planned_quantity = 1000
       await outputPage.gotoWOOutputs('wo-id-123');
 
       await outputPage.registerOutput({ quantity: 400 });
@@ -121,7 +121,7 @@ test.describe('Output Registration', () => {
       await outputPage.expectProgressBar(40);
     });
 
-    test.skip('should show total output_qty=700 and progress=70% after second output', async () => {
+    test.skip('should show total produced_quantity=700 and progress=70% after second output', async () => {
       await outputPage.gotoWOOutputs('wo-first-output-id');
 
       // First output already = 400, add 300 more
@@ -143,7 +143,7 @@ test.describe('Output Registration', () => {
       await outputPage.expectUniqueLPIDs(lpNumbers);
     });
 
-    test.skip('should auto-complete WO when output_qty=1000 and auto_complete_wo=true', async () => {
+    test.skip('should auto-complete WO when produced_quantity=1000 and auto_complete_wo=true', async () => {
       // Planned = 1000, auto_complete_wo = true
       await outputPage.gotoWOOutputs('wo-almost-done-id');
 
@@ -152,7 +152,7 @@ test.describe('Output Registration', () => {
       await outputPage.expectWOAutoCompleted();
     });
 
-    test.skip('should remain In Progress when output_qty=1200 exceeds planned and auto_complete_wo=false', async () => {
+    test.skip('should remain In Progress when produced_quantity=1200 exceeds planned and auto_complete_wo=false', async () => {
       await outputPage.gotoWOOutputs('wo-over-produced-id');
 
       await outputPage.expectWOInProgress();
@@ -227,9 +227,9 @@ test.describe('Output Registration', () => {
   });
 
   test.describe('TC-PROD-082: By-Product Registration', () => {
-    test.skip('should show expected qty=50 when WO planned_qty=1000 and yield_percent=5', async () => {
+    test.skip('should show expected qty=50 when WO planned_quantity=1000 and yield_percent=5', async () => {
       // BOM has by-product with yield_percent = 5%
-      // WO planned_qty = 1000, expected by-product = 50
+      // WO planned_quantity = 1000, expected by-product = 50
       await outputPage.gotoWOOutputs('wo-with-byproduct-id');
 
       await outputPage.expectByProductPrompt();

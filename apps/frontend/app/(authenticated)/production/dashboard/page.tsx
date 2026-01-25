@@ -221,7 +221,7 @@ export default function ProductionDashboardPage() {
                           </td>
                           <td className="py-3 px-2">{wo.product_name}</td>
                           <td className="py-3 px-2">
-                            {wo.planned_qty} / {wo.output_qty}
+                            {wo.planned_quantity} / {wo.produced_quantity}
                           </td>
                           <td className="py-3 px-2">
                             <div className="flex items-center gap-2">

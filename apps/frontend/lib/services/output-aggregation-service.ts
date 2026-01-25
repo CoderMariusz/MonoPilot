@@ -344,8 +344,8 @@ export async function getWOProgress(woId: string): Promise<WOProgressResponse> {
   return {
     wo_id: wo.id,
     wo_number: wo.wo_number,
-    planned_qty: plannedQty,
-    produced_qty: outputQty,
+    planned_quantity: plannedQty,
+    produced_quantity: outputQty,
     progress_percent: progressPercent,
     remaining_qty: remainingQty,
     outputs_count: outputsCount || 0,

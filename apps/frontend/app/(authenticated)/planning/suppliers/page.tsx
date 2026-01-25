@@ -406,14 +406,14 @@ export default function SuppliersPage() {
   const isFilteredEmptyState = !loadingSuppliers && suppliers.length === 0 && hasFiltersApplied
 
   return (
-    <div>
+    <div data-testid="suppliers-page">
       <PlanningHeader currentPage="suppliers" />
 
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Suppliers</h1>
+            <h1 className="text-2xl font-bold" data-testid="suppliers-header">Suppliers</h1>
             <p className="text-muted-foreground text-sm">
               Manage supplier information and product assignments
             </p>
@@ -428,7 +428,7 @@ export default function SuppliersPage() {
                 setEditingSupplier(null)
                 setCreateModalOpen(true)
               }}
-              data-testid="button-create-supplier"
+              data-testid="add-supplier-button"
             >
               <Plus className="mr-2 h-4 w-4" />
               Create Supplier
@@ -531,24 +531,26 @@ export default function SuppliersPage() {
             />
 
             {/* Table */}
-            <SupplierListTable
-              data={suppliers}
-              selectedIds={selectedIds}
-              loading={loadingSuppliers}
-              pagination={pagination}
-              isMobile={isMobile}
-              onSelect={handleSelect}
-              onEdit={handleEdit}
-              onViewDetails={handleViewDetails}
-              onDeactivate={handleDeactivate}
-              onActivate={handleActivate}
-              onDelete={handleDelete}
-              onPageChange={handlePageChange}
-              onLoadMore={handleLoadMore}
-              onSort={handleSort}
-              sortColumn={sortColumn}
-              sortOrder={sortOrder}
-            />
+            <div data-testid="suppliers-table">
+              <SupplierListTable
+                data={suppliers}
+                selectedIds={selectedIds}
+                loading={loadingSuppliers}
+                pagination={pagination}
+                isMobile={isMobile}
+                onSelect={handleSelect}
+                onEdit={handleEdit}
+                onViewDetails={handleViewDetails}
+                onDeactivate={handleDeactivate}
+                onActivate={handleActivate}
+                onDelete={handleDelete}
+                onPageChange={handlePageChange}
+                onLoadMore={handleLoadMore}
+                onSort={handleSort}
+                sortColumn={sortColumn}
+                sortOrder={sortOrder}
+              />
+            </div>
           </>
         )}
       </div>

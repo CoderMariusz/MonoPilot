@@ -105,7 +105,7 @@ test.describe('Yield Tracking', () => {
   });
 
   test.describe('TC-PROD-111: Output Yield Calculation', () => {
-    test.skip('should calculate output_yield=95% when planned_qty=1000 and actual_output_qty=950', async () => {
+    test.skip('should calculate output_yield=95% when planned_quantity=1000 and actual_produced_quantity=950', async () => {
       await outputPage.gotoWOOutputs('wo-yield-95-id');
 
       await outputPage.expectOutputYield(95.0);

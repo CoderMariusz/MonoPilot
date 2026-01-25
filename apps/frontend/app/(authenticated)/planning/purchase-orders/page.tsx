@@ -330,14 +330,14 @@ export default function PurchaseOrdersPage() {
   const isEmpty = !isLoading && pos.length === 0 && !filters.search && filters.status.length === 0
 
   return (
-    <div>
+    <div data-testid="purchase-orders-page">
       <PlanningHeader currentPage="po" />
 
       <div className="px-6 py-6 space-y-6">
         {/* Page Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Purchase Orders</h1>
+            <h1 className="text-2xl font-bold" data-testid="purchase-orders-header">Purchase Orders</h1>
             <p className="text-muted-foreground text-sm">
               Manage and track purchase orders
             </p>
@@ -351,7 +351,7 @@ export default function PurchaseOrdersPage() {
               <Upload className="h-4 w-4" />
               Import POs
             </Button>
-            <Button onClick={handleCreate} className="gap-2">
+            <Button onClick={handleCreate} className="gap-2" data-testid="add-purchase-order-button">
               <Plus className="h-4 w-4" />
               Create PO
             </Button>
@@ -388,23 +388,25 @@ export default function PurchaseOrdersPage() {
           />
         ) : (
           <>
-            <PODataTable
-              data={pos}
-              isLoading={isLoading}
-              onRowClick={handleRowClick}
-              onEdit={handleEdit}
-              onSubmit={handleSubmit}
-              onCancel={handleCancelClick}
-              onDuplicate={handleDuplicate}
-              onPrint={handlePrint}
-              // Story 03.6: Selection props
-              selectable={true}
-              selectedIds={selectedIds}
-              onRowSelect={handleRowSelect}
-              onSelectAll={handleSelectAll}
-              isAllSelected={isAllSelected}
-              isPartiallySelected={isPartiallySelected}
-            />
+            <div data-testid="purchase-orders-table">
+              <PODataTable
+                data={pos}
+                isLoading={isLoading}
+                onRowClick={handleRowClick}
+                onEdit={handleEdit}
+                onSubmit={handleSubmit}
+                onCancel={handleCancelClick}
+                onDuplicate={handleDuplicate}
+                onPrint={handlePrint}
+                // Story 03.6: Selection props
+                selectable={true}
+                selectedIds={selectedIds}
+                onRowSelect={handleRowSelect}
+                onSelectAll={handleSelectAll}
+                isAllSelected={isAllSelected}
+                isPartiallySelected={isPartiallySelected}
+              />
+            </div>
             <Pagination
               page={page}
               totalPages={totalPages}

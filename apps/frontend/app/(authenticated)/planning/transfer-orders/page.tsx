@@ -152,10 +152,20 @@ export default function TransferOrdersPage() {
   }, [editingTO, refetchSummary])
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" data-testid="transfer-orders-page">
       <PlanningHeader currentPage="to" />
 
       <div className="px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900" data-testid="transfer-orders-header">Transfer Orders</h1>
+            <p className="text-gray-500 text-sm">
+              Manage warehouse transfer orders
+            </p>
+          </div>
+        </div>
+
         {/* KPI Summary Cards */}
         <TOKPICards
           summary={summary}
@@ -164,7 +174,7 @@ export default function TransferOrdersPage() {
         />
 
         {/* Data Table */}
-        <div className="bg-white rounded-lg border p-4 sm:p-6">
+        <div className="bg-white rounded-lg border p-4 sm:p-6" data-testid="transfer-orders-table">
           <TransferOrdersDataTable
             initialFilters={getInitialFilters()}
             onCreateClick={handleCreateClick}

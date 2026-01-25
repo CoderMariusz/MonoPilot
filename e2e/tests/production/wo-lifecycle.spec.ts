@@ -282,9 +282,9 @@ test.describe('Work Order Lifecycle', () => {
   });
 
   test.describe('TC-PROD-018: Auto-Complete WO', () => {
-    test.skip('should auto-complete when output_qty >= planned_qty and auto_complete_wo = true', async () => {
+    test.skip('should auto-complete when produced_quantity >= planned_quantity and auto_complete_wo = true', async () => {
       // auto_complete_wo = true
-      // WO planned_qty = 1000, output_qty = 1000
+      // WO planned_quantity = 1000, produced_quantity = 1000
       await woPage.gotoWODetail('wo-full-output-id');
 
       // Register final output to reach planned qty
@@ -295,7 +295,7 @@ test.describe('Work Order Lifecycle', () => {
 
     test.skip('should remain In Progress when auto_complete_wo = false', async () => {
       // auto_complete_wo = false
-      // WO planned_qty = 1000, output_qty = 1000
+      // WO planned_quantity = 1000, produced_quantity = 1000
       await woPage.gotoWODetail('wo-full-output-no-auto-id');
 
       await woPage.expectWOInProgress();

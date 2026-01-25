@@ -284,14 +284,14 @@ export default function WorkOrdersPage() {
   const isFilteredEmpty = isEmpty && hasActiveFilters
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" data-testid="work-orders-page">
       <PlanningHeader currentPage="wo" />
 
       <div className="px-4 md:px-6 py-6 space-y-6 max-w-[1600px] mx-auto">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Work Orders</h1>
+            <h1 className="text-2xl font-bold text-gray-900" data-testid="work-orders-header">Work Orders</h1>
             <p className="text-gray-500 text-sm">
               Manage production work orders and scheduling
             </p>
@@ -321,9 +321,9 @@ export default function WorkOrdersPage() {
               </Button>
             </div>
 
-            <Button onClick={() => setFormOpen(true)}>
+            <Button onClick={() => setFormOpen(true)} data-testid="add-work-order-button">
               <Plus className="h-4 w-4 mr-2" />
-              Create WO
+              Create Work Order
             </Button>
           </div>
         </div>
@@ -383,21 +383,23 @@ export default function WorkOrdersPage() {
             )}
 
             {/* Data Table */}
-            <WODataTable
-              data={data?.data || []}
-              loading={isLoading}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-              onRowClick={handleRowClick}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onPlan={handlePlan}
-              onRelease={handleRelease}
-              onCancel={handleCancel}
-              sortField={sortField}
-              sortOrder={sortOrder}
-              onSortChange={handleSortChange}
-            />
+            <div data-testid="work-orders-table">
+              <WODataTable
+                data={data?.data || []}
+                loading={isLoading}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+                onRowClick={handleRowClick}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onPlan={handlePlan}
+                onRelease={handleRelease}
+                onCancel={handleCancel}
+                sortField={sortField}
+                sortOrder={sortOrder}
+                onSortChange={handleSortChange}
+              />
+            </div>
 
             {/* Pagination */}
             {data?.pagination && data.pagination.totalPages > 1 && (
