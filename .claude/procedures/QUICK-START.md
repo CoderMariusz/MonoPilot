@@ -127,7 +127,7 @@ Full details: `handoff-templates.md`
 - Write failing tests
 - Cover all AC
 - Independent tests
-- Append checkpoint: `P2: ✓ test-writer {time} files:N tests:X status:red`
+- Append checkpoint: `P2: ✓ unit-test-writer {time} files:N tests:X status:red`
 
 ### Phase 3: GREEN (Implementation)
 **Who**: Backend-Dev, Frontend-Dev | **See**: tdd-phase-flow.md → Phase 3

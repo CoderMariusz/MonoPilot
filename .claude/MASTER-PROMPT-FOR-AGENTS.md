@@ -6,17 +6,54 @@ Stories: {{STORY_IDS}}  07.8 07.9 07.10 07.11 03.13
 Epic: {{EPIC_ID}}        07-shipping
 ```
    e
+## 🚀 PRE-DELEGATION: SCRIPT-FIRST APPROACH
+
+**MANDATORY**: Run helper scripts BEFORE spawning agents to minimize tokens.
+
+### For Each Story, Run:
+
+```bash
+# 1. Load story context (saves 1000 tokens per agent)
+./scripts/load-story-context.sh {STORY_ID}
+
+# 2. For P2 (e2e-test-writer):
+./ops e2e:detect-type apps/frontend/app/(authenticated)/{module}/{feature}/page.tsx
+./ops e2e:extract-selectors apps/frontend/components/{module}/{feature}/
+
+# 3. For P3 (backend-dev):
+./scripts/query-table-schema.sh {table_names}
+./scripts/extract-api-endpoints.sh apps/frontend/app/api/{module}
+./scripts/extract-service-patterns.sh {service_name}
+
+# 4. For P3 (frontend-dev):
+./scripts/extract-component-patterns.sh {ComponentType}
+./scripts/extract-selectors.sh apps/frontend/components/{module}/
+
+# 5. For P4 (senior-dev):
+./scripts/detect-code-smells.sh {file_to_refactor}
+```
+
+**Delegation pattern**:
+```
+Task(backend-dev): 06.11 P3
+Pre-analyzed: {query-table-schema output}
+Pre-analyzed: {extract-service-patterns output}
+Do: Implement batch release approval
+```
+
 ## 📋 7-PHASE FLOW
 
-| Phase | Agent | Skip When | Parallel |
-|-------|-------|-----------|----------|
-| P1 | ux-designer | Backend-only | No |
-| P2 | test-writer | Never | No |
-| P3 | backend/frontend-dev | - | ✓ Both tracks |
-| P4 | senior-dev | Clean code | No |
-| P5 | code-reviewer | Never | ✓ Multi-story |
-| P6 | qa-agent | Never | ✓ Multi-story |
-| P7 | tech-writer | Never | No |
+| Phase | Agent | Pre-Scripts | Skip When | Parallel |
+|-------|-------|-------------|-----------|----------|
+| **P0** | orchestrator | load-story-context | Never | - |
+| P1 | ux-designer | - | Backend-only | No |
+| P2 | e2e-test-writer | detect-type, extract-selectors | Never | No |
+| P3 | backend-dev | query-schema, extract-api, extract-service | - | ✓ Both tracks |
+| P3 | frontend-dev | extract-component, extract-selectors | - | ✓ Both tracks |
+| P4 | senior-dev | detect-smells | Clean code | No |
+| P5 | code-reviewer | - | Never | ✓ Multi-story |
+| P6 | qa-agent | - | Never | ✓ Multi-story |
+| P7 | tech-writer | - | Never | No |
 
 **Agents append checkpoints. Orchestrator reads + routes.**
 **check what need to be fix/done**
@@ -65,14 +102,16 @@ Exit: {condition}
 
 1. **Read checkpoints ONLY** - Never read full context
 2. **No reports until P7** - Agents work, tech-writer reports
-3. **Max 4 parallel agents**
+3. **Max 8 parallel agents**
 4. **Phase skip = orchestrator decision** (agents don't skip)
 5. **Micro-handoff ≤150 tokens** from agents
-6. **check UX in cataloge 3-Architecture/ux/wireframe do not relay on code! make sure you are doing STRICT how project show wireframe** 
+6. **check UX in cataloge 3-Architecture/ux/wireframe do not relay on code! make sure you are doing STRICT how project show wireframe**
 7. **check context make sure you dont runout if there is posibility /compact context or close subagent and run next after short handover**
 8. **Aways one soties per Agent!**
 9. **update Roadmaps files**
 10. **Validation**: Always run `./ops check` before marking a task as COMPLETED.
+11. **Phase 0 Scripts**: Always run scripts before delegating (orchestrator responsibility)
+12. **Pre-analyzed data**: Pass script output to agents (avoid re-reading)
 
 ---
 

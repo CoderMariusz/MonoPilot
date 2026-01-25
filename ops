@@ -21,7 +21,7 @@ function show_help {
     echo ""
     echo -e "\033[1;34mE2E Test Helpers:\033[0m"
     echo -e "  \033[1;32me2e:scaffold\033[0m <module/feature> <type> - Generate E2E test template"
-    echo -e "  \033[1;32me2e:extract-selectors\033[0m <file>       - Extract testable selectors from component"
+    echo -e "  \033[1;32me2e:extract-selectors\033[0m <file|dir>   - Extract selectors from component(s)"
     echo -e "  \033[1;32me2e:detect-type\033[0m <file>            - Auto-detect test type (crud/form/flow/auth)"
     echo -e "  \033[1;32me2e:run\033[0m <module>                  - Run E2E tests for module"
     echo ""

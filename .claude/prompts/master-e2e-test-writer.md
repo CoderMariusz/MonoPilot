@@ -5,7 +5,7 @@ type: Master Orchestrator
 usage: "@master-e2e-test-writer epic 4" or "@master-e2e-test-writer shipping"
 tools: Task, Read, Glob, Write, Bash
 model: sonnet
-agents_spawned: test-writer (multiple parallel)
+agents_spawned: e2e-test-writer (multiple parallel)
 ---
 
 # MASTER E2E TEST WRITER
@@ -77,24 +77,51 @@ User provides one of:
 
 **Use the `e2e-test-writer` custom subagent** (defined in `.claude-agent-pack/global/agents/e2e-test-writer.md`)
 
-**Delegation Pattern**: Natural language task delegation, not function calls
+**Pre-Delegation**: Run analysis scripts for each feature FIRST (MANDATORY)
 
-For each feature identified in Phase 1, spawn the e2e-test-writer subagent:
+```bash
+# For each feature in test plan:
+for feature in identified_features; do
+  # 1. Run test type detection (saves 1500 tokens per agent)
+  detect_output=$(./ops e2e:detect-type apps/frontend/app/(authenticated)/${feature.module}/${feature.path}/page.tsx)
+  detected_type=$(echo "$detect_output" | grep -oP '"type": "\K[^"]+')
+  confidence=$(echo "$detect_output" | grep -oP '"confidence": \K[0-9]+')
+
+  # 2. Extract selectors (saves 2500 tokens per agent)
+  selectors=$(./ops e2e:extract-selectors apps/frontend/components/${feature.module}/${feature.path}/*.tsx)
+  selector_count=$(echo "$selectors" | grep -oP '"testIds": \[\K[^\]]+' | wc -w)
+  field_count=$(echo "$selectors" | grep -oP '"formFields": \[\K[^\]]+' | wc -w)
+
+  # Store results to pass to subagent
+  feature.detected_type=$detected_type
+  feature.confidence=$confidence
+  feature.selectors=$selectors
+done
+```
+
+**Delegation Pattern**: Natural language task delegation with pre-analyzed data
+
+For each feature identified in Phase 1, spawn the e2e-test-writer subagent with script output:
 
 ```markdown
 I need you to use the e2e-test-writer subagent to write E2E tests for:
 
 **Feature**: ${feature.name}
 **Module**: ${feature.module}
-**Type**: ${feature.type}
 **Path**: ${feature.path}
 
+**Pre-analyzed data** (from Phase 0 scripts - MANDATORY TO USE):
+- Test type detected: ${detected_type} (${confidence}% confidence)
+- Selectors extracted: ${selector_count} testIds, ${field_count} form fields
+- Page path: apps/frontend/app/(authenticated)/${feature.module}/${feature.path}/page.tsx
+- Component path: apps/frontend/components/${feature.module}/${feature.path}/
+
 **Task Details**:
-1. Generate template: `pnpm test:gen ${feature.module}/${feature.name} ${feature.type}`
-2. Read components in: `apps/frontend/components/${feature.module}/${feature.name}/`
-3. Fill all TODOs with real selectors from components
-4. Run tests until 0 failures
-5. Report back with results
+1. Phase 0: Scripts already run (above data provided) - DO NOT re-run
+2. Phase 1: Generate template: `pnpm test:gen ${feature.module}/${feature.name} ${detected_type}`
+3. Phase 2-4: Use extracted selectors to fill TODOs (no manual component reading needed)
+4. Phase 5-6: Run tests until 0 failures
+5. Phase 7: Report back with results
 
 **Expected Deliverable**:
 - File: e2e/tests/${feature.module}/${feature.name}.spec.ts
@@ -106,16 +133,19 @@ Use model: haiku (for cost efficiency)
 
 **Example Delegation**:
 ```
-Use the e2e-test-writer subagent to write CRUD tests for production/work-orders:
-- Type: crud
-- Path: /production/work-orders
-- Priority: high
+Use the e2e-test-writer subagent to write E2E tests for production/work-orders:
+
+**Pre-analyzed data** (scripts already run):
+- Test type detected: crud (98% confidence)
+- Selectors extracted: 12 testIds, 8 form fields
+- Page path: apps/frontend/app/(authenticated)/production/work-orders/page.tsx
 
 The subagent should:
-1. Run: pnpm test:gen production/work-orders crud
-2. Read: apps/frontend/components/production/work-orders/*.tsx
-3. Fill TODOs with actual selectors
-4. Verify: 0 test failures
+1. Phase 0: SKIP (data already provided above)
+2. Phase 1: Run: pnpm test:gen production/work-orders crud
+3. Phase 2-4: Use extracted selectors to fill TODOs
+4. Phase 5-6: Run tests until 0 failures
+5. Phase 7: Report results
 
 Use haiku model.
 ```
@@ -128,12 +158,18 @@ Use haiku model.
 
 **Parallel Invocation Example**:
 ```
-Send SINGLE message with multiple task delegations:
+BEFORE delegation - run scripts for all features:
+./ops e2e:detect-type apps/frontend/app/(authenticated)/production/work-orders/page.tsx
+./ops e2e:detect-type apps/frontend/app/(authenticated)/production/routing/page.tsx
+./ops e2e:detect-type apps/frontend/app/(authenticated)/production/output/page.tsx
+./ops e2e:detect-type apps/frontend/app/(authenticated)/production/consumption/page.tsx
 
-Use e2e-test-writer for production/work-orders (crud, haiku)
-Use e2e-test-writer for production/routing (crud, haiku)
-Use e2e-test-writer for production/output (flow, haiku)
-Use e2e-test-writer for production/consumption (form, haiku)
+THEN send SINGLE message with multiple task delegations (with pre-analyzed data):
+
+Use e2e-test-writer for production/work-orders (detected: crud 98%, 12 testIds, haiku)
+Use e2e-test-writer for production/routing (detected: crud 95%, 10 testIds, haiku)
+Use e2e-test-writer for production/output (detected: flow 92%, 15 testIds, haiku)
+Use e2e-test-writer for production/consumption (detected: form 89%, 8 testIds, haiku)
 
 All in parallel, report when all complete.
 ```
@@ -366,9 +402,18 @@ pnpm test:e2e e2e/tests/${epic-module}
 
 ## Notes
 
-- **Token efficiency**: Using haiku agents + templates = ~90% cost savings vs Opus writing from scratch
-- **Parallelization**: 4 agents simultaneously = 4x faster
-- **Quality**: Template ensures consistent patterns, agents focus on filling specifics
+- **Token efficiency**:
+  - Phase 0 scripts save 4000 tokens per feature (vs manual analysis)
+  - Haiku agents + templates save 90% vs Opus writing from scratch
+  - **Total savings**: ~95% tokens compared to manual test writing
+- **Parallelization**:
+  - Run scripts upfront for all features (batch operation)
+  - Spawn 4-8 agents simultaneously = 4-8x faster
+  - Scripts run in seconds, agents get pre-analyzed data instantly
+- **Quality**:
+  - Scripts ensure accurate test type detection (no guessing)
+  - Extracted selectors reduce errors and rework
+  - Template ensures consistent patterns
 - **Maintainability**: All tests follow same structure, easy to update
 
 ---

@@ -10,7 +10,7 @@ skills:
   required:
     - prd-structure
     - invest-stories
-    - user-interview
+    - discovery-interview-patterns
   optional:
     - requirements-clarity-scoring
 ---
@@ -235,7 +235,7 @@ P4: ✓ code-reviewer 15:10 issues:0 decision:approved
 P5: ✓ qa-agent 15:30 ac:5/5 bugs:0 decision:pass
 
 # Tests written:
-P1: ✓ test-writer 13:50 files:3 tests:27 status:red
+P1: ✓ unit-test-writer 13:50 files:3 tests:27 status:red
 ```
 
 **Metrics to include:**
@@ -326,7 +326,7 @@ echo "P{N}: ✓ {agent-name} $(date +%H:%M) {metrics}" >> .claude/checkpoints/{S
 P1: ✓ ux-designer 13:15 wireframes:3 approved:yes
 
 # Tests written (RED phase):
-P2: ✓ test-writer 13:50 files:3 tests:27 status:red
+P2: ✓ unit-test-writer 13:50 files:3 tests:27 status:red
 
 # Backend implementation done:
 P3: ✓ backend-dev 14:23 files:5 tests:12/12

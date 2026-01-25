@@ -12,7 +12,7 @@ echo "P{N}: ✓ {agent-name} $(date +%H:%M) {metrics}" >> .claude/checkpoints/{S
 
 Replace:
 - `{N}` with phase number (1-7)
-- `{agent-name}` with agent identifier (e.g., test-writer, backend-dev)
+- `{agent-name}` with agent identifier (e.g., unit-test-writer, backend-dev)
 - `{metrics}` with comma-separated metric pairs (see metrics table below)
 - `{STORY_ID}` with story identifier (e.g., 06.10)
 
@@ -27,7 +27,7 @@ P1: ✓ ux-designer 13:15 wireframes:3 approved:yes
 
 ### Phase 2: Test Writing (RED phase)
 ```yaml
-P2: ✓ test-writer 13:50 files:3 tests:27 status:red
+P2: ✓ unit-test-writer 13:50 files:3 tests:27 status:red
 ```
 
 ### Phase 3: Implementation

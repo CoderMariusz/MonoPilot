@@ -85,12 +85,12 @@ Complete explanation of RED → GREEN → REFACTOR workflow and phase transition
 
 **Checkpoint Format**:
 ```yaml
-P2: ✓ test-writer {time} files:N tests:X status:red
+P2: ✓ unit-test-writer {time} files:N tests:X status:red
 ```
 
 Example:
 ```yaml
-P2: ✓ test-writer 13:50 files:3 tests:27 status:red
+P2: ✓ unit-test-writer 13:50 files:3 tests:27 status:red
 ```
 
 **Transition to P3**:
