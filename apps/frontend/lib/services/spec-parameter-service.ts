@@ -358,7 +358,7 @@ export function validateValue(
 
   switch (parameter.parameter_type) {
     case 'numeric':
-    case 'range':
+    case 'range': {
       const numValue = typeof value === 'number' ? value : parseFloat(value as string);
       if (isNaN(numValue)) {
         return { valid: false, reason: 'Invalid numeric value' };
@@ -370,17 +370,20 @@ export function validateValue(
         return { valid: false, reason: `Above maximum (${parameter.max_value})` };
       }
       return { valid: true };
+    }
 
-    case 'boolean':
+    case 'boolean': {
       if (parameter.target_value) {
         const match = value.toString().toLowerCase() === parameter.target_value.toLowerCase();
         return { valid: match, reason: match ? undefined : `Expected ${parameter.target_value}` };
       }
       return { valid: true };
+    }
 
-    case 'text':
+    case 'text': {
       // Text parameters are manually evaluated
       return { valid: true };
+    }
 
     default:
       return { valid: false, reason: 'Unknown parameter type' };

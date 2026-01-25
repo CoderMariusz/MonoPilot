@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     let result: any = {}
 
     switch (action) {
-      case 'quarantine':
+      case 'quarantine': {
         // Update LPs to quarantine status
         const { data: quarantineData, error: quarantineError } = await supabase
           .from('license_plates')
@@ -109,8 +109,9 @@ export async function POST(request: NextRequest) {
           lp_numbers: quarantineData?.map((lp) => lp.lp_number) ?? [],
         }
         break
+      }
 
-      case 'adjust':
+      case 'adjust': {
         // For adjust action, return LPs that can be adjusted
         // Actual adjustment creation would be done in separate endpoint
         result = {
@@ -121,8 +122,9 @@ export async function POST(request: NextRequest) {
           message: 'Ready for adjustment. Use adjustment creation endpoint to complete.',
         }
         break
+      }
 
-      case 'print_labels':
+      case 'print_labels': {
         // For print action, return LP data for label generation
         result = {
           action: 'print_labels',
@@ -132,6 +134,7 @@ export async function POST(request: NextRequest) {
           message: 'Ready for label printing. Use print endpoint to generate labels.',
         }
         break
+      }
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

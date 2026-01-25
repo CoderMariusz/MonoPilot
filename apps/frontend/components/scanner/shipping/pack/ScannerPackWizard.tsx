@@ -133,7 +133,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         isLoading: false,
       }
 
-    case 'SET_BOXES':
+    case 'SET_BOXES': {
       const boxesArray = Array.isArray(action.payload) ? action.payload : []
       const firstOpen = boxesArray.find((b) => b.status === 'open')
       return {
@@ -141,6 +141,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         boxes: boxesArray,
         activeBoxId: firstOpen?.id || boxesArray[0]?.id || null,
       }
+    }
 
     case 'ADD_BOX':
       return {

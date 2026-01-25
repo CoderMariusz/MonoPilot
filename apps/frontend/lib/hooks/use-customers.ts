@@ -44,7 +44,7 @@ export interface CreateCustomerDto {
   is_active?: boolean
 }
 
-export interface UpdateCustomerDto extends Partial<Omit<CreateCustomerDto, 'customer_code'>> {}
+export type UpdateCustomerDto = Partial<Omit<CreateCustomerDto, 'customer_code'>>
 
 /**
  * Fetches customers with filters, search, and pagination

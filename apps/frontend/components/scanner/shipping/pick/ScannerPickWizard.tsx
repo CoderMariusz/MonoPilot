@@ -129,7 +129,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         startTime: Date.now(),
       }
 
-    case 'SET_PICK_LIST_DETAIL':
+    case 'SET_PICK_LIST_DETAIL': {
       const detail = action.payload
       const pendingLines = detail.lines.filter((l) => l.status === 'pending')
       return {
@@ -145,6 +145,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         quantity: pendingLines[0]?.quantity_to_pick.toString() || '',
         isLoading: false,
       }
+    }
 
     case 'SET_SCANNED_BARCODE':
       return { ...state, scannedBarcode: action.payload }
@@ -152,7 +153,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     case 'SET_QUANTITY':
       return { ...state, quantity: action.payload }
 
-    case 'ADVANCE_TO_NEXT_LINE':
+    case 'ADVANCE_TO_NEXT_LINE': {
       const nextIndex = state.currentLineIndex + 1
       const lines = state.pickListDetail?.lines || []
       const nextPending = lines.slice(nextIndex).find((l) => l.status === 'pending')
@@ -178,6 +179,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         },
         allergenAcknowledged: false,
       }
+    }
 
     case 'COMPLETE_PICK_LIST':
       return {
