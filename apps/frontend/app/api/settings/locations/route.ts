@@ -72,16 +72,22 @@ export async function GET(request: NextRequest) {
         warehouseId = warehouse.id
       }
     }
+
+    // If no warehouse exists, return empty locations array
+    // This prevents errors when org has no warehouses yet
+    if (!warehouseId) {
+      return NextResponse.json({ locations: [] }, { status: 200 })
+    }
+
     const result = await getLocations(warehouseId, filters, currentUser.org_id)
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Failed to fetch locations' },
-        { status: 500 }
-      )
+      // Log error but return empty array for graceful degradation
+      console.error('getLocations failed:', result.error)
+      return NextResponse.json({ locations: [] }, { status: 200 })
     }
 
-    return NextResponse.json({ locations: result.data || [] }, { status: 200 })
+    return NextResponse.json({ locations: result.data?.locations || [] }, { status: 200 })
   } catch (error) {
     console.error('Error in GET /api/settings/locations:', error)
 
