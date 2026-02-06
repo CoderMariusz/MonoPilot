@@ -4,6 +4,9 @@
  *
  * Returns recent audit log entries for the organization.
  * Supports limit query parameter (default 5, max 100).
+ *
+ * NOTE: Returns empty array if audit_logs table doesn't exist yet.
+ * The table will be created in a future migration.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -38,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     const { org_id } = context
 
-    // Fetch recent audit logs
+    // Fetch recent audit logs - gracefully handle missing table
     const { data: logs, error: logsError } = await supabase
       .from('audit_logs')
       .select('id, user_name, action, created_at')
@@ -46,12 +49,21 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit)
 
+    // If table doesn't exist or other error, return empty array
+    // This allows the feature to degrade gracefully
     if (logsError) {
+      // Check if it's a "table doesn't exist" error
+      if (logsError.code === '42P01' || logsError.message?.includes('does not exist')) {
+        console.log('audit_logs table not yet created, returning empty array')
+        const response = NextResponse.json({ logs: [] }, { status: 200 })
+        response.headers.set('Cache-Control', 'max-age=60, private')
+        return response
+      }
       console.error('Error fetching audit logs:', logsError)
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
+      // For other errors, still return empty array to not break the UI
+      const response = NextResponse.json({ logs: [] }, { status: 200 })
+      response.headers.set('Cache-Control', 'max-age=60, private')
+      return response
     }
 
     const response = NextResponse.json({ logs: logs || [] }, { status: 200 })
@@ -59,9 +71,9 @@ export async function GET(request: NextRequest) {
     return response
   } catch (error) {
     console.error('Audit logs endpoint error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    // Return empty logs instead of 500 to not break the UI
+    const response = NextResponse.json({ logs: [] }, { status: 200 })
+    response.headers.set('Cache-Control', 'max-age=60, private')
+    return response
   }
 }

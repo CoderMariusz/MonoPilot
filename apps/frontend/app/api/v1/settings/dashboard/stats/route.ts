@@ -57,14 +57,21 @@ export async function GET(request: NextRequest) {
           .select('id', { count: 'exact' })
           .eq('org_id', org_id)
 
-        const invitationCountResult = await supabase
-          .from('invitations')
-          .select('id', { count: 'exact' })
-          .eq('org_id', org_id)
+        // Invitations table may not exist yet - gracefully handle
+        let invitationCount = 0
+        try {
+          const invitationCountResult = await supabase
+            .from('invitations')
+            .select('id', { count: 'exact' })
+            .eq('org_id', org_id)
+          invitationCount = invitationCountResult.count || 0
+        } catch {
+          // Table doesn't exist yet
+        }
 
         stats.users = {
           total: userCountResult.count || 0,
-          pending_invitations: invitationCountResult.count || 0,
+          pending_invitations: invitationCount,
         }
       }
 
@@ -110,51 +117,84 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Get integrations stats
+      // Get integrations stats - tables may not exist yet
       if (allowedStats.includes('integrations')) {
-        const apiKeys = await supabase
-          .from('api_keys')
-          .select('id', { count: 'exact' })
-          .eq('org_id', org_id)
+        let apiKeysCount = 0
+        let webhooksCount = 0
 
-        const webhooks = await supabase
-          .from('webhooks')
-          .select('id', { count: 'exact' })
-          .eq('org_id', org_id)
+        try {
+          const apiKeys = await supabase
+            .from('api_keys')
+            .select('id', { count: 'exact' })
+            .eq('org_id', org_id)
+          apiKeysCount = apiKeys.count || 0
+        } catch {
+          // Table doesn't exist yet
+        }
+
+        try {
+          const webhooks = await supabase
+            .from('webhooks')
+            .select('id', { count: 'exact' })
+            .eq('org_id', org_id)
+          webhooksCount = webhooks.count || 0
+        } catch {
+          // Table doesn't exist yet
+        }
 
         stats.integrations = {
-          api_keys: apiKeys.count || 0,
-          webhooks: webhooks.count || 0,
+          api_keys: apiKeysCount,
+          webhooks: webhooksCount,
         }
       }
 
-      // Get system stats
+      // Get system stats - tables may not exist yet
       if (allowedStats.includes('system')) {
-        const enabledModules = await supabase
-          .from('module_access')
-          .select('id', { count: 'exact' })
-          .eq('org_id', org_id)
+        let enabledModulesCount = 0
+        let auditLogsCount = 0
 
-        const auditLogs = await supabase
-          .from('audit_logs')
-          .select('id', { count: 'exact' })
-          .eq('org_id', org_id)
+        try {
+          const enabledModules = await supabase
+            .from('module_access')
+            .select('id', { count: 'exact' })
+            .eq('org_id', org_id)
+          enabledModulesCount = enabledModules.count || 0
+        } catch {
+          // Table doesn't exist yet
+        }
+
+        try {
+          const auditLogs = await supabase
+            .from('audit_logs')
+            .select('id', { count: 'exact' })
+            .eq('org_id', org_id)
+          auditLogsCount = auditLogs.count || 0
+        } catch {
+          // Table doesn't exist yet
+        }
 
         stats.system = {
-          enabled_modules: enabledModules.count || 0,
-          audit_log_entries: auditLogs.count || 0,
+          enabled_modules: enabledModulesCount,
+          audit_log_entries: auditLogsCount,
         }
       }
 
-      // Get security stats (last login from auth logs)
+      // Get security stats (last login from auth logs) - table may not exist
       if (allowedStats.includes('security')) {
-        const lastLoginResult = await supabase
-          .from('audit_logs')
-          .select('created_at')
-          .eq('org_id', org_id)
+        let lastLoginDate = null
 
-        // Get the most recent entry (filtering in code)
-        const lastLoginDate = lastLoginResult?.data?.[0]?.created_at || null
+        try {
+          const lastLoginResult = await supabase
+            .from('audit_logs')
+            .select('created_at')
+            .eq('org_id', org_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+          lastLoginDate = lastLoginResult?.data?.[0]?.created_at || null
+        } catch {
+          // Table doesn't exist yet
+        }
 
         stats.security = {
           last_login: lastLoginDate,
