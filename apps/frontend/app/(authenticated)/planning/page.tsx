@@ -17,7 +17,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import { KPICardsGrid, KPIType } from '@/components/planning/dashboard/KPICard'
 import { AlertPanel } from '@/components/planning/dashboard/AlertPanel'
@@ -34,6 +33,9 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import type { KPIData, Alert, Activity } from '@/lib/types/planning-dashboard'
+import { PurchaseOrderFormModal } from '@/components/planning/PurchaseOrderFormModal'
+import { TransferOrderFormModal } from '@/components/planning/TransferOrderFormModal'
+import { WorkOrderFormModal } from '@/components/planning/WorkOrderFormModal'
 
 // Dashboard data state
 interface DashboardData {
@@ -73,6 +75,11 @@ export default function PlanningDashboardPage() {
     alerts: null,
     activities: null,
   })
+  
+  // Modal states
+  const [showPOModal, setShowPOModal] = useState(false)
+  const [showTOModal, setShowTOModal] = useState(false)
+  const [showWOModal, setShowWOModal] = useState(false)
 
   // Fetch KPIs
   const fetchKPIs = useCallback(async () => {
@@ -215,23 +222,17 @@ export default function PlanningDashboardPage() {
 
           {/* Quick Actions */}
           <div className="flex flex-wrap gap-2" role="group" aria-label="Quick actions">
-            <Button asChild>
-              <Link href="/planning/purchase-orders/new">
-                <Plus className="h-4 w-4 mr-1" aria-hidden="true" />
-                Create PO
-              </Link>
+            <Button onClick={() => setShowPOModal(true)}>
+              <Plus className="h-4 w-4 mr-1" aria-hidden="true" />
+              Create PO
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/planning/transfer-orders/new">
-                <Truck className="h-4 w-4 mr-1" aria-hidden="true" />
-                Create TO
-              </Link>
+            <Button variant="outline" onClick={() => setShowTOModal(true)}>
+              <Truck className="h-4 w-4 mr-1" aria-hidden="true" />
+              Create TO
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/planning/work-orders/new">
-                <Factory className="h-4 w-4 mr-1" aria-hidden="true" />
-                Create WO
-              </Link>
+            <Button variant="outline" onClick={() => setShowWOModal(true)}>
+              <Factory className="h-4 w-4 mr-1" aria-hidden="true" />
+              Create WO
             </Button>
           </div>
         </div>
@@ -293,6 +294,35 @@ export default function PlanningDashboardPage() {
           </section>
         </div>
       </div>
+
+      {/* Modals */}
+      <PurchaseOrderFormModal
+        open={showPOModal}
+        onClose={() => setShowPOModal(false)}
+        onSuccess={() => {
+          setShowPOModal(false)
+          fetchKPIs()
+          fetchActivities()
+        }}
+      />
+      <TransferOrderFormModal
+        open={showTOModal}
+        onClose={() => setShowTOModal(false)}
+        onSuccess={() => {
+          setShowTOModal(false)
+          fetchKPIs()
+          fetchActivities()
+        }}
+      />
+      <WorkOrderFormModal
+        open={showWOModal}
+        onClose={() => setShowWOModal(false)}
+        onSuccess={() => {
+          setShowWOModal(false)
+          fetchKPIs()
+          fetchActivities()
+        }}
+      />
     </div>
   )
 }

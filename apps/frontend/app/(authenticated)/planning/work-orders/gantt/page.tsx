@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { List, Settings, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlanningHeader } from '@/components/planning/PlanningHeader';
+import { WorkOrderFormModal } from '@/components/planning/WorkOrderFormModal';
 import { useGanttData } from '@/lib/hooks/use-gantt-data';
 import { useGanttZoom } from '@/lib/hooks/use-gantt-zoom';
 import { useRescheduleWO } from '@/lib/hooks/use-reschedule-wo';
@@ -71,6 +72,7 @@ export default function GanttPage() {
 
   // Quick view state
   const [selectedWO, setSelectedWO] = useState<GanttWorkOrder | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Fetch Gantt data
   const { data, isLoading, error, refetch } = useGanttData(filters);
@@ -147,8 +149,8 @@ export default function GanttPage() {
 
   // Handle create WO
   const handleCreateWO = useCallback(() => {
-    router.push('/planning/work-orders?create=true');
-  }, [router]);
+    setShowCreateModal(true);
+  }, []);
 
   // Handle clear filters
   const handleClearFilters = useCallback(() => {
@@ -262,6 +264,16 @@ export default function GanttPage() {
       <GanttQuickView
         workOrder={selectedWO}
         onClose={() => setSelectedWO(null)}
+      />
+
+      {/* Create WO Modal */}
+      <WorkOrderFormModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          setShowCreateModal(false);
+          refetch();
+        }}
       />
     </div>
   );

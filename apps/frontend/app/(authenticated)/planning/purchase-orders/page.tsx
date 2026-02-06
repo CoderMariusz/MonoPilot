@@ -30,6 +30,7 @@ import {
   POExportDialog,
   POBulkActionsBar,
 } from '@/components/planning/purchase-orders'
+import { PurchaseOrderFormModal } from '@/components/planning/PurchaseOrderFormModal'
 import { usePurchaseOrders, useSubmitPO, useCancelPO, useDeletePO } from '@/lib/hooks/use-purchase-orders'
 import { useSuppliers } from '@/lib/hooks/use-suppliers'
 import { useWarehouses } from '@/lib/hooks/use-warehouses'
@@ -106,6 +107,7 @@ export default function PurchaseOrdersPage() {
   // Story 03.6: Import/Export dialogs
   const [isImportWizardOpen, setIsImportWizardOpen] = useState(false)
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Fetch data
   const { data: suppliers, isLoading: isLoadingSuppliers } = useSuppliers({})
@@ -270,8 +272,8 @@ export default function PurchaseOrdersPage() {
   }, [])
 
   const handleCreate = useCallback(() => {
-    router.push('/planning/purchase-orders/new')
-  }, [router])
+    setShowCreateModal(true)
+  }, [])
 
   // Story 03.6: Import/Export handlers
   const handleImport = useCallback(() => {
@@ -448,6 +450,16 @@ export default function PurchaseOrdersPage() {
           supplier_id: filters.supplier_id || undefined,
           date_from: filters.from_date || undefined,
           date_to: filters.to_date || undefined,
+        }}
+      />
+
+      {/* Create PO Modal */}
+      <PurchaseOrderFormModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          setShowCreateModal(false)
+          refetch()
         }}
       />
     </div>
