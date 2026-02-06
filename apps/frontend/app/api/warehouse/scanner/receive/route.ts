@@ -3,7 +3,7 @@
  * POST /api/warehouse/scanner/receive - Process scanner receipt
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { scannerReceiveSchema } from '@/lib/validation/scanner-receive'
@@ -11,7 +11,7 @@ import { ScannerReceiveService } from '@/lib/services/scanner-receive-service'
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServerSupabase()
 
     // Check authentication
     const {

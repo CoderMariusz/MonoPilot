@@ -762,8 +762,8 @@ export async function getMyPicks(
     .select(
       `
       *,
-      assigned_user:users!pick_lists_assigned_to_fkey(id, name),
-      created_by_user:users!pick_lists_created_by_fkey(id, name)
+      assigned_user:users!pick_lists_assigned_to_fkey(id, first_name, last_name),
+      created_by_user:users!pick_lists_created_by_fkey(id, first_name, last_name)
     `
     )
     .eq('org_id', orgId)
