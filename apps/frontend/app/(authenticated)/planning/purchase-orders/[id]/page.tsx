@@ -241,7 +241,7 @@ export default function PurchaseOrderDetailsPage(
   }, [toast])
 
   const handleGoToReceiving = useCallback(() => {
-    router.push(`/warehouse/receiving?po_id=${paramsId}`)
+    router.push(`/scanner/receive?po_id=${paramsId}`)
   }, [router, paramsId])
 
   // Line handlers

@@ -107,7 +107,7 @@ export default async function DashboardPage() {
         { label: 'Pending Receipts', value: 0 },
         { label: 'Low Stock Alerts', value: 0 },
       ],
-      primaryAction: { label: 'Receive', href: '/warehouse/receive' },
+      primaryAction: { label: 'Receive', href: '/scanner/receive' },
       detailsHref: '/warehouse',
     },
     {
