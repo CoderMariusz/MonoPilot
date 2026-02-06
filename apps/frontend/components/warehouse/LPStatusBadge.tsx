@@ -1,6 +1,7 @@
 /**
  * LP Status Badge Component
  * Story 05.1: License Plates UI
+ * Bug Fix: Expired LPs now show "Expired" status instead of "Available"
  */
 
 import { Badge } from '@/components/ui/badge'
@@ -11,10 +12,11 @@ interface LPStatusBadgeProps {
   status: LPStatus
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  expiryDate?: string | null
 }
 
 const statusConfig: Record<
-  LPStatus,
+  LPStatus | 'expired',
   {
     label: string
     className: string
@@ -41,10 +43,28 @@ const statusConfig: Record<
     className: 'bg-red-100 text-red-800 hover:bg-red-100',
     icon: '⛔',
   },
+  expired: {
+    label: 'Expired',
+    className: 'bg-red-100 text-red-800 hover:bg-red-100',
+    icon: '🔴',
+  },
 }
 
-export function LPStatusBadge({ status, size = 'md', className }: LPStatusBadgeProps) {
-  const config = statusConfig[status]
+export function LPStatusBadge({ status, size = 'md', className, expiryDate }: LPStatusBadgeProps) {
+  // Check if LP is expired
+  let effectiveStatus: LPStatus | 'expired' = status
+  
+  if (expiryDate && status !== 'blocked' && status !== 'consumed') {
+    const expiry = new Date(expiryDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset time to start of day for accurate comparison
+    
+    if (expiry < today) {
+      effectiveStatus = 'expired'
+    }
+  }
+
+  const config = statusConfig[effectiveStatus]
 
   const sizeClasses = {
     sm: 'text-xs px-2 py-0.5',

@@ -1,6 +1,7 @@
 /**
  * LP Identity Card Component
  * Story 05.6: LP Detail Page
+ * Bug Fix: Pass expiry date to status badge
  *
  * Identity section - LP number, status, dates
  */
@@ -18,6 +19,7 @@ interface LPIdentityCardProps {
   source: LPSource
   createdAt: string
   updatedAt: string
+  expiryDate?: string | null
 }
 
 export function LPIdentityCard({
@@ -27,6 +29,7 @@ export function LPIdentityCard({
   source,
   createdAt,
   updatedAt,
+  expiryDate,
 }: LPIdentityCardProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6" data-testid="identity-card">
@@ -36,7 +39,7 @@ export function LPIdentityCard({
         <div>
           <div className="text-2xl font-bold text-gray-900 mb-2">{lpNumber}</div>
           <div className="flex gap-2">
-            <LPStatusBadge status={status} type="lp" />
+            <LPStatusBadge status={status} type="lp" expiryDate={expiryDate} />
             <LPStatusBadge status={qaStatus} type="qa" />
           </div>
         </div>

@@ -87,7 +87,7 @@ export default function LicensePlateDetailPage(props: PageProps) {
             <h1 className="text-3xl font-bold">{lp.lp_number}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <LPStatusBadge status={lp.status} type="lp" />
+            <LPStatusBadge status={lp.status} type="lp" expiryDate={lp.expiry_date} />
             <LPStatusBadge status={lp.qa_status} type="qa" />
           </div>
         </div>
@@ -153,6 +153,7 @@ export default function LicensePlateDetailPage(props: PageProps) {
               source={lp.source}
               createdAt={lp.created_at}
               updatedAt={lp.updated_at}
+              expiryDate={lp.expiry_date}
             />
 
             <LPProductCard

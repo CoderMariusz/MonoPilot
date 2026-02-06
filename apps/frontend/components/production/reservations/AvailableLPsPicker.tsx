@@ -122,6 +122,14 @@ function isNearExpiry(expiryDate: string | null): boolean {
   return days !== null && days >= 0 && days < 30
 }
 
+/**
+ * Check if LP is expired (past expiry date)
+ */
+function isExpired(expiryDate: string | null): boolean {
+  const days = getDaysUntilExpiry(expiryDate)
+  return days !== null && days < 0
+}
+
 export function AvailableLPsPicker({
   lps,
   selectedLPs,
@@ -441,26 +449,40 @@ export function AvailableLPsPicker({
                 const isSelected = selectedLPs.has(lp.id)
                 const selectedQty = selectedLPs.get(lp.id) || 0
                 const nearExpiry = isNearExpiry(lp.expiry_date)
+                const expired = isExpired(lp.expiry_date)
                 const hasOtherReservations = lp.other_reservations && lp.other_reservations.length > 0
                 const validationError = validationErrors.get(lp.id)
-                const isSuggested = index === 0 // First item is suggested
+                const isSuggested = index === 0 && !expired // First item is suggested (if not expired)
 
                 return (
                   <TableRow
                     key={lp.id}
                     className={cn(
                       isSelected && 'bg-blue-50',
-                      nearExpiry && !isSelected && 'bg-yellow-50'
+                      nearExpiry && !isSelected && !expired && 'bg-yellow-50',
+                      expired && 'bg-red-50 opacity-60'
                     )}
                     data-testid={`lp-row-${lp.id}`}
                   >
                     <TableCell>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleSelect(lp.id, checked === true)}
-                        aria-label={`Select ${lp.lp_number} for reservation`}
-                        data-testid={`checkbox-${lp.id}`}
-                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => handleSelect(lp.id, checked === true)}
+                              aria-label={`Select ${lp.lp_number} for reservation`}
+                              data-testid={`checkbox-${lp.id}`}
+                              disabled={expired}
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        {expired && (
+                          <TooltipContent>
+                            <p className="text-sm">Cannot select expired LP</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
@@ -482,9 +504,18 @@ export function AvailableLPsPicker({
                       {lp.lot_number || 'N/A'}
                     </TableCell>
                     <TableCell>
-                      <div className={cn('text-sm', nearExpiry && 'text-yellow-600 font-medium')}>
+                      <div className={cn(
+                        'text-sm',
+                        nearExpiry && !expired && 'text-yellow-600 font-medium',
+                        expired && 'text-red-600 font-bold'
+                      )}>
                         {lp.expiry_date ? formatDate(lp.expiry_date) : 'No expiry'}
-                        {nearExpiry && (
+                        {expired && (
+                          <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold">
+                            EXPIRED
+                          </span>
+                        )}
+                        {nearExpiry && !expired && (
                           <AlertTriangle
                             className="inline-block ml-1 h-4 w-4 text-yellow-500"
                             data-testid="near-expiry-warning"
@@ -532,7 +563,8 @@ export function AvailableLPsPicker({
                       <span
                         className={cn(
                           'text-sm',
-                          nearExpiry && 'text-yellow-600 font-medium'
+                          nearExpiry && !expired && 'text-yellow-600 font-medium',
+                          expired && 'text-red-600 font-bold'
                         )}
                       >
                         {formatShelfLife(lp.expiry_date)}
@@ -547,7 +579,7 @@ export function AvailableLPsPicker({
                           step="0.01"
                           value={isSelected ? selectedQty : ''}
                           onChange={(e) => handleQuantityChange(lp.id, e.target.value)}
-                          disabled={!isSelected}
+                          disabled={!isSelected || expired}
                           className={cn(
                             'w-20 h-8 text-sm',
                             validationError && 'border-red-500'
@@ -558,6 +590,11 @@ export function AvailableLPsPicker({
                         {validationError && (
                           <p className="text-xs text-red-500" data-testid="validation-error">
                             {validationError}
+                          </p>
+                        )}
+                        {expired && (
+                          <p className="text-xs text-red-600 font-medium">
+                            Cannot use expired LP
                           </p>
                         )}
                       </div>

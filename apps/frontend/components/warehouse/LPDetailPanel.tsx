@@ -56,7 +56,7 @@ export function LPDetailPanel({ lp, open, onClose, onBlock, onUnblock, onUpdateQ
               <div className="grid grid-cols-3 gap-2">
                 <span className="text-muted-foreground">Status:</span>
                 <div className="col-span-2">
-                  <LPStatusBadge status={lp.status} />
+                  <LPStatusBadge status={lp.status} expiryDate={lp.expiry_date} />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">

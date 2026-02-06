@@ -116,7 +116,7 @@ export function LPDataTable({ data, isLoading, onRowClick, onBlock, onUnblock, o
                 </div>
               </TableCell>
               <TableCell>
-                <LPStatusBadge status={lp.status} size="sm" />
+                <LPStatusBadge status={lp.status} size="sm" expiryDate={lp.expiry_date} />
               </TableCell>
               <TableCell>
                 <LPQAStatusBadge qaStatus={lp.qa_status} size="sm" />

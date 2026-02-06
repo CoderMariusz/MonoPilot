@@ -1,21 +1,36 @@
 /**
  * LP Status Badge Component
  * Story 05.6: LP Detail Page
+ * Bug Fix: Expired LPs now show "Expired" status instead of "Available"
  *
  * Status badge with color coding and icon
  */
 
 import React from 'react'
-import { CheckCircle, Lock, Archive, Ban } from 'lucide-react'
+import { CheckCircle, Lock, Archive, Ban, AlertCircle } from 'lucide-react'
 import type { LPStatus, QAStatus } from '@/lib/types/license-plate'
 
 interface LPStatusBadgeProps {
   status: LPStatus | QAStatus
   type?: 'lp' | 'qa'
+  expiryDate?: string | null
 }
 
-export function LPStatusBadge({ status, type = 'lp' }: LPStatusBadgeProps) {
-  const config = getStatusConfig(status, type)
+export function LPStatusBadge({ status, type = 'lp', expiryDate }: LPStatusBadgeProps) {
+  // Check if LP is expired (only for LP status, not QA status)
+  let effectiveStatus = status
+  
+  if (type === 'lp' && expiryDate && status !== 'blocked' && status !== 'consumed') {
+    const expiry = new Date(expiryDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset time to start of day for accurate comparison
+    
+    if (expiry < today) {
+      effectiveStatus = 'expired' as LPStatus
+    }
+  }
+
+  const config = getStatusConfig(effectiveStatus, type)
 
   return (
     <span
@@ -28,9 +43,9 @@ export function LPStatusBadge({ status, type = 'lp' }: LPStatusBadgeProps) {
   )
 }
 
-function getStatusConfig(status: LPStatus | QAStatus, type: 'lp' | 'qa') {
+function getStatusConfig(status: LPStatus | QAStatus | 'expired', type: 'lp' | 'qa') {
   if (type === 'lp') {
-    const lpStatus = status as LPStatus
+    const lpStatus = status as LPStatus | 'expired'
     switch (lpStatus) {
       case 'available':
         return {
@@ -63,6 +78,14 @@ function getStatusConfig(status: LPStatus | QAStatus, type: 'lp' | 'qa') {
           text: 'text-red-800',
           border: 'border-red-300',
           icon: Ban,
+        }
+      case 'expired':
+        return {
+          label: 'Expired',
+          background: 'bg-red-100',
+          text: 'text-red-800',
+          border: 'border-red-300',
+          icon: AlertCircle,
         }
       default:
         return {
