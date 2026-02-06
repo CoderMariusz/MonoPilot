@@ -319,7 +319,7 @@ export async function createHold(
   // Get held_by user info
   const { data: heldByUser } = await supabase
     .from('users')
-    .select('id, name, email')
+    .select('id, first_name, last_name, email')
     .eq('id', userId)
     .single()
 
@@ -329,7 +329,9 @@ export async function createHold(
   return {
     hold: {
       ...hold,
-      held_by: heldByUser || { id: userId, name: 'Unknown', email: '' },
+      held_by: heldByUser 
+        ? { id: heldByUser.id, name: `${heldByUser.first_name} ${heldByUser.last_name}`.trim(), email: heldByUser.email }
+        : { id: userId, name: 'Unknown', email: '' },
     } as QualityHold,
     items: responseItems,
     lp_updates: lpUpdates.length > 0 ? lpUpdates : undefined,
@@ -347,8 +349,8 @@ export async function getHoldById(holdId: string, orgId: string): Promise<HoldDe
     .from('quality_holds')
     .select(`
       *,
-      held_by_user:users!quality_holds_held_by_fkey(id, name, email),
-      released_by_user:users!quality_holds_released_by_fkey(id, name, email)
+      held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name, email),
+      released_by_user:users!quality_holds_released_by_fkey(id, first_name, last_name, email)
     `)
     .eq('id', holdId)
     .eq('org_id', orgId)
@@ -372,12 +374,19 @@ export async function getHoldById(holdId: string, orgId: string): Promise<HoldDe
   // Enrich items with reference_display and location_name
   const enrichedItems = await enrichHoldItems(supabase, items || [])
 
-  // Transform response
+  // Transform response - combine first_name and last_name into name
+  const heldByUser = hold.held_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+  const releasedByUser = hold.released_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+
   const response: HoldDetailResponse = {
     hold: {
       ...hold,
-      held_by: hold.held_by_user || { id: hold.held_by, name: 'Unknown', email: '' },
-      released_by: hold.released_by_user || null,
+      held_by: heldByUser 
+        ? { id: heldByUser.id, name: `${heldByUser.first_name} ${heldByUser.last_name}`.trim(), email: heldByUser.email }
+        : { id: hold.held_by, name: 'Unknown', email: '' },
+      released_by: releasedByUser
+        ? { id: releasedByUser.id, name: `${releasedByUser.first_name} ${releasedByUser.last_name}`.trim(), email: releasedByUser.email }
+        : null,
     } as QualityHold,
     items: enrichedItems,
     ncr: null, // NCR table doesn't exist yet
@@ -435,8 +444,8 @@ export async function releaseHold(
     .eq('id', holdId)
     .select(`
       *,
-      held_by_user:users!quality_holds_held_by_fkey(id, name, email),
-      released_by_user:users!quality_holds_released_by_fkey(id, name, email)
+      held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name, email),
+      released_by_user:users!quality_holds_released_by_fkey(id, first_name, last_name, email)
     `)
     .single()
 
@@ -524,11 +533,19 @@ export async function releaseHold(
       .in('id', lpIds)
   }
 
+  // Transform user info - combine first_name and last_name into name
+  const heldByUser = updatedHold.held_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+  const releasedByUser = updatedHold.released_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+
   return {
     hold: {
       ...updatedHold,
-      held_by: updatedHold.held_by_user || { id: updatedHold.held_by, name: 'Unknown', email: '' },
-      released_by: updatedHold.released_by_user || null,
+      held_by: heldByUser
+        ? { id: heldByUser.id, name: `${heldByUser.first_name} ${heldByUser.last_name}`.trim(), email: heldByUser.email }
+        : { id: updatedHold.held_by, name: 'Unknown', email: '' },
+      released_by: releasedByUser
+        ? { id: releasedByUser.id, name: `${releasedByUser.first_name} ${releasedByUser.last_name}`.trim(), email: releasedByUser.email }
+        : null,
     } as QualityHold,
     lp_updates: lpUpdates.length > 0 ? lpUpdates : undefined,
   }
@@ -544,7 +561,7 @@ export async function getActiveHolds(orgId: string): Promise<ActiveHoldsResponse
     .from('quality_holds')
     .select(`
       id, hold_number, status, priority, hold_type, reason, held_at,
-      held_by_user:users!quality_holds_held_by_fkey(id, name)
+      held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name)
     `)
     .eq('org_id', orgId)
     .eq('status', 'active')
@@ -578,7 +595,7 @@ export async function getHoldsList(
     .from('quality_holds')
     .select(`
       id, hold_number, status, priority, hold_type, reason, held_at,
-      held_by_user:users!quality_holds_held_by_fkey(id, name)
+      held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name)
     `, { count: 'exact' })
     .eq('org_id', orgId)
 
@@ -784,8 +801,8 @@ export async function getActiveLPHold(
         id, org_id, hold_number, reason, hold_type, status, priority,
         held_at, released_at, release_notes, disposition, ncr_id,
         created_at, updated_at, created_by, updated_by,
-        held_by_user:users!quality_holds_held_by_fkey(id, name, email),
-        released_by_user:users!quality_holds_released_by_fkey(id, name, email)
+        held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name, email),
+        released_by_user:users!quality_holds_released_by_fkey(id, first_name, last_name, email)
       )
     `)
     .eq('reference_type', 'lp')
@@ -806,10 +823,17 @@ export async function getActiveLPHold(
   if (!data?.hold) return null
 
   const hold = data.hold as any
+  const heldByUser = hold.held_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+  const releasedByUser = hold.released_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+
   return {
     ...hold,
-    held_by: hold.held_by_user || { id: '', name: 'Unknown', email: '' },
-    released_by: hold.released_by_user || null,
+    held_by: heldByUser
+      ? { id: heldByUser.id, name: `${heldByUser.first_name} ${heldByUser.last_name}`.trim(), email: heldByUser.email }
+      : { id: '', name: 'Unknown', email: '' },
+    released_by: releasedByUser
+      ? { id: releasedByUser.id, name: `${releasedByUser.first_name} ${releasedByUser.last_name}`.trim(), email: releasedByUser.email }
+      : null,
   } as QualityHold
 }
 
@@ -851,7 +875,7 @@ function buildHoldSummaries(
     hold_type: string
     reason: string
     held_at: string
-    held_by_user?: { id: string; name: string } | null
+    held_by_user?: { id: string; first_name: string; last_name: string } | null
   }>,
   itemsCounts: Record<string, number>
 ): QualityHoldSummary[] {
@@ -859,6 +883,12 @@ function buildHoldSummaries(
     const heldAt = new Date(hold.held_at)
     const agingHours = (Date.now() - heldAt.getTime()) / (1000 * 60 * 60)
     const agingStatus = calculateAgingStatus(hold.priority as any, heldAt)
+
+    // Combine first_name and last_name into name
+    const heldByUser = hold.held_by_user
+    const heldBy = heldByUser
+      ? { id: heldByUser.id, name: `${heldByUser.first_name} ${heldByUser.last_name}`.trim() }
+      : { id: '', name: 'Unknown' }
 
     return {
       id: hold.id,
@@ -868,7 +898,7 @@ function buildHoldSummaries(
       hold_type: hold.hold_type as any,
       reason: truncateReason(hold.reason),
       items_count: itemsCounts[hold.id] || 0,
-      held_by: hold.held_by_user || { id: '', name: 'Unknown' },
+      held_by: heldBy,
       held_at: hold.held_at,
       aging_hours: Math.round(agingHours * 100) / 100,
       aging_status: agingStatus,
