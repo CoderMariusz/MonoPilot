@@ -258,8 +258,8 @@ export async function changePassword(
     // Use service role client for RLS bypass
     const policy = await getPasswordPolicy(supabase, user.org_id)
     if (policy.enforce_password_history) {
-      const { createAdminClient } = await import('@/lib/supabase/server')
-      const adminClient = await createAdminClient()
+      const { createAdminClient } = await import('@/lib/supabase/admin-client')
+      const adminClient = createAdminClient()
       const inHistory = await checkPasswordHistory(adminClient, userId, newPassword)
       if (inHistory) {
         throw new Error('Password was used recently. Please choose a different password.')
@@ -272,8 +272,8 @@ export async function changePassword(
     // Add old password to history (if exists)
     // Use service role client for RLS bypass
     if (user.password_hash) {
-      const { createAdminClient } = await import('@/lib/supabase/server')
-      const adminClient = await createAdminClient()
+      const { createAdminClient } = await import('@/lib/supabase/admin-client')
+      const adminClient = createAdminClient()
       await addToHistory(adminClient, userId, user.password_hash)
     }
 
