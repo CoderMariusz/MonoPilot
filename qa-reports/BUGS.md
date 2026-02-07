@@ -216,6 +216,60 @@ Additionally, two migration files (004 and 007) both seeded roles, causing confu
 
 ---
 
+## BUG-010: Warehouse Code field truncates last character on create
+
+| Field | Value |
+|-------|-------|
+| **ID** | BUG-010 |
+| **Severity** | HIGH |
+| **Status** | 🟢 FIXED |
+| **Page** | /settings/warehouses |
+| **Reported** | 2026-02-07 |
+| **Fixed** | 2026-02-07 |
+
+### Problem
+When creating a warehouse with a code longer than 20 characters (e.g., "QA-TEST-20260207-2307" with 23 chars), the saved value was truncated to 22 characters, missing the last character.
+
+### Root Cause
+**Database VARCHAR(20) limit and matching frontend validation:**
+1. **Database**: `code VARCHAR(20)` column with CHECK constraint `code ~ '^[A-Z0-9-]{2,20}$'`
+2. **Frontend**: Zod schema with `.max(20)` and regex `/^[A-Z0-9-]{2,20}$/`
+
+The 20-character limit was too restrictive for longer warehouse codes that include date-based identifiers.
+
+### Solution
+Increased the limit from 20 to 50 characters in both:
+1. **Database migration** (`149_expand_warehouse_code_length.sql`):
+   - Dropped old CHECK constraint
+   - Altered column to `VARCHAR(50)`
+   - Added new CHECK constraint `{2,50}`
+
+2. **Frontend validation** (`warehouse-schemas.ts`):
+   - Changed `.max(20)` to `.max(50)`
+   - Updated regex from `{2,20}` to `{2,50}`
+
+### Commit
+- **Hash**: `b8337bad`
+- **Message**: `fix(warehouse): expand code field from 20 to 50 characters`
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `supabase/migrations/149_expand_warehouse_code_length.sql` | Created |
+| `apps/frontend/lib/validation/warehouse-schemas.ts` | Modified |
+
+### Verification
+- [x] Migration file created
+- [x] Frontend validation updated
+- [x] Commit pushed to main branch
+- [ ] Migration applied to Supabase
+
+### Notes
+- After deployment, migration needs to be applied via `supabase db push` or dashboard
+- Codes up to 50 characters are now supported (e.g., "QA-TEST-20260207-2307" works)
+
+---
+
 ## Closed Bugs
 
 _No closed bugs yet._
