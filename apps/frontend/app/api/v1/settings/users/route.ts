@@ -87,9 +87,17 @@ export async function GET(request: Request) {
       query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
     }
 
-    // Apply role filter
+    // Apply role filter (convert role code to role_id first)
     if (role) {
-      query = query.eq('role.code', role)
+      const { data: roleData } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('code', role)
+        .single()
+      
+      if (roleData) {
+        query = query.eq('role_id', roleData.id)
+      }
     }
 
     // Apply status filter

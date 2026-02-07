@@ -1,14 +1,13 @@
 /**
  * Toast Hook (Story 01.15)
  *
- * Simple toast notification hook
+ * Simple toast notification hook with Context Provider
  * Provides a minimal implementation for toast notifications
  */
 
 'use client'
 
-import { useState, useCallback } from 'react'
-import type { ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
 export interface Toast {
   id: string
@@ -18,7 +17,15 @@ export interface Toast {
   action?: ReactNode
 }
 
-export function useToast() {
+interface ToastContextValue {
+  toasts: Toast[]
+  toast: (props: Omit<Toast, 'id'>) => { id: string }
+  dismiss: (toastId: string) => void
+}
+
+const ToastContext = createContext<ToastContextValue | null>(null)
+
+export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const toast = useCallback(
@@ -42,9 +49,19 @@ export function useToast() {
     setToasts((prev) => prev.filter((t) => t.id !== toastId))
   }, [])
 
-  return {
-    toast,
-    dismiss,
-    toasts,
+  return (
+    <ToastContext.Provider value={{ toasts, toast, dismiss }}>
+      {children}
+    </ToastContext.Provider>
+  )
+}
+
+export function useToast() {
+  const context = useContext(ToastContext)
+  
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider')
   }
+  
+  return context
 }
