@@ -73,6 +73,8 @@ export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
   const today = new Date().toISOString().split('T')[0]
 
   try {
+    console.log('[getDashboardKPIs] Starting KPI fetch for org:', orgId)
+    
     // Execute all queries in parallel for performance
     const [
       totalResult,
@@ -86,7 +88,11 @@ export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
         .from('license_plates')
         .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId)
-        .not('status', 'eq', 'consumed'),
+        .not('status', 'eq', 'consumed')
+        .then(res => {
+          if (res.error) console.error('[KPI 1] Total LPs error:', res.error)
+          return res
+        }),
 
       // 2. Available LPs (status='available' AND qa_status='passed')
       supabase
@@ -94,14 +100,22 @@ export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
         .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId)
         .eq('status', 'available')
-        .eq('qa_status', 'passed'),
+        .eq('qa_status', 'passed')
+        .then(res => {
+          if (res.error) console.error('[KPI 2] Available LPs error:', res.error)
+          return res
+        }),
 
       // 3. Reserved LPs (distinct count from lp_reservations)
       supabase
         .from('lp_reservations')
         .select('lp_id', { count: 'exact', head: true })
         .eq('org_id', orgId)
-        .eq('status', 'active'),
+        .eq('status', 'active')
+        .then(res => {
+          if (res.error) console.error('[KPI 3] Reserved LPs error:', res.error)
+          return res
+        }),
 
       // 4. Consumed today (status='consumed' AND updated_at >= today)
       supabase
@@ -109,7 +123,11 @@ export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
         .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId)
         .eq('status', 'consumed')
-        .gte('updated_at', `${today}T00:00:00Z`),
+        .gte('updated_at', `${today}T00:00:00Z`)
+        .then(res => {
+          if (res.error) console.error('[KPI 4] Consumed today error:', res.error)
+          return res
+        }),
 
       // 5. Expiring soon (within 30 days)
       supabase
@@ -118,8 +136,19 @@ export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
         .eq('org_id', orgId)
         .eq('status', 'available')
         .gte('expiry_date', today)
-        .lte('expiry_date', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+        .lte('expiry_date', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .then(res => {
+          if (res.error) console.error('[KPI 5] Expiring soon error:', res.error)
+          return res
+        }),
     ])
+
+    // Check for any errors in the results
+    if (totalResult.error || availableResult.error || reservedResult.error || 
+        consumedTodayResult.error || expiringSoonResult.error) {
+      console.error('[getDashboardKPIs] One or more queries failed')
+      throw new Error('Failed to fetch KPIs: Database query error')
+    }
 
     const kpis: DashboardKPIs = {
       total_lps: totalResult.count ?? 0,
@@ -129,12 +158,14 @@ export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
       expiring_soon: expiringSoonResult.count ?? 0,
     }
 
+    console.log('[getDashboardKPIs] Successfully fetched KPIs:', kpis)
+
     // Cache the result
     setCache(cacheKey, kpis, CACHE_TTL)
 
     return kpis
   } catch (error) {
-    console.error('Error fetching warehouse dashboard KPIs:', error)
+    console.error('[getDashboardKPIs] Error fetching warehouse dashboard KPIs:', error)
     // Return zeros on error
     return {
       total_lps: 0,
