@@ -15,13 +15,19 @@ const SelectValue = SelectPrimitive.Value
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onClick, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
       "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className
     )}
+    onClick={(e) => {
+      // Stop propagation to prevent clicks from bubbling to parent elements
+      // This fixes navigation issues when Select is inside a Dialog or clickable container
+      e.stopPropagation()
+      onClick?.(e)
+    }}
     {...props}
   >
     {children}
@@ -81,6 +87,13 @@ const SelectContent = React.forwardRef<
         className
       )}
       position={position}
+      // Prevent pointer events from propagating outside the select
+      // This fixes issues when Select is used inside Dialog where clicks
+      // could unintentionally trigger navigation on elements behind the portal
+      onPointerDownOutside={(e) => {
+        // Prevent the event from closing dialogs or triggering other handlers
+        e.preventDefault()
+      }}
       {...props}
     >
       <SelectScrollUpButton />
