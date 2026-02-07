@@ -33,8 +33,9 @@ export async function GET(request: Request, props: { params: Promise<{ barcode: 
     }
 
     const { barcode } = params
+    const decodedBarcode = decodeURIComponent(barcode)
 
-    if (!barcode || barcode.length === 0) {
+    if (!decodedBarcode || decodedBarcode.length === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -47,7 +48,37 @@ export async function GET(request: Request, props: { params: Promise<{ barcode: 
       )
     }
 
-    const lp = await ScannerMoveService.lookupLP(supabase, decodeURIComponent(barcode))
+    // Validate barcode format: alphanumeric, hyphens, underscores only
+    const LP_PATTERN = /^[A-Za-z0-9\-_]+$/
+    const MAX_LP_LENGTH = 50
+
+    if (decodedBarcode.length > MAX_LP_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: SCANNER_MOVE_ERROR_CODES.VALIDATION_ERROR,
+            message: `Barcode too long (max ${MAX_LP_LENGTH} characters)`,
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (!LP_PATTERN.test(decodedBarcode)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: SCANNER_MOVE_ERROR_CODES.VALIDATION_ERROR,
+            message: 'Invalid barcode format. Only letters, numbers, hyphens, and underscores allowed.',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    const lp = await ScannerMoveService.lookupLP(supabase, decodedBarcode)
 
     if (!lp) {
       return NextResponse.json(

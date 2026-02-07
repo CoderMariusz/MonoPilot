@@ -23,9 +23,27 @@ interface Step1ScanLPProps {
   onBarcodeScan?: (barcode: string) => Promise<{ lp: LPDetails; suggestion: LocationSuggestionData }>
 }
 
+// LP validation: alphanumeric, hyphens, underscores only (common barcode chars)
+const LP_PATTERN = /^[A-Za-z0-9\-_]+$/
+const MAX_LP_LENGTH = 50
+
+function validateLPInput(value: string): { isValid: boolean; error?: string } {
+  if (!value.trim()) {
+    return { isValid: false }
+  }
+  if (value.length > MAX_LP_LENGTH) {
+    return { isValid: false, error: `LP code too long (max ${MAX_LP_LENGTH} characters)` }
+  }
+  if (!LP_PATTERN.test(value)) {
+    return { isValid: false, error: 'LP code can only contain letters, numbers, hyphens, and underscores' }
+  }
+  return { isValid: true }
+}
+
 export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, onBarcodeScan }: Step1ScanLPProps) {
   const [barcode, setBarcode] = useState('')
   const [isScanning, setIsScanning] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Auto-focus input on mount
@@ -35,10 +53,44 @@ export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, 
     }
   }, [])
 
+  // Handle input change with validation
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setBarcode(value)
+    
+    // Clear validation error when input is empty
+    if (!value.trim()) {
+      setValidationError(null)
+      return
+    }
+    
+    // Validate input
+    const { error: valError } = validateLPInput(value)
+    setValidationError(valError || null)
+  }, [])
+
+  // Focus input for manual entry
+  const handleManualEntryClick = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [])
+
   const handleSubmit = useCallback(async () => {
     const trimmed = barcode.trim()
     if (!trimmed || isLoading || isScanning) return
 
+    // Validate before submitting
+    const { isValid, error: valError } = validateLPInput(trimmed)
+    if (!isValid) {
+      setValidationError(valError || 'Invalid LP code')
+      AudioFeedback.playError()
+      HapticFeedback.error()
+      return
+    }
+
+    setValidationError(null)
     setIsScanning(true)
 
     try {
@@ -181,9 +233,9 @@ export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, 
       </div>
 
       {/* Error message */}
-      {error && (
+      {(error || validationError) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-center">
-          {error}
+          {validationError || error}
         </div>
       )}
 
@@ -200,24 +252,31 @@ export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, 
           ref={inputRef}
           type="text"
           value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="LP00000001"
           className={cn(
             'h-12 min-h-[48px] text-xl font-mono text-center',
-            'border-2 focus:border-cyan-500'
+            'border-2 focus:border-cyan-500',
+            validationError && 'border-red-500 focus:border-red-500'
           )}
           autoComplete="off"
           autoFocus
           disabled={isLoading || isScanning}
           aria-label="LP barcode"
+          aria-invalid={!!validationError}
+          aria-describedby={validationError ? 'lp-error' : undefined}
+          pattern="[A-Za-z0-9\-_]+"
+          maxLength={MAX_LP_LENGTH}
         />
         <button
           type="button"
+          onClick={handleManualEntryClick}
           className="w-full mt-2 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1"
+          title="Click to focus input and type LP code manually instead of scanning"
         >
           <Keyboard className="h-4 w-4" />
-          Tap to type manually
+          Type LP code manually
         </button>
       </div>
 
