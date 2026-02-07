@@ -470,20 +470,41 @@ export class PackingScannerService {
     orgId: string,
     barcode: string
   ): Promise<ShipmentLookupResult | null> {
-    // Try to find by shipment_number or sales_order.so_number
-    const { data: shipment } = await supabase
+    // Try to find by shipment_number first
+    let { data: shipment } = await supabase
       .from('shipments')
       .select(`
         id,
         shipment_number,
         sales_orders!inner(
+          id,
           so_number,
           customers!inner(id, name, allergen_restrictions)
         )
       `)
       .eq('org_id', orgId)
-      .or(`shipment_number.eq.${barcode},sales_orders.so_number.eq.${barcode}`)
+      .eq('shipment_number', barcode)
       .single()
+
+    // If not found by shipment_number, try by SO number
+    if (!shipment) {
+      const { data: shipmentBySO } = await supabase
+        .from('shipments')
+        .select(`
+          id,
+          shipment_number,
+          sales_orders!inner(
+            id,
+            so_number,
+            customers!inner(id, name, allergen_restrictions)
+          )
+        `)
+        .eq('org_id', orgId)
+        .eq('sales_orders.so_number', barcode)
+        .single()
+
+      shipment = shipmentBySO
+    }
 
     if (!shipment) {
       return null
