@@ -58,7 +58,42 @@ export async function GET(req: NextRequest) {
       query = query.or(`code.ilike.%${params.search}%,name.ilike.%${params.search}%`)
     }
 
-    if (params.product_type_id) {
+    // Handle type filter (can be code like "RM" or UUID)
+    const typeParam = searchParams.type || searchParams.product_type_id
+    if (typeParam) {
+      const types = Array.isArray(typeParam) ? typeParam : [typeParam]
+      
+      // Check if it's a UUID or a code
+      const isUUID = types[0]?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+      
+      if (isUUID) {
+        // Filter by UUID directly
+        query = query.in('product_type_id', types)
+      } else {
+        // Filter by product type code - need to join
+        // Get product type IDs from codes first
+        const { data: productTypes } = await supabase
+          .from('product_types')
+          .select('id')
+          .in('code', types)
+        
+        if (productTypes && productTypes.length > 0) {
+          const typeIds = productTypes.map((pt: { id: string }) => pt.id)
+          query = query.in('product_type_id', typeIds)
+        } else {
+          // No matching types found - return empty result
+          return NextResponse.json({
+            data: [],
+            pagination: {
+              page: params.page,
+              limit: params.limit,
+              total: 0,
+              totalPages: 0
+            }
+          })
+        }
+      }
+    } else if (params.product_type_id) {
       const types = Array.isArray(params.product_type_id) ? params.product_type_id : [params.product_type_id]
       query = query.in('product_type_id', types)
     }

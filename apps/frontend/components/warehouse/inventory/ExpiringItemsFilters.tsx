@@ -60,10 +60,10 @@ export function ExpiringItemsFilters({
   useEffect(() => {
     async function fetchWarehouses() {
       try {
-        const response = await fetch('/api/settings/warehouses')
+        const response = await fetch('/api/v1/settings/warehouses?status=active&limit=100')
         if (response.ok) {
-          const data = await response.json()
-          setWarehouses(data.data || data.warehouses || [])
+          const result = await response.json()
+          setWarehouses(result.data || [])
         }
       } catch (error) {
         console.error('Failed to fetch warehouses:', error)

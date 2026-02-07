@@ -35,12 +35,22 @@ export async function simulateRecall(
   let rootLp: LicensePlate | null = null
 
   if (input.lp_id) {
-    const { data, error } = await supabase
+    // Determine if lp_id is a UUID or LP number
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const isUuid = uuidRegex.test(input.lp_id)
+
+    let query = supabase
       .from('license_plates')
       .select('*')
-      .eq('id', input.lp_id)
       .eq('org_id', orgId)
-      .single()
+    
+    if (isUuid) {
+      query = query.eq('id', input.lp_id)
+    } else {
+      query = query.eq('lp_number', input.lp_id)
+    }
+
+    const { data, error } = await query.single()
 
     if (error || !data) throw new Error('License Plate not found')
     rootLp = data as LicensePlate

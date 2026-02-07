@@ -138,9 +138,69 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Note: search on related product fields requires post-filtering or a view
-    // For now, we'll do client-side filtering if search is provided
-    // This is a limitation - in production, use a database view or function
+    // Apply search filter BEFORE pagination
+    // Search on product code/name using the joined product relation
+    if (search) {
+      // Get products matching the search first
+      const { data: matchingProducts } = await supabase
+        .from('products')
+        .select('id')
+        .or(`code.ilike.%${search}%,name.ilike.%${search}%`)
+        .eq('org_id', userData.org_id)
+      
+      if (matchingProducts && matchingProducts.length > 0) {
+        const productIds = matchingProducts.map((p: { id: string }) => p.id)
+        query = query.in('product_id', productIds)
+      } else {
+        // No matching products - return empty result
+        return NextResponse.json({
+          boms: [],
+          total: 0,
+          page,
+          limit,
+        })
+      }
+    }
+
+    // Apply product_type filter BEFORE pagination
+    if (product_type) {
+      // Get product type ID from code first
+      const { data: productTypes } = await supabase
+        .from('product_types')
+        .select('id')
+        .eq('code', product_type)
+        .single()
+      
+      if (productTypes) {
+        // Get products of this type
+        const { data: matchingProducts } = await supabase
+          .from('products')
+          .select('id')
+          .eq('product_type_id', productTypes.id)
+          .eq('org_id', userData.org_id)
+        
+        if (matchingProducts && matchingProducts.length > 0) {
+          const productIds = matchingProducts.map((p: { id: string }) => p.id)
+          query = query.in('product_id', productIds)
+        } else {
+          // No matching products - return empty result
+          return NextResponse.json({
+            boms: [],
+            total: 0,
+            page,
+            limit,
+          })
+        }
+      } else {
+        // Product type not found - return empty result
+        return NextResponse.json({
+          boms: [],
+          total: 0,
+          page,
+          limit,
+        })
+      }
+    }
 
     // Apply sorting
     const ascending = sortOrder === 'asc'
@@ -156,30 +216,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Post-filter by search if provided (searches product code/name)
-    let filteredData = data || []
-    if (search) {
-      const searchLower = search.toLowerCase()
-      filteredData = filteredData.filter((bom: any) => {
-        const product = bom.product
-        if (!product) return false
-        return (
-          product.code?.toLowerCase().includes(searchLower) ||
-          product.name?.toLowerCase().includes(searchLower)
-        )
-      })
-    }
-
-    // Post-filter by product_type if provided
-    if (product_type) {
-      filteredData = filteredData.filter((bom: any) => {
-        return bom.product?.type === product_type
-      })
-    }
-
     // Format response
     const response: BOMsListResponse = {
-      boms: filteredData as BOMWithProduct[],
+      boms: (data || []) as BOMWithProduct[],
       total: count || 0,
       page,
       limit,

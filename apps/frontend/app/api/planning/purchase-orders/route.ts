@@ -71,9 +71,10 @@ export async function GET(request: NextRequest) {
 
     // Search filter (AC-1.1: Search by PO number or supplier name)
     // MAJOR-01 Fix: Sanitize search input to prevent query manipulation
+    // BUG FIX: Search on po_number only (joined table filtering requires different approach)
     if (search) {
       const sanitized = sanitizeSearchInput(search)
-      query = query.or(`po_number.ilike.%${sanitized}%,suppliers.name.ilike.%${sanitized}%`)
+      query = query.ilike('po_number', `%${sanitized}%`)
     }
 
     // Status filter

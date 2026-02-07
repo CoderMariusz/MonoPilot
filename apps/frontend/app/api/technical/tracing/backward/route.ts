@@ -32,18 +32,44 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const input = traceInputSchema.parse(body)
 
-    const lpId = input.lp_id
+    let lpId: string | undefined = input.lp_id
+    
+    // Check if we need to lookup LP by batch number or LP number
     if (!lpId && input.batch_number) {
-      // TODO: Query LP by batch_number
-      throw new Error('Batch number lookup not implemented yet')
+      // Query LP by batch_number
+      const { data: batchLp, error: batchError } = await supabase
+        .from('license_plates')
+        .select('id')
+        .eq('batch_number', input.batch_number)
+        .eq('org_id', currentUser.org_id)
+        .single()
+      
+      if (batchError || !batchLp) {
+        return NextResponse.json({ error: 'License plate with batch number not found' }, { status: 404 })
+      }
+      lpId = batchLp.id
     }
 
+    if (!lpId) {
+      return NextResponse.json({ error: 'LP ID or batch number required' }, { status: 400 })
+    }
+
+    // Determine if lpId is a UUID or LP number
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const isUuid = uuidRegex.test(lpId)
+
     // CRITICAL SECURITY: Verify LP belongs to user's organization
-    const { data: lp, error: lpError } = await supabase
+    let query = supabase
       .from('license_plates')
       .select('id, org_id')
-      .eq('id', lpId!)
-      .single()
+    
+    if (isUuid) {
+      query = query.eq('id', lpId)
+    } else {
+      query = query.eq('lp_number', lpId)
+    }
+
+    const { data: lp, error: lpError } = await query.single()
 
     if (lpError || !lp) {
       return NextResponse.json({ error: 'License plate not found' }, { status: 404 })
@@ -56,7 +82,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await traceBackward(lpId!, input.max_depth)
+    const result = await traceBackward(lp.id, input.max_depth)
 
     return NextResponse.json(result)
   } catch (error: any) {

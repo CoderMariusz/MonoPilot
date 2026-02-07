@@ -127,7 +127,7 @@ export function ReviewModal({
         const [suppliersRes, taxCodesRes, warehousesRes] = await Promise.all([
           fetch('/api/planning/suppliers?is_active=true'),
           fetch('/api/settings/tax-codes'),
-          fetch('/api/settings/warehouses?is_active=true'),
+          fetch('/api/v1/settings/warehouses?status=active&limit=100'),
         ])
 
         if (!suppliersRes.ok || !taxCodesRes.ok || !warehousesRes.ok) {
@@ -142,11 +142,11 @@ export function ReviewModal({
 
         setSuppliers(suppliersData.suppliers || [])
         setTaxCodes(taxCodesData.taxCodes || [])
-        setWarehouses(warehousesData.warehouses || [])
+        setWarehouses(warehousesData.data || [])
 
         // Set default warehouse if not already set
-        if (!selectedWarehouse && warehousesData.warehouses?.length > 0) {
-          setSelectedWarehouse(warehousesData.warehouses[0].id)
+        if (!selectedWarehouse && warehousesData.data?.length > 0) {
+          setSelectedWarehouse(warehousesData.data[0].id)
         }
       } catch (error) {
         console.error('Error fetching reference data:', error)

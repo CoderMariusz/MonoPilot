@@ -81,14 +81,14 @@ export function TransferOrderFormModal({
     const fetchWarehouses = async () => {
       try {
         setLoadingWarehouses(true)
-        const response = await fetch('/api/settings/warehouses?is_active=true')
+        const response = await fetch('/api/v1/settings/warehouses?status=active&limit=100')
 
         if (!response.ok) {
           throw new Error('Failed to fetch warehouses')
         }
 
-        const data = await response.json()
-        setWarehouses(data.warehouses || [])
+        const result = await response.json()
+        setWarehouses(result.data || [])
       } catch (error) {
         console.error('Error fetching warehouses:', error)
         toast({
@@ -105,7 +105,7 @@ export function TransferOrderFormModal({
     if (open) {
       fetchWarehouses()
     }
-  }, [open])
+  }, [open, toast])
 
   // Auto-calculate planned_receive_date when planned_ship_date changes
   useEffect(() => {

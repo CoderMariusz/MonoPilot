@@ -230,7 +230,7 @@ export default function TraceabilityPage() {
                   id="lp-id"
                   ref={searchInputRef}
                   type="text"
-                  placeholder="e.g., LP-2024-001 or UUID"
+                  placeholder="e.g., LP08528390 or LP-2024-001"
                   value={lpId}
                   onChange={(e) => setLpId(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -238,7 +238,7 @@ export default function TraceabilityPage() {
                   aria-describedby="lp-id-help"
                 />
                 <p id="lp-id-help" className="text-xs text-muted-foreground">
-                  Enter the full LP number or UUID
+                  Enter the LP number (e.g., LP08528390)
                 </p>
               </div>
 

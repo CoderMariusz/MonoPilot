@@ -75,10 +75,10 @@ export function ProductionLineFormModal({ line, onClose, onSuccess }: Production
   const fetchWarehouses = async () => {
     try {
       setLoadingWarehouses(true)
-      const response = await fetch('/api/settings/warehouses')
+      const response = await fetch('/api/v1/settings/warehouses?status=active&limit=100')
       if (!response.ok) throw new Error('Failed to fetch warehouses')
-      const data = await response.json()
-      setWarehouses(data.warehouses || [])
+      const result = await response.json()
+      setWarehouses(result.data || [])
     } catch (error) {
       console.error('Error fetching warehouses:', error)
       toast({

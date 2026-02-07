@@ -111,10 +111,10 @@ export function TransferOrdersDataTable({
     async function fetchWarehouses() {
       try {
         setLoadingWarehouses(true)
-        const response = await fetch('/api/settings/warehouses?is_active=true')
+        const response = await fetch('/api/v1/settings/warehouses?status=active&limit=100')
         if (response.ok) {
-          const data = await response.json()
-          setWarehouses(data.warehouses || [])
+          const result = await response.json()
+          setWarehouses(result.data || [])
         }
       } catch (error) {
         console.error('Error fetching warehouses:', error)

@@ -91,12 +91,12 @@ export function UserModal({ mode, user, open, onClose, onSuccess }: UserModalPro
     setWarehousesError(null)
 
     try {
-      const response = await fetch('/api/settings/warehouses')
+      const response = await fetch('/api/v1/settings/warehouses?status=active&limit=100')
       if (!response.ok) {
         throw new Error('Failed to fetch warehouses')
       }
-      const data = await response.json()
-      setWarehouses(data.warehouses || [])
+      const result = await response.json()
+      setWarehouses(result.data || [])
     } catch (error) {
       console.error('Error fetching warehouses:', error)
       setWarehousesError(
