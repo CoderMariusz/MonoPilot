@@ -36,22 +36,33 @@ ALTER TABLE public.organizations
 ALTER TABLE public.organizations
   ADD COLUMN IF NOT EXISTS fiscal_year_start INTEGER;
 
--- Add constraints
-ALTER TABLE public.organizations
-  ADD CONSTRAINT IF NOT EXISTS organizations_country_check
-    CHECK (country IS NULL OR length(country) <= 3);
+-- Add constraints (idempotent using DO block)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'organizations_country_check') THEN
+    ALTER TABLE public.organizations
+      ADD CONSTRAINT organizations_country_check
+        CHECK (country IS NULL OR length(country) <= 3);
+  END IF;
 
-ALTER TABLE public.organizations
-  ADD CONSTRAINT IF NOT EXISTS organizations_date_format_check
-    CHECK (date_format IS NULL OR date_format IN ('DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'));
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'organizations_date_format_check') THEN
+    ALTER TABLE public.organizations
+      ADD CONSTRAINT organizations_date_format_check
+        CHECK (date_format IS NULL OR date_format IN ('DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'));
+  END IF;
 
-ALTER TABLE public.organizations
-  ADD CONSTRAINT IF NOT EXISTS organizations_number_format_check
-    CHECK (number_format IS NULL OR number_format IN ('1,234.56', '1.234,56', '1 234.56'));
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'organizations_number_format_check') THEN
+    ALTER TABLE public.organizations
+      ADD CONSTRAINT organizations_number_format_check
+        CHECK (number_format IS NULL OR number_format IN ('1,234.56', '1.234,56', '1 234.56'));
+  END IF;
 
-ALTER TABLE public.organizations
-  ADD CONSTRAINT IF NOT EXISTS organizations_unit_system_check
-    CHECK (unit_system IS NULL OR unit_system IN ('metric', 'imperial'));
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'organizations_unit_system_check') THEN
+    ALTER TABLE public.organizations
+      ADD CONSTRAINT organizations_unit_system_check
+        CHECK (unit_system IS NULL OR unit_system IN ('metric', 'imperial'));
+  END IF;
+END $$;
 
 -- Sync company_name with existing 'name' for existing records
 UPDATE public.organizations

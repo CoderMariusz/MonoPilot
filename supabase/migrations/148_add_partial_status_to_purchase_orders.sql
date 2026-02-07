@@ -33,5 +33,4 @@ END $$;
 
 -- Comment for documentation
 COMMENT ON COLUMN purchase_orders.status IS 
-  'PO lifecycle status: draft → submitted → pending_approval → approved → confirmed → partial/receiving → closed | rejected/cancelled. ' ||
-  'partial = some lines fully received; receiving = active receipt in progress';
+  'PO lifecycle status: draft → submitted → pending_approval → approved → confirmed → partial/receiving → closed | rejected/cancelled. partial = some lines fully received; receiving = active receipt in progress';
