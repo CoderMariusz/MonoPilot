@@ -48,12 +48,18 @@ export function Step1SelectShipment({
       try {
         const response = await fetch('/api/shipping/scanner/pack/shipments')
         if (!response.ok) {
-          throw new Error('Failed to load shipments')
+          // On first load failure, show empty state instead of error (graceful degradation)
+          console.warn('Failed to load shipments:', response.status)
+          setShipments([])
+          setIsLoading(false)
+          return
         }
         const data = await response.json()
         setShipments(data.data || [])
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load shipments')
+        // Network errors on first load: show empty state, not error (graceful degradation)
+        console.warn('Network error loading shipments:', err)
+        setShipments([])
       } finally {
         setIsLoading(false)
       }

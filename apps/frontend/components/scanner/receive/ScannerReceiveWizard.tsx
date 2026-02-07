@@ -1,6 +1,8 @@
 /**
  * Scanner Receive Wizard Component (Story 05.19)
  * Purpose: 5-step wizard for scanner-based receiving
+ * BUG-080: Added help modal/sheet with workflow instructions
+ * BUG-081: Added validation for PO with 0 lines
  */
 
 'use client'
@@ -13,6 +15,7 @@ import { LoadingOverlay } from '../shared/LoadingOverlay'
 import { ErrorAnimation } from '../shared/ErrorAnimation'
 import { AudioFeedback } from '../shared/AudioFeedback'
 import { HapticFeedback } from '../shared/HapticFeedback'
+import { HelpSheet } from '../shared/HelpSheet'
 import { Step1SelectPO } from './Step1SelectPO'
 import { Step2ReviewLines } from './Step2ReviewLines'
 import { Step3EnterDetails } from './Step3EnterDetails'
@@ -56,6 +59,9 @@ export function ScannerReceiveWizard({
   const [currentStep, setCurrentStep] = useState(initialStep)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Help sheet state (BUG-080)
+  const [showHelp, setShowHelp] = useState(false)
 
   // Data states
   const [pendingPOs, setPendingPOs] = useState<PendingReceiptSummary[]>([])
@@ -107,14 +113,24 @@ export function ScannerReceiveWizard({
       const data = await response.json()
 
       if (data.success) {
-        setPOLines(data.data.lines || [])
+        const lines = data.data.lines || []
+        
+        // BUG-081: Validate that PO has lines before proceeding
+        if (lines.length === 0) {
+          setError('This Purchase Order has no line items. Please select a different PO or contact your administrator.')
+          AudioFeedback.playError()
+          HapticFeedback.error()
+          return
+        }
+        
+        setPOLines(lines)
         setSelectedPO({
           id: data.data.id,
           po_number: data.data.po_number,
           supplier_name: data.data.supplier_name,
           expected_date: data.data.expected_date,
-          lines_total: data.data.lines?.length || 0,
-          lines_pending: data.data.lines?.filter((l: POLineForScanner) => l.remaining_qty > 0).length || 0,
+          lines_total: lines.length,
+          lines_pending: lines.filter((l: POLineForScanner) => l.remaining_qty > 0).length,
           total_qty_ordered: 0,
           total_qty_received: 0,
         })
@@ -278,17 +294,41 @@ export function ScannerReceiveWizard({
 
   // Render error state
   if (error || externalError) {
+    const errorMessage = error || externalError || ''
+    const isEmptyPOError = errorMessage.includes('no line items')
+    
     return (
       <div className="h-screen flex flex-col bg-white">
         <ScannerHeader title="Receive Goods" onBack={handleBack} />
         <div className="flex-1 flex flex-col items-center justify-center p-8">
-          <ErrorAnimation show message={error || externalError} />
-          <button
-            onClick={handleRetry}
-            className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium"
-          >
-            Retry
-          </button>
+          <ErrorAnimation show message={errorMessage} />
+          <div className="mt-6 flex flex-col gap-3 w-full max-w-xs">
+            {isEmptyPOError ? (
+              // BUG-081: Show "Select Different PO" button for empty PO error
+              <button
+                onClick={() => {
+                  setError(null)
+                  setCurrentStep(1)
+                }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium text-center"
+              >
+                Select Different PO
+              </button>
+            ) : (
+              <button
+                onClick={handleRetry}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium text-center"
+              >
+                Retry
+              </button>
+            )}
+            <button
+              onClick={handleBack}
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium text-center"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -300,10 +340,18 @@ export function ScannerReceiveWizard({
         title="Receive Goods"
         onBack={currentStep < 5 ? handleBack : undefined}
         showHelp={currentStep < 5}
+        onHelp={() => setShowHelp(true)}
       />
       {currentStep < 5 && (
         <StepProgress currentStep={currentStep} totalSteps={5} stepLabels={STEP_LABELS} />
       )}
+      
+      {/* Help Sheet (BUG-080) */}
+      <HelpSheet
+        open={showHelp}
+        onOpenChange={setShowHelp}
+        workflow="receive"
+      />
 
       {currentStep === 1 && (
         <Step1SelectPO

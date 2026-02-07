@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
 import {
   Settings,
   Wrench,
@@ -141,21 +142,28 @@ export function Sidebar({ enabledModules = [] }: SidebarProps) {
       <nav className="flex-1 pt-8 px-2">
         <Link
           href="/dashboard"
-          className={`flex items-center h-12 px-3 rounded-lg transition-colors mb-1 ${isActive('/dashboard')
-            ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
-            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
+          data-active={isActive('/dashboard') || undefined}
+          className={cn(
+            'flex items-center h-12 px-3 rounded-lg transition-colors mb-1',
+            isActive('/dashboard')
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+          )}
         >
           <Lightbulb
-            className={`h-6 w-6 flex-shrink-0 ${isActive('/dashboard') ? 'text-blue-600' : 'text-gray-600'
-              }`}
+            className={cn(
+              'h-6 w-6 flex-shrink-0',
+              isActive('/dashboard') ? 'text-blue-600' : 'text-gray-600'
+            )}
           />
           {!collapsed && (
             <span
-              className={`ml-3 text-sm font-medium ${isActive('/dashboard')
-                ? 'text-blue-600'
-                : 'text-gray-900 dark:text-white'
-                }`}
+              className={cn(
+                'ml-3 text-sm font-medium',
+                isActive('/dashboard')
+                  ? 'text-blue-600'
+                  : 'text-gray-900 dark:text-white'
+              )}
             >
               Dashboard
             </span>
@@ -175,21 +183,28 @@ export function Sidebar({ enabledModules = [] }: SidebarProps) {
               <Link
                 key={module.key}
                 href={module.href}
-                className={`flex items-center h-12 px-3 rounded-lg transition-colors ${active
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
+                data-active={active || undefined}
+                className={cn(
+                  'flex items-center h-12 px-3 rounded-lg transition-colors',
+                  active
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                )}
               >
                 <Icon
-                  className={`h-6 w-6 flex-shrink-0 ${active ? 'text-blue-600' : module.color
-                    }`}
+                  className={cn(
+                    'h-6 w-6 flex-shrink-0',
+                    active ? 'text-blue-600' : module.color
+                  )}
                 />
                 {!collapsed && (
                   <span
-                    className={`ml-3 text-sm font-medium ${active
-                      ? 'text-blue-600'
-                      : 'text-gray-900 dark:text-white'
-                      }`}
+                    className={cn(
+                      'ml-3 text-sm font-medium',
+                      active
+                        ? 'text-blue-600'
+                        : 'text-gray-900 dark:text-white'
+                    )}
                   >
                     {module.name}
                   </span>

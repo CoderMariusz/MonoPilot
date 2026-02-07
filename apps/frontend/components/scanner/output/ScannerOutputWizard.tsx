@@ -257,7 +257,7 @@ export function ScannerOutputWizard({ onComplete }: ScannerOutputWizardProps) {
   if (isSubmitting) {
     return (
       <div className="h-screen flex flex-col bg-slate-900">
-        <ScannerHeader title="Register Output" onBack={handleBack} />
+        <ScannerHeader title="Register Output" onBack={handleBack} showHelp />
         <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} />
         <LoadingOverlay show message="Registering output..." />
       </div>
@@ -268,7 +268,7 @@ export function ScannerOutputWizard({ onComplete }: ScannerOutputWizardProps) {
   if (error && state !== 'scan_wo') {
     return (
       <div className="h-screen flex flex-col bg-slate-900">
-        <ScannerHeader title="Register Output" onBack={handleBack} />
+        <ScannerHeader title="Register Output" onBack={handleBack} showHelp />
         <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} />
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <ErrorAnimation show message={error.message} />
@@ -319,6 +319,7 @@ export function ScannerOutputWizard({ onComplete }: ScannerOutputWizardProps) {
       <ScannerHeader
         title={woData ? woData.wo_number : 'Register Output'}
         onBack={state !== 'lp_created' ? handleBack : undefined}
+        showHelp={state !== 'lp_created'}
       />
       <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} />
 
