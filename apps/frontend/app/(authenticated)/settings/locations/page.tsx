@@ -29,7 +29,6 @@ import { Badge } from '@/components/ui/badge'
 import { MapPin, Search, Edit, Trash2, Archive, QrCode } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { LocationForm } from '@/components/settings/LocationForm'
-import { SettingsHeader } from '@/components/settings/SettingsHeader'
 import { LocationDetailModal } from '@/components/settings/LocationDetailModal'
 
 interface Location {
@@ -195,18 +194,24 @@ export default function LocationsPage() {
   }
 
   return (
-    <div>
-      <SettingsHeader currentPage="locations" />
-      <div className="px-4 md:px-6 py-6">
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Location Management</h1>
+          <p className="text-muted-foreground">
+            Manage warehouse locations for inventory storage and tracking
+          </p>
+        </div>
+        <Button onClick={() => setShowCreateForm(true)}>
+          <MapPin className="mr-2 h-4 w-4" />
+          Add Location
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Location Management</CardTitle>
-            <Button onClick={() => setShowCreateForm(true)}>
-              <MapPin className="mr-2 h-4 w-4" />
-              Add Location
-            </Button>
-          </div>
+          <CardTitle>Locations</CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -375,7 +380,6 @@ export default function LocationsPage() {
         onOpenChange={(open) => !open && setViewingLocationId(null)}
         locationId={viewingLocationId}
       />
-      </div>
     </div>
   )
 }
