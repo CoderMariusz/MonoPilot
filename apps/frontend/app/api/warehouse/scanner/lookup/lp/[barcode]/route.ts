@@ -78,20 +78,26 @@ export async function GET(request: Request, props: { params: Promise<{ barcode: 
       )
     }
 
+    // BUG-087: Add debug logging for LP lookup
+    console.log('[LP Lookup] Searching for LP:', decodedBarcode, 'by user:', user.id)
+    
     const lp = await ScannerMoveService.lookupLP(supabase, decodedBarcode)
 
     if (!lp) {
+      console.log('[LP Lookup] LP not found:', decodedBarcode)
       return NextResponse.json(
         {
           success: false,
           error: {
             code: SCANNER_MOVE_ERROR_CODES.LP_NOT_FOUND,
-            message: 'LP not found',
+            message: `LP not found: ${decodedBarcode}`,
           },
         },
         { status: 404 }
       )
     }
+    
+    console.log('[LP Lookup] Found LP:', lp.id, lp.lp_number)
 
     return NextResponse.json({
       success: true,

@@ -254,11 +254,14 @@ export class ScannerMoveService {
   /**
    * Lookup LP by barcode (lp_number)
    * Returns full LP details for display
+   * BUG-087: Added debug logging for troubleshooting
    */
   static async lookupLP(
     supabase: SupabaseClient,
     barcode: string
   ): Promise<LPLookupResult | null> {
+    console.log('[ScannerMoveService.lookupLP] Querying for lp_number:', barcode)
+    
     const { data, error } = await supabase
       .from('license_plates')
       .select(`
@@ -278,9 +281,17 @@ export class ScannerMoveService {
       .eq('lp_number', barcode)
       .single()
 
-    if (error || !data) {
+    if (error) {
+      console.log('[ScannerMoveService.lookupLP] Query error:', error.code, error.message)
       return null
     }
+    
+    if (!data) {
+      console.log('[ScannerMoveService.lookupLP] No data returned for:', barcode)
+      return null
+    }
+    
+    console.log('[ScannerMoveService.lookupLP] Found LP:', data.id)
 
     const product = data.product as unknown as { id: string; name: string; code: string } | null
     const location = data.location as unknown as { id: string; location_code: string; full_path: string } | null

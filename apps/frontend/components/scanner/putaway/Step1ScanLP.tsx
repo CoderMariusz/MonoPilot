@@ -1,6 +1,7 @@
 /**
  * Step 1: Scan LP Barcode (Story 05.21)
  * Purpose: Scan or enter license plate barcode to begin putaway
+ * BUG-088: Added onError callback to display scan failures to user
  */
 
 'use client'
@@ -21,6 +22,8 @@ interface Step1ScanLPProps {
   isLoading?: boolean
   /** Optional callback to handle barcode scan - if not provided, will make fetch calls */
   onBarcodeScan?: (barcode: string) => Promise<{ lp: LPDetails; suggestion: LocationSuggestionData }>
+  /** Callback to report scan errors to parent (BUG-088) */
+  onError?: (code: string, message: string) => void
 }
 
 // LP validation: alphanumeric, hyphens, underscores only (common barcode chars)
@@ -40,7 +43,7 @@ function validateLPInput(value: string): { isValid: boolean; error?: string } {
   return { isValid: true }
 }
 
-export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, onBarcodeScan }: Step1ScanLPProps) {
+export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, onBarcodeScan, onError }: Step1ScanLPProps) {
   const [barcode, setBarcode] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -108,7 +111,12 @@ export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, 
         if (!lpResponse.ok || !lpData.data) {
           AudioFeedback.playError()
           HapticFeedback.error()
-          throw new Error(lpData.error || 'LP not found')
+          const errorMsg = lpData.error?.message || 'LP not found'
+          const errorCode = lpData.error?.code || 'LP_NOT_FOUND'
+          if (onError) {
+            onError(errorCode, errorMsg)
+          }
+          return // Exit early, error reported via callback
         }
 
         // Get putaway suggestion
@@ -118,7 +126,12 @@ export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, 
         if (!suggestResponse.ok) {
           AudioFeedback.playError()
           HapticFeedback.error()
-          throw new Error(suggestData.error || 'Failed to get putaway suggestion')
+          const errorMsg = suggestData.error?.message || suggestData.error || 'Failed to get putaway suggestion'
+          const errorCode = suggestData.error?.code || 'SUGGESTION_FAILED'
+          if (onError) {
+            onError(errorCode, errorMsg)
+          }
+          return // Exit early, error reported via callback
         }
 
         AudioFeedback.playSuccess()
@@ -150,8 +163,14 @@ export function Step1ScanLP({ onLPScanned, lpDetails, error, isLoading = false, 
         onLPScanned(lp, suggestion)
       }
     } catch (err) {
-      // Error will be displayed via error prop from parent
+      // BUG-088: Report errors to parent via callback
       console.error('LP scan error:', err)
+      AudioFeedback.playError()
+      HapticFeedback.error()
+      if (onError) {
+        const message = err instanceof Error ? err.message : 'Failed to scan LP'
+        onError('SCAN_ERROR', message)
+      }
     } finally {
       setIsScanning(false)
     }

@@ -8,11 +8,13 @@
  * 3. Scan Location - Scan location barcode for confirmation
  * 4. Confirm - Review and confirm putaway
  * 5. Success - Putaway complete, option for next LP
+ *
+ * BUG-086: Added HelpSheet modal with putaway workflow instructions
  */
 
 'use client'
 
-import { useCallback, useReducer } from 'react'
+import { useCallback, useReducer, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ScannerHeader } from '../shared/ScannerHeader'
 import { StepProgress } from '../shared/StepProgress'
@@ -20,6 +22,7 @@ import { LoadingOverlay } from '../shared/LoadingOverlay'
 import { ErrorAnimation } from '../shared/ErrorAnimation'
 import { AudioFeedback } from '../shared/AudioFeedback'
 import { HapticFeedback } from '../shared/HapticFeedback'
+import { HelpSheet } from '../shared/HelpSheet'
 import { Step1ScanLP } from './Step1ScanLP'
 import { Step2ViewSuggestion } from './Step2ViewSuggestion'
 import { Step3ScanLocation } from './Step3ScanLocation'
@@ -273,6 +276,9 @@ interface ScannerPutawayWizardProps {
 export function ScannerPutawayWizard({ onComplete, isLoading, error: propError }: ScannerPutawayWizardProps) {
   const router = useRouter()
   const [state, dispatch] = useReducer(putawayReducer, initialState)
+  
+  // Help sheet state (BUG-086)
+  const [showHelp, setShowHelp] = useState(false)
 
   // Handle LP scan and suggestion fetch
   const handleLPScanned = useCallback(async (lp: LPDetails, suggestion: LocationSuggestionData) => {
@@ -452,10 +458,18 @@ export function ScannerPutawayWizard({ onComplete, isLoading, error: propError }
         title={state.lpDetails ? state.lpDetails.lp_number : 'Putaway'}
         onBack={state.state !== 'success' ? handleBack : undefined}
         showHelp={state.state !== 'success'}
+        onHelp={() => setShowHelp(true)}
       />
       {state.state !== 'success' && (
         <StepProgress currentStep={state.step} totalSteps={3} stepLabels={STEP_LABELS} />
       )}
+      
+      {/* Help Sheet (BUG-086) */}
+      <HelpSheet
+        open={showHelp}
+        onOpenChange={setShowHelp}
+        workflow="putaway"
+      />
 
       {state.state === 'scan_lp' && (
         <Step1ScanLP
@@ -463,6 +477,7 @@ export function ScannerPutawayWizard({ onComplete, isLoading, error: propError }
           lpDetails={state.lpDetails}
           error={state.error?.message}
           isLoading={false}
+          onError={handleLPError}
         />
       )}
 
