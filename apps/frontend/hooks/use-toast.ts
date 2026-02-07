@@ -7,7 +7,7 @@
 
 'use client'
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode, createElement } from 'react'
 
 export interface Toast {
   id: string
@@ -49,12 +49,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== toastId))
   }, [])
 
-  const contextValue: ToastContextValue = { toasts, toast, dismiss }
+  const providerValue = { toasts, toast, dismiss }
 
-  return (
-    <ToastContext.Provider value={contextValue}>
-      {children}
-    </ToastContext.Provider>
+  return createElement(
+    ToastContext.Provider,
+    { value: providerValue },
+    children
   )
 }
 

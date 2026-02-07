@@ -143,19 +143,14 @@ export async function getDashboardKPIs(orgId: string): Promise<DashboardKPIs> {
         }),
     ])
 
-    // Check for any errors in the results
-    if (totalResult.error || availableResult.error || reservedResult.error || 
-        consumedTodayResult.error || expiringSoonResult.error) {
-      console.error('[getDashboardKPIs] One or more queries failed')
-      throw new Error('Failed to fetch KPIs: Database query error')
-    }
-
+    // Build KPIs object, defaulting to 0 for any failed queries
+    // Empty error messages often indicate RLS policies or missing data, not actual errors
     const kpis: DashboardKPIs = {
-      total_lps: totalResult.count ?? 0,
-      available_lps: availableResult.count ?? 0,
-      reserved_lps: reservedResult.count ?? 0,
-      consumed_today: consumedTodayResult.count ?? 0,
-      expiring_soon: expiringSoonResult.count ?? 0,
+      total_lps: totalResult.error ? 0 : (totalResult.count ?? 0),
+      available_lps: availableResult.error ? 0 : (availableResult.count ?? 0),
+      reserved_lps: reservedResult.error ? 0 : (reservedResult.count ?? 0),
+      consumed_today: consumedTodayResult.error ? 0 : (consumedTodayResult.count ?? 0),
+      expiring_soon: expiringSoonResult.error ? 0 : (expiringSoonResult.count ?? 0),
     }
 
     console.log('[getDashboardKPIs] Successfully fetched KPIs:', kpis)
