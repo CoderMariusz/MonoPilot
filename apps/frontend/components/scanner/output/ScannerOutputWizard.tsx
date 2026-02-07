@@ -10,11 +10,13 @@
  * 5. LP Created - Success confirmation
  * 6. Print Label - Print LP label
  * 7. By-Products - By-product registration
+ *
+ * BUG-099: Added HelpSheet with output workflow instructions
  */
 
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ScannerHeader } from '../shared/ScannerHeader'
 import { StepProgress } from '../shared/StepProgress'
@@ -22,6 +24,7 @@ import { LoadingOverlay } from '../shared/LoadingOverlay'
 import { ErrorAnimation } from '../shared/ErrorAnimation'
 import { AudioFeedback } from '../shared/AudioFeedback'
 import { HapticFeedback } from '../shared/HapticFeedback'
+import { HelpSheet } from '../shared/HelpSheet'
 import { ScanWOStep } from './ScanWOStep'
 import { EnterQuantityStep } from './EnterQuantityStep'
 import { SelectQAStatusStep } from './SelectQAStatusStep'
@@ -39,6 +42,7 @@ interface ScannerOutputWizardProps {
 
 export function ScannerOutputWizard({ onComplete }: ScannerOutputWizardProps) {
   const router = useRouter()
+  const [helpOpen, setHelpOpen] = useState(false)
 
   // Scanner output state machine
   const {
@@ -257,8 +261,9 @@ export function ScannerOutputWizard({ onComplete }: ScannerOutputWizardProps) {
   if (isSubmitting) {
     return (
       <div className="h-screen flex flex-col bg-slate-900">
-        <ScannerHeader title="Register Output" onBack={handleBack} showHelp />
-        <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} />
+        <ScannerHeader title="Register Output" onBack={handleBack} showHelp onHelp={() => setHelpOpen(true)} />
+        <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} variant="dark" />
+        <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} workflow="output" />
         <LoadingOverlay show message="Registering output..." />
       </div>
     )
@@ -268,8 +273,9 @@ export function ScannerOutputWizard({ onComplete }: ScannerOutputWizardProps) {
   if (error && state !== 'scan_wo') {
     return (
       <div className="h-screen flex flex-col bg-slate-900">
-        <ScannerHeader title="Register Output" onBack={handleBack} showHelp />
-        <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} />
+        <ScannerHeader title="Register Output" onBack={handleBack} showHelp onHelp={() => setHelpOpen(true)} />
+        <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} variant="dark" />
+        <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} workflow="output" />
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <ErrorAnimation show message={error.message} />
           <button
@@ -320,8 +326,10 @@ export function ScannerOutputWizard({ onComplete }: ScannerOutputWizardProps) {
         title={woData ? woData.wo_number : 'Register Output'}
         onBack={state !== 'lp_created' ? handleBack : undefined}
         showHelp={state !== 'lp_created'}
+        onHelp={() => setHelpOpen(true)}
       />
-      <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} />
+      <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} variant="dark" />
+      <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} workflow="output" />
 
       {state === 'scan_wo' && (
         <ScanWOStep

@@ -2,6 +2,11 @@
  * Scan WO Step Component (Story 04.7b)
  * Purpose: Step 1 - Scan WO barcode
  * Features: Auto-focus, 500ms validation, success/error states
+ *
+ * BUG-098: Fixed button ARIA state to match disabled state
+ * BUG-100: Added input validation for security (alphanumeric + hyphens/underscores)
+ * BUG-102: Communicated max length (50 chars) in hint and via maxLength attr
+ * BUG-103: Clarified "Tap to type manually" with better wording and click handler
  */
 
 'use client'
@@ -9,10 +14,28 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { LargeTouchButton } from '../shared/LargeTouchButton'
-import { SuccessAnimation } from '../shared/SuccessAnimation'
 import { ErrorAnimation } from '../shared/ErrorAnimation'
 import { Camera, Loader2 } from 'lucide-react'
+import { AudioFeedback } from '../shared/AudioFeedback'
+import { HapticFeedback } from '../shared/HapticFeedback'
 import type { WizardError } from '@/lib/hooks/use-scanner-output'
+
+// WO barcode validation: alphanumeric, hyphens, underscores only (common barcode chars)
+const WO_PATTERN = /^[A-Za-z0-9\-_]+$/
+const MAX_WO_LENGTH = 50
+
+function validateWOInput(value: string): { isValid: boolean; error?: string } {
+  if (!value.trim()) {
+    return { isValid: false }
+  }
+  if (value.length > MAX_WO_LENGTH) {
+    return { isValid: false, error: `WO code too long (max ${MAX_WO_LENGTH} characters)` }
+  }
+  if (!WO_PATTERN.test(value)) {
+    return { isValid: false, error: 'WO code can only contain letters, numbers, hyphens, and underscores' }
+  }
+  return { isValid: true }
+}
 
 interface ScanWOStepProps {
   onScan: (barcode: string) => Promise<void>
@@ -23,6 +46,7 @@ interface ScanWOStepProps {
 export function ScanWOStep({ onScan, error, onClearError }: ScanWOStepProps) {
   const [barcode, setBarcode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Auto-focus on mount
@@ -32,15 +56,42 @@ export function ScanWOStep({ onScan, error, onClearError }: ScanWOStepProps) {
     }
   }, [])
 
-  // Handle scan
-  const handleScan = useCallback(async () => {
-    if (!barcode.trim() || isLoading) return
+  // Handle input change with validation
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setBarcode(value)
+    
+    // Clear validation error when input is empty
+    if (!value.trim()) {
+      setValidationError(null)
+      return
+    }
+    
+    // Validate input
+    const { error: valError } = validateWOInput(value)
+    setValidationError(valError || null)
+  }, [])
 
+  // Handle scan with validation
+  const handleScan = useCallback(async () => {
+    const trimmed = barcode.trim()
+    if (!trimmed || isLoading) return
+
+    // Validate before submitting
+    const { isValid, error: valError } = validateWOInput(trimmed)
+    if (!isValid) {
+      setValidationError(valError || 'Invalid WO code')
+      AudioFeedback.playError()
+      HapticFeedback.error()
+      return
+    }
+
+    setValidationError(null)
     setIsLoading(true)
     onClearError()
 
     try {
-      await onScan(barcode.trim())
+      await onScan(trimmed)
     } finally {
       setIsLoading(false)
     }
@@ -55,12 +106,14 @@ export function ScanWOStep({ onScan, error, onClearError }: ScanWOStepProps) {
     [handleScan]
   )
 
-  // Handle manual entry
+  // Handle manual entry - focus and select input for typing
   const handleManualEntry = useCallback(() => {
     setBarcode('')
+    setValidationError(null)
     onClearError()
     if (inputRef.current) {
       inputRef.current.focus()
+      inputRef.current.select()
     }
   }, [onClearError])
 
@@ -134,25 +187,40 @@ export function ScanWOStep({ onScan, error, onClearError }: ScanWOStepProps) {
               id="barcode-input"
               type="text"
               value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
+              onChange={handleInputChange}
               placeholder="WO-2025-0001"
+              maxLength={MAX_WO_LENGTH}
               className={cn(
                 'w-full h-12 px-4 text-2xl font-mono text-center',
-                'bg-slate-800 border-2 border-slate-700 rounded-lg',
+                'bg-slate-800 border-2 rounded-lg',
                 'text-white placeholder-slate-500',
-                'focus:border-cyan-500 focus:outline-none'
+                'focus:border-cyan-500 focus:outline-none',
+                validationError ? 'border-red-500' : 'border-slate-700'
               )}
               inputMode="none"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              aria-describedby="barcode-hint"
+              aria-describedby="barcode-hint barcode-error"
+              aria-invalid={!!validationError}
               data-testid="barcode-input"
             />
-            <p id="barcode-hint" className="text-slate-400 text-center text-sm mt-2">
-              Tap to type manually
-            </p>
+            {validationError ? (
+              <p id="barcode-error" className="text-red-400 text-center text-sm mt-2" role="alert">
+                {validationError}
+              </p>
+            ) : (
+              <button
+                type="button"
+                id="barcode-hint"
+                onClick={handleManualEntry}
+                className="w-full text-slate-400 text-center text-sm mt-2 hover:text-cyan-400 transition-colors cursor-pointer"
+                title="Click to focus the input field and type the WO code manually"
+              >
+                Type WO code manually (max {MAX_WO_LENGTH} chars)
+              </button>
+            )}
           </div>
         </div>
 
@@ -162,9 +230,10 @@ export function ScanWOStep({ onScan, error, onClearError }: ScanWOStepProps) {
             type="submit"
             variant="primary"
             size="full"
-            disabled={!barcode.trim()}
+            disabled={!barcode.trim() || !!validationError}
+            aria-disabled={!barcode.trim() || !!validationError}
           >
-            {barcode.trim() ? 'Scan' : 'Scan or press Enter'}
+            {barcode.trim() && !validationError ? 'Validate WO' : 'Enter WO code to continue'}
           </LargeTouchButton>
         </div>
       </form>
