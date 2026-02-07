@@ -4,13 +4,19 @@ export const OrganizationSchema = z.object({
   // Basic Data
   company_name: z
     .string()
+    .min(1, 'Company name is required')
     .min(2, 'Company name must be at least 2 characters')
     .max(100, 'Company name must be less than 100 characters'),
   logo_url: z.string().url('Invalid logo URL').optional().or(z.literal('')),
   address: z.string().optional(),
   city: z.string().max(100, 'City name too long').optional(),
   postal_code: z.string().max(20, 'Postal code too long').optional(),
-  country: z.string().length(2, 'Invalid country code').optional(),
+  country: z
+    .string()
+    .refine((val) => val === '' || val.length === 2, {
+      message: 'Country code must be 2 characters',
+    })
+    .optional(),
   nip_vat: z.string().max(50, 'Tax ID too long').optional(),
 
   // Business Settings
