@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { ShippingDashboardService } from '@/lib/services/shipping-dashboard-service'
+import { getOrgContext } from '@/lib/services/org-context-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,21 +27,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's org_id
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('org_id')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile?.org_id) {
-      return NextResponse.json(
-        { error: 'Organization not found' },
-        { status: 404 }
-      )
-    }
-
-    const orgId = profile.org_id
+    // Get user's org_id using the org-context-service (single source of truth)
+    const context = await getOrgContext(user.id, supabase)
+    const orgId = context.org_id
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams
