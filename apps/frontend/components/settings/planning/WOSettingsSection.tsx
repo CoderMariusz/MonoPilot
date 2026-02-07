@@ -199,7 +199,7 @@ export function WOSettingsSection({ control, errors, watch }: WOSettingsSectionP
               />
             </FormControl>
             <FormDescription>
-              Prefix for auto-generated WO numbers
+              Prefix for auto-generated WO numbers (uppercase letters, numbers, and dashes only)
             </FormDescription>
             <FormMessage />
           </FormItem>

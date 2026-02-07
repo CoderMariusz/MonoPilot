@@ -18,11 +18,12 @@ import { z } from 'zod';
 const autoNumberFormatRegex = /YYYY.*NNNNN|NNNNN.*YYYY/;
 
 /**
- * Prefix validation: 1-10 chars, alphanumeric + dash + underscore only
- * Valid examples: PO-, TO-, WO-, PUR-, TC_001
- * Rejects special chars: @#$%^&*()+=[]{}|;':",.<>?/\`~
+ * Prefix validation: 1-10 chars, uppercase alphanumeric + dash only
+ * Matches tax-codes pattern for consistency
+ * Valid examples: PO-, TO-, WO-, PUR-2024, TC-001
+ * Rejects: lowercase, underscore, special chars
  */
-const prefixRegex = /^[A-Za-z0-9_-]+$/;
+const prefixRegex = /^[A-Z0-9-]+$/;
 
 /**
  * Payment terms enum values
@@ -41,12 +42,12 @@ export const currencyValues = ['PLN', 'EUR', 'USD', 'GBP'] as const;
 const planningSettingsBaseSchema = z.object({
   // PO Settings (7 fields)
   po_require_approval: z.boolean(),
-  po_approval_threshold: z.number().min(0).max(10000000, 'Approval threshold cannot exceed 10,000,000').nullable(),
+  po_approval_threshold: z.number().min(0).max(1000000, 'Approval threshold cannot exceed 1,000,000').nullable(),
   po_approval_roles: z.array(z.string()).min(1, 'At least one approval role required'),
   po_auto_number_prefix: z.string()
     .min(1, 'Prefix cannot be empty')
     .max(10, 'Prefix max 10 characters')
-    .regex(prefixRegex, 'Prefix must be alphanumeric (A-Z, 0-9, dash, underscore only)'),
+    .regex(prefixRegex, 'Prefix must be uppercase alphanumeric with dashes only (A-Z, 0-9, dash)'),
   po_auto_number_format: z.string()
     .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
   po_default_payment_terms: z.enum(paymentTermsValues),
@@ -58,7 +59,7 @@ const planningSettingsBaseSchema = z.object({
   to_auto_number_prefix: z.string()
     .min(1, 'Prefix cannot be empty')
     .max(10, 'Prefix max 10 characters')
-    .regex(prefixRegex, 'Prefix must be alphanumeric (A-Z, 0-9, dash, underscore only)'),
+    .regex(prefixRegex, 'Prefix must be uppercase alphanumeric with dashes only (A-Z, 0-9, dash)'),
   to_auto_number_format: z.string()
     .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
   to_default_transit_days: z.number().int().min(0).max(365, 'Transit days max 365'),
@@ -73,7 +74,7 @@ const planningSettingsBaseSchema = z.object({
   wo_auto_number_prefix: z.string()
     .min(1, 'Prefix cannot be empty')
     .max(10, 'Prefix max 10 characters')
-    .regex(prefixRegex, 'Prefix must be alphanumeric (A-Z, 0-9, dash, underscore only)'),
+    .regex(prefixRegex, 'Prefix must be uppercase alphanumeric with dashes only (A-Z, 0-9, dash)'),
   wo_auto_number_format: z.string()
     .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
   wo_default_scheduling_buffer_hours: z.number().int().min(0).max(168, 'Buffer max 168 hours (1 week)'),

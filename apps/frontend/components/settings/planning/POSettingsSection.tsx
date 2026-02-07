@@ -84,9 +84,9 @@ export function POSettingsSection({ control, errors, watch }: POSettingsSectionP
                   onChange={(e) => {
                     const val = e.target.value;
                     const numVal = parseFloat(val);
-                    // Prevent values over 10 million
-                    if (numVal > 10000000) {
-                      field.onChange(10000000);
+                    // Prevent values over 1 million
+                    if (numVal > 1000000) {
+                      field.onChange(1000000);
                     } else {
                       field.onChange(val === '' ? null : numVal);
                     }
@@ -101,14 +101,14 @@ export function POSettingsSection({ control, errors, watch }: POSettingsSectionP
                   data-testid="po_approval_threshold"
                   className="max-w-xs"
                   min={0}
-                  max={10000000}
+                  max={1000000}
                   step={0.01}
                 />
                 <span className="text-sm text-muted-foreground">PLN</span>
               </div>
             </FormControl>
             <FormDescription>
-              Require approval for POs above this amount (0 = all orders, max: 10,000,000 PLN)
+              Require approval for POs above this amount (0 = all orders, max: 1,000,000 PLN)
             </FormDescription>
             <FormMessage />
           </FormItem>
@@ -131,7 +131,7 @@ export function POSettingsSection({ control, errors, watch }: POSettingsSectionP
               />
             </FormControl>
             <FormDescription>
-              Prefix for auto-generated PO numbers
+              Prefix for auto-generated PO numbers (uppercase letters, numbers, and dashes only)
             </FormDescription>
             <FormMessage />
           </FormItem>

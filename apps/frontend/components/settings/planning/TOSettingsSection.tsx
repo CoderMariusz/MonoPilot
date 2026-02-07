@@ -95,7 +95,7 @@ export function TOSettingsSection({ control, errors }: TOSettingsSectionProps) {
               />
             </FormControl>
             <FormDescription>
-              Prefix for auto-generated TO numbers
+              Prefix for auto-generated TO numbers (uppercase letters, numbers, and dashes only)
             </FormDescription>
             <FormMessage />
           </FormItem>
