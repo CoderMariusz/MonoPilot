@@ -18,7 +18,6 @@ interface Step1ScanWOProps {
 
 export function Step1ScanWO({ onScan, isLoading = false }: Step1ScanWOProps) {
   const [barcode, setBarcode] = useState('')
-  const [showManualEntry, setShowManualEntry] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Auto-focus input on mount
@@ -76,13 +75,14 @@ export function Step1ScanWO({ onScan, isLoading = false }: Step1ScanWOProps) {
           autoFocus
           disabled={isLoading}
         />
+        {/* BUG-095: Clarified button text - focuses input for manual entry */}
         <button
           type="button"
-          onClick={() => setShowManualEntry(!showManualEntry)}
+          onClick={() => inputRef.current?.focus()}
           className="w-full mt-2 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1"
         >
           <Keyboard className="h-4 w-4" />
-          Tap to type manually
+          Enter WO number manually
         </button>
       </div>
 

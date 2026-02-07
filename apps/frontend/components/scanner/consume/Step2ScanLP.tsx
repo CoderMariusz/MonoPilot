@@ -101,12 +101,14 @@ export function Step2ScanLP({ woData, material, onScan, isLoading = false }: Ste
           autoFocus
           disabled={isLoading}
         />
+        {/* BUG-095: Clarified button text - focuses input for manual entry */}
         <button
           type="button"
+          onClick={() => inputRef.current?.focus()}
           className="w-full mt-2 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1"
         >
           <Keyboard className="h-4 w-4" />
-          Tap to type manually
+          Enter LP number manually
         </button>
       </div>
 

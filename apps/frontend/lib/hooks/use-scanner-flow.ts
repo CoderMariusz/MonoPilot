@@ -71,6 +71,7 @@ type ScannerAction =
   | { type: 'CONSUMPTION_ERROR'; payload: ScannerError }
   | { type: 'NEXT_MATERIAL' }
   | { type: 'GO_BACK' }
+  | { type: 'CLEAR_ERROR' }
   | { type: 'RESET' }
 
 const STEP_MAP: Record<ScannerState, number> = {
@@ -219,6 +220,13 @@ function scannerReducer(state: ScannerFlowState, action: ScannerAction): Scanner
           return state
       }
 
+    case 'CLEAR_ERROR':
+      // BUG-092: Clear error and reset UI to retry the current step
+      return {
+        ...state,
+        error: null,
+      }
+
     case 'RESET':
       return initialState
 
@@ -282,6 +290,11 @@ export function useScannerFlow() {
     dispatch({ type: 'GO_BACK' })
   }, [])
 
+  // BUG-092: Clear error to reset UI for retry
+  const clearError = useCallback(() => {
+    dispatch({ type: 'CLEAR_ERROR' })
+  }, [])
+
   return {
     // State
     state: state.state,
@@ -308,6 +321,7 @@ export function useScannerFlow() {
     handleNextMaterial,
     handleDone,
     goBack,
+    clearError,
   }
 }
 

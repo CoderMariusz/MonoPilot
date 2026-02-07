@@ -92,15 +92,78 @@ const WORKFLOW_HELP = {
   },
   output: {
     title: 'Production Output',
-    description: 'How to record production output',
-    steps: [],
-    tips: [],
+    description: 'How to record production output for work orders',
+    steps: [
+      {
+        icon: ScanLine,
+        title: 'Step 1: Scan Work Order',
+        description: 'Scan the WO barcode or type it manually. The system will validate the work order status.',
+      },
+      {
+        icon: Package,
+        title: 'Step 2: Enter Quantity',
+        description: 'Enter the quantity produced using the number pad. You will be warned if over-producing.',
+      },
+      {
+        icon: ClipboardList,
+        title: 'Step 3: Select QA Status',
+        description: 'Choose the quality status: Approved, On Hold, or Rejected based on quality inspection.',
+      },
+      {
+        icon: CheckCircle2,
+        title: 'Step 4: Review & Confirm',
+        description: 'Review all details and confirm the output. A License Plate (LP) will be created.',
+      },
+      {
+        icon: MapPin,
+        title: 'Step 5: Print Label',
+        description: 'Print the LP label for the produced goods. You can skip if printer is not available.',
+      },
+    ],
+    tips: [
+      'WO must be in "Started" status to register output',
+      'Batch numbers are auto-assigned from the work order',
+      'Over-production will show a warning but can be confirmed',
+      'By-products can be registered after the main output',
+      'LP labels include QR code for easy scanning',
+    ],
   },
   consume: {
-    title: 'Consumption',
-    description: 'How to consume inventory for production',
-    steps: [],
-    tips: [],
+    title: 'Material Consumption',
+    description: 'How to consume materials for a work order',
+    steps: [
+      {
+        icon: ClipboardList,
+        title: 'Step 1: Scan Work Order',
+        description: 'Scan the WO barcode or enter the work order number to select the production order.',
+      },
+      {
+        icon: ScanLine,
+        title: 'Step 2: Scan License Plate',
+        description: 'Scan the LP barcode of the material to consume. The system shows required materials and quantities.',
+      },
+      {
+        icon: Package,
+        title: 'Step 3: Enter Quantity',
+        description: 'Enter the quantity to consume, or use "Consume Full LP" for the entire license plate.',
+      },
+      {
+        icon: CheckCircle2,
+        title: 'Step 4: Review & Confirm',
+        description: 'Review the consumption details and confirm. The material will be deducted from inventory.',
+      },
+      {
+        icon: MapPin,
+        title: 'Step 5: Next Material',
+        description: 'Continue with more materials for the same WO, or finish when complete.',
+      },
+    ],
+    tips: [
+      'Use the barcode scanner for faster entry',
+      'Some materials require consuming the full LP (indicated by a lock icon)',
+      'Check the material list to see remaining quantities needed',
+      'You can consume from multiple LPs for the same material',
+    ],
   },
 }
 

@@ -13,7 +13,7 @@
 
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ScannerHeader } from '../shared/ScannerHeader'
 import { StepProgress } from '../shared/StepProgress'
@@ -21,6 +21,7 @@ import { LoadingOverlay } from '../shared/LoadingOverlay'
 import { ErrorAnimation } from '../shared/ErrorAnimation'
 import { AudioFeedback } from '../shared/AudioFeedback'
 import { HapticFeedback } from '../shared/HapticFeedback'
+import { HelpSheet } from '../shared/HelpSheet'
 import { Step1ScanWO } from './Step1ScanWO'
 import { Step2ScanLP } from './Step2ScanLP'
 import { Step3EnterQty } from './Step3EnterQty'
@@ -39,6 +40,9 @@ interface ScannerConsumeWizardProps {
 
 export function ScannerConsumeWizard({ onComplete }: ScannerConsumeWizardProps) {
   const router = useRouter()
+  
+  // BUG-094: Help modal state
+  const [showHelp, setShowHelp] = useState(false)
 
   // Scanner flow state machine
   const {
@@ -64,6 +68,7 @@ export function ScannerConsumeWizard({ onComplete }: ScannerConsumeWizardProps) 
     handleNextMaterial,
     handleDone,
     goBack,
+    clearError,
   } = useScannerFlow()
 
   // Mutation for recording consumption
@@ -221,18 +226,19 @@ export function ScannerConsumeWizard({ onComplete }: ScannerConsumeWizardProps) 
   }, [onComplete, router])
 
   // Handle back navigation
+  // BUG-093: Navigate to /scanner instead of router.back() which could go to Dashboard
   const handleBack = useCallback(() => {
     if (step === 1) {
-      router.back()
+      router.push('/scanner')
     } else {
       goBack()
     }
   }, [step, goBack, router])
 
-  // Clear error
+  // BUG-092: Clear error and reset UI for retry
   const handleClearError = useCallback(() => {
-    // Error auto-clears on next action
-  }, [])
+    clearError()
+  }, [clearError])
 
   // Render loading overlay
   if (isSubmitting) {
@@ -270,7 +276,11 @@ export function ScannerConsumeWizard({ onComplete }: ScannerConsumeWizardProps) 
         title={woData ? woData.wo_number : 'Consume Material'}
         onBack={state !== 'next' ? handleBack : undefined}
         showHelp={state !== 'next'}
+        onHelp={() => setShowHelp(true)}
       />
+      
+      {/* BUG-094: Help modal */}
+      <HelpSheet open={showHelp} onOpenChange={setShowHelp} workflow="consume" />
       {state !== 'next' && (
         <StepProgress currentStep={step} totalSteps={totalSteps} stepLabels={STEP_LABELS} />
       )}
