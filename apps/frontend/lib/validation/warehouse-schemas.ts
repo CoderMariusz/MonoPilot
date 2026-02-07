@@ -15,18 +15,18 @@ export const warehouseTypeEnum = z.enum([
   'QUARANTINE',
 ])
 
-// Code regex pattern: 2-20 uppercase alphanumeric characters with hyphens
-const CODE_REGEX = /^[A-Z0-9-]{2,20}$/
+// Code regex pattern: 2-50 uppercase alphanumeric characters with hyphens
+const CODE_REGEX = /^[A-Z0-9-]{2,50}$/
 
 // Shared field validators
 const codeValidator = z
   .string()
   .min(2, 'Code must be at least 2 characters')
-  .max(20, 'Code must be at most 20 characters')
+  .max(50, 'Code must be at most 50 characters')
   .transform((val) => val.toUpperCase())
   .refine(
     (val) => CODE_REGEX.test(val),
-    'Code must be 2-20 uppercase alphanumeric characters with hyphens only'
+    'Code must be 2-50 uppercase alphanumeric characters with hyphens only'
   )
 
 const nameValidator = z
