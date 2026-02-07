@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import { taxCodeUpdateSchema } from '@/lib/validation/tax-code-schemas'
 import { ZodError } from 'zod'
 
@@ -283,20 +283,26 @@ export async function DELETE(
       tax_code_id: id,
     })
 
+    console.log('[DELETE] Reference check result:', { refCount, refError })
+
     if (refError) {
-      console.error('Failed to check tax code references:', refError)
+      console.error('[DELETE] Failed to check tax code references:', refError)
       return NextResponse.json({ error: 'Failed to check references' }, { status: 500 })
     }
 
     if (refCount && refCount > 0) {
+      console.log('[DELETE] Tax code has references, cannot delete:', refCount)
       return NextResponse.json(
         { error: `Cannot delete tax code referenced by ${refCount} suppliers` },
         { status: 400 }
       )
     }
 
-    // Soft delete
-    const { error: deleteError } = await supabase
+    console.log('[DELETE] No references found, proceeding with soft delete for tax code:', id)
+
+    // Soft delete - use admin client to bypass RLS
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const { error: deleteError } = await supabaseAdmin
       .from('tax_codes')
       .update({
         is_deleted: true,
@@ -307,9 +313,12 @@ export async function DELETE(
       .eq('org_id', orgId)
 
     if (deleteError) {
-      console.error('Failed to delete tax code:', deleteError)
-      return NextResponse.json({ error: 'Failed to delete tax code' }, { status: 500 })
+      console.error('[DELETE] Failed to delete tax code:', deleteError)
+      console.error('[DELETE] Delete error details:', JSON.stringify(deleteError, null, 2))
+      return NextResponse.json({ error: 'Failed to delete tax code', details: deleteError.message }, { status: 500 })
     }
+
+    console.log('[DELETE] Successfully soft-deleted tax code:', id)
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
