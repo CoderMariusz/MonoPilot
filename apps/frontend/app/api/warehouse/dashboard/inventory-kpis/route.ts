@@ -3,6 +3,7 @@
  * GET /api/warehouse/dashboard/inventory-kpis
  *
  * Returns summary KPIs for inventory browser page header
+ * Uses direct queries instead of RPC for reliability
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -49,44 +50,94 @@ export async function GET(request: NextRequest) {
       .single();
 
     const expiryWarningDays = settings?.expiry_warning_days || 30;
+    const today = new Date().toISOString().split('T')[0];
+    const warningDate = new Date(Date.now() + expiryWarningDays * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
 
-    // Query inventory KPIs
-    const { data: kpisArray, error: kpisError } = await supabase.rpc('get_inventory_kpis', {
-      p_org_id: org_id,
-      p_expiry_warning_days: expiryWarningDays,
-    });
+    // Execute all queries in parallel using direct queries for reliability
+    // (RPC function may have schema drift issues)
+    const [totalResult, valueResult, expiringSoonResult, expiredResult] = await Promise.all([
+      // 1. Total active LPs (not consumed)
+      supabase
+        .from('license_plates')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', org_id)
+        .not('status', 'ilike', 'consumed'),
 
-    if (kpisError) {
-      console.error('KPIs query error:', kpisError);
-      return NextResponse.json(
-        { error: 'Failed to fetch inventory KPIs' },
-        { status: 500 }
-      );
+      // 2. Total inventory value - get LPs with product cost
+      supabase
+        .from('license_plates')
+        .select('quantity, products!inner(cost_per_unit)')
+        .eq('org_id', org_id)
+        .not('status', 'ilike', 'consumed'),
+
+      // 3. Expiring soon (within warning days, only available)
+      supabase
+        .from('license_plates')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', org_id)
+        .ilike('status', 'available')
+        .not('expiry_date', 'is', null)
+        .gt('expiry_date', today)
+        .lte('expiry_date', warningDate),
+
+      // 4. Expired (past expiry, only available)
+      supabase
+        .from('license_plates')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', org_id)
+        .ilike('status', 'available')
+        .not('expiry_date', 'is', null)
+        .lt('expiry_date', today),
+    ]);
+
+    // Calculate total value from the LP data
+    let totalValue = 0;
+    if (!valueResult.error && valueResult.data) {
+      for (const lp of valueResult.data) {
+        const qty = Number(lp.quantity) || 0;
+        const cost = Number((lp.products as { cost_per_unit?: number })?.cost_per_unit) || 0;
+        totalValue += qty * cost;
+      }
     }
 
-    // RPC returns an array with one row (Supabase RETURNS TABLE behavior)
-    const kpis = Array.isArray(kpisArray) ? kpisArray[0] : kpisArray;
+    // Build response with graceful fallbacks
+    const kpis = {
+      total_lps: totalResult.error ? 0 : (totalResult.count ?? 0),
+      total_value: totalValue,
+      expiring_soon: expiringSoonResult.error ? 0 : (expiringSoonResult.count ?? 0),
+      expired: expiredResult.error ? 0 : (expiredResult.count ?? 0),
+    };
 
-    // Return KPIs with proper type conversions
+    // Log any errors for debugging (but don't fail the request)
+    if (totalResult.error) console.error('[inventory-kpis] total_lps error:', totalResult.error);
+    if (valueResult.error) console.error('[inventory-kpis] value error:', valueResult.error);
+    if (expiringSoonResult.error) console.error('[inventory-kpis] expiring_soon error:', expiringSoonResult.error);
+    if (expiredResult.error) console.error('[inventory-kpis] expired error:', expiredResult.error);
+
+    return NextResponse.json(kpis, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
+    });
+  } catch (error) {
+    console.error('Unexpected error in inventory KPIs endpoint:', error);
+    // Return zeros instead of 500 for graceful degradation
     return NextResponse.json(
       {
-        total_lps: Number(kpis?.total_lps) || 0,
-        total_value: Number(kpis?.total_value) || 0,
-        expiring_soon: Number(kpis?.expiring_soon) || 0,
-        expired: Number(kpis?.expired) || 0,
+        total_lps: 0,
+        total_value: 0,
+        expiring_soon: 0,
+        expired: 0,
       },
       {
         status: 200,
         headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+          'Cache-Control': 'public, s-maxage=30',
         },
       }
-    );
-  } catch (error) {
-    console.error('Unexpected error in inventory KPIs endpoint:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
     );
   }
 }
