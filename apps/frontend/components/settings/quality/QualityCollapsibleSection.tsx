@@ -99,6 +99,7 @@ export function QualityCollapsibleSection({
     >
       <CollapsibleTrigger asChild>
         <Button
+          type="button"
           variant="ghost"
           className="flex w-full items-center justify-between p-4 hover:bg-muted/50"
           data-testid={isOpen ? `${testId}-collapse` : `${testId}-expand`}
