@@ -135,7 +135,7 @@ async function seedRoles(client: SupabaseClient) {
   const roles = [
     {
       id: TEST_UUIDS.roleAdmin,
-      code: 'ADMIN',
+      code: 'admin',
       name: 'Administrator',
       description: 'Full access within organization',
       permissions: {
@@ -152,7 +152,7 @@ async function seedRoles(client: SupabaseClient) {
     },
     {
       id: TEST_UUIDS.roleManager,
-      code: 'PRODUCTION_MANAGER',
+      code: 'production_manager',
       name: 'Production Manager',
       description: 'Manage production operations',
       permissions: {
@@ -169,7 +169,7 @@ async function seedRoles(client: SupabaseClient) {
     },
     {
       id: TEST_UUIDS.roleOperator,
-      code: 'PRODUCTION_OPERATOR',
+      code: 'production_operator',
       name: 'Production Operator',
       description: 'Execute production tasks',
       permissions: {
@@ -186,7 +186,7 @@ async function seedRoles(client: SupabaseClient) {
     },
     {
       id: TEST_UUIDS.rolePlanner,
-      code: 'WAREHOUSE_MANAGER',
+      code: 'warehouse_manager',
       name: 'Warehouse Manager',
       description: 'Manage warehouse operations',
       permissions: {

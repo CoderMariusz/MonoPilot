@@ -9,7 +9,7 @@
 export const testRoles = {
   superAdmin: {
     id: '10000000-0000-0000-0000-000000000001',
-    code: 'SUPER_ADMIN',
+    code: 'super_admin',
     name: 'Super Administrator',
     description: 'Full system access including multi-tenant management',
     permissions: {
@@ -26,7 +26,7 @@ export const testRoles = {
   },
   admin: {
     id: '10000000-0000-0000-0000-000000000002',
-    code: 'ADMIN',
+    code: 'admin',
     name: 'Administrator',
     description: 'Full access within organization',
     permissions: {
@@ -43,7 +43,7 @@ export const testRoles = {
   },
   productionManager: {
     id: '10000000-0000-0000-0000-000000000003',
-    code: 'PRODUCTION_MANAGER',
+    code: 'production_manager',
     name: 'Production Manager',
     description: 'Manage production operations',
     permissions: {
@@ -60,7 +60,7 @@ export const testRoles = {
   },
   productionOperator: {
     id: '10000000-0000-0000-0000-000000000004',
-    code: 'PRODUCTION_OPERATOR',
+    code: 'production_operator',
     name: 'Production Operator',
     description: 'Execute production tasks',
     permissions: {
@@ -77,7 +77,7 @@ export const testRoles = {
   },
   warehouseManager: {
     id: '10000000-0000-0000-0000-000000000005',
-    code: 'WAREHOUSE_MANAGER',
+    code: 'warehouse_manager',
     name: 'Warehouse Manager',
     description: 'Manage warehouse operations',
     permissions: {
@@ -94,7 +94,7 @@ export const testRoles = {
   },
   warehouseOperator: {
     id: '10000000-0000-0000-0000-000000000006',
-    code: 'WAREHOUSE_OPERATOR',
+    code: 'warehouse_operator',
     name: 'Warehouse Operator',
     description: 'Execute warehouse tasks',
     permissions: {
@@ -111,7 +111,7 @@ export const testRoles = {
   },
   qualityManager: {
     id: '10000000-0000-0000-0000-000000000007',
-    code: 'QUALITY_MANAGER',
+    code: 'quality_manager',
     name: 'Quality Manager',
     description: 'Manage quality control',
     permissions: {
@@ -128,7 +128,7 @@ export const testRoles = {
   },
   qualityInspector: {
     id: '10000000-0000-0000-0000-000000000008',
-    code: 'QUALITY_INSPECTOR',
+    code: 'quality_inspector',
     name: 'Quality Inspector',
     description: 'Perform quality inspections',
     permissions: {
@@ -145,7 +145,7 @@ export const testRoles = {
   },
   viewer: {
     id: '10000000-0000-0000-0000-000000000009',
-    code: 'VIEWER',
+    code: 'viewer',
     name: 'Viewer',
     description: 'Read-only access',
     permissions: {
@@ -162,7 +162,7 @@ export const testRoles = {
   },
   technicalDesigner: {
     id: '10000000-0000-0000-0000-000000000010',
-    code: 'TECHNICAL_DESIGNER',
+    code: 'technical_designer',
     name: 'Technical Designer',
     description: 'Manage products, BOMs, routings',
     permissions: {
