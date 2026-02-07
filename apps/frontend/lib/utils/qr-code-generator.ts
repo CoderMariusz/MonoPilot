@@ -46,7 +46,10 @@ export async function generateQRCode(signupUrl: string): Promise<string> {
  * @returns Full signup URL
  */
 export function buildSignupUrl(token: string, email: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  // In production, NEXT_PUBLIC_APP_URL must be set
+  // For local dev, fallback to localhost
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
   const url = new URL('/signup', baseUrl)
   url.searchParams.set('token', token)
   url.searchParams.set('email', email)

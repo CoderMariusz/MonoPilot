@@ -353,7 +353,7 @@ export default function PurchaseOrdersPage() {
               <Upload className="h-4 w-4" />
               Import POs
             </Button>
-            <Button onClick={handleCreate} className="gap-2" data-testid="add-purchase-order-button">
+            <Button type="button" onClick={handleCreate} className="gap-2" data-testid="add-purchase-order-button">
               <Plus className="h-4 w-4" />
               Create PO
             </Button>
