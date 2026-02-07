@@ -128,11 +128,11 @@ export async function GET(
     // Get line counts from sales_order_lines
     const { data: lineCounts } = await supabase
       .from('sales_order_lines')
-      .select('id, packed_quantity, quantity')
+      .select('id, quantity_packed, quantity_ordered')
       .eq('sales_order_id', salesOrder?.id)
 
     const total = lineCounts?.length || 0
-    const packed = lineCounts?.filter((l) => (l.packed_quantity || 0) >= (l.quantity || 0)).length || 0
+    const packed = lineCounts?.filter((l) => (l.quantity_packed || 0) >= (l.quantity_ordered || 0)).length || 0
 
     // Check allergen restrictions
     const allergenRestrictions = customer?.allergen_restrictions || []

@@ -158,18 +158,18 @@ export class PackingScannerService {
     // 8. Get SO line status
     const { data: soLine } = await supabase
       .from('sales_order_lines')
-      .select('quantity, packed_quantity')
+      .select('quantity_ordered, quantity_packed')
       .eq('id', input.so_line_id)
       .single()
 
-    const packedQty = (Number(soLine?.packed_quantity) || 0) + input.quantity
-    const remainingQty = Math.max(0, (Number(soLine?.quantity) || 0) - packedQty)
+    const packedQty = (Number(soLine?.quantity_packed) || 0) + input.quantity
+    const remainingQty = Math.max(0, (Number(soLine?.quantity_ordered) || 0) - packedQty)
     const lineStatus: 'partial' | 'complete' = remainingQty === 0 ? 'complete' : 'partial'
 
-    // Update SO line packed_quantity
+    // Update SO line quantity_packed
     await supabase
       .from('sales_order_lines')
-      .update({ packed_quantity: packedQty })
+      .update({ quantity_packed: packedQty })
       .eq('id', input.so_line_id)
 
     // 9. Get box summary
@@ -424,12 +424,12 @@ export class PackingScannerService {
         .select('id', { count: 'exact', head: true })
         .eq('sales_order_id', salesOrder?.id)
 
-      // Get packed lines count (lines with packed_quantity > 0)
+      // Get packed lines count (lines with quantity_packed > 0)
       const { count: linesPacked } = await supabase
         .from('sales_order_lines')
         .select('id', { count: 'exact', head: true })
         .eq('sales_order_id', salesOrder?.id)
-        .gt('packed_quantity', 0)
+        .gt('quantity_packed', 0)
 
       // Get boxes count
       const { count: boxesCount } = await supabase
@@ -740,19 +740,19 @@ export class PackingScannerService {
       throw new PackingScannerError('Cannot modify closed box', 'BOX_CLOSED', 400)
     }
 
-    // 3. Update SO line packed_quantity
+    // 3. Update SO line quantity_packed
     if (content.sales_order_line_id) {
       const { data: soLine } = await supabase
         .from('sales_order_lines')
-        .select('packed_quantity')
+        .select('quantity_packed')
         .eq('id', content.sales_order_line_id)
         .single()
 
-      const newPackedQty = Math.max(0, (Number(soLine?.packed_quantity) || 0) - Number(content.quantity))
+      const newPackedQty = Math.max(0, (Number(soLine?.quantity_packed) || 0) - Number(content.quantity))
 
       await supabase
         .from('sales_order_lines')
-        .update({ packed_quantity: newPackedQty })
+        .update({ quantity_packed: newPackedQty })
         .eq('id', content.sales_order_line_id)
     }
 
