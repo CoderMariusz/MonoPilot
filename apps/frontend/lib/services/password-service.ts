@@ -224,18 +224,30 @@ export async function changePassword(
     if (!user) throw new Error('User not found')
 
     // Verify current password
-    // If user has password_hash in custom table, verify against that
-    // Otherwise, verify using Supabase Auth
     if (user.password_hash) {
+      // If user has custom password_hash, verify against that
       const isValid = await verifyPassword(currentPassword, user.password_hash)
       if (!isValid) throw new Error('Current password is incorrect')
     } else {
-      // Verify using Supabase Auth (for users without custom password_hash)
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      // For Supabase Auth users, we can verify by attempting a sign-in
+      // This doesn't affect the current session
+      const { createClient } = await import('@supabase/supabase-js')
+      const tempClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      
+      const { error: authError } = await tempClient.auth.signInWithPassword({
         email: user.email,
         password: currentPassword,
       })
-      if (authError) throw new Error('Current password is incorrect')
+      
+      // Immediately sign out from temp session
+      await tempClient.auth.signOut()
+      
+      if (authError) {
+        throw new Error('Current password is incorrect')
+      }
     }
 
     // Validate new password

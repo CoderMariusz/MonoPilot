@@ -41,7 +41,7 @@ export const currencyValues = ['PLN', 'EUR', 'USD', 'GBP'] as const;
 const planningSettingsBaseSchema = z.object({
   // PO Settings (7 fields)
   po_require_approval: z.boolean(),
-  po_approval_threshold: z.number().min(0).nullable(),
+  po_approval_threshold: z.number().min(0).max(10000000, 'Approval threshold cannot exceed 10,000,000').nullable(),
   po_approval_roles: z.array(z.string()).min(1, 'At least one approval role required'),
   po_auto_number_prefix: z.string()
     .min(1, 'Prefix cannot be empty')

@@ -83,18 +83,32 @@ export function POSettingsSection({ control, errors, watch }: POSettingsSectionP
                   value={field.value ?? ''}
                   onChange={(e) => {
                     const val = e.target.value;
-                    field.onChange(val === '' ? null : parseFloat(val));
+                    const numVal = parseFloat(val);
+                    // Prevent values over 10 million
+                    if (numVal > 10000000) {
+                      field.onChange(10000000);
+                    } else {
+                      field.onChange(val === '' ? null : numVal);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Prevent minus key for negative values
+                    if (e.key === '-') {
+                      e.preventDefault();
+                    }
                   }}
                   disabled={!requireApproval}
                   data-testid="po_approval_threshold"
                   className="max-w-xs"
                   min={0}
+                  max={10000000}
+                  step={0.01}
                 />
                 <span className="text-sm text-muted-foreground">PLN</span>
               </div>
             </FormControl>
             <FormDescription>
-              Require approval for POs above this amount (0 = all orders)
+              Require approval for POs above this amount (0 = all orders, max: 10,000,000 PLN)
             </FormDescription>
             <FormMessage />
           </FormItem>
