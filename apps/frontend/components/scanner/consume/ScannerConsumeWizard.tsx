@@ -81,24 +81,24 @@ export function ScannerConsumeWizard({ onComplete }: ScannerConsumeWizardProps) 
   const handleWOBarcodeScan = useCallback(
     async (barcode: string) => {
       try {
-        // Lookup WO by barcode
-        const response = await fetch(`/api/production/work-orders/lookup?barcode=${encodeURIComponent(barcode)}`)
+        // Lookup WO by barcode - use correct REST path
+        const response = await fetch(`/api/production/work-orders/barcode/${encodeURIComponent(barcode)}`)
         const data = await response.json()
 
-        if (data.error || !data.data) {
+        if (!response.ok || data.error || !data.wo) {
           AudioFeedback.playError()
           HapticFeedback.error()
-          handleWOScanError('WO_NOT_FOUND', data.error?.message || 'Work order not found')
+          handleWOScanError('WO_NOT_FOUND', data.message || data.error || 'Work order not found')
           return
         }
 
-        // Transform to WOData
+        // Transform to WOData - endpoint returns { wo, materials }
         const wo: WOData = {
-          id: data.data.id,
-          wo_number: data.data.wo_number,
-          product_name: data.data.product_name,
-          status: data.data.status,
-          materials: data.data.materials || [],
+          id: data.wo.id,
+          wo_number: data.wo.wo_number,
+          product_name: data.wo.product_name,
+          status: data.wo.status,
+          materials: data.materials || [],
         }
 
         AudioFeedback.playSuccess()
