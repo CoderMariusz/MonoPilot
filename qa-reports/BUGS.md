@@ -69,6 +69,91 @@ Created migration `0335_add_organization_profile_fields.sql` that:
 
 ---
 
+## BUG-003: Empty Company Name shows wrong validation message
+
+| Field | Value |
+|-------|-------|
+| **ID** | BUG-003 |
+| **Severity** | MEDIUM |
+| **Status** | 🟢 FIXED |
+| **Page** | /settings/organization |
+| **Reported** | 2026-02-07 |
+| **Fixed** | 2026-02-07 |
+
+### Problem
+When submitting the Organization form with an empty Company Name field, the error message shows "must be at least 2 characters" instead of "required".
+
+### Root Cause
+The Zod validation schema used `.min(2, 'Company name must be at least 2 characters')` which triggers on empty strings (length 0 < 2).
+
+### Solution
+Added an explicit required check before the min length check:
+```typescript
+company_name: z
+  .string()
+  .min(1, 'Company name is required')  // NEW: explicit required check
+  .min(2, 'Company name must be at least 2 characters')
+  .max(100, 'Company name must be less than 100 characters'),
+```
+
+### Commit
+- **Hash**: `cf95a808`
+- **Message**: `fix(validation): distinguish empty vs invalid for company_name and country (BUG-003, BUG-004)`
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `apps/frontend/lib/validation/organization-schemas.ts` | Modified |
+
+### Verification
+- [x] TypeScript compiles without errors
+- [x] Commit pushed to main branch
+
+---
+
+## BUG-004: Empty Country shows wrong validation message
+
+| Field | Value |
+|-------|-------|
+| **ID** | BUG-004 |
+| **Severity** | MEDIUM |
+| **Status** | 🟢 FIXED |
+| **Page** | /settings/organization |
+| **Reported** | 2026-02-07 |
+| **Fixed** | 2026-02-07 |
+
+### Problem
+When submitting the Organization form with an empty Country field, the error message shows "Invalid country code" instead of allowing the empty value (since Country is optional).
+
+### Root Cause
+The Zod validation schema used `.length(2, 'Invalid country code').optional()` which rejects empty strings because their length (0) doesn't equal 2.
+
+### Solution
+Used `.refine()` to allow empty strings while still validating that non-empty values are exactly 2 characters:
+```typescript
+country: z
+  .string()
+  .refine((val) => val === '' || val.length === 2, {
+    message: 'Country code must be 2 characters',
+  })
+  .optional(),
+```
+
+### Commit
+- **Hash**: `cf95a808`
+- **Message**: `fix(validation): distinguish empty vs invalid for company_name and country (BUG-003, BUG-004)`
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `apps/frontend/lib/validation/organization-schemas.ts` | Modified |
+
+### Verification
+- [x] TypeScript compiles without errors
+- [x] Commit pushed to main branch
+
+---
+
 ## Closed Bugs
 
 _No closed bugs yet._
