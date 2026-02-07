@@ -42,8 +42,9 @@ export function PermissionMatrixTable({ roles }: PermissionMatrixTableProps) {
   const premiumModules = modules.filter((m) => m.category === 'Premium')
 
   const renderPermissionCell = (role: Role, module: Module) => {
-    const permissions = (role.permissions ?? {}) as Record<string, string>
-    const level = permissions[module.code] ?? '-'
+    const permissions = (role.permissions ?? {}) as Record<string, any>
+    const permissionValue = permissions[module.code] ?? '-'
+    const level = RoleService.permissionToString(permissionValue)
     const parsed = RoleService.parsePermissionLevel(level)
     const label = RoleService.getPermissionLabel(level)
 

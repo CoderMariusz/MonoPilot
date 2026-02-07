@@ -71,6 +71,43 @@ export class RoleService {
   }
 
   /**
+   * Convert permission object to string notation
+   * Handles both string notation ("CRUD") and object notation ({read, create, update, delete})
+   */
+  static permissionToString(permission: any): string {
+    // Already a string
+    if (typeof permission === 'string') {
+      return permission
+    }
+
+    // Null/undefined
+    if (!permission) {
+      return '-'
+    }
+
+    // Object notation {read, create, update, delete} or {view, create, update, delete}
+    if (typeof permission === 'object') {
+      const read = permission.read ?? permission.view ?? false
+      const create = permission.create ?? false
+      const update = permission.update ?? false
+      const del = permission.delete ?? false
+
+      if (!read && !create && !update && !del) {
+        return '-'
+      }
+
+      let result = ''
+      if (create) result += 'C'
+      if (read) result += 'R'
+      if (update) result += 'U'
+      if (del) result += 'D'
+      return result || '-'
+    }
+
+    return '-'
+  }
+
+  /**
    * Parse permission level string to boolean flags
    * Converts "CRUD" notation to object with view/create/update/delete flags
    *
@@ -81,8 +118,12 @@ export class RoleService {
    * - "R" → { view: true, create: false, update: false, delete: false }
    * - "-" → { view: false, create: false, update: false, delete: false }
    */
-  static parsePermissionLevel(level: string): PermissionLevel {
-    if (level === '-') {
+  static parsePermissionLevel(level: string | any): PermissionLevel {
+    // Convert to string if it's an object
+    const levelStr = this.permissionToString(level)
+    
+    // Handle null/undefined/empty or "-"
+    if (!levelStr || levelStr === '-') {
       return {
         view: false,
         create: false,
@@ -92,10 +133,10 @@ export class RoleService {
     }
 
     return {
-      view: level.includes('R'),
-      create: level.includes('C'),
-      update: level.includes('U'),
-      delete: level.includes('D'),
+      view: levelStr.includes('R'),
+      create: levelStr.includes('C'),
+      update: levelStr.includes('U'),
+      delete: levelStr.includes('D'),
     }
   }
 
@@ -156,6 +197,9 @@ export class RoleService {
    * - "-" → "No Access"
    */
   static getPermissionLabel(level: string): string {
+    // Handle null/undefined/non-string values
+    if (!level || typeof level !== 'string') return 'No Access'
+    
     if (level === 'CRUD') return 'Full Access'
     if (level === 'CRU') return 'No Delete'
     if (level === 'CR') return 'Create & Read'
