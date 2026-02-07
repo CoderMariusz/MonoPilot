@@ -154,6 +154,68 @@ country: z
 
 ---
 
+## BUG-006, BUG-007, BUG-008, BUG-009: Duplicate Role Names
+
+| Field | Value |
+|-------|-------|
+| **IDs** | BUG-006, BUG-007, BUG-008, BUG-009 |
+| **Severity** | HIGH |
+| **Status** | 🟢 FIXED |
+| **Page** | Database / Settings |
+| **Reported** | 2026-02-07 |
+| **Fixed** | 2026-02-07 |
+
+### Problem
+Four roles appeared twice in the database with different permissions:
+- Production Manager (2×)
+- Administrator (2×)
+- Warehouse Manager (2×)
+- Production Operator (2×)
+
+### Root Cause
+**Case-sensitive PostgreSQL codes** caused duplicate role names:
+- **Migrations** (004, 007) used lowercase codes: `admin`, `production_manager`, `warehouse_manager`, `production_operator`
+- **E2E fixtures** used UPPERCASE codes: `ADMIN`, `PRODUCTION_MANAGER`, `WAREHOUSE_MANAGER`, `PRODUCTION_OPERATOR`
+- PostgreSQL treats these as different codes, so both got inserted, creating duplicate role **names** with different **codes**
+
+Additionally, two migration files (004 and 007) both seeded roles, causing confusion about which permissions were authoritative.
+
+### Solution
+1. **Standardized all role codes to lowercase** (matching the migrations)
+2. **Removed duplicate role seed** from `007_seed_system_data.sql` → single source of truth is now `004_seed_system_roles.sql`
+3. Updated `e2e/fixtures/seed-production-data.ts` - lowercase codes
+4. Updated `apps/frontend/__tests__/01-settings/fixtures/roles.ts` - lowercase codes
+
+### Commit
+- **Hash**: `ada0d08a`
+- **Message**: `fix(db): standardize role codes to lowercase (BUG-006,007,008,009)`
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `e2e/fixtures/seed-production-data.ts` | Modified - lowercase role codes |
+| `apps/frontend/__tests__/01-settings/fixtures/roles.ts` | Modified - lowercase role codes |
+| `supabase/migrations/007_seed_system_data.sql` | Modified - removed duplicate role seed |
+
+### Verification
+- [x] E2E fixtures use lowercase role codes
+- [x] Test fixtures use lowercase role codes
+- [x] Single source of truth for roles (004_seed_system_roles.sql)
+- [x] Commit pushed to main branch
+
+### Notes
+- Existing duplicate roles in production database may need manual cleanup via SQL:
+  ```sql
+  -- Find duplicates
+  SELECT name, COUNT(*) FROM roles GROUP BY name HAVING COUNT(*) > 1;
+  
+  -- Remove UPPERCASE duplicates (keep lowercase)
+  DELETE FROM roles WHERE code IN ('ADMIN', 'PRODUCTION_MANAGER', 'WAREHOUSE_MANAGER', 'PRODUCTION_OPERATOR');
+  ```
+- Future role references should always use lowercase codes
+
+---
+
 ## Closed Bugs
 
 _No closed bugs yet._
