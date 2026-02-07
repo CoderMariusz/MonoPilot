@@ -46,12 +46,11 @@ export function ScanWOStep({ onScan, error, onClearError }: ScanWOStepProps) {
     }
   }, [barcode, isLoading, onScan, onClearError])
 
-  // Handle key press
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        handleScan()
-      }
+  // Handle form submission
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      handleScan()
     },
     [handleScan]
   )
@@ -118,51 +117,57 @@ export function ScanWOStep({ onScan, error, onClearError }: ScanWOStepProps) {
     <div className="flex-1 flex flex-col p-6 bg-slate-900">
       <h2 className="text-2xl font-bold text-white mb-6">Scan WO Barcode</h2>
 
-      {/* Barcode icon */}
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mb-6">
-          <Camera className="w-12 h-12 text-slate-600" />
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
+        {/* Barcode icon */}
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center mb-6">
+            <Camera className="w-12 h-12 text-slate-600" />
+          </div>
+
+          {/* Scan input */}
+          <div className="w-full max-w-sm">
+            <label htmlFor="barcode-input" className="sr-only">
+              Work Order Barcode
+            </label>
+            <input
+              ref={inputRef}
+              id="barcode-input"
+              type="text"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="WO-2025-0001"
+              className={cn(
+                'w-full h-12 px-4 text-2xl font-mono text-center',
+                'bg-slate-800 border-2 border-slate-700 rounded-lg',
+                'text-white placeholder-slate-500',
+                'focus:border-cyan-500 focus:outline-none'
+              )}
+              inputMode="none"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              aria-describedby="barcode-hint"
+              data-testid="barcode-input"
+            />
+            <p id="barcode-hint" className="text-slate-400 text-center text-sm mt-2">
+              Tap to type manually
+            </p>
+          </div>
         </div>
 
-        {/* Scan input */}
-        <div className="w-full max-w-sm">
-          <input
-            ref={inputRef}
-            type="text"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="WO-2025-0001"
-            className={cn(
-              'w-full h-12 px-4 text-2xl font-mono text-center',
-              'bg-slate-800 border-2 border-slate-700 rounded-lg',
-              'text-white placeholder-slate-500',
-              'focus:border-cyan-500 focus:outline-none'
-            )}
-            inputMode="none"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            data-testid="barcode-input"
-          />
-          <p className="text-slate-400 text-center text-sm mt-2">
-            Tap to type manually
-          </p>
+        {/* Action bar */}
+        <div className="pt-4">
+          <LargeTouchButton
+            type="submit"
+            variant="primary"
+            size="full"
+            disabled={!barcode.trim()}
+          >
+            {barcode.trim() ? 'Scan' : 'Scan or press Enter'}
+          </LargeTouchButton>
         </div>
-      </div>
-
-      {/* Action bar */}
-      <div className="pt-4">
-        <LargeTouchButton
-          variant="primary"
-          size="full"
-          onClick={handleScan}
-          disabled={!barcode.trim()}
-        >
-          {barcode.trim() ? 'Scan' : 'Scan or press Enter'}
-        </LargeTouchButton>
-      </div>
+      </form>
     </div>
   )
 }
