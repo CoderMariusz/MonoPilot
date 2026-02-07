@@ -33,14 +33,20 @@ export interface PermissionLevel {
 }
 
 export class RoleService {
-  private static supabase = createClient()
+  /**
+   * Get Supabase client instance (lazy initialization)
+   */
+  private static getSupabase() {
+    return createClient()
+  }
 
   /**
    * Fetch all roles for the organization
    * AC-ROL-01: Returns all system roles sorted by display_order
    */
   static async getRoles(): Promise<{ data: Role[] | null; error: any }> {
-    const { data, error } = await this.supabase
+    const supabase = this.getSupabase()
+    const { data, error } = await supabase
       .from('roles')
       .select('*')
       .eq('is_system', true)
@@ -54,7 +60,8 @@ export class RoleService {
    * AC-ROL-02: Returns single role by code
    */
   static async getRoleByCode(code: string): Promise<{ data: Role | null; error: any }> {
-    const { data, error } = await this.supabase
+    const supabase = this.getSupabase()
+    const { data, error } = await supabase
       .from('roles')
       .select('*')
       .eq('code', code)
