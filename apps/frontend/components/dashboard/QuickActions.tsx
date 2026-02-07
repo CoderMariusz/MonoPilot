@@ -86,13 +86,13 @@ export function QuickActions() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/production/work-orders/new">Create Work Order</Link>
+            <Link href="/planning/work-orders/new">Create Work Order</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/quality/ncr/new">Create NCR</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/warehouse/transfers/new">
+            <Link href="/planning/transfer-orders/new">
               Create Transfer Order
             </Link>
           </DropdownMenuItem>
