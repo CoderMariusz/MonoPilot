@@ -41,12 +41,10 @@ import { useToast } from '@/hooks/use-toast'
 import {
   UpdateUserSchema,
   type UpdateUserInput,
-  type User,
-  getRoleLabel,
-  getStatusLabel,
   UserRoleEnum,
   UserStatusEnum,
 } from '@/lib/validation/user-schemas'
+import type { User } from '@/lib/types/user'
 
 interface EditUserDrawerProps {
   user: User | null
@@ -80,8 +78,8 @@ export function EditUserDrawer({
       form.reset({
         first_name: user.first_name,
         last_name: user.last_name,
-        role: user.role,
-        status: user.status,
+        role: user.role?.code as any,
+        status: user.is_active ? 'active' : 'inactive' as any,
       })
     }
   }, [user, form])

@@ -30,8 +30,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { UserPlus, Search, Edit, Trash2, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import type { User } from '@/lib/validation/user-schemas'
-import { getRoleLabel, getStatusLabel } from '@/lib/validation/user-schemas'
+import type { User } from '@/lib/types/user'
 import { UserForm } from '@/components/settings/UserForm'
 import { EditUserDrawer } from '@/components/settings/EditUserDrawer'
 import { InvitationsTable } from '@/components/settings/InvitationsTable'
@@ -174,20 +173,6 @@ export default function UsersPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      active: 'default',
-      invited: 'secondary',
-      inactive: 'destructive',
-    }
-
-    return (
-      <Badge variant={variants[status] || 'default'}>
-        {getStatusLabel(status as any)}
-      </Badge>
-    )
-  }
-
   return (
     <div>
       <SettingsHeader currentPage="users" />
@@ -251,7 +236,6 @@ export default function UsersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="invited">Invited</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
@@ -291,26 +275,11 @@ export default function UsersPage() {
                         {user.first_name} {user.last_name}
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell>{getRoleLabel(user.role)}</TableCell>
+                      <TableCell>{user.role?.name || 'Unknown'}</TableCell>
                       <TableCell>
-                        {user.status === 'invited' ? (
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge(user.status)}
-                            <button
-                              onClick={() => handleResend(user)}
-                              disabled={resendingUserId === user.id}
-                              className="text-blue-600 hover:underline text-sm disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
-                              title="Resend invitation email"
-                            >
-                              {resendingUserId === user.id ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : null}
-                              Resend
-                            </button>
-                          </div>
-                        ) : (
-                          getStatusBadge(user.status)
-                        )}
+                        <Badge variant={user.is_active ? 'default' : 'destructive'}>
+                          {user.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {user.last_login_at
@@ -330,7 +299,7 @@ export default function UsersPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeactivate(user)}
-                            disabled={user.status === 'inactive'}
+                            disabled={!user.is_active}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
