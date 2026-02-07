@@ -76,31 +76,46 @@ export function WarehouseModal({
   const codeCheckTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const isEditMode = mode === 'edit'
+  const warehouseIdRef = useRef<string | null>(null)
 
-  // Reset form when modal opens or warehouse changes
+  // Reset form ONLY when modal opens or when editing a different warehouse
+  // Do NOT reset when warehouse object reference changes (React Query refetch)
   useEffect(() => {
     if (open) {
-      if (warehouse) {
-        setFormData({
-          code: warehouse.code || '',
-          name: warehouse.name || '',
-          type: warehouse.type || 'GENERAL',
-          address: warehouse.address || '',
-          contact_email: warehouse.contact_email || '',
-          contact_phone: warehouse.contact_phone || '',
-          is_active: warehouse.is_active ?? true,
-        })
-        // Check if warehouse has inventory (code immutability)
-        setHasInventory(warehouse.location_count > 0)
-      } else {
-        setFormData(initialFormData)
-        setHasInventory(false)
+      const currentWarehouseId = warehouse?.id || null
+      
+      // Only reset form if:
+      // 1. Modal just opened (warehouseIdRef is null)
+      // 2. Switched to a different warehouse (ID changed)
+      if (warehouseIdRef.current !== currentWarehouseId) {
+        if (warehouse) {
+          setFormData({
+            code: warehouse.code || '',
+            name: warehouse.name || '',
+            type: warehouse.type || 'GENERAL',
+            address: warehouse.address || '',
+            contact_email: warehouse.contact_email || '',
+            contact_phone: warehouse.contact_phone || '',
+            is_active: warehouse.is_active ?? true,
+          })
+          // Check if warehouse has inventory (code immutability)
+          setHasInventory(warehouse.location_count > 0)
+        } else {
+          setFormData(initialFormData)
+          setHasInventory(false)
+        }
+        setErrors({})
+        setCodeAvailable(null)
+        setCodeValidating(false)
+        
+        // Update the ref to current warehouse ID
+        warehouseIdRef.current = currentWarehouseId
       }
-      setErrors({})
-      setCodeAvailable(null)
-      setCodeValidating(false)
+    } else {
+      // Modal closed - reset ref so next open will re-initialize
+      warehouseIdRef.current = null
     }
-  }, [warehouse, open])
+  }, [warehouse?.id, open])
 
   // Handle input change
   const handleChange = (field: keyof FormData, value: string | boolean) => {
