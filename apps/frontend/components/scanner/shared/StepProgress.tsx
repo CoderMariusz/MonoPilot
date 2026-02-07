@@ -4,6 +4,12 @@
  * Features: 32dp height, step dots, step label
  *
  * BUG-101: Added dark variant for visibility on dark backgrounds (scanner pages)
+ *
+ * BUG-084: Step dots are intentionally NOT interactive (design decision):
+ * - Mobile scanner UIs prioritize explicit touch targets (back/forward buttons)
+ * - Small dots (8px) are poor touch targets for warehouse environments
+ * - Wizard steps have dependencies; skipping could cause data issues
+ * - Users can use the back button or edit buttons on confirmation screens
  */
 
 'use client'

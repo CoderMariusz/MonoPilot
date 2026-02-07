@@ -68,6 +68,22 @@ export const TEST_UUIDS = {
 
   // License Plates - Use valid UUID format
   lpFlour: 'e2e00000-0000-0000-0000-000000000002',
+  
+  // Suppliers
+  supplierFlour: 'e2e00000-0000-0000-0000-000000001001',
+  supplierYeast: 'e2e00000-0000-0000-0000-000000001002',
+  
+  // Purchase Orders - with receivable statuses
+  poFlourApproved: 'e2e00000-0000-0000-0000-000000002001',
+  poYeastConfirmed: 'e2e00000-0000-0000-0000-000000002002',
+  poMixedPartial: 'e2e00000-0000-0000-0000-000000002003',
+  
+  // Purchase Order Lines
+  poLineFlour1: 'e2e00000-0000-0000-0000-000000003001',
+  poLineFlour2: 'e2e00000-0000-0000-0000-000000003002',
+  poLineYeast1: 'e2e00000-0000-0000-0000-000000003003',
+  poLineMixed1: 'e2e00000-0000-0000-0000-000000003004',
+  poLineMixed2: 'e2e00000-0000-0000-0000-000000003005',
 };
 
 // ==================== Seeding Functions ====================
@@ -666,6 +682,209 @@ async function seedLicensePlates(client: SupabaseClient) {
   console.log(`  ✓ ${licensePlates.length} license plates created`);
 }
 
+/**
+ * Create suppliers if not exist
+ */
+async function seedSuppliers(client: SupabaseClient) {
+  console.log('📋 Seeding suppliers...');
+
+  const { data: existing } = await client
+    .from('suppliers')
+    .select('id')
+    .eq('org_id', TEST_UUIDS.org);
+
+  if (existing && existing.length >= 2) {
+    console.log(`  ✓ Suppliers already exist (${existing.length} found)`);
+    return;
+  }
+
+  const { error } = await client.from('suppliers').insert([
+    {
+      id: TEST_UUIDS.supplierFlour,
+      org_id: TEST_UUIDS.org,
+      code: 'SUP-FLOUR-001',
+      name: 'Best Flour Co.',
+      address: '123 Mill Street',
+      city: 'Warsaw',
+      postal_code: '00-001',
+      country: 'PL',
+      contact_name: 'Jan Kowalski',
+      contact_email: 'jan@bestflour.pl',
+      contact_phone: '+48 123 456 789',
+      currency: 'PLN',
+      payment_terms: 'Net 30',
+      is_active: true,
+      approved_supplier: true,
+    },
+    {
+      id: TEST_UUIDS.supplierYeast,
+      org_id: TEST_UUIDS.org,
+      code: 'SUP-YEAST-001',
+      name: 'Yeast Masters Ltd.',
+      address: '456 Baker Avenue',
+      city: 'Krakow',
+      postal_code: '30-001',
+      country: 'PL',
+      contact_name: 'Anna Nowak',
+      contact_email: 'anna@yeastmasters.pl',
+      contact_phone: '+48 987 654 321',
+      currency: 'PLN',
+      payment_terms: 'Net 14',
+      is_active: true,
+      approved_supplier: true,
+    },
+  ]);
+
+  if (error) throw new Error(`Failed to seed suppliers: ${error.message}`);
+  console.log('  ✓ Suppliers created');
+}
+
+/**
+ * Create purchase orders with lines if not exist
+ * Creates POs with receivable statuses: approved, confirmed, partial
+ */
+async function seedPurchaseOrders(client: SupabaseClient) {
+  console.log('📋 Seeding purchase orders...');
+
+  const { data: existing } = await client
+    .from('purchase_orders')
+    .select('id')
+    .eq('org_id', TEST_UUIDS.org);
+
+  if (existing && existing.length >= 3) {
+    console.log(`  ✓ Purchase orders already exist (${existing.length} found)`);
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+  const nextMonth = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
+  // Insert POs first (triggers will auto-generate po_number)
+  const { error: poError } = await client.from('purchase_orders').insert([
+    {
+      id: TEST_UUIDS.poFlourApproved,
+      org_id: TEST_UUIDS.org,
+      po_number: 'PO-E2E-001',
+      supplier_id: TEST_UUIDS.supplierFlour,
+      currency: 'PLN',
+      expected_delivery_date: nextWeek,
+      warehouse_id: TEST_UUIDS.mainWarehouse,
+      status: 'approved', // Receivable status
+      payment_terms: 'Net 30',
+      notes: 'E2E test PO - Approved status',
+    },
+    {
+      id: TEST_UUIDS.poYeastConfirmed,
+      org_id: TEST_UUIDS.org,
+      po_number: 'PO-E2E-002',
+      supplier_id: TEST_UUIDS.supplierYeast,
+      currency: 'PLN',
+      expected_delivery_date: today,
+      warehouse_id: TEST_UUIDS.mainWarehouse,
+      status: 'confirmed', // Receivable status
+      payment_terms: 'Net 14',
+      notes: 'E2E test PO - Confirmed status',
+    },
+    {
+      id: TEST_UUIDS.poMixedPartial,
+      org_id: TEST_UUIDS.org,
+      po_number: 'PO-E2E-003',
+      supplier_id: TEST_UUIDS.supplierFlour,
+      currency: 'PLN',
+      expected_delivery_date: nextMonth,
+      warehouse_id: TEST_UUIDS.mainWarehouse,
+      status: 'confirmed', // Receivable status (confirmed = approved by supplier)
+      payment_terms: 'Net 30',
+      notes: 'E2E test PO - Confirmed status with partial receipt simulation',
+    },
+  ]);
+
+  if (poError) throw new Error(`Failed to seed purchase orders: ${poError.message}`);
+  console.log('  ✓ Purchase orders created');
+}
+
+/**
+ * Create purchase order lines if not exist
+ */
+async function seedPurchaseOrderLines(client: SupabaseClient) {
+  console.log('📋 Seeding purchase order lines...');
+
+  const { data: existing } = await client
+    .from('purchase_order_lines')
+    .select('id')
+    .in('po_id', [TEST_UUIDS.poFlourApproved, TEST_UUIDS.poYeastConfirmed, TEST_UUIDS.poMixedPartial]);
+
+  if (existing && existing.length >= 5) {
+    console.log(`  ✓ PO lines already exist (${existing.length} found)`);
+    return;
+  }
+
+  const { error } = await client.from('purchase_order_lines').insert([
+    // Lines for PO-E2E-001 (Flour - Approved)
+    {
+      id: TEST_UUIDS.poLineFlour1,
+      po_id: TEST_UUIDS.poFlourApproved,
+      line_number: 1,
+      product_id: TEST_UUIDS.productFlour,
+      quantity: 500,
+      uom: 'kg',
+      unit_price: 2.50,
+      received_qty: 0,
+      notes: 'All-purpose flour for bread production',
+    },
+    {
+      id: TEST_UUIDS.poLineFlour2,
+      po_id: TEST_UUIDS.poFlourApproved,
+      line_number: 2,
+      product_id: TEST_UUIDS.productYeast,
+      quantity: 10,
+      uom: 'kg',
+      unit_price: 25.00,
+      received_qty: 0,
+      notes: 'Yeast for bread production',
+    },
+    // Lines for PO-E2E-002 (Yeast - Confirmed)
+    {
+      id: TEST_UUIDS.poLineYeast1,
+      po_id: TEST_UUIDS.poYeastConfirmed,
+      line_number: 1,
+      product_id: TEST_UUIDS.productYeast,
+      quantity: 25,
+      uom: 'kg',
+      unit_price: 22.00,
+      received_qty: 0,
+      notes: 'Active dry yeast bulk order',
+    },
+    // Lines for PO-E2E-003 (Mixed - Partial)
+    {
+      id: TEST_UUIDS.poLineMixed1,
+      po_id: TEST_UUIDS.poMixedPartial,
+      line_number: 1,
+      product_id: TEST_UUIDS.productFlour,
+      quantity: 1000,
+      uom: 'kg',
+      unit_price: 2.40,
+      received_qty: 600, // Partially received
+      notes: 'Flour - partially received',
+    },
+    {
+      id: TEST_UUIDS.poLineMixed2,
+      po_id: TEST_UUIDS.poMixedPartial,
+      line_number: 2,
+      product_id: TEST_UUIDS.productYeast,
+      quantity: 50,
+      uom: 'kg',
+      unit_price: 23.00,
+      received_qty: 0, // Not received yet
+      notes: 'Yeast - pending receipt',
+    },
+  ]);
+
+  if (error) throw new Error(`Failed to seed PO lines: ${error.message}`);
+  console.log('  ✓ PO lines created');
+}
+
 // ==================== Main Seeding Function ====================
 
 /**
@@ -687,15 +906,21 @@ export async function seedProductionData(client: SupabaseClient) {
     await seedMachines(client);
     await seedWorkOrder(client);
     await seedLicensePlates(client);
+    await seedSuppliers(client);
+    await seedPurchaseOrders(client);
+    await seedPurchaseOrderLines(client);
 
     console.log('\n✅ Data seeding completed successfully!\n');
     console.log('📊 Test Data Summary:');
     console.log(`  - Organization: ${TEST_UUIDS.org}`);
-    console.log(`  - Work Order: wo-id-123 (status=released)`);
-    console.log(`  - License Plate: LP-001 (qty=100 KG)`);
+    console.log(`  - Work Order: WO-E2E-001 (status=released)`);
+    console.log(`  - License Plate: LP-E2E-001 (qty=100 KG)`);
     console.log(`  - Products: Flour, Yeast, Bread`);
     console.log(`  - Production Lines: 2 (Line A, Line B)`);
     console.log(`  - Machines: 2 (Oven, Mixer)`);
+    console.log(`  - Suppliers: 2 (Best Flour Co., Yeast Masters Ltd.)`);
+    console.log(`  - Purchase Orders: 3 (approved, confirmed, partial)`);
+    console.log(`  - PO Lines: 5 (with receivable items)`);
     console.log('\n');
   } catch (error) {
     console.error('\n❌ Data seeding failed:', error);
@@ -714,6 +939,24 @@ export async function cleanupProductionData(client: SupabaseClient) {
 
   try {
     // Delete in reverse order of creation (respecting FK constraints)
+    console.log('  - Removing purchase order lines...');
+    await client
+      .from('purchase_order_lines')
+      .delete()
+      .in('po_id', [TEST_UUIDS.poFlourApproved, TEST_UUIDS.poYeastConfirmed, TEST_UUIDS.poMixedPartial]);
+
+    console.log('  - Removing purchase orders...');
+    await client
+      .from('purchase_orders')
+      .delete()
+      .eq('org_id', TEST_UUIDS.org);
+
+    console.log('  - Removing suppliers...');
+    await client
+      .from('suppliers')
+      .delete()
+      .eq('org_id', TEST_UUIDS.org);
+
     console.log('  - Removing license plates...');
     await client
       .from('license_plates')
@@ -849,6 +1092,38 @@ export const PRODUCTION_TEST_DATA = {
     unit: 'KG',
     status: 'available',
   },
+  suppliers: [
+    {
+      id: TEST_UUIDS.supplierFlour,
+      code: 'SUP-FLOUR-001',
+      name: 'Best Flour Co.',
+    },
+    {
+      id: TEST_UUIDS.supplierYeast,
+      code: 'SUP-YEAST-001',
+      name: 'Yeast Masters Ltd.',
+    },
+  ],
+  purchaseOrders: [
+    {
+      id: TEST_UUIDS.poFlourApproved,
+      number: 'PO-E2E-001',
+      status: 'approved',
+      linesCount: 2,
+    },
+    {
+      id: TEST_UUIDS.poYeastConfirmed,
+      number: 'PO-E2E-002',
+      status: 'confirmed',
+      linesCount: 1,
+    },
+    {
+      id: TEST_UUIDS.poMixedPartial,
+      number: 'PO-E2E-003',
+      status: 'confirmed',
+      linesCount: 2,
+    },
+  ],
   productionLines: [
     {
       id: TEST_UUIDS.lineA,
