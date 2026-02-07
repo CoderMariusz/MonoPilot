@@ -39,6 +39,22 @@ interface Location {
     name: string
   }
   qr_code_url?: string
+  created_at?: string
+  updated_at?: string
+  created_by?: string
+  updated_by?: string
+  created_by_user?: {
+    id: string
+    first_name?: string
+    last_name?: string
+    email: string
+  }
+  updated_by_user?: {
+    id: string
+    first_name?: string
+    last_name?: string
+    email: string
+  }
 }
 
 interface LocationDetailModalProps {
@@ -292,6 +308,56 @@ export function LocationDetailModal({
           )}
 
           <Separator />
+
+          {/* Audit Information */}
+          {(location.created_at || location.updated_at) && (
+            <>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-gray-700">Audit Trail</p>
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  {location.created_at && (
+                    <div className="bg-gray-50 p-3 rounded-md">
+                      <p className="font-medium text-gray-500 mb-1">Created</p>
+                      <p className="text-gray-900">
+                        {new Date(location.created_at).toLocaleString('en-GB', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })}
+                      </p>
+                      {location.created_by_user && (
+                        <p className="text-gray-600 text-xs mt-1">
+                          by{' '}
+                          {location.created_by_user.first_name && location.created_by_user.last_name
+                            ? `${location.created_by_user.first_name} ${location.created_by_user.last_name}`
+                            : location.created_by_user.email}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {location.updated_at && (
+                    <div className="bg-gray-50 p-3 rounded-md">
+                      <p className="font-medium text-gray-500 mb-1">Last Updated</p>
+                      <p className="text-gray-900">
+                        {new Date(location.updated_at).toLocaleString('en-GB', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })}
+                      </p>
+                      {location.updated_by_user && (
+                        <p className="text-gray-600 text-xs mt-1">
+                          by{' '}
+                          {location.updated_by_user.first_name && location.updated_by_user.last_name
+                            ? `${location.updated_by_user.first_name} ${location.updated_by_user.last_name}`
+                            : location.updated_by_user.email}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
 
           {/* QR Code Display (AC-005.6) */}
           <div className="flex flex-col items-center space-y-4">

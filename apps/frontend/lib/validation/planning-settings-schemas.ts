@@ -18,10 +18,11 @@ import { z } from 'zod';
 const autoNumberFormatRegex = /YYYY.*NNNNN|NNNNN.*YYYY/;
 
 /**
- * Prefix validation: 1-10 chars, alphanumeric + dash only
- * Valid examples: PO-, TO-, WO-, PUR-
+ * Prefix validation: 1-10 chars, alphanumeric + dash + underscore only
+ * Valid examples: PO-, TO-, WO-, PUR-, TC_001
+ * Rejects special chars: @#$%^&*()+=[]{}|;':",.<>?/\`~
  */
-const prefixRegex = /^[A-Za-z0-9-]+$/;
+const prefixRegex = /^[A-Za-z0-9_-]+$/;
 
 /**
  * Payment terms enum values
@@ -45,7 +46,7 @@ const planningSettingsBaseSchema = z.object({
   po_auto_number_prefix: z.string()
     .min(1, 'Prefix cannot be empty')
     .max(10, 'Prefix max 10 characters')
-    .regex(prefixRegex, 'Prefix must be alphanumeric with dashes only'),
+    .regex(prefixRegex, 'Prefix must be alphanumeric (A-Z, 0-9, dash, underscore only)'),
   po_auto_number_format: z.string()
     .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
   po_default_payment_terms: z.enum(paymentTermsValues),
@@ -57,7 +58,7 @@ const planningSettingsBaseSchema = z.object({
   to_auto_number_prefix: z.string()
     .min(1, 'Prefix cannot be empty')
     .max(10, 'Prefix max 10 characters')
-    .regex(prefixRegex, 'Prefix must be alphanumeric with dashes only'),
+    .regex(prefixRegex, 'Prefix must be alphanumeric (A-Z, 0-9, dash, underscore only)'),
   to_auto_number_format: z.string()
     .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
   to_default_transit_days: z.number().int().min(0).max(365, 'Transit days max 365'),
@@ -72,7 +73,7 @@ const planningSettingsBaseSchema = z.object({
   wo_auto_number_prefix: z.string()
     .min(1, 'Prefix cannot be empty')
     .max(10, 'Prefix max 10 characters')
-    .regex(prefixRegex, 'Prefix must be alphanumeric with dashes only'),
+    .regex(prefixRegex, 'Prefix must be alphanumeric (A-Z, 0-9, dash, underscore only)'),
   wo_auto_number_format: z.string()
     .regex(autoNumberFormatRegex, 'Format must contain both YYYY (year) and NNNNN (sequence)'),
   wo_default_scheduling_buffer_hours: z.number().int().min(0).max(168, 'Buffer max 168 hours (1 week)'),

@@ -9,16 +9,11 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { BasePage } from '../../pages/BasePage';
 
 const PLANNING_SETTINGS_ROUTE = '/settings/planning';
 
 test.describe('Planning Settings - Section Navigation', () => {
-  let basePage: BasePage;
-
   test.beforeEach(async ({ page }) => {
-    basePage = new BasePage(page);
-    await basePage.login('admin@monopilot.com', 'test1234');
     await page.goto(PLANNING_SETTINGS_ROUTE);
     await page.waitForLoadState('networkidle');
   });

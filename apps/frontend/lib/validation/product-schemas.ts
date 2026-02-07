@@ -126,6 +126,7 @@ export const productListQuerySchema = z.object({
   code: z.string().optional(), // Exact match by product code
   product_type_id: z.array(z.string().uuid()).or(z.string().uuid()).optional(),
   status: z.array(z.string()).or(z.string()).optional(),
+  allergen_id: z.string().uuid().optional(), // Filter by allergen
   // TODO: Enable when categories table is created
   // category_id: z.string().uuid().optional(),
   page: z.coerce.number().int().positive().optional().default(1),

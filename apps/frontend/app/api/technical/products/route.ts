@@ -103,6 +103,30 @@ export async function GET(req: NextRequest) {
       query = query.in('status', statuses)
     }
 
+    // Filter by allergen (join with product_allergens table)
+    if (params.allergen_id) {
+      const { data: productsWithAllergen } = await supabase
+        .from('product_allergens')
+        .select('product_id')
+        .eq('allergen_id', params.allergen_id)
+      
+      if (productsWithAllergen && productsWithAllergen.length > 0) {
+        const productIds = productsWithAllergen.map((pa: { product_id: string }) => pa.product_id)
+        query = query.in('id', productIds)
+      } else {
+        // No products found with this allergen - return empty result
+        return NextResponse.json({
+          data: [],
+          pagination: {
+            page: params.page,
+            limit: params.limit,
+            total: 0,
+            totalPages: 0
+          }
+        })
+      }
+    }
+
     // TODO: Enable when categories table is created
     // if (params.category_id) {
     //   query = query.eq('category_id', params.category_id)

@@ -848,7 +848,11 @@ export async function getLocationById(
 
     const { data, error } = await supabaseAdmin
       .from('locations')
-      .select('*')
+      .select(`
+        *,
+        created_by_user:users!locations_created_by_fkey(id, first_name, last_name, email),
+        updated_by_user:users!locations_updated_by_fkey(id, first_name, last_name, email)
+      `)
       .eq('id', id)
       .eq('org_id', orgId)
       .eq('warehouse_id', warehouseId)

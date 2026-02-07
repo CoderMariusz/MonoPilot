@@ -213,20 +213,29 @@ export async function changePassword(
   const startTime = Date.now()
 
   try {
-    // Get user's current password hash
+    // Get user's current password hash and email
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, org_id, password_hash')
+      .select('id, org_id, email, password_hash')
       .eq('id', userId)
       .single()
 
     if (userError) throw userError
     if (!user) throw new Error('User not found')
 
-    // Verify current password (if user has password_hash)
+    // Verify current password
+    // If user has password_hash in custom table, verify against that
+    // Otherwise, verify using Supabase Auth
     if (user.password_hash) {
       const isValid = await verifyPassword(currentPassword, user.password_hash)
       if (!isValid) throw new Error('Current password is incorrect')
+    } else {
+      // Verify using Supabase Auth (for users without custom password_hash)
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      })
+      if (authError) throw new Error('Current password is incorrect')
     }
 
     // Validate new password
@@ -265,7 +274,14 @@ export async function changePassword(
       passwordExpiresAt = expiresAt.toISOString()
     }
 
-    // Update user password
+    // Update password in Supabase Auth (this will update auth.users)
+    const { error: authUpdateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (authUpdateError) throw authUpdateError
+
+    // Update user password in custom users table
     const { error: updateError } = await supabase
       .from('users')
       .update({

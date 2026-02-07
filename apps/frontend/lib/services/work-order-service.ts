@@ -413,18 +413,9 @@ export async function getById(
   supabase: SupabaseClient,
   id: string
 ): Promise<WorkOrderWithRelations | null> {
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('work_orders')
-    .select(
-      `
-      *,
-      product:products(id, code, name, base_uom),
-      bom:boms(id, code, version, output_qty, effective_from, effective_to),
-      routing:routings(id, code, name),
-      production_line:production_lines(id, code, name),
-      machine:machines(id, code, name)
-    `
-    )
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -432,6 +423,7 @@ export async function getById(
     if (error.code === 'PGRST116') {
       return null
     }
+    console.error('[WorkOrderService.getById] Supabase error:', error)
     throw new WorkOrderError(
       `Failed to fetch work order: ${error.message}`,
       'FETCH_ERROR',
@@ -439,7 +431,60 @@ export async function getById(
     )
   }
 
-  return data as WorkOrderWithRelations
+  // Fetch related data separately to avoid schema conflicts
+  const woId = data.id
+  const orgId = data.org_id
+
+  // Fetch product
+  const { data: product } = await supabase
+    .from('products')
+    .select('id, code, name, base_uom')
+    .eq('id', data.product_id)
+    .single()
+
+  // Fetch BOM if exists
+  let bom = null
+  if (data.bom_id) {
+    const { data: bomData } = await supabase
+      .from('boms')
+      .select('id, version, output_qty, effective_from, effective_to')
+      .eq('id', data.bom_id)
+      .single()
+    if (bomData) {
+      bom = { ...bomData, code: `BOM-v${bomData.version}` }
+    }
+  }
+
+  // Fetch routing if exists
+  let routing = null
+  if (data.routing_id) {
+    const { data: routingData } = await supabase
+      .from('routings')
+      .select('id, code, name')
+      .eq('id', data.routing_id)
+      .single()
+    routing = routingData
+  }
+
+  // Fetch machines table for production line
+  let machine = null
+  if (data.production_line_id) {
+    const { data: machineData } = await supabase
+      .from('machines')
+      .select('id, code, name')
+      .eq('id', data.production_line_id)
+      .single()
+    machine = machineData
+  }
+
+  return {
+    ...data,
+    product,
+    bom,
+    routing,
+    production_line: machine,
+    machine,
+  } as WorkOrderWithRelations
 }
 
 /**

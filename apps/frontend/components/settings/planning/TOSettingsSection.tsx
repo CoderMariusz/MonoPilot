@@ -138,17 +138,32 @@ export function TOSettingsSection({ control, errors }: TOSettingsSectionProps) {
                   type="number"
                   {...field}
                   value={field.value ?? 1}
-                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    // Prevent negative values
+                    if (val < 0 || isNaN(val)) {
+                      field.onChange(0);
+                    } else {
+                      field.onChange(val);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Prevent minus key
+                    if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                      e.preventDefault();
+                    }
+                  }}
                   data-testid="to_default_transit_days"
                   className="max-w-xs"
                   min={0}
                   max={365}
+                  step={1}
                 />
                 <span className="text-sm text-muted-foreground">days</span>
               </div>
             </FormControl>
             <FormDescription>
-              Default transit time between warehouses
+              Default transit time between warehouses (must be 0 or greater)
             </FormDescription>
             <FormMessage />
           </FormItem>

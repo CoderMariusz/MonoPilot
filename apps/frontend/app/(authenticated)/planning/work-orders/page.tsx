@@ -179,8 +179,40 @@ export default function WorkOrdersPage() {
   }, [])
 
   const handleRowClick = useCallback((wo: WOListItem) => {
+    // Defensive checks for data integrity
+    if (!wo) {
+      console.error('❌ handleRowClick: work order is null/undefined')
+      toast({
+        title: 'Error',
+        description: 'Cannot open work order: Invalid data',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!wo.id) {
+      console.error('❌ handleRowClick: work order missing ID:', wo)
+      toast({
+        title: 'Error',
+        description: 'Cannot open work order: Missing ID',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!router) {
+      console.error('❌ handleRowClick: router not available')
+      toast({
+        title: 'Error',
+        description: 'Navigation error. Please refresh the page.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    console.log('✅ handleRowClick navigating to:', wo.id, wo.wo_number)
     router.push(`/planning/work-orders/${wo.id}`)
-  }, [router])
+  }, [router, toast])
 
   const handleEdit = useCallback((wo: WOListItem) => {
     setEditingWO(wo)

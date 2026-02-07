@@ -44,11 +44,12 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  // Filters
+  // Filters - initialize allergen_id from URL if present
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
     type: null,
     status: null,
+    allergen_id: searchParams.get('allergen_id') || null,
   })
 
   // Pagination
@@ -94,6 +95,9 @@ export default function ProductsPage() {
       }
       if (filters.status) {
         params.append('status', filters.status)
+      }
+      if (filters.allergen_id) {
+        params.append('allergen_id', filters.allergen_id)
       }
 
       const response = await fetch(`/api/technical/products?${params.toString()}`)

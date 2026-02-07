@@ -28,6 +28,7 @@ export interface ProductFilters {
   search: string
   type: string | null
   status: string | null
+  allergen_id?: string | null
 }
 
 interface ProductFiltersProps {

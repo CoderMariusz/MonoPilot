@@ -101,7 +101,7 @@ export default function InventoryBrowserPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {kpisLoading ? '...' : `$${kpis?.total_value.toLocaleString() || '0'}`}
+              {kpisLoading ? '...' : `${kpis?.total_value.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN' }) || '0 zł'}`}
             </div>
             <p className="text-xs text-muted-foreground">
               Inventory at cost
