@@ -4,6 +4,7 @@
  * Features: Touch-friendly rows, allergen indicators, sort by date
  *
  * States: loading, error, empty, success
+ * BUG-107 fix: Added input validation to reject special characters (security concern)
  */
 
 'use client'
@@ -20,6 +21,34 @@ import { ErrorAnimation } from '../../shared/ErrorAnimation'
 import { AudioFeedback } from '../../shared/AudioFeedback'
 import { HapticFeedback } from '../../shared/HapticFeedback'
 import type { PendingShipment } from '@/lib/hooks/use-scanner-pack'
+
+// =============================================================================
+// Validation - BUG-107 fix
+// =============================================================================
+
+/**
+ * Validate barcode input - only alphanumeric, hyphens, and underscores allowed
+ * Rejects special characters that could be a security concern
+ */
+const BARCODE_PATTERN = /^[a-zA-Z0-9\-_]+$/
+
+function validateBarcode(barcode: string): { valid: boolean; error?: string } {
+  const trimmed = barcode.trim()
+  
+  if (!trimmed) {
+    return { valid: false, error: 'Barcode is required' }
+  }
+  
+  if (trimmed.length > 100) {
+    return { valid: false, error: 'Barcode too long (max 100 characters)' }
+  }
+  
+  if (!BARCODE_PATTERN.test(trimmed)) {
+    return { valid: false, error: 'Invalid characters. Only letters, numbers, hyphens and underscores allowed.' }
+  }
+  
+  return { valid: true }
+}
 
 interface Step1SelectShipmentProps {
   onSelect: (shipment: PendingShipment) => void
@@ -79,9 +108,18 @@ export function Step1SelectShipment({
   const handleScan = async (barcode: string) => {
     if (!barcode.trim()) return
 
+    // BUG-107 fix: Validate barcode input before making API call
+    const validation = validateBarcode(barcode)
+    if (!validation.valid) {
+      setScanError(validation.error || 'Invalid barcode')
+      AudioFeedback.playError()
+      HapticFeedback.error()
+      return
+    }
+
     setScanError(null)
     try {
-      const response = await fetch(`/api/shipping/scanner/pack/lookup/${encodeURIComponent(barcode)}`)
+      const response = await fetch(`/api/shipping/scanner/pack/lookup/${encodeURIComponent(barcode.trim())}`)
 
       if (!response.ok) {
         if (response.status === 404) {

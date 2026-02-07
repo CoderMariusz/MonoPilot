@@ -3,6 +3,7 @@
  * Story: 07.15 - Shipping Dashboard + KPIs
  *
  * Panel with quick action buttons
+ * BUG-108 fix: Added "Start Packing" action that navigates to /scanner/pack
  */
 
 'use client'
@@ -16,7 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { Plus, ClipboardList, AlertTriangle } from 'lucide-react'
+import { Plus, ClipboardList, AlertTriangle, BoxesIcon } from 'lucide-react'
 import type { UserRole } from '@/lib/types/shipping-dashboard'
 
 export interface QuickActionsPanelProps {
@@ -28,6 +29,7 @@ export function QuickActionsPanel({ userRole }: QuickActionsPanelProps) {
 
   const canCreateSO = userRole === 'ADMIN' || userRole === 'MANAGER' || userRole === 'OPERATOR'
   const canCreatePickList = userRole === 'ADMIN' || userRole === 'MANAGER' || userRole === 'OPERATOR'
+  const canPack = userRole === 'ADMIN' || userRole === 'MANAGER' || userRole === 'OPERATOR' || userRole === 'Warehouse'
 
   const ActionButton = ({
     label,
@@ -96,6 +98,15 @@ export function QuickActionsPanel({ userRole }: QuickActionsPanelProps) {
             onClick={() => router.push('/shipping/pick-lists/new')}
             disabled={!canCreatePickList}
             disabledReason="You don't have permission to create pick lists"
+          />
+
+          {/* BUG-108 fix: Add Start Packing action that navigates to /scanner/pack */}
+          <ActionButton
+            label="Start Packing"
+            icon={<BoxesIcon className="h-4 w-4" />}
+            onClick={() => router.push('/scanner/pack')}
+            disabled={!canPack}
+            disabledReason="You don't have permission to pack shipments"
           />
 
           <ActionButton
