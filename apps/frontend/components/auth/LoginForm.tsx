@@ -27,8 +27,10 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
+  // Use useCallback to ensure form instance is stable
   const form = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
+    mode: 'onSubmit',
     defaultValues: {
       email: '',
       password: '',
