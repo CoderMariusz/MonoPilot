@@ -7,6 +7,50 @@ export interface AuthResult {
 }
 
 /**
+ * Sign in via server-side API endpoint
+ * Uses POST to /api/auth/login which sets cookies server-side
+ * This ensures cookies are in request headers when router.push() fires
+ * Fixes race condition: client-side signIn returns before cookies reach headers
+ * @param email - User email
+ * @param password - User password
+ */
+export async function signInViaAPI(
+  email: string,
+  password: string
+): Promise<AuthResult> {
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      credentials: 'include' // IMPORTANT: Include cookies in request
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      return {
+        session: null,
+        error: {
+          message: error.error || error.message || 'Login failed',
+          status: response.status,
+        } as AuthError
+      }
+    }
+
+    // Server already set cookies via Set-Cookie headers
+    // Cookies will be automatically included in next request
+    return { session: null, error: null }
+  } catch (error) {
+    return {
+      session: null,
+      error: {
+        message: error instanceof Error ? error.message : 'Network error',
+      } as AuthError
+    }
+  }
+}
+
+/**
  * Sign in with email and password
  * @param email - User email
  * @param password - User password

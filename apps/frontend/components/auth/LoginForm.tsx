@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { LoginSchema, type LoginInput } from '@/lib/validation/auth-schemas'
-import { signIn } from '@/lib/auth/auth-client'
+import { signInViaAPI } from '@/lib/auth/auth-client'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -43,10 +43,9 @@ export function LoginForm() {
     setIsLoading(true)
 
     try {
-      const { session, error } = await signIn(
+      const { error } = await signInViaAPI(
         data.email,
-        data.password,
-        data.rememberMe
+        data.password
       )
 
       if (error) {
@@ -60,17 +59,16 @@ export function LoginForm() {
         return
       }
 
-      if (session) {
-        toast({
-          title: 'Welcome back!',
-          description: 'Successfully logged in',
-        })
+      toast({
+        title: 'Welcome back!',
+        description: 'Successfully logged in',
+      })
 
-        // Redirect to original URL or dashboard
-        const redirect = searchParams.get('redirect') || '/dashboard'
-        router.push(redirect)
-        router.refresh()
-      }
+      // Redirect to original URL or dashboard
+      // Cookies are already set by server, middleware will allow access
+      const redirect = searchParams.get('redirect') || '/dashboard'
+      router.push(redirect)
+      router.refresh()
     } catch (error) {
       console.error('Login error:', error)
       toast({
