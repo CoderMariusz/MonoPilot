@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
 import { LoginSchema, type LoginInput } from '@/lib/validation/auth-schemas'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,27 +42,34 @@ export function LoginForm() {
 
     try {
       // Use server-side login API to properly set cookies
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-        }),
+      // Use Supabase client for auth (handles session automatically)
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
+      if (error) {
         toast({
           variant: 'destructive',
           title: 'Login failed',
-          description: result.error || 'Invalid credentials',
+          description: error.message || 'Invalid credentials',
         })
         // Clear password field on error
         form.setValue('password', '')
+        return
+      }
+
+      if (!data.session) {
+        toast({
+          variant: 'destructive',
+          title: 'Login failed',
+          description: 'No session created',
+        })
         return
       }
 
