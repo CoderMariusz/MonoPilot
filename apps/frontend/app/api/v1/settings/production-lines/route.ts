@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
 
     // Check role permissions - use lowercase role codes as stored in DB
-    if (!['owner', 'admin', 'production_manager'].includes(userRole || '')) {
+    if (!['owner', 'admin', 'super_admin', 'production_manager'].includes(userRole || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

@@ -106,7 +106,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
 
     // Check role permissions - use lowercase role codes as stored in DB
-    if (!['owner', 'admin', 'production_manager'].includes(userRole || '')) {
+    if (!['owner', 'admin', 'super_admin', 'production_manager'].includes(userRole || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -188,7 +188,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
 
     // Check role permissions - use lowercase role codes (ADMIN+ only)
-    if (!['owner', 'admin'].includes(userRole || '')) {
+    if (!['owner', 'admin', 'super_admin'].includes(userRole || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const userRole = Array.isArray(roleData) ? roleData[0]?.code : roleData?.code
 
     // Check role permissions - use lowercase role codes
-    if (!['owner', 'admin', 'production_manager'].includes(userRole || '')) {
+    if (!['owner', 'admin', 'super_admin', 'production_manager'].includes(userRole || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
