@@ -757,7 +757,10 @@ export async function getLocations(
 
     let query = supabaseAdmin
       .from('locations')
-      .select('*')
+      .select(`
+        *,
+        warehouse:warehouses(id, code, name)
+      `)
       .eq('org_id', orgId)
       .eq('warehouse_id', warehouseId)
 

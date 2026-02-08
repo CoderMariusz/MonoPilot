@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
 interface LoginRequest {
   email: string
@@ -18,10 +18,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create browser client for auth (works server-side for sign-in)
-    const supabase = createClient(
+    // Collect cookies that @supabase/ssr wants to set during auth
+    const pendingCookies: Array<{ name: string; value: string; options: CookieOptions }> = []
+
+    const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach((cookie) => pendingCookies.push(cookie))
+          },
+        },
+      }
     )
 
     // Sign in with email and password
@@ -45,37 +57,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create response with session cookie
+    // Create response and apply auth cookies in @supabase/ssr format
+    // This ensures middleware and layout can read the session correctly
     const response = NextResponse.json(
       { success: true, message: 'Login successful' },
       { status: 200 }
     )
 
-    // Set auth cookies for server-side session persistence
-    // Using Supabase's cookie naming convention: sb-{projectRef}-auth-token
-    const { access_token, refresh_token } = data.session
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-    const projectRef = supabaseUrl.split('//')[1]?.split('.')[0] || 'supabase'
-
-    response.cookies.set({
-      name: `sb-${projectRef}-auth-token`,
-      value: access_token,
-      httpOnly: true,
-      secure: false, // Allow http://localhost in dev
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/',
-    })
-
-    response.cookies.set({
-      name: `sb-${projectRef}-refresh-token`,
-      value: refresh_token,
-      httpOnly: true,
-      secure: false, // Allow http://localhost in dev
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/',
-    })
+    pendingCookies.forEach(({ name, value, options }) =>
+      response.cookies.set(name, value, options)
+    )
 
     return response
   } catch (error) {

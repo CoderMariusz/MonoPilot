@@ -49,13 +49,17 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const warehouse_id = searchParams.get('warehouse_id')
     const type = searchParams.get('type')
+    const level = searchParams.get('level')
     const is_active = searchParams.get('is_active')
     const search = searchParams.get('search')
+    const view = searchParams.get('view') || 'tree'
 
     // Validate filters
     const filters = LocationFiltersSchema.parse({
       type: type || undefined,
+      level: level || undefined,
       search: search || undefined,
+      view: view,
     })
 
     // Call service to get locations (warehouseId required, default to first warehouse if not specified)

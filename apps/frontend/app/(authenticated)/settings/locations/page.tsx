@@ -36,17 +36,23 @@ interface Location {
   warehouse_id: string
   code: string
   name: string
-  type: string
-  zone: string | null
-  zone_enabled: boolean
-  capacity: number | null
-  capacity_enabled: boolean
-  barcode: string
+  level: string
+  location_type: string
+  full_path: string | null
+  depth: number
+  parent_id: string | null
+  max_pallets: number | null
+  max_weight_kg: number | null
+  current_pallets: number
   is_active: boolean
   warehouse?: {
+    id: string
     code: string
     name: string
   }
+  // Computed fields from LocationNode
+  children_count?: number
+  capacity_percent?: number | null
 }
 
 export default function LocationsPage() {
@@ -54,6 +60,7 @@ export default function LocationsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [levelFilter, setLevelFilter] = useState<string>('all')
   const [activeFilter, setActiveFilter] = useState<string>('active')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
@@ -69,7 +76,10 @@ export default function LocationsPage() {
       const params = new URLSearchParams()
       if (searchTerm) params.append('search', searchTerm)
       if (typeFilter !== 'all') params.append('type', typeFilter)
+      if (levelFilter !== 'all') params.append('level', levelFilter)
       if (activeFilter !== 'all') params.append('is_active', activeFilter)
+      // Request flat view to get all locations without tree structure
+      params.append('view', 'flat')
 
       const response = await fetch(`/api/settings/locations?${params.toString()}`)
 
@@ -89,7 +99,7 @@ export default function LocationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchTerm, typeFilter, activeFilter, toast])
+  }, [searchTerm, typeFilter, levelFilter, activeFilter, toast])
 
   useEffect(() => {
     fetchLocations()
@@ -169,26 +179,43 @@ export default function LocationsPage() {
       string,
       'default' | 'secondary' | 'destructive' | 'outline'
     > = {
-      receiving: 'default',
-      production: 'secondary',
-      storage: 'outline',
-      shipping: 'default',
-      transit: 'secondary',
-      quarantine: 'destructive',
+      bulk: 'default',
+      pallet: 'secondary',
+      shelf: 'outline',
+      floor: 'secondary',
+      staging: 'default',
     }
 
     const labels: Record<string, string> = {
-      receiving: 'Receiving',
-      production: 'Production',
-      storage: 'Storage',
-      shipping: 'Shipping',
-      transit: 'Transit',
-      quarantine: 'Quarantine',
+      bulk: 'Bulk',
+      pallet: 'Pallet',
+      shelf: 'Shelf',
+      floor: 'Floor',
+      staging: 'Staging',
     }
 
     return (
       <Badge variant={colors[type] || 'default'}>
         {labels[type] || type}
+      </Badge>
+    )
+  }
+
+  // Location level badge with color coding
+  const getLevelBadge = (level: string) => {
+    const colors: Record<
+      string,
+      'default' | 'secondary' | 'destructive' | 'outline'
+    > = {
+      zone: 'default',
+      aisle: 'secondary',
+      rack: 'outline',
+      bin: 'secondary',
+    }
+
+    return (
+      <Badge variant={colors[level] || 'default'}>
+        {level.charAt(0).toUpperCase() + level.slice(1)}
       </Badge>
     )
   }
@@ -228,19 +255,32 @@ export default function LocationsPage() {
               />
             </div>
 
+            {/* Level Filter */}
+            <Select value={levelFilter} onValueChange={setLevelFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Filter by level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Levels</SelectItem>
+                <SelectItem value="zone">Zone</SelectItem>
+                <SelectItem value="aisle">Aisle</SelectItem>
+                <SelectItem value="rack">Rack</SelectItem>
+                <SelectItem value="bin">Bin</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Type Filter */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="receiving">Receiving</SelectItem>
-                <SelectItem value="production">Production</SelectItem>
-                <SelectItem value="storage">Storage</SelectItem>
-                <SelectItem value="shipping">Shipping</SelectItem>
-                <SelectItem value="transit">Transit</SelectItem>
-                <SelectItem value="quarantine">Quarantine</SelectItem>
+                <SelectItem value="bulk">Bulk</SelectItem>
+                <SelectItem value="pallet">Pallet</SelectItem>
+                <SelectItem value="shelf">Shelf</SelectItem>
+                <SelectItem value="floor">Floor</SelectItem>
+                <SelectItem value="staging">Staging</SelectItem>
               </SelectContent>
             </Select>
 
@@ -271,10 +311,10 @@ export default function LocationsPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Warehouse</TableHead>
+                  <TableHead>Level</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Zone</TableHead>
+                  <TableHead>Path</TableHead>
                   <TableHead>Capacity</TableHead>
-                  <TableHead>Barcode</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -289,17 +329,15 @@ export default function LocationsPage() {
                         ? `${location.warehouse.name} (${location.warehouse.code})`
                         : '-'}
                     </TableCell>
-                    <TableCell>{getTypeBadge(location.type)}</TableCell>
-                    <TableCell>
-                      {location.zone_enabled ? location.zone || '-' : '-'}
+                    <TableCell>{getLevelBadge(location.level)}</TableCell>
+                    <TableCell>{getTypeBadge(location.location_type)}</TableCell>
+                    <TableCell className="font-mono text-sm max-w-[200px] truncate" title={location.full_path || ''}>
+                      {location.full_path || '-'}
                     </TableCell>
                     <TableCell>
-                      {location.capacity_enabled
-                        ? location.capacity?.toFixed(2) || '-'
+                      {location.max_pallets 
+                        ? `${location.current_pallets || 0}/${location.max_pallets}`
                         : '-'}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {location.barcode}
                     </TableCell>
                     <TableCell>
                       <Badge variant={location.is_active ? 'default' : 'secondary'}>
