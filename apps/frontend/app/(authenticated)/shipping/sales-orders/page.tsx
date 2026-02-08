@@ -11,8 +11,8 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useCallback, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -70,6 +70,7 @@ const mockProducts: Product[] = [
 
 export default function SalesOrdersPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
 
   // State
@@ -82,6 +83,15 @@ export default function SalesOrdersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null)
   const [confirmOrderId, setConfirmOrderId] = useState<string | null>(null)
+
+  // Open create modal if action=create in URL (BUG-011 fix)
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setShowCreateModal(true)
+      // Clean up URL
+      router.replace('/shipping/sales-orders', { scroll: false })
+    }
+  }, [searchParams, router])
 
   // Queries and Mutations
   const { data, isLoading, error } = useSalesOrders(params)

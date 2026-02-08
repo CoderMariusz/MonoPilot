@@ -87,7 +87,7 @@ export function QuickActionsPanel({ userRole }: QuickActionsPanelProps) {
           <ActionButton
             label="Create sales order"
             icon={<Plus className="h-4 w-4" />}
-            onClick={() => router.push('/shipping/sales-orders/new')}
+            onClick={() => router.push('/shipping/sales-orders?action=create')}
             disabled={!canCreateSO}
             disabledReason="You don't have permission to create sales orders"
           />
