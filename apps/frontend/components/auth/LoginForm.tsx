@@ -72,8 +72,10 @@ export function LoginForm() {
 
       // Redirect to original URL or dashboard
       const redirect = searchParams.get('redirect') || '/dashboard'
-      router.push(redirect)
-      router.refresh()
+      
+      // Use window.location for full page reload to ensure cookies are sent with the request
+      // This guarantees the middleware sees the new session cookies
+      window.location.href = redirect
     } catch (error) {
       console.error('Login error:', error)
       toast({

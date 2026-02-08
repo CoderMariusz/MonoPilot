@@ -1,4 +1,5 @@
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -12,7 +13,27 @@ export async function POST(request: Request) {
     const json = await request.json()
     const { email, password } = loginSchema.parse(json)
 
-    const supabase = await createServerSupabase()
+    const cookieStore = await cookies()
+    
+    // Collect cookies to set on the response
+    const cookiesToSet: Array<{ name: string; value: string; options: Record<string, unknown> }> = []
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookies) {
+            cookies.forEach(({ name, value, options }) => {
+              cookiesToSet.push({ name, value, options: options || {} })
+            })
+          },
+        },
+      }
+    )
 
     console.log('[Login API] Attempting login for:', email)
 
@@ -39,15 +60,30 @@ export async function POST(request: Request) {
     }
 
     console.log('[Login API] Login successful, user ID:', data.user.id)
+    console.log('[Login API] Setting cookies:', cookiesToSet.map(c => c.name))
 
-    // Session cookies are automatically set by createServerSupabase
-    return NextResponse.json({
+    // Create response and set cookies on it
+    const response = NextResponse.json({
       success: true,
       user: {
         id: data.user.id,
         email: data.user.email,
       },
     })
+
+    // Set all session cookies on the response
+    cookiesToSet.forEach(({ name, value, options }) => {
+      response.cookies.set(name, value, {
+        ...options,
+        // Ensure cookies work across the domain
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      })
+    })
+
+    return response
   } catch (error) {
     console.error('[Login API] Unexpected error:', error)
 
