@@ -1,9 +1,9 @@
 /**
  * Location Form Component
- * Story: 1.6 Location Management
- * Task 7: Frontend Location Form Modal (AC-005.1, AC-005.2, AC-005.3)
+ * Story: 01.9 - Warehouse Locations Management (Hierarchical)
+ * Updated for hierarchical schema: zone > aisle > rack > bin
  *
- * Modal form for creating and editing locations with zone/capacity toggles
+ * Modal form for creating and editing hierarchical locations
  */
 
 'use client'
@@ -35,22 +35,30 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
-import { LocationTypeEnum } from '@/lib/validation/location-schemas'
 
-// Form values interface matches actual form structure
+// Hierarchical location levels
+const LOCATION_LEVELS = ['zone', 'aisle', 'rack', 'bin'] as const
+type LocationLevel = typeof LOCATION_LEVELS[number]
+
+// Location storage types
+const LOCATION_TYPES = ['bulk', 'pallet', 'shelf', 'floor', 'staging'] as const
+type LocationType = typeof LOCATION_TYPES[number]
+
+// Form values interface for hierarchical locations
 interface LocationFormValues {
   warehouse_id: string
   code: string
   name: string
-  type: string
-  zone: string
-  zone_enabled: boolean
-  capacity: number | undefined
-  capacity_enabled: boolean
-  barcode: string
+  description: string
+  level: LocationLevel
+  location_type: LocationType
+  parent_id: string | null
+  max_pallets: number | null
+  max_weight_kg: number | null
   is_active: boolean
 }
 
@@ -60,18 +68,35 @@ interface Warehouse {
   name: string
 }
 
+interface ParentLocation {
+  id: string
+  code: string
+  name: string
+  level: LocationLevel
+  full_path: string | null
+}
+
+// Hierarchical Location interface matching database schema
 interface Location {
   id: string
   warehouse_id: string
   code: string
   name: string
-  type: string
-  zone: string | null
-  zone_enabled: boolean
-  capacity: number | null
-  capacity_enabled: boolean
-  barcode: string
+  description?: string | null
+  level: string
+  location_type: string
+  full_path: string | null
+  depth: number
+  parent_id: string | null
+  max_pallets: number | null
+  max_weight_kg: number | null
+  current_pallets: number
   is_active: boolean
+  warehouse?: {
+    id: string
+    code: string
+    name: string
+  }
 }
 
 interface LocationFormProps {
@@ -79,6 +104,17 @@ interface LocationFormProps {
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
   location?: Location // If provided, edit mode
+}
+
+// Get allowed parent levels based on child level
+function getAllowedParentLevel(level: LocationLevel): LocationLevel | null {
+  switch (level) {
+    case 'zone': return null // zones have no parent
+    case 'aisle': return 'zone'
+    case 'rack': return 'aisle'
+    case 'bin': return 'rack'
+    default: return null
+  }
 }
 
 export function LocationForm({
@@ -90,6 +126,8 @@ export function LocationForm({
   const [loading, setLoading] = useState(false)
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [loadingWarehouses, setLoadingWarehouses] = useState(false)
+  const [parentLocations, setParentLocations] = useState<ParentLocation[]>([])
+  const [loadingParents, setLoadingParents] = useState(false)
   const { toast } = useToast()
 
   const isEditMode = !!location
@@ -99,19 +137,19 @@ export function LocationForm({
       warehouse_id: location?.warehouse_id || '',
       code: location?.code || '',
       name: location?.name || '',
-      type: location?.type || 'storage',
-      zone: location?.zone || '',
-      zone_enabled: location?.zone_enabled || false,
-      capacity: location?.capacity || undefined,
-      capacity_enabled: location?.capacity_enabled || false,
-      barcode: location?.barcode || '',
+      description: location?.description || '',
+      level: (location?.level as LocationLevel) || 'zone',
+      location_type: (location?.location_type as LocationType) || 'shelf',
+      parent_id: location?.parent_id || null,
+      max_pallets: location?.max_pallets || null,
+      max_weight_kg: location?.max_weight_kg || null,
       is_active: location?.is_active ?? true,
     },
   })
 
-  // Watch zone/capacity toggles to show/hide fields
-  const zoneEnabled = form.watch('zone_enabled')
-  const capacityEnabled = form.watch('capacity_enabled')
+  // Watch fields for conditional rendering
+  const selectedLevel = form.watch('level')
+  const selectedWarehouseId = form.watch('warehouse_id')
 
   // Fetch warehouses for dropdown
   useEffect(() => {
@@ -143,6 +181,53 @@ export function LocationForm({
     }
   }, [open, toast])
 
+  // Fetch parent locations when warehouse or level changes
+  useEffect(() => {
+    const fetchParentLocations = async () => {
+      const parentLevel = getAllowedParentLevel(selectedLevel)
+      
+      // Zones have no parent
+      if (!parentLevel || !selectedWarehouseId) {
+        setParentLocations([])
+        return
+      }
+
+      try {
+        setLoadingParents(true)
+        const response = await fetch(
+          `/api/v1/settings/warehouses/${selectedWarehouseId}/locations?level=${parentLevel}`
+        )
+
+        if (!response.ok) {
+          // Try alternative endpoint
+          const altResponse = await fetch(
+            `/api/settings/locations?warehouse_id=${selectedWarehouseId}&level=${parentLevel}&view=flat`
+          )
+          if (!altResponse.ok) {
+            throw new Error('Failed to fetch parent locations')
+          }
+          const result = await altResponse.json()
+          setParentLocations(result.locations || [])
+          return
+        }
+
+        const result = await response.json()
+        setParentLocations(result.locations || result.data || [])
+      } catch (error) {
+        console.error('Error fetching parent locations:', error)
+        setParentLocations([])
+      } finally {
+        setLoadingParents(false)
+      }
+    }
+
+    if (open && selectedWarehouseId && selectedLevel !== 'zone') {
+      fetchParentLocations()
+    } else {
+      setParentLocations([])
+    }
+  }, [open, selectedWarehouseId, selectedLevel])
+
   // Reset form when location changes or dialog opens
   useEffect(() => {
     if (location) {
@@ -150,12 +235,12 @@ export function LocationForm({
         warehouse_id: location.warehouse_id,
         code: location.code,
         name: location.name,
-        type: location.type as any,
-        zone: location.zone || '',
-        zone_enabled: location.zone_enabled,
-        capacity: location.capacity || undefined,
-        capacity_enabled: location.capacity_enabled,
-        barcode: location.barcode,
+        description: location.description || '',
+        level: location.level as LocationLevel,
+        location_type: location.location_type as LocationType,
+        parent_id: location.parent_id,
+        max_pallets: location.max_pallets,
+        max_weight_kg: location.max_weight_kg,
         is_active: location.is_active,
       })
     } else {
@@ -163,20 +248,39 @@ export function LocationForm({
         warehouse_id: '',
         code: '',
         name: '',
-        type: 'storage',
-        zone: '',
-        zone_enabled: false,
-        capacity: undefined,
-        capacity_enabled: false,
-        barcode: '',
+        description: '',
+        level: 'zone',
+        location_type: 'shelf',
+        parent_id: null,
+        max_pallets: null,
+        max_weight_kg: null,
         is_active: true,
       })
     }
   }, [location, form])
 
+  // Clear parent when level changes to zone
+  useEffect(() => {
+    if (selectedLevel === 'zone') {
+      form.setValue('parent_id', null)
+    }
+  }, [selectedLevel, form])
+
   const onSubmit = async (data: LocationFormValues) => {
     try {
       setLoading(true)
+
+      // Validate hierarchy
+      const parentLevel = getAllowedParentLevel(data.level)
+      if (parentLevel && !data.parent_id) {
+        toast({
+          title: 'Validation Error',
+          description: `${data.level.charAt(0).toUpperCase() + data.level.slice(1)}s require a parent ${parentLevel}`,
+          variant: 'destructive',
+        })
+        setLoading(false)
+        return
+      }
 
       const url = isEditMode
         ? `/api/settings/locations/${location.id}`
@@ -188,15 +292,19 @@ export function LocationForm({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          // Clean up null values
+          max_pallets: data.max_pallets || null,
+          max_weight_kg: data.max_weight_kg || null,
+          parent_id: data.parent_id || null,
+        }),
       })
 
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || `Failed to ${isEditMode ? 'update' : 'create'} location`)
       }
-
-      const result = await response.json()
 
       toast({
         title: 'Success',
@@ -232,14 +340,14 @@ export function LocationForm({
           </DialogTitle>
           <DialogDescription>
             {isEditMode
-              ? 'Update location details. Barcode will be regenerated if changed.'
-              : 'Create a new location. Barcode will be auto-generated if not provided.'}
+              ? 'Update location details. Code and level cannot be changed.'
+              : 'Create a new hierarchical location. Locations follow: Zone → Aisle → Rack → Bin'}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Warehouse Selection (AC-005.1) */}
+            {/* Warehouse Selection */}
             <FormField
               control={form.control}
               name="warehouse_id"
@@ -274,7 +382,89 @@ export function LocationForm({
               )}
             />
 
-            {/* Code and Name (AC-005.1) */}
+            {/* Level Selection - determines hierarchy position */}
+            <FormField
+              control={form.control}
+              name="level"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Level *</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={loading || isEditMode}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select hierarchy level" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {LOCATION_LEVELS.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                  <FormDescription className="text-xs">
+                    Hierarchy: Zone → Aisle → Rack → Bin
+                  </FormDescription>
+                </FormItem>
+              )}
+            />
+
+            {/* Parent Location - shown for non-zone levels */}
+            {selectedLevel !== 'zone' && (
+              <FormField
+                control={form.control}
+                name="parent_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Parent {getAllowedParentLevel(selectedLevel)?.charAt(0).toUpperCase()}
+                      {getAllowedParentLevel(selectedLevel)?.slice(1)} *
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ''}
+                      disabled={loading || loadingParents || !selectedWarehouseId}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={
+                            loadingParents 
+                              ? 'Loading...' 
+                              : `Select parent ${getAllowedParentLevel(selectedLevel)}`
+                          } />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {parentLocations.map((parent) => (
+                          <SelectItem key={parent.id} value={parent.id}>
+                            {parent.code} - {parent.name}
+                            {parent.full_path && (
+                              <span className="text-muted-foreground ml-2">
+                                ({parent.full_path})
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                        {parentLocations.length === 0 && !loadingParents && (
+                          <SelectItem value="" disabled>
+                            No {getAllowedParentLevel(selectedLevel)}s found. Create one first.
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Code and Name */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -284,9 +474,9 @@ export function LocationForm({
                     <FormLabel>Code *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="LOC-A01"
+                        placeholder={selectedLevel === 'zone' ? 'ZONE-A' : 'A01'}
                         {...field}
-                        disabled={loading}
+                        disabled={loading || isEditMode}
                         className="uppercase"
                         onChange={(e) =>
                           field.onChange(e.target.value.toUpperCase())
@@ -309,7 +499,7 @@ export function LocationForm({
                     <FormLabel>Name *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Receiving Area 1"
+                        placeholder="Zone A"
                         {...field}
                         disabled={loading}
                       />
@@ -320,13 +510,33 @@ export function LocationForm({
               />
             </div>
 
-            {/* Location Type (AC-005.1) */}
+            {/* Description */}
             <FormField
               control={form.control}
-              name="type"
+              name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Type *</FormLabel>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Optional description..."
+                      {...field}
+                      disabled={loading}
+                      rows={2}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Location Type (storage classification) */}
+            <FormField
+              control={form.control}
+              name="location_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Storage Type *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -334,11 +544,11 @@ export function LocationForm({
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select location type" />
+                        <SelectValue placeholder="Select storage type" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {LocationTypeEnum.options.map((type) => (
+                      {LOCATION_TYPES.map((type) => (
                         <SelectItem key={type} value={type}>
                           {type.charAt(0).toUpperCase() + type.slice(1)}
                         </SelectItem>
@@ -350,131 +560,69 @@ export function LocationForm({
               )}
             />
 
-            {/* Zone Toggle and Field (AC-005.2) */}
-            <div className="space-y-2">
+            {/* Capacity fields */}
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="zone_enabled"
+                name="max_pallets"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormItem>
+                    <FormLabel>Max Pallets</FormLabel>
                     <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="e.g., 10"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value ? parseInt(e.target.value, 10) : null
+                          )
+                        }
                         disabled={loading}
                       />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Enable Zone Tracking</FormLabel>
-                      <FormDescription>
-                        Track specific zone/area within this location
-                      </FormDescription>
-                    </div>
+                    <FormMessage />
+                    <FormDescription className="text-xs">
+                      Leave empty for no limit
+                    </FormDescription>
                   </FormItem>
                 )}
               />
 
-              {zoneEnabled && (
-                <FormField
-                  control={form.control}
-                  name="zone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Zone *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Zone A, Freezer-1, etc."
-                          {...field}
-                          value={field.value || ''}
-                          disabled={loading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
-
-            {/* Capacity Toggle and Field (AC-005.2) */}
-            <div className="space-y-2">
               <FormField
                 control={form.control}
-                name="capacity_enabled"
+                name="max_weight_kg"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormItem>
+                    <FormLabel>Max Weight (kg)</FormLabel>
                     <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="e.g., 5000"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value ? parseFloat(e.target.value) : null
+                          )
+                        }
                         disabled={loading}
                       />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Enable Capacity Tracking</FormLabel>
-                      <FormDescription>
-                        Set maximum storage capacity for this location
-                      </FormDescription>
-                    </div>
+                    <FormMessage />
+                    <FormDescription className="text-xs">
+                      Leave empty for no limit
+                    </FormDescription>
                   </FormItem>
                 )}
               />
-
-              {capacityEnabled && (
-                <FormField
-                  control={form.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Capacity *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="100.00"
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? parseFloat(e.target.value) : undefined
-                            )
-                          }
-                          disabled={loading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                      <FormDescription className="text-xs">
-                        Maximum storage capacity (units/pallets/m³)
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-              )}
             </div>
 
-            {/* Barcode (optional override) (AC-005.3) */}
-            <FormField
-              control={form.control}
-              name="barcode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Barcode (optional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Auto-generated if empty"
-                      {...field}
-                      disabled={loading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                  <FormDescription className="text-xs">
-                    Leave empty for auto-generation (LOC-{'{warehouse}'}-{'{seq}'}). Must be globally unique if provided.
-                  </FormDescription>
-                </FormItem>
-              )}
-            />
-
-            {/* Active Status (AC-005.5) */}
+            {/* Active Status (edit mode only) */}
             {isEditMode && (
               <FormField
                 control={form.control}
