@@ -109,10 +109,20 @@
 - **Severity**: 🔴 CRITICAL (Blocks main workflow, cannot access WO details from dashboard)
 - **Impact**: Users could not view active work orders from the dashboard
 - **Fixed By**: Subagent Developer at 2026-02-08 17:00 UTC
-- **Commit**: 0b7ac7d2 (Fix: Active WOs table rendering on dashboard (#2))
+- **Commits**: 
+  - 0b7ac7d2: Fix: Active WOs table rendering on dashboard (#2)
+  - 604ba0b6: Fix: Correct paused status queries across production services (additional fixes for consistency)
+- **Files Modified**:
+  - `/lib/services/production-dashboard-service.ts` - Fixed getActiveWorkOrders, getKPIs, getAlerts functions
+  - `/lib/services/wo-complete-service.ts` - Fixed status validation and optimistic lock
 - **Test Date**: 2026-02-08
 - **Tester**: Subagent Developer
 - **Status**: ✅ Fixed
+- **Test Results**: 
+  - API endpoint now correctly returns work orders with status='in_progress'
+  - paused_at field is used to derive 'paused' status for UI display
+  - Active Work Orders table will now display all in-progress work orders (including paused ones)
+  - WO Number links are clickable and navigate to `/production/work-orders/{id}`
 
 ---
 
