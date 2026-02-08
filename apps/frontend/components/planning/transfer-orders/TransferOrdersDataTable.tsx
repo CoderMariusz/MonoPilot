@@ -211,66 +211,7 @@ export function TransferOrdersDataTable({
   const totalItems = data?.meta.total || 0
   const totalPages = data?.meta.pages || 1
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-[300px]" />
-          <Skeleton className="h-10 w-[150px]" />
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-[150px]" />
-          <Skeleton className="h-10 w-[150px]" />
-          <Skeleton className="h-10 w-[150px]" />
-        </div>
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                  <TableHead key={i}>
-                    <Skeleton className="h-4 w-20" />
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <TableRow key={i}>
-                  {[1, 2, 3, 4, 5, 6, 7].map((j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 px-4">
-        <FileX className="h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Failed to Load Transfer Orders
-        </h3>
-        <p className="text-sm text-gray-500 mb-4 text-center">
-          Unable to retrieve transfer order data. Please check your connection and try again.
-        </p>
-        <Button onClick={() => refetch()} variant="outline">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Retry
-        </Button>
-      </div>
-    )
-  }
-
+  // Always show controls, even while loading
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -374,131 +315,170 @@ export function TransferOrdersDataTable({
 
       {/* Table */}
       <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <button
-                  onClick={() => handleSort('to_number')}
-                  className="flex items-center font-medium hover:text-gray-900"
-                >
-                  TO Number
-                  {getSortIcon('to_number')}
-                </button>
-              </TableHead>
-              <TableHead>From / To Warehouse</TableHead>
-              <TableHead>
-                <button
-                  onClick={() => handleSort('status')}
-                  className="flex items-center font-medium hover:text-gray-900"
-                >
-                  Status
-                  {getSortIcon('status')}
-                </button>
-              </TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>
-                <button
-                  onClick={() => handleSort('planned_ship_date')}
-                  className="flex items-center font-medium hover:text-gray-900"
-                >
-                  Planned Ship
-                  {getSortIcon('planned_ship_date')}
-                </button>
-              </TableHead>
-              <TableHead>
-                <button
-                  onClick={() => handleSort('created_at')}
-                  className="flex items-center font-medium hover:text-gray-900"
-                >
-                  Created
-                  {getSortIcon('created_at')}
-                </button>
-              </TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {transferOrders.length === 0 ? (
+        {isError ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <FileX className="h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Failed to Load Transfer Orders
+            </h3>
+            <p className="text-sm text-gray-500 mb-4 text-center">
+              Unable to retrieve transfer order data. Please check your connection and try again.
+            </p>
+            <Button onClick={() => refetch()} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        ) : isLoading ? (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="py-12">
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <FileX className="h-10 w-10 text-gray-400 mb-3" />
-                    {hasActiveFilters ? (
-                      <>
-                        <h3 className="text-sm font-medium text-gray-900 mb-1">
-                          No matching transfer orders
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-3">
-                          No TOs match your current filters.
-                        </p>
-                        <Button variant="outline" size="sm" onClick={clearFilters}>
-                          Clear Filters
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <h3 className="text-sm font-medium text-gray-900 mb-1">
-                          No Transfer Orders Yet
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-3">
-                          Create your first transfer order to move inventory between warehouses.
-                        </p>
-                        {canCreate && (
-                          <Button size="sm" onClick={onCreateClick}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Create First Transfer Order
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </TableCell>
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <TableHead key={i}>
+                    <Skeleton className="h-4 w-20" />
+                  </TableHead>
+                ))}
               </TableRow>
-            ) : (
-              transferOrders.map((to) => (
-                <TableRow
-                  key={to.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => handleRowClick(to)}
-                >
-                  <TableCell className="font-medium">{to.to_number}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">{to.from_warehouse?.name || 'Unknown'}</p>
-                        <p className="text-xs text-gray-500">{to.from_warehouse?.code}</p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">{to.to_warehouse?.name || 'Unknown'}</p>
-                        <p className="text-xs text-gray-500">{to.to_warehouse?.code}</p>
-                      </div>
+            </TableHeader>
+            <TableBody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i}>
+                  {[1, 2, 3, 4, 5, 6, 7].map((j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <button
+                    onClick={() => handleSort('to_number')}
+                    className="flex items-center font-medium hover:text-gray-900"
+                  >
+                    TO Number
+                    {getSortIcon('to_number')}
+                  </button>
+                </TableHead>
+                <TableHead>From / To Warehouse</TableHead>
+                <TableHead>
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center font-medium hover:text-gray-900"
+                  >
+                    Status
+                    {getSortIcon('status')}
+                  </button>
+                </TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>
+                  <button
+                    onClick={() => handleSort('planned_ship_date')}
+                    className="flex items-center font-medium hover:text-gray-900"
+                  >
+                    Planned Ship
+                    {getSortIcon('planned_ship_date')}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    onClick={() => handleSort('created_at')}
+                    className="flex items-center font-medium hover:text-gray-900"
+                  >
+                    Created
+                    {getSortIcon('created_at')}
+                  </button>
+                </TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transferOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <FileX className="h-10 w-10 text-gray-400 mb-3" />
+                      {hasActiveFilters ? (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-900 mb-1">
+                            No matching transfer orders
+                          </h3>
+                          <p className="text-sm text-gray-500 mb-3">
+                            No TOs match your current filters.
+                          </p>
+                          <Button variant="outline" size="sm" onClick={clearFilters}>
+                            Clear Filters
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-900 mb-1">
+                            No Transfer Orders Yet
+                          </h3>
+                          <p className="text-sm text-gray-500 mb-3">
+                            Create your first transfer order to move inventory between warehouses.
+                          </p>
+                          {canCreate && (
+                            <Button size="sm" onClick={onCreateClick}>
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create First Transfer Order
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <TOStatusBadge status={to.status} size="sm" />
-                  </TableCell>
-                  <TableCell>
-                    <TOPriorityBadge priority={to.priority} size="sm" />
-                  </TableCell>
-                  <TableCell>{formatDate(to.planned_ship_date)}</TableCell>
-                  <TableCell>{formatDate(to.created_at)}</TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <TOActions
-                      toId={to.id}
-                      toNumber={to.to_number}
-                      status={to.status}
-                      linesCount={to.lines_count || 0}
-                      canEdit={canEdit}
-                      onAction={(action) => handleAction(action, to)}
-                    />
-                  </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                transferOrders.map((to) => (
+                  <TableRow
+                    key={to.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleRowClick(to)}
+                  >
+                    <TableCell className="font-medium">{to.to_number}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm">{to.from_warehouse?.name || 'Unknown'}</p>
+                          <p className="text-xs text-gray-500">{to.from_warehouse?.code}</p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm">{to.to_warehouse?.name || 'Unknown'}</p>
+                          <p className="text-xs text-gray-500">{to.to_warehouse?.code}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <TOStatusBadge status={to.status} size="sm" />
+                    </TableCell>
+                    <TableCell>
+                      <TOPriorityBadge priority={to.priority} size="sm" />
+                    </TableCell>
+                    <TableCell>{formatDate(to.planned_ship_date)}</TableCell>
+                    <TableCell>{formatDate(to.created_at)}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TOActions
+                        toId={to.id}
+                        toNumber={to.to_number}
+                        status={to.status}
+                        linesCount={to.lines_count || 0}
+                        canEdit={canEdit}
+                        onAction={(action) => handleAction(action, to)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Pagination */}
