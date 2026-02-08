@@ -1,65 +1,84 @@
-import { createServerSupabase } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-import { z } from 'zod'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-})
+interface LoginRequest {
+  email: string
+  password: string
+}
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const json = await request.json()
-    const { email, password } = loginSchema.parse(json)
+    const body: LoginRequest = await request.json()
+    const { email, password } = body
 
-    const supabase = await createServerSupabase()
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'Email and password are required' },
+        { status: 400 }
+      )
+    }
 
-    console.log('[Login API] Attempting login for:', email)
+    // Create client-side Supabase client for auth
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
-    // Sign in with password
+    // Sign in with email and password
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
     if (error) {
-      console.log('[Login API] Login failed:', error.message)
+      console.error('Login error:', error)
       return NextResponse.json(
-        { error: error.message },
+        { error: error.message || 'Invalid credentials' },
         { status: 401 }
       )
     }
 
     if (!data.session) {
-      console.log('[Login API] No session returned')
       return NextResponse.json(
-        { error: 'No session created' },
+        { error: 'Session creation failed' },
         { status: 500 }
       )
     }
 
-    console.log('[Login API] Login successful, user ID:', data.user.id)
+    // Create response with session cookie
+    const response = NextResponse.json(
+      { success: true, message: 'Login successful' },
+      { status: 200 }
+    )
 
-    // Session cookies are automatically set by createServerSupabase
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-      },
+    // Set auth cookies for server-side session persistence
+    const { access_token, refresh_token } = data.session
+
+    response.cookies.set({
+      name: 'sb-auth-token',
+      value: access_token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
     })
+
+    response.cookies.set({
+      name: 'sb-refresh-token',
+      value: refresh_token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
+    })
+
+    return response
   } catch (error) {
-    console.error('[Login API] Unexpected error:', error)
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data' },
-        { status: 400 }
-      )
-    }
-
+    console.error('Login endpoint error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'An unexpected error occurred' },
       { status: 500 }
     )
   }
