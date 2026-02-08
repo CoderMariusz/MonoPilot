@@ -139,7 +139,7 @@ export default function QualityHoldsPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit, toast])
+  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit])
 
   // Fetch on filter changes
   useEffect(() => {
@@ -148,7 +148,7 @@ export default function QualityHoldsPage() {
     }, search ? 300 : 0) // Debounce search
 
     return () => clearTimeout(timer)
-  }, [search, statusFilter, priorityFilter, pagination.page, fetchHolds])
+  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit, fetchHolds])
 
   // Format date
   const formatDate = (dateString: string) => {
