@@ -209,7 +209,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: result.error }, { status: 500 })
     }
 
-    return new NextResponse(null, { status: 204 })
+    return NextResponse.json({ success: true, message: 'Production line deleted successfully' })
   } catch (error) {
     console.error('Error in DELETE /api/v1/settings/production-lines/:id:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

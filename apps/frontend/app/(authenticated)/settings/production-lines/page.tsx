@@ -182,7 +182,18 @@ export default function ProductionLinesPage() {
         method: 'DELETE',
       })
 
-      const data = await response.json()
+      // Handle 204 No Content (no body) or parse JSON for other responses
+      let data: any = {}
+      if (response.status !== 204) {
+        try {
+          data = await response.json()
+        } catch {
+          // If JSON parsing fails and response is ok, treat as success
+          if (response.ok) {
+            data = { success: true }
+          }
+        }
+      }
 
       if (!response.ok) {
         // AC-007.2: Cannot delete if used in WOs or machines
