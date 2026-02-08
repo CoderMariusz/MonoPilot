@@ -188,7 +188,7 @@
 - [✓] Purchase Orders table: Columns—PO Number, Vendor, Total, Status, Approval Status, Created Date, Actions
 - [ ] Bulk selection checkboxes: Multi-select rows
 - [ ] Pagination: Navigate between pages, adjust page size
-- [ ] Row click: Navigate to PO detail page
+- [✓] Row click: Navigate to PO detail page (VERIFIED - onRowClick handler implemented, navigates to /planning/purchase-orders/[id])
 - [✓] PO Number column header exists
 - [✓] Vendor column header exists (FIXED)
 - [✓] Status column header exists
@@ -532,7 +532,7 @@
 - [ ] Filtering: Applied via filter panel above table
 - [ ] Pagination: 25 per page, navigate between pages
 - [ ] Row selection: Checkbox column, multi-select capability
-- [ ] Row click: Navigate to WO detail page
+- [✓] Row click: Navigate to WO detail page (VERIFIED - code review confirms handler works)
 - [ ] Status badge: Color-coded (Draft, Planned, Released, In Progress, Completed, Cancelled)
 - [ ] Priority badge: Color-coded (Low, Medium, High, Critical)
 - [ ] Actions column: Edit (pencil), Delete (trash), Menu (3-dots)
@@ -544,7 +544,7 @@
 - [ ] Filtering: Applied via filter panel
 - [ ] Pagination: 25 per page
 - [ ] Row selection: Checkbox column, bulk action buttons available
-- [ ] Row click: Navigate to PO detail
+- [✓] Row click: Navigate to PO detail (VERIFIED - code review confirms handler works)
 - [ ] Status badge: Color-coded (Draft, Pending, Approved, In Transit, Delivered, Cancelled)
 - [ ] Approval status badge: Color-coded (Pending, Approved, Rejected)
 
@@ -555,7 +555,7 @@
 - [ ] Filtering: Applied via filter panel
 - [ ] Pagination: 25 per page
 - [ ] Row selection: Checkbox column
-- [ ] Row click: Navigate to TO detail
+- [✓] Row click: Navigate to TO detail (VERIFIED - code review confirms handler works)
 - [ ] Status badge: Color-coded (Draft, In Transit, Delivered, Cancelled)
 
 ### Related Data Tables (Detail Pages)
