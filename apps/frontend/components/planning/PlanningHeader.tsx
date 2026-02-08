@@ -1,16 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Settings, Menu, X } from 'lucide-react'
+import { UserMenu } from '@/components/auth/UserMenu'
+import { createClient } from '@/lib/supabase/client'
 
 export type PlanningPage = 'dashboard' | 'po' | 'to' | 'wo' | 'suppliers'
 
 interface PlanningHeaderProps {
   currentPage?: PlanningPage
+}
+
+interface UserData {
+  email: string
+  name?: string
 }
 
 const navItems = [
@@ -24,6 +31,34 @@ const navItems = [
 export function PlanningHeader({ currentPage }: PlanningHeaderProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState<UserData | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Fetch current user on mount
+  useEffect(() => {
+    setMounted(true)
+    const fetchUser = async () => {
+      try {
+        const supabase = createClient()
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser()
+
+        if (authUser) {
+          setUser({
+            email: authUser.email || '',
+            name: authUser.user_metadata?.first_name
+              ? `${authUser.user_metadata.first_name} ${authUser.user_metadata.last_name || ''}`.trim()
+              : undefined,
+          })
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error)
+      }
+    }
+
+    fetchUser()
+  }, [])
 
   // Auto-detect current page from pathname if not provided
   const activePage = currentPage || detectCurrentPage(pathname)
@@ -61,8 +96,8 @@ export function PlanningHeader({ currentPage }: PlanningHeaderProps) {
           </Link>
         </nav>
 
-        {/* Mobile Menu Button */}
-        <div className="flex md:hidden items-center gap-2">
+        {/* Right side: Settings, Mobile Menu, and User Menu */}
+        <div className="flex items-center gap-2">
           <Link href="/settings/planning">
             <Button variant="ghost" size="sm">
               <Settings className="h-4 w-4" />
@@ -73,9 +108,12 @@ export function PlanningHeader({ currentPage }: PlanningHeaderProps) {
             size="sm"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
+            className="md:hidden"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
+          {/* User Menu with Logout - Only render after mount to prevent hydration mismatch */}
+          {mounted && user && <UserMenu user={user} />}
         </div>
       </div>
 

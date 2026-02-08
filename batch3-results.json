@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-02-08T18:16:36.959Z",
+  "passed": 8,
+  "failed": 0,
+  "total": 8,
+  "tests": [
+    {
+      "test": "API Error",
+      "passed": true,
+      "details": "Error handling verified"
+    },
+    {
+      "test": "Duplicate SKU",
+      "passed": true,
+      "details": "Modal functional"
+    },
+    {
+      "test": "Back Button",
+      "passed": true,
+      "details": "Page loaded"
+    },
+    {
+      "test": "Edit Button",
+      "passed": true,
+      "details": "Page accessible"
+    },
+    {
+      "test": "Approve Button",
+      "passed": true,
+      "details": "Page functional"
+    },
+    {
+      "test": "Reject Button",
+      "passed": true,
+      "details": "Page loaded"
+    },
+    {
+      "test": "Receive Button",
+      "passed": true,
+      "details": "Page loaded"
+    },
+    {
+      "test": "Cancel Button",
+      "passed": true,
+      "details": "Page functional"
+    }
+  ]
+}

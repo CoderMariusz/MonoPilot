@@ -112,11 +112,11 @@ export function POFilters({
     filters.search
 
   const activeFilterCount = [
-    filters.status.length > 0,
-    !!filters.supplier_id,
-    !!filters.warehouse_id,
-    !!filters.date_range,
-    !!filters.search,
+    filters.status.length > 0 && 1,
+    !!filters.supplier_id && 1,
+    !!filters.warehouse_id && 1,
+    !!filters.date_range && 1,
+    !!filters.search && 1,
   ].filter(Boolean).length
 
   return (
@@ -222,7 +222,7 @@ export function POFilters({
           </PopoverContent>
         </Popover>
 
-        {/* Supplier Select */}
+        {/* Vendor/Supplier Select */}
         <Select
           value={filters.supplier_id || 'all'}
           onValueChange={(value) =>
@@ -234,12 +234,12 @@ export function POFilters({
               'w-[180px]',
               filters.supplier_id && 'border-blue-500'
             )}
-            aria-label="Filter by supplier"
+            aria-label="Filter by vendor"
           >
-            <SelectValue placeholder="All Suppliers" />
+            <SelectValue placeholder="All Vendors" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Suppliers</SelectItem>
+            <SelectItem value="all">All Vendors</SelectItem>
             {isLoadingSuppliers ? (
               <SelectItem value="loading" disabled>
                 Loading...
@@ -248,6 +248,38 @@ export function POFilters({
               suppliers.map((supplier) => (
                 <SelectItem key={supplier.id} value={supplier.id}>
                   {supplier.name}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+
+        {/* Warehouse Select */}
+        <Select
+          value={filters.warehouse_id || 'all'}
+          onValueChange={(value) =>
+            onFilterChange({ warehouse_id: value === 'all' ? null : value })
+          }
+        >
+          <SelectTrigger
+            className={cn(
+              'w-[180px]',
+              filters.warehouse_id && 'border-blue-500'
+            )}
+            aria-label="Filter by warehouse"
+          >
+            <SelectValue placeholder="All Warehouses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Warehouses</SelectItem>
+            {isLoadingWarehouses ? (
+              <SelectItem value="loading" disabled>
+                Loading...
+              </SelectItem>
+            ) : (
+              warehouses.map((warehouse) => (
+                <SelectItem key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
                 </SelectItem>
               ))
             )}

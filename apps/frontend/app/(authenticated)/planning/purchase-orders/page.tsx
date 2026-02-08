@@ -368,7 +368,9 @@ export default function PurchaseOrdersPage() {
           filters={filters}
           onFilterChange={handleFilterChange}
           suppliers={suppliers?.data || []}
+          warehouses={warehouses?.data || []}
           isLoadingSuppliers={isLoadingSuppliers}
+          isLoadingWarehouses={isLoadingWarehouses}
         />
 
         {/* Story 03.6: Bulk Actions Bar */}

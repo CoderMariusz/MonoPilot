@@ -179,7 +179,7 @@ export function PODataTable({
       },
       {
         accessorKey: 'supplier_name',
-        header: 'Supplier',
+        header: 'Vendor',
         cell: ({ row }) => (
           <div>
             <div className="font-medium">{row.original.supplier_name}</div>
