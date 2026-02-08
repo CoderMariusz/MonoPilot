@@ -422,23 +422,42 @@ export class ProductionLineService {
     try {
       const supabase = supabaseClient || createClient()
 
+      // First verify the line exists and user has access
+      const { data: existingLine, error: fetchError } = await supabase
+        .from('production_lines')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle()
+
+      if (fetchError) {
+        throw fetchError
+      }
+
+      if (!existingLine) {
+        throw new Error('Line not found')
+      }
+
       // Check work orders
       const hasWorkOrders = await this.hasWorkOrders(id, supabase)
       if (hasWorkOrders) {
         throw new Error('Line has active work orders')
       }
 
-      // Delete line (CASCADE will handle junction tables)
-      const { error } = await supabase
+      // Delete line with .select() to verify deletion occurred
+      // CASCADE will handle junction tables (production_line_machines, production_line_products)
+      const { data: deletedRows, error } = await supabase
         .from('production_lines')
         .delete()
         .eq('id', id)
+        .select('id')
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          throw new Error('Line not found')
-        }
         throw error
+      }
+
+      // If RLS blocked the delete, no rows will be returned
+      if (!deletedRows || deletedRows.length === 0) {
+        throw new Error('Line not found')
       }
 
       return { success: true }
