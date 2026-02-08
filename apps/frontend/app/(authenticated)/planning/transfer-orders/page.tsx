@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import {
@@ -81,6 +81,21 @@ export default function TransferOrdersPage() {
     },
     [router]
   )
+
+  // Handle action=create query parameter to open create form
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setEditingTO(null)
+      setFormModalOpen(true)
+      // Clean up URL by removing action param
+      const params = new URLSearchParams(searchParams)
+      params.delete('action')
+      const newUrl = params.toString() 
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
 
   // Handle create click
   const handleCreateClick = useCallback(() => {

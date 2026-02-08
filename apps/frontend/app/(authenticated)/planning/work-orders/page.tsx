@@ -141,6 +141,20 @@ export default function WorkOrdersPage() {
     fetchReferenceData()
   }, [])
 
+  // Handle action=create query parameter to open create form
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setFormOpen(true)
+      // Clean up URL by removing action param
+      const params = new URLSearchParams(searchParams)
+      params.delete('action')
+      const newUrl = params.toString() 
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
+
   // Handlers
   const handleFiltersChange = useCallback((newFilters: WOFiltersState) => {
     setFilters(newFilters)
