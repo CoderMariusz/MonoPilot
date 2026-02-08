@@ -30,6 +30,64 @@
 
 ---
 
+## Bug-003 | ✅ FIXED - Vendor Filter NOT FOUND on Purchase Orders List Page
+
+- **Module**: Planning / Purchase Orders
+- **Checkbox**: "Vendor filter: Single-select dropdown (NOT FOUND)"
+- **Issue**: Vendor filter (single-select dropdown) not appearing on `/planning/purchase-orders` list page
+- **Expected**: Filter should allow filtering POs by vendor/supplier - display a dropdown showing "All Vendors" with vendor options
+- **Actual**: Vendor filter dropdown was missing from the filters bar
+- **Root Cause**: The `warehouses` props were not being passed to the `POFilters` component, and the warehouse filter dropdown was missing from the UI. Additionally, the vendor/supplier filter was labeled as "Supplier" instead of "Vendor".
+- **Fix Applied**:
+  - Updated `/planning/purchase-orders/page.tsx` to pass `warehouses` and `isLoadingWarehouses` props to `POFilters`
+  - Updated `POFilters.tsx` to render warehouse filter dropdown alongside vendor filter
+  - Changed vendor filter label from "All Suppliers" to "All Vendors" to match user expectations
+  - Changed aria-label from "Filter by supplier" to "Filter by vendor" for accessibility
+- **Files Modified**:
+  - `/app/(authenticated)/planning/purchase-orders/page.tsx` - Added warehouses props to POFilters
+  - `/components/planning/purchase-orders/POFilters.tsx` - Added warehouse select dropdown, updated vendor filter labels
+- **Steps to Verify**:
+  1. Navigate to `/planning/purchase-orders`
+  2. Verify vendor filter dropdown appears with label "All Vendors"
+  3. Verify warehouse filter dropdown appears with label "All Warehouses"
+  4. Select a vendor from the dropdown - list should filter by that vendor
+  5. Select a warehouse from the dropdown - list should filter by that warehouse
+- **Severity**: 🟠 HIGH (Blocks vendor filtering workflow)
+- **Impact**: Users could not filter purchase orders by vendor, reducing visibility and filtering capabilities
+- **Fixed By**: Subagent Fixer-Planning-Bug003-Bug004 at 2026-02-08 18:11 UTC
+- **Status**: ✅ Fixed
+- **Test Date**: 2026-02-08
+- **Verification**: Manual testing on local environment
+
+---
+
+## Bug-004 | ✅ FIXED - Vendor Column Header NOT FOUND in Purchase Orders Table
+
+- **Module**: Planning / Purchase Orders  
+- **Checkbox**: "Vendor column header exists (NOT FOUND)"
+- **Issue**: Vendor column header missing from purchase orders table on `/planning/purchase-orders`
+- **Expected**: Table should display columns: PO Number | Vendor | Status | Total | Actions
+- **Actual**: Vendor column header was not visible (or labeled as "Supplier" instead of "Vendor")
+- **Root Cause**: The column was labeled as "Supplier" instead of "Vendor", and the column definition used `header: 'Supplier'` instead of `header: 'Vendor'`
+- **Fix Applied**:
+  - Updated `PODataTable.tsx` column definition to change header label from "Supplier" to "Vendor"
+  - The column now correctly displays vendor name with line count information
+- **Files Modified**:
+  - `/components/planning/purchase-orders/PODataTable.tsx` - Updated column header from "Supplier" to "Vendor"
+- **Steps to Verify**:
+  1. Navigate to `/planning/purchase-orders`
+  2. Verify "Vendor" column header appears in the table (between "PO Number" and "Status")
+  3. Verify vendor names are correctly displayed in the column for each purchase order
+  4. Verify the column shows vendor name and line count information
+- **Severity**: 🟠 HIGH (Reduces table readability, users cannot see vendor information)
+- **Impact**: Users could not quickly identify which vendor a purchase order belongs to in the table view
+- **Fixed By**: Subagent Fixer-Planning-Bug003-Bug004 at 2026-02-08 18:11 UTC
+- **Status**: ✅ Fixed
+- **Test Date**: 2026-02-08
+- **Verification**: Manual testing on local environment
+
+---
+
 ## Test Summary
 
 ### ✓ Passed Tests (28)
@@ -125,4 +183,146 @@
   - WO Number links are clickable and navigate to `/production/work-orders/{id}`
 
 ---
+
+
+---
+
+## Bug-005 | ⏳ PENDING - Status Filter Dropdown NOT RENDERING on Work Orders List
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Status filter: Multi-select checkboxes (NOT FOUND)"
+- **Route**: `/planning/work-orders`
+- **Expected**: Filter panel should display a "Status: All" dropdown button that opens a popover with multi-select checkboxes for status values (Draft, Planned, Released, In Progress, On Hold, Completed, Closed, Cancelled)
+- **Actual**: Status filter dropdown is either not rendering or not visible in the filter panel
+- **Severity**: 🟠 HIGH (Blocks filtering workflow)
+- **Status**: ⏳ IN PROGRESS
+- **Notes**: Frontend component WOFilters.tsx appears to have the implementation, but may not be rendering correctly due to missing props or CSS issues
+
+---
+
+## Bug-006 | ⏳ PENDING - Product Filter Dropdown NOT RENDERING on Work Orders List
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Product filter: Single-select dropdown (NOT FOUND)"
+- **Route**: `/planning/work-orders`
+- **Expected**: Filter panel should display a "Product: All" dropdown with available finished goods products
+- **Actual**: Product filter dropdown not visible or not rendering
+- **Severity**: 🟠 HIGH (Blocks filtering workflow)
+- **Status**: ⏳ IN PROGRESS
+- **Notes**: Frontend component WOFilters.tsx has the Select component, but products array may not be populated correctly
+
+---
+
+## Bug-007 | ⏳ PENDING - Production Line Filter Dropdown NOT RENDERING on Work Orders List
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Line filter: Single-select dropdown (NOT FOUND)"
+- **Route**: `/planning/work-orders`
+- **Expected**: Filter panel should display a "Line: All" dropdown with available production lines
+- **Actual**: Line filter dropdown not visible or not rendering
+- **Severity**: 🟠 HIGH (Blocks filtering workflow)
+- **Status**: ⏳ IN PROGRESS
+- **Notes**: Frontend component WOFilters.tsx has the Select component, but productionLines array may not be populated correctly
+
+---
+
+## Bug-008 | ⏳ PENDING - Priority Filter Dropdown NOT RENDERING on Work Orders List
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Priority filter: Single-select dropdown (NOT FOUND)"
+- **Route**: `/planning/work-orders`
+- **Expected**: Filter panel should display a "Priority: All" dropdown with values (Low, Normal, High, Critical)
+- **Actual**: Priority filter dropdown not visible or not rendering
+- **Severity**: 🟠 HIGH (Blocks filtering workflow)
+- **Status**: ⏳ IN PROGRESS
+
+---
+
+## Bug-009 | ⏳ PENDING - Bulk Selection Checkboxes NOT VISIBLE in Work Orders Table
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Bulk selection checkboxes: Multi-select rows (NOT FOUND)"
+- **Route**: `/planning/work-orders`
+- **Expected**: Table should have a checkbox column in the header with "Select All" checkbox, and each row should have an individual checkbox for multi-select
+- **Actual**: Checkboxes not visible in table
+- **Severity**: 🟠 HIGH (Blocks bulk operations workflow)
+- **Status**: ⏳ IN PROGRESS
+- **Notes**: Frontend component WODataTable.tsx has the checkbox logic, but may not be rendering correctly
+
+---
+
+## Bug-010 | ⏳ PENDING - Pagination Controls NOT VISIBLE on Work Orders List
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Pagination: Navigate between pages, adjust page size (NOT FOUND)"
+- **Route**: `/planning/work-orders`
+- **Expected**: Below the table should appear pagination controls with Previous/Next buttons and page number links
+- **Actual**: Pagination not visible even when data spans multiple pages
+- **Severity**: 🟠 HIGH (Cannot view data on additional pages)
+- **Status**: ⏳ IN PROGRESS
+- **Notes**: Frontend page.tsx has pagination code, but may not be rendering due to missing pagination data from API
+
+---
+
+## Bug-011 | ⏳ PENDING - Filter Action Buttons (Apply/Clear) NOT VISIBLE on Work Orders List
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Apply Filters button: Applies selected filters (NOT FOUND)" and "Clear Filters button: Resets all filters (NOT FOUND)"
+- **Route**: `/planning/work-orders`
+- **Expected**: Below the filter dropdowns should appear "Apply Filters" and "Clear Filters" buttons (or similar)
+- **Actual**: Action buttons not visible
+- **Severity**: 🟠 HIGH (Unclear how to apply/clear filters)
+- **Status**: ⏳ IN PROGRESS
+- **Notes**: WOFilters.tsx uses "Clear All (count)" button for clearing. May need explicit Apply/Clear buttons per test plan
+
+---
+
+## Bug-012 | ⏳ PENDING - Empty State Message NOT SHOWING When Filters Return Zero Results
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Empty list: 'No work orders found' message with Create button (NOT SHOWING PROPERLY)"
+- **Route**: `/planning/work-orders`
+- **Expected**: When filters are applied and return 0 results, should show empty state message like "No work orders match your filters. Adjust filters or Create a new work order."
+- **Actual**: Empty state message not displayed or not properly distinguished from normal empty list
+- **Severity**: 🟡 MEDIUM (UX issue, unclear feedback)
+- **Status**: ⏳ IN PROGRESS
+
+---
+
+## Bug-013 | 🔴 CRITICAL - Work Order Detail Page NOT ACCESSIBLE
+
+- **Module**: Planning / Work Orders
+- **Checkbox**: "Row click action: Navigate to WO detail page (NOT ACCESSIBLE)"
+- **Route**: `/planning/work-orders/[id]`
+- **Expected**: Clicking on a work order row should navigate to `/planning/work-orders/{id}` detail page showing full WO information with tabs for Overview, Production, Materials, etc.
+- **Actual**: Detail page either does not exist, is not routing correctly, or returns 404 / error
+- **Severity**: 🔴 CRITICAL (Completely blocks detail viewing workflow)
+- **Status**: ⏳ IN PROGRESS
+- **Notes**: The detail page file exists at `/app/(authenticated)/planning/work-orders/[id]/page.tsx` but may have runtime errors or routing issues
+
+---
+
+## Bug-014 | ⏳ PENDING - Related Operations Table NOT DISPLAYED on Work Order Detail Page
+
+- **Module**: Planning / Work Orders (Detail Page)
+- **Checkbox**: "Related Operations table: Columns—Sequence #, Operation, Status, Duration (NOT FOUND)"
+- **Route**: `/planning/work-orders/[id]`
+- **Expected**: On the detail page, there should be a tab or section showing related operations for this work order (sequence, operation name, status, duration, etc.)
+- **Actual**: Operations table not visible or not rendering on detail page
+- **Severity**: 🟡 MEDIUM (Reduces visibility into WO execution plan)
+- **Status**: ⏳ PENDING
+- **Prerequisites**: Bug-013 (detail page accessibility) must be fixed first
+
+---
+
+## Bug-015 | ⏳ PENDING - Related Materials Table NOT DISPLAYED on Work Order Detail Page
+
+- **Module**: Planning / Work Orders (Detail Page)
+- **Checkbox**: "Related Materials table: Columns—Material, Required Qty, Consumed Qty, Status (NOT FOUND)"
+- **Route**: `/planning/work-orders/[id]`
+- **Expected**: On the detail page, there should be a section showing materials required for this work order (material code, required quantity, consumed quantity, status)
+- **Actual**: Materials table not visible or not rendering on detail page
+- **Severity**: 🟡 MEDIUM (Reduces visibility into material requirements)
+- **Status**: ⏳ PENDING
+- **Prerequisites**: Bug-013 (detail page accessibility) must be fixed first
 
