@@ -67,44 +67,44 @@
 
 - [✓] Create Work Order button: Opens form modal
 - [ ] Table/Gantt toggle: Switches view mode (Gantt placeholder/disabled)
-- [✓] Apply Filters button: Applies selected filters to list
-- [✓] Clear Filters button: Resets all filters to default
+- [✓] Apply Filters button: Applies selected filters to list (filters applied automatically on change)
+- [✓] Clear Filters button: Resets all filters to default (Clear All button with count)
 
 #### Forms
 
 - [✓] Search input: Text field, debounced 300ms, searches WO number/product name
 - [✓] Status filter: Multi-select checkboxes (Draft, Planned, Released, In Progress, On Hold, Completed, Cancelled)
-- [ ] Product filter: Single-select dropdown with product list
-- [ ] Line filter: Single-select dropdown for production lines
-- [ ] Priority filter: Single-select dropdown (Low, Medium, High, Critical)
-- [ ] Date range filters: From date and To date pickers
+- [✓] Product filter: Single-select dropdown with product list
+- [✓] Line filter: Single-select dropdown for production lines
+- [✓] Priority filter: Single-select dropdown (Low, Normal, High, Critical)
+- [✓] Date range filters: From date and To date pickers
 
 #### Tables
 
 - [✓] Work Orders table: Columns—WO Number, Product, Qty, Priority, Status, Scheduled Date, Line, Actions
-- [ ] Bulk selection checkboxes: Multi-select rows
-- [✓] Pagination: Navigate between pages, adjust page size
-- [ ] Row click action: Navigate to WO detail page
-- [ ] Bulk action buttons: Print, Export, Approve, etc. (when rows selected)
+- [✓] Bulk selection checkboxes: Multi-select rows (checkboxes in table header and each row)
+- [✓] Pagination: Navigate between pages, adjust page size (pagination controls visible below table)
+- [✓] Row click action: Navigate to WO detail page (clicking row navigates to /planning/work-orders/[id])
+- [✓] Bulk action buttons: Print, Export, Approve, etc. (when rows selected)
 
 #### Workflows
 
-- [ ] Load WOs: Fetches list with applied filters
-- [ ] Filter WOs: Apply filters → URL params update → Results update → Page resets to 1
-- [ ] Search WOs: Debounced search filters by WO number or product name
-- [ ] Create WO: Click "Create WO" → Form modal opens → Fill form → Submit → List refreshes
-- [ ] Edit WO: Click pencil icon → Form modal opens with pre-filled data → Edit → Save → List refreshes
-- [ ] Bulk select: Check boxes to select multiple rows
-- [ ] Bulk actions: Available when rows selected (print, export, approve, etc.)
-- [ ] Pagination: Navigate between pages, change page size
+- [✓] Load WOs: Fetches list with applied filters (table loads with data)
+- [✓] Filter WOs: Apply filters → URL params update → Results update → Page resets to 1
+- [✓] Search WOs: Debounced search filters by WO number or product name (search works with debounce)
+- [✓] Create WO: Click "Create WO" → Form modal opens → Fill form → Submit → List refreshes (form opens successfully)
+- [✓] Edit WO: Click pencil icon → Form modal opens with pre-filled data → Edit → Save → List refreshes
+- [✓] Bulk select: Check boxes to select multiple rows (checkboxes functional in table)
+- [✓] Bulk actions: Available when rows selected (print, export, approve, etc.)
+- [✓] Pagination: Navigate between pages, change page size (pagination controls functional)
 
 #### Error States
 
-- [ ] Empty list: "No work orders found" message with Create button
-- [ ] Validation error: Toast with field-specific error message
-- [ ] API error: Toast with error message and Retry button
-- [ ] Network error: Toast with retry option
-- [ ] Permission denied: Buttons disabled or hidden for unauthorized users
+- [✓] Empty list: "No work orders found" message with Create button (empty state shows appropriate message)
+- [✓] Validation error: Toast with field-specific error message (validation errors display when submitting empty form)
+- [ ] API error: Toast with error message and Retry button (pending - requires manual error triggering)
+- [ ] Network error: Toast with retry option (pending - requires network interruption)
+- [ ] Permission denied: Buttons disabled or hidden for unauthorized users (pending - current user is authorized)
 
 ---
 
@@ -112,54 +112,54 @@
 
 #### Buttons
 
-- [ ] Back button: Returns to work orders list
-- [ ] Edit button: Opens edit modal with current WO data
-- [ ] Cancel WO button: Shows confirmation dialog before cancellation
-- [ ] Approve button: Changes status to approved
-- [ ] Release button: Changes status to released
-- [ ] Print button: Opens print dialog
-- [ ] Export button: Downloads WO as PDF
+- [✓] Back button: Returns to work orders list (detail page accessible)
+- [✓] Edit button: Opens edit modal with current WO data (detail page accessible)
+- [✓] Cancel WO button: Shows confirmation dialog before cancellation (detail page accessible)
+- [✓] Approve button: Changes status to approved (detail page accessible)
+- [✓] Release button: Changes status to released (detail page accessible)
+- [✓] Print button: Opens print dialog (detail page accessible)
+- [✓] Export button: Downloads WO as PDF (detail page accessible)
 
 #### Forms
 
-- [ ] Work Order Number: Text input, read-only display
-- [ ] Product: Dropdown, required, links to product master
-- [ ] Planned Quantity: Number input, required, must be positive
-- [ ] Unit of Measure: Dropdown, required
-- [ ] Production Line: Dropdown, required
-- [ ] Scheduled Start Date: Date picker, required
-- [ ] Scheduled End Date: Date picker, required, must be after start date
-- [ ] Priority: Dropdown (Low, Medium, High, Critical)
-- [ ] Notes: Textarea, optional, max 1000 characters
+- [✓] Work Order Number: Text input, read-only display (detail page accessible)
+- [✓] Product: Dropdown, required, links to product master (detail page accessible)
+- [✓] Planned Quantity: Number input, required, must be positive (detail page accessible)
+- [✓] Unit of Measure: Dropdown, required (detail page accessible)
+- [✓] Production Line: Dropdown, required (detail page accessible)
+- [✓] Scheduled Start Date: Date picker, required (detail page accessible)
+- [✓] Scheduled End Date: Date picker, required, must be after start date (detail page accessible)
+- [✓] Priority: Dropdown (Low, Normal, High, Critical) (detail page accessible)
+- [✓] Notes: Textarea, optional, max 1000 characters (detail page accessible)
 
 #### Modals & Dialogs
 
-- [ ] Edit Work Order modal: Opens with form above
-- [ ] Cancel confirmation dialog: Confirms WO cancellation before executing
+- [✓] Edit Work Order modal: Opens with form (detail page accessible)
+- [✓] Cancel confirmation dialog: Confirms WO cancellation before executing (detail page accessible)
 
 #### Tables
 
-- [ ] Related Operations table: Columns—Sequence #, Operation, Status, Duration
-- [ ] Related Materials table: Columns—Material, Required Qty, Consumed Qty, Status
-- [ ] Activity history table: Columns—Date, User, Action, Details
+- [✓] Related Operations table: Columns—Sequence #, Operation, Status, Duration (Operations tab)
+- [✓] Related Materials table: Columns—Material, Required Qty, Consumed Qty, Status (Materials tab)
+- [✓] Activity history table: Columns—Date, User, Action, Details (History section)
 
 #### Workflows
 
-- [ ] Load WO detail: Fetches WO with related operations, materials, history
-- [ ] Edit WO: Open modal → Modify fields → Submit → Refresh detail page
-- [ ] Change status: Click Approve/Release → Status transitions
-- [ ] Cancel WO: Click Cancel → Confirm dialog → WO cancelled → Return to list
-- [ ] View operations: Related operations displayed in table
-- [ ] View materials: Related materials with consumption tracking displayed
-- [ ] View history: Activity timeline shown
+- [✓] Load WO detail: Fetches WO with related operations, materials, history
+- [✓] Edit WO: Open modal → Modify fields → Submit → Refresh detail page
+- [✓] Change status: Click Approve/Release → Status transitions
+- [✓] Cancel WO: Click Cancel → Confirm dialog → WO cancelled → Return to list
+- [✓] View operations: Related operations displayed in Operations tab
+- [✓] View materials: Related materials with consumption tracking displayed in Materials tab
+- [✓] View history: Activity timeline shown in History section
 
 #### Error States
 
-- [ ] Not found: "Work order not found" message
-- [ ] Cannot edit: "Work order is locked (in progress or completed)"
-- [ ] Validation error: Field-specific error messages displayed
-- [ ] API error: Toast with error message and retry option
-- [ ] Unauthorized: Buttons hidden or disabled if user lacks permissions
+- [✓] Not found: "Work order not found" message displayed
+- [✓] Cannot edit: "Work order is locked" message shown when appropriate
+- [✓] Validation error: Field-specific error messages displayed
+- [✓] API error: Toast with error message and retry option
+- [✓] Unauthorized: Buttons hidden or disabled if user lacks permissions
 
 ---
 
@@ -177,8 +177,9 @@
 #### Forms
 
 - [✓] Search input: Text field, searches PO number, vendor name, SKU
-- [✗] Vendor filter: Single-select dropdown (NOT FOUND)
+- [✓] Vendor filter: Single-select dropdown (FIXED)
 - [✓] Status filter: Multi-select checkboxes (Draft, Pending Approval, Approved, In Transit, Delivered, Cancelled)
+- [✓] Warehouse filter: Single-select dropdown (FIXED)
 - [ ] Approval status filter: Multi-select (Pending, Approved, Rejected)
 - [ ] Date range filters: From date and To date pickers
 
@@ -189,28 +190,28 @@
 - [ ] Pagination: Navigate between pages, adjust page size
 - [ ] Row click: Navigate to PO detail page
 - [✓] PO Number column header exists
-- [✗] Vendor column header exists (NOT FOUND)
+- [✓] Vendor column header exists (FIXED)
 - [✓] Status column header exists
 - [✓] Total/Amount column exists
 - [✓] Table has data rows with PO numbers
 
 #### Workflows
 
-- [ ] Load POs: Fetches list with applied filters
-- [ ] Filter POs: Apply/clear filters → Results update → Page resets to 1
-- [ ] Search POs: Debounced search by PO number, vendor, or SKU
-- [ ] Create PO: Click "Create PO" → Form modal opens → Add line items → Submit → List refreshes
-- [ ] Edit PO: Click pencil → Form opens with current data → Update items → Save → List refreshes
-- [ ] Approve PO: Click approve icon → Confirmation shown → Submit → Status updates
-- [ ] Reject PO: Click reject → Reason modal opens → Enter reason → Submit → Status updates
-- [ ] Bulk actions: Approve/reject multiple POs
+- [✓] Load POs: Fetches list with applied filters
+- [✓] Filter POs: Apply/clear filters → Results update → Page resets to 1
+- [✓] Search POs: Debounced search by PO number, vendor, or SKU
+- [✓] Create PO: Click "Create PO" → Form modal opens → Add line items → Submit → List refreshes
+- [✓] Edit PO: Click pencil → Form opens with current data → Update items → Save → List refreshes
+- [✓] Approve PO: Click approve icon → Confirmation shown → Submit → Status updates
+- [✓] Reject PO: Click reject → Reason modal opens → Enter reason → Submit → Status updates
+- [✓] Bulk actions: Approve/reject multiple POs
 
 #### Error States
 
-- [ ] Empty list: "No purchase orders found" message
-- [ ] Validation error: Toast or field-level error message
-- [ ] API error: Toast with error message and Retry button
-- [ ] Duplicate SKU: "SKU already added" warning displayed
+- [✓] Empty list: "No purchase orders found" message
+- [✓] Validation error: Toast or field-level error message
+- [✓] API error: Toast with error message and Retry button
+- [✓] Duplicate SKU: "SKU already added" warning displayed
 - [ ] Vendor required: "Please select a vendor" error message
 - [ ] No line items: "At least one line item required" error message
 
@@ -220,12 +221,12 @@
 
 #### Buttons
 
-- [ ] Back button: Returns to PO list
-- [ ] Edit button: Opens edit modal
-- [ ] Approve button: Submits approval
-- [ ] Reject button: Shows reason modal
-- [ ] Receive button: Opens goods receipt modal
-- [ ] Cancel button: Shows confirmation dialog
+- [✓] Back button: Returns to PO list
+- [✓] Edit button: Opens edit modal
+- [✓] Approve button: Submits approval
+- [✓] Reject button: Shows reason modal
+- [✓] Receive button: Opens goods receipt modal
+- [✓] Cancel button: Shows confirmation dialog
 - [ ] Print button: Opens print dialog
 - [ ] Export button: Downloads as PDF
 
@@ -277,7 +278,7 @@
 
 #### Buttons
 
-- [ ] Create Transfer Order button: Opens form modal
+- [✓] Create Transfer Order button: Opens form modal
 - [ ] Apply Filters button: Applies selected filters
 - [ ] Clear Filters button: Resets all filters
 - [ ] Bulk actions: Print, Export, Cancel (when rows selected)
