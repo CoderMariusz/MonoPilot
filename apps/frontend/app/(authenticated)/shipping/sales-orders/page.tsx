@@ -11,9 +11,10 @@
 
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -35,38 +36,105 @@ import {
   useConfirmSalesOrder,
   type SalesOrderListParams,
 } from '@/lib/hooks/use-sales-orders'
+import { useCustomers } from '@/lib/hooks/use-customers'
 
 // =============================================================================
-// Mock Data (Replace with real API calls)
+// Types for API responses
 // =============================================================================
 
-const mockCustomers: Customer[] = [
-  {
-    id: 'cust-001',
-    name: 'Acme Corporation',
-    addresses: [
-      { id: 'addr-001', label: 'Main Office', address_line1: '123 Main St', city: 'Springfield' },
-      { id: 'addr-002', label: 'Warehouse', address_line1: '456 Industrial Ave', city: 'Springfield' },
-    ],
-  },
-  {
-    id: 'cust-002',
-    name: 'Best Foods Inc',
-    addresses: [
-      { id: 'addr-003', label: 'Headquarters', address_line1: '789 Business Blvd', city: 'Shelbyville' },
-    ],
-  },
-]
+interface CustomerAddress {
+  id: string
+  label: string
+  address_line1: string
+  city: string
+}
 
-const mockProducts: Product[] = [
-  { id: 'prod-001', code: 'FG-WIDGET-A', name: 'Widget A', std_price: 10.50, available_qty: 150 },
-  { id: 'prod-002', code: 'FG-WIDGET-B', name: 'Widget B', std_price: 20.00, available_qty: 75 },
-  { id: 'prod-003', code: 'FG-GADGET-C', name: 'Gadget C', std_price: 5.25, available_qty: 500 },
-]
+interface ProductFromAPI {
+  id: string
+  code: string
+  name: string
+  std_price: number | null
+}
 
 // =============================================================================
 // Component
 // =============================================================================
+
+// =============================================================================
+// Hooks for fetching customers with addresses and products
+// =============================================================================
+
+function useCustomersWithAddresses() {
+  const { data: customersResponse, isLoading: customersLoading } = useCustomers({ limit: 100, is_active: true })
+  
+  // Fetch addresses for all customers
+  const customerIds = customersResponse?.data?.map((c: any) => c.id) || []
+  
+  const { data: addressesData, isLoading: addressesLoading } = useQuery({
+    queryKey: ['customer-addresses', customerIds],
+    queryFn: async () => {
+      if (customerIds.length === 0) return {}
+      
+      // Fetch addresses for each customer in parallel
+      const addressPromises = customerIds.map(async (customerId: string) => {
+        const res = await fetch(`/api/shipping/customers/${customerId}/addresses`)
+        if (!res.ok) return { customerId, addresses: [] }
+        const addresses = await res.json()
+        return { customerId, addresses }
+      })
+      
+      const results = await Promise.all(addressPromises)
+      const addressMap: Record<string, CustomerAddress[]> = {}
+      results.forEach(({ customerId, addresses }) => {
+        addressMap[customerId] = addresses
+      })
+      return addressMap
+    },
+    enabled: customerIds.length > 0,
+    staleTime: 60000,
+  })
+  
+  const customers: Customer[] = useMemo(() => {
+    if (!customersResponse?.data) return []
+    
+    return customersResponse.data.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      addresses: (addressesData?.[c.id] || []).map((addr: any) => ({
+        id: addr.id,
+        label: addr.label || addr.address_type || 'Address',
+        address_line1: addr.address_line1 || addr.street || '',
+        city: addr.city || '',
+      })),
+    }))
+  }, [customersResponse?.data, addressesData])
+  
+  return {
+    customers,
+    isLoading: customersLoading || addressesLoading,
+  }
+}
+
+function useProductsForSO() {
+  return useQuery({
+    queryKey: ['products-for-so'],
+    queryFn: async (): Promise<Product[]> => {
+      // Fetch finished goods products (FG type) for sales orders
+      const res = await fetch('/api/technical/products?limit=200&status=active')
+      if (!res.ok) throw new Error('Failed to fetch products')
+      const data = await res.json()
+      
+      return (data.data || []).map((p: ProductFromAPI) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        std_price: p.std_price ?? 0,
+        available_qty: 0, // TODO: integrate with inventory when available
+      }))
+    },
+    staleTime: 60000,
+  })
+}
 
 export default function SalesOrdersPage() {
   const router = useRouter()
@@ -92,6 +160,10 @@ export default function SalesOrdersPage() {
       router.replace('/shipping/sales-orders', { scroll: false })
     }
   }, [searchParams, router])
+
+  // Fetch real customers with addresses and products
+  const { customers, isLoading: customersLoading } = useCustomersWithAddresses()
+  const { data: products = [], isLoading: productsLoading } = useProductsForSO()
 
   // Queries and Mutations
   const { data, isLoading, error } = useSalesOrders(params)
@@ -222,8 +294,9 @@ export default function SalesOrdersPage() {
         onClose={() => setShowCreateModal(false)}
         onSubmit={handleCreate}
         mode="create"
-        customers={mockCustomers}
-        products={mockProducts}
+        customers={customers}
+        products={products}
+        isLoading={customersLoading || productsLoading}
       />
 
       {/* Delete Confirmation */}
