@@ -1,6 +1,6 @@
 # Dashboard Module - Phase 2 Test Bugs
 
-## Bug-001 | 🟠 HIGH - Create Menu Items Navigate to List Pages Instead of Create Pages
+## Bug-001 | ✅ FIXED - Create Menu Items Navigate to List Pages Instead of Create Pages
 
 - **Module**: Dashboard
 - **Checkbox**: "Create WO" option: Navigates to `/planning/work-orders/new`
@@ -20,6 +20,13 @@
   4. Observe: Page navigates to work orders list, not create form
   5. Repeat for NCR and TO options
 - **Severity**: 🟠 HIGH (Inconsistent UX, breaks intended workflow)
+- **Fixed By**: Subagent Developer at 2026-02-08 16:26 UTC
+- **Commit**: b25ba410 (Fix: Create menu WO/NCR/TO routes to create pages (#1))
+- **Fix Details**: 
+  - Added useEffect hooks to work-orders, transfer-orders, and NCR list pages to detect and handle the `?action=create` query parameter
+  - When action=create is present, the form modal opens automatically
+  - Updated NCR page to handle create action and show create form view
+  - Routes in QuickActions.tsx were already correct (`/new` endpoints); the issue was the /new pages redirect to list pages with `?action=create`, but list pages didn't handle this parameter
 
 ---
 
@@ -79,3 +86,25 @@
 
 **Date Tested**: 2026-02-08
 **Tester**: Subagent QA-Tester
+
+## Bug-002 | CRITICAL - Active Work Orders Table Not Displaying on Production Dashboard
+
+- **Module**: Production
+- **Section**: Production Dashboard - Active Work Orders Table
+- **Checkbox**: "WO Number link: Navigates to `/production/work-orders/{id}`"
+- **Expected**: Active work orders table should display with clickable WO numbers
+- **Actual**: Table element not found or not rendering
+- **Steps to Reproduce**:
+  1. Login as admin (admin@monopilot.com / test1234)
+  2. Navigate to `/production/dashboard`
+  3. Scroll to "Active Work Orders" section
+  4. Expected: Table with WO numbers, product names, quantities, status badges, etc.
+  5. Actual: Table not visible or not accessible via standard selectors
+- **Severity**: 🔴 CRITICAL (Blocks main workflow, cannot access WO details from dashboard)
+- **Impact**: Users cannot navigate to individual work orders from the dashboard
+- **Test Date**: 2026-02-08
+- **Tester**: Subagent QA-Tester
+- **Status**: Pending Investigation
+
+---
+

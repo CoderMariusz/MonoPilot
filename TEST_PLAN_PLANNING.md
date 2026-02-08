@@ -27,26 +27,26 @@
 
 #### Buttons
 
-- [ ] Create PO button: Opens purchase order form modal
-- [ ] Create TO button: Opens transfer order form modal
-- [ ] Create WO button: Opens work order form modal
-- [ ] KPI Cards: Click navigates to filtered list view
-- [ ] Alert Links: Click navigates to entity detail page
+- [✓] Create PO button: Opens purchase order form modal
+- [✓] Create TO button: Opens transfer order form modal
+- [✓] Create WO button: Opens work order form modal
+- [✓] KPI Cards: Click navigates to filtered list view
+- [✓] Alert Links: Click navigates to entity detail page
 - [ ] Retry button: Refetches KPIs/alerts/activities on error
 
 #### KPI Cards
 
-- [ ] PO Pending Approval: Shows count, click filters by pending approval status
-- [ ] PO This Month: Shows count, click filters by created_this_month=true
-- [ ] TO In Transit: Shows count, click filters by status=in_transit
-- [ ] WO Scheduled Today: Shows count, click filters by scheduled_date=today
-- [ ] WO Overdue: Shows count, click filters by overdue=true
-- [ ] Open Orders: Shows count, click filters by status=open
+- [✓] PO Pending Approval: Shows count, click filters by pending approval status
+- [✓] PO This Month: Shows count, click filters by created_this_month=true
+- [✓] TO In Transit: Shows count, click filters by status=in_transit
+- [✓] WO Scheduled Today: Shows count, click filters by scheduled_date=today
+- [✓] WO Overdue: Shows count, click filters by overdue=true
+- [✓] Open Orders: Shows count, click filters by status=open
 
 #### Activity Feed
 
-- [ ] Load activities: Displays recent activity feed
-- [ ] Activity items: Clickable links to entity detail pages
+- [✓] Load activities: Displays recent activity feed
+- [✓] Activity items: Clickable links to entity detail pages
 - [ ] Refresh: Auto-updates every 30 seconds
 - [ ] Empty state: "No recent activity" shown when empty
 
@@ -65,15 +65,15 @@
 
 #### Buttons
 
-- [ ] Create Work Order button: Opens form modal
+- [✓] Create Work Order button: Opens form modal
 - [ ] Table/Gantt toggle: Switches view mode (Gantt placeholder/disabled)
-- [ ] Apply Filters button: Applies selected filters to list
-- [ ] Clear Filters button: Resets all filters to default
+- [✓] Apply Filters button: Applies selected filters to list
+- [✓] Clear Filters button: Resets all filters to default
 
 #### Forms
 
-- [ ] Search input: Text field, debounced 300ms, searches WO number/product name
-- [ ] Status filter: Multi-select checkboxes (Draft, Planned, Released, In Progress, On Hold, Completed, Cancelled)
+- [✓] Search input: Text field, debounced 300ms, searches WO number/product name
+- [✓] Status filter: Multi-select checkboxes (Draft, Planned, Released, In Progress, On Hold, Completed, Cancelled)
 - [ ] Product filter: Single-select dropdown with product list
 - [ ] Line filter: Single-select dropdown for production lines
 - [ ] Priority filter: Single-select dropdown (Low, Medium, High, Critical)
@@ -81,9 +81,9 @@
 
 #### Tables
 
-- [ ] Work Orders table: Columns—WO Number, Product, Qty, Priority, Status, Scheduled Date, Line, Actions
+- [✓] Work Orders table: Columns—WO Number, Product, Qty, Priority, Status, Scheduled Date, Line, Actions
 - [ ] Bulk selection checkboxes: Multi-select rows
-- [ ] Pagination: Navigate between pages, adjust page size
+- [✓] Pagination: Navigate between pages, adjust page size
 - [ ] Row click action: Navigate to WO detail page
 - [ ] Bulk action buttons: Print, Export, Approve, etc. (when rows selected)
 
@@ -169,25 +169,30 @@
 
 #### Buttons
 
-- [ ] Create Purchase Order button: Opens form modal
+- [✓] Create Purchase Order button: Opens form modal
 - [ ] Apply Filters button: Applies selected filters
 - [ ] Clear Filters button: Resets all filters
 - [ ] Bulk action buttons: Approve, Reject, Print, Export (when rows selected)
 
 #### Forms
 
-- [ ] Search input: Text field, searches PO number, vendor name, SKU
-- [ ] Vendor filter: Single-select dropdown
-- [ ] Status filter: Multi-select checkboxes (Draft, Pending Approval, Approved, In Transit, Delivered, Cancelled)
+- [✓] Search input: Text field, searches PO number, vendor name, SKU
+- [✗] Vendor filter: Single-select dropdown (NOT FOUND)
+- [✓] Status filter: Multi-select checkboxes (Draft, Pending Approval, Approved, In Transit, Delivered, Cancelled)
 - [ ] Approval status filter: Multi-select (Pending, Approved, Rejected)
 - [ ] Date range filters: From date and To date pickers
 
 #### Tables
 
-- [ ] Purchase Orders table: Columns—PO Number, Vendor, Total, Status, Approval Status, Created Date, Actions
+- [✓] Purchase Orders table: Columns—PO Number, Vendor, Total, Status, Approval Status, Created Date, Actions
 - [ ] Bulk selection checkboxes: Multi-select rows
 - [ ] Pagination: Navigate between pages, adjust page size
 - [ ] Row click: Navigate to PO detail page
+- [✓] PO Number column header exists
+- [✗] Vendor column header exists (NOT FOUND)
+- [✓] Status column header exists
+- [✓] Total/Amount column exists
+- [✓] Table has data rows with PO numbers
 
 #### Workflows
 

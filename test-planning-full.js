@@ -59,7 +59,7 @@ async function runTests() {
       await btn.click();
       const modal = await page.locator('[role="dialog"]');
       if (!await modal.isVisible()) throw new Error('Modal not visible');
-      await page.press('Escape'); // Close modal
+      await page.keyboard.press('Escape'); // Close modal
       await page.waitForTimeout(300);
     });
     

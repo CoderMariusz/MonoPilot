@@ -138,6 +138,8 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
 /**
  * Get active work orders for dashboard table
  * AC-4.1.2: Returns list of active WOs with progress
+ * Note: WOs are considered "active" if status is 'in_progress' (regardless of paused_at)
+ * The paused_at field is used to track pause history but doesn't change the status
  */
 export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<ActiveWorkOrder[]> {
   const supabase = createServerSupabaseAdmin()
@@ -155,6 +157,7 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         status,
         started_at,
         production_line_id,
+        paused_at,
         products (
           name
         ),
@@ -164,7 +167,7 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
       `
       )
       .eq('org_id', orgId)
-      .in('status', ['in_progress', 'paused'])
+      .eq('status', 'in_progress')
       .order('started_at', { ascending: true })
       .limit(limit)
 
@@ -177,7 +180,7 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         product_name: wo.products?.name || 'Unknown',
         planned_quantity: wo.planned_quantity || 0,
         produced_quantity: wo.produced_quantity || 0,
-        status: wo.status,
+        status: wo.paused_at ? 'paused' : wo.status,
         progress_percent: wo.planned_quantity ? (wo.produced_quantity / wo.planned_quantity) * 100 : 0,
         started_at: wo.started_at,
         line_name: wo.production_lines?.name || 'Unassigned',
