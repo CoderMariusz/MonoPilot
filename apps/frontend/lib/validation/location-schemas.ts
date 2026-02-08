@@ -26,6 +26,16 @@ export type LocationType = z.infer<typeof LocationTypeEnum>
 // CREATE LOCATION SCHEMA (Story 01.9)
 // ============================================================================
 
+// Legacy type enum for backward compatibility with Story 1.6 frontend
+export const LegacyLocationTypeEnum = z.enum([
+  'receiving',
+  'production',
+  'storage',
+  'shipping',
+  'transit',
+  'quarantine',
+])
+
 export const createLocationSchema = z.object({
   code: z
     .string()
@@ -44,9 +54,21 @@ export const createLocationSchema = z.object({
 
   parent_id: z.string().uuid().optional().nullable(),
 
-  level: LocationLevelEnum,
+  // Made optional with default for backward compatibility with Story 1.6
+  level: LocationLevelEnum.optional().default('zone'),
 
-  location_type: LocationTypeEnum.default('shelf'),
+  // New Story 01.9 field
+  location_type: LocationTypeEnum.optional().default('shelf'),
+
+  // Legacy Story 1.6 field - maps to location_type if provided
+  type: z.union([LocationTypeEnum, LegacyLocationTypeEnum]).optional(),
+
+  // Legacy Story 1.6 fields
+  zone: z.string().max(255).optional().nullable(),
+  zone_enabled: z.boolean().optional(),
+  capacity: z.number().positive().optional().nullable(),
+  capacity_enabled: z.boolean().optional(),
+  barcode: z.string().max(100).optional().nullable(),
 
   max_pallets: z
     .number()
