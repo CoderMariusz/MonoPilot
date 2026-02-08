@@ -615,8 +615,11 @@ export async function getHoldsList(
   if (filters.to) {
     query = query.lte('held_at', filters.to)
   }
+  
+  // Apply search filter using OR (search in hold_number or reason)
   if (filters.search) {
-    query = query.or(`hold_number.ilike.%${filters.search}%,reason.ilike.%${filters.search}%`)
+    const searchTerm = filters.search
+    query = query.or(`hold_number.ilike.%${searchTerm}%,reason.ilike.%${searchTerm}%`)
   }
 
   // Apply sorting (default: held_at DESC)

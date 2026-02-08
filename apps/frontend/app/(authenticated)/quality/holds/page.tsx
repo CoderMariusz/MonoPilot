@@ -141,7 +141,12 @@ export default function QualityHoldsPage() {
     }
   }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit])
 
-  // Fetch on filter changes
+  // Reset pagination to page 1 when filters change (but not when pagination.page changes)
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 1 }))
+  }, [search, statusFilter, priorityFilter])
+
+  // Fetch on filter changes and pagination changes
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchHolds()
