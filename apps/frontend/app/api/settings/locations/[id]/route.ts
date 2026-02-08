@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import { UpdateLocationSchema } from '@/lib/validation/location-schemas'
 import {
-  getLocationById,
   updateLocation,
   deleteLocation,
 } from '@/lib/services/location-service'
@@ -19,6 +18,64 @@ import { ZodError } from 'zod'
  */
 
 // ============================================================================
+// LEGACY FORMAT MAPPING (Story 01.9 → Story 1.6)
+// ============================================================================
+
+const LOCATION_TYPE_TO_LEGACY: Record<string, string> = {
+  bulk: 'storage',
+  pallet: 'storage',
+  shelf: 'storage',
+  floor: 'storage',
+  staging: 'transit',
+}
+
+const LEVEL_TO_LEGACY_TYPE: Record<string, string> = {
+  zone: 'receiving',
+  aisle: 'storage',
+  rack: 'storage',
+  bin: 'storage',
+}
+
+interface LegacyLocation {
+  id: string
+  warehouse_id: string
+  code: string
+  name: string
+  type: string
+  zone: string | null
+  zone_enabled: boolean
+  capacity: number | null
+  capacity_enabled: boolean
+  barcode: string
+  is_active: boolean
+  warehouse?: {
+    code: string
+    name: string
+  }
+}
+
+function toLegacyLocation(loc: Record<string, unknown>, warehouse?: { code: string; name: string }): LegacyLocation {
+  const locationType = loc.location_type as string
+  const level = loc.level as string
+  const maxPallets = loc.max_pallets as number | null
+  
+  return {
+    id: loc.id as string,
+    warehouse_id: loc.warehouse_id as string,
+    code: loc.code as string,
+    name: loc.name as string,
+    type: LOCATION_TYPE_TO_LEGACY[locationType] || LEVEL_TO_LEGACY_TYPE[level] || 'storage',
+    zone: level !== 'zone' ? level : null,
+    zone_enabled: level !== 'zone',
+    capacity: maxPallets,
+    capacity_enabled: maxPallets !== null,
+    barcode: `LOC-${(loc.code as string).toUpperCase()}`,
+    is_active: loc.is_active as boolean,
+    warehouse: warehouse,
+  }
+}
+
+// ============================================================================
 // GET /api/settings/locations/:id - Get Location Detail (AC-005.6)
 // ============================================================================
 
@@ -28,6 +85,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const params = await context.params
     const locationId = params.id
 
@@ -52,29 +110,40 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // First get warehouse_id from location (required by service)
-    const { data: locationBase, error: locError } = await supabase
+    // Fetch location with warehouse using admin client
+    const { data: location, error: locError } = await supabaseAdmin
       .from('locations')
-      .select('warehouse_id')
+      .select(`
+        id,
+        org_id,
+        warehouse_id,
+        code,
+        name,
+        level,
+        location_type,
+        max_pallets,
+        max_weight_kg,
+        is_active,
+        full_path,
+        warehouse:warehouses(code, name)
+      `)
       .eq('id', locationId)
       .eq('org_id', currentUser.org_id)
       .single()
 
-    if (locError || !locationBase) {
+    if (locError || !location) {
       return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
-    // Call service to get location detail with QR code
-    const result = await getLocationById(locationBase.warehouse_id, locationId, currentUser.org_id)
+    // Convert to legacy format
+    const warehouseData = location.warehouse
+    const warehouse = Array.isArray(warehouseData) 
+      ? warehouseData[0] as { code: string; name: string } | undefined
+      : warehouseData as { code: string; name: string } | null
+    
+    const legacyLocation = toLegacyLocation(location, warehouse || undefined)
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Location not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({ location: result.data }, { status: 200 })
+    return NextResponse.json({ location: legacyLocation }, { status: 200 })
   } catch (error) {
     console.error('Error in GET /api/settings/locations/:id:', error)
 
