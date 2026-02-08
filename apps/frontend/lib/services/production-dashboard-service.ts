@@ -99,7 +99,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
       .from('work_orders')
       .select('id')
       .eq('org_id', orgId)
-      .in('status', ['in_progress', 'paused'])
+      .eq('status', 'in_progress')
 
     if (activeError) throw activeError
     const active_wos = activeWOs?.length || 0
@@ -232,7 +232,7 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
       .from('work_orders')
       .select('id, wo_number, scheduled_completion_date')
       .eq('org_id', orgId)
-      .in('status', ['in_progress', 'paused'])
+      .eq('status', 'in_progress')
       .lt('scheduled_completion_date', delayThreshold)
       .limit(10)
 

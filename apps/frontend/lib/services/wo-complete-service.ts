@@ -248,8 +248,9 @@ export async function completeWorkOrder(
     throw new WOCompleteError('ALREADY_COMPLETED', 400, `Work order ${wo.wo_number} is already completed`)
   }
 
-  // AC-2: Invalid status prevention - must be in_progress (or paused per business rules)
-  if (wo.status !== 'in_progress' && wo.status !== 'paused') {
+  // AC-2: Invalid status prevention - must be in_progress
+  // Note: Paused WOs have paused_at timestamp but status is still 'in_progress'
+  if (wo.status !== 'in_progress') {
     throw new WOCompleteError(
       'INVALID_WO_STATUS',
       400,
@@ -319,7 +320,7 @@ export async function completeWorkOrder(
       updated_at: now,
     })
     .eq('id', woId)
-    .in('status', ['in_progress', 'paused']) // Optimistic lock
+    .eq('status', 'in_progress') // Optimistic lock - WO must still be in_progress (paused WOs have same status with paused_at set)
 
   if (updateError) {
     console.error('Failed to complete WO:', updateError)
