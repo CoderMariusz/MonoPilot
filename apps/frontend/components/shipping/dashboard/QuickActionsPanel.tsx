@@ -99,6 +99,12 @@ export function QuickActionsPanel({ userRole }: QuickActionsPanelProps) {
           />
 
           <ActionButton
+            label="View shipments"
+            icon={<ClipboardList className="h-4 w-4" />}
+            onClick={() => router.push('/shipping/shipments')}
+          />
+
+          <ActionButton
             label="View backorders"
             icon={<AlertTriangle className="h-4 w-4" />}
             onClick={() => router.push('/shipping/sales-orders?filter=backorder')}

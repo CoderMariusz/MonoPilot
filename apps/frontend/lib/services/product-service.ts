@@ -114,7 +114,7 @@ export async function getById(
 }
 
 /**
- * Create new product with SKU uniqueness check
+ * Create new product with SKU and barcode uniqueness check
  */
 export async function create(
   supabase: SupabaseClient,
@@ -124,6 +124,14 @@ export async function create(
   const skuExists = await checkSkuExists(supabase, input.code)
   if (skuExists) {
     throw new Error(`SKU "${input.code}" already exists`)
+  }
+
+  // Check barcode uniqueness (if barcode is provided)
+  if (input.barcode) {
+    const barcodeExists = await checkBarcodeExists(supabase, input.barcode)
+    if (barcodeExists) {
+      throw new Error(`Barcode "${input.barcode}" already exists`)
+    }
   }
 
   // Insert product with version 1 and default status
@@ -235,6 +243,34 @@ export async function checkSkuExists(
   return data !== null
 }
 
+/**
+ * Check if barcode already exists in organization (excluding soft-deleted)
+ * BUG-W-002: Enforce duplicate barcode prevention
+ */
+export async function checkBarcodeExists(
+  supabase: SupabaseClient,
+  barcode: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, barcode')
+    .eq('barcode', barcode)
+    .is('deleted_at', null)
+    .single()
+
+  // If not found (PGRST116), barcode doesn't exist
+  if (error && error.code === 'PGRST116') {
+    return false
+  }
+
+  // For other errors, don't throw on check, return false
+  if (error) {
+    return false
+  }
+
+  return data !== null
+}
+
 // Export service as default object for easier testing
 export const ProductService = {
   list,
@@ -243,4 +279,5 @@ export const ProductService = {
   update,
   delete: deleteProduct,
   checkSkuExists,
+  checkBarcodeExists,
 }
