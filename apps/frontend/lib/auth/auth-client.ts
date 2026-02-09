@@ -19,27 +19,47 @@ export async function signInViaAPI(
   password: string
 ): Promise<AuthResult> {
   try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include' // IMPORTANT: Include cookies in request
-    })
+    // Add timeout to prevent hanging on Supabase connection issues
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000) // 10s timeout
 
-    if (!response.ok) {
-      const error = await response.json()
-      return {
-        session: null,
-        error: {
-          message: error.error || error.message || 'Login failed',
-          status: response.status,
-        } as AuthError
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include', // IMPORTANT: Include cookies in request
+        signal: controller.signal
+      })
+
+      clearTimeout(timeout)
+
+      if (!response.ok) {
+        const error = await response.json()
+        return {
+          session: null,
+          error: {
+            message: error.error || error.message || 'Login failed',
+            status: response.status,
+          } as AuthError
+        }
       }
-    }
 
-    // Server already set cookies via Set-Cookie headers
-    // Cookies will be automatically included in next request
-    return { session: null, error: null }
+      // Server already set cookies via Set-Cookie headers
+      // Cookies will be automatically included in next request
+      return { session: null, error: null }
+    } catch (error) {
+      clearTimeout(timeout)
+      if (error instanceof Error && error.name === 'AbortError') {
+        return {
+          session: null,
+          error: {
+            message: 'Login request timeout. Please check your connection and try again.',
+          } as AuthError
+        }
+      }
+      throw error
+    }
   } catch (error) {
     return {
       session: null,
