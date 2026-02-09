@@ -42,11 +42,13 @@ export function WarehouseActionsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
-          size="icon"
+          variant="outline"
+          size="sm"
           aria-label={`Actions for warehouse ${warehouse.code}`}
+          className="opacity-100 visible"
         >
           <MoreVertical className="h-4 w-4" />
+          <span className="ml-1">Actions</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

@@ -171,9 +171,10 @@ export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps) {
           <button
             type="button"
             onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground hover:bg-gray-100 p-1 rounded opacity-100 visible"
             aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
             tabIndex={0}
+            title={showCurrentPassword ? 'Hide password' : 'Show password'}
           >
             {showCurrentPassword ? (
               <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -207,9 +208,10 @@ export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps) {
           <button
             type="button"
             onClick={() => setShowNewPassword(!showNewPassword)}
-            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground hover:bg-gray-100 p-1 rounded opacity-100 visible"
             aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
             tabIndex={0}
+            title={showNewPassword ? 'Hide password' : 'Show password'}
           >
             {showNewPassword ? (
               <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -253,9 +255,10 @@ export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps) {
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground hover:bg-gray-100 p-1 rounded opacity-100 visible"
             aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
             tabIndex={0}
+            title={showConfirmPassword ? 'Hide password' : 'Show password'}
           >
             {showConfirmPassword ? (
               <EyeOff className="h-4 w-4" aria-hidden="true" />

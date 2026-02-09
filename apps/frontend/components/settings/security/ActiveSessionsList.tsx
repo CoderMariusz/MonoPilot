@@ -221,18 +221,20 @@ export function ActiveSessionsList({ initialSessions = [] }: ActiveSessionsListP
   // Empty State
   if (sessions.length === 0) {
     return (
-      <div
-        className="text-center py-8 text-muted-foreground"
-        role="status"
-        aria-label="No active sessions"
-      >
-        <ShieldCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" aria-hidden="true" />
-        <p className="font-medium">No Active Sessions</p>
-        <p className="text-sm mt-1">You don&apos;t have any active sessions at the moment.</p>
-        <Button variant="outline" size="sm" onClick={fetchSessions} className="mt-4">
-          <RefreshCw className="h-4 w-4 mr-1" aria-hidden="true" />
-          Refresh
-        </Button>
+      <div className="space-y-4">
+        <div
+          className="text-center py-8 text-muted-foreground bg-gray-50 rounded-lg border-2 border-dashed border-gray-300"
+          role="status"
+          aria-label="No active sessions"
+        >
+          <ShieldCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" aria-hidden="true" />
+          <p className="font-medium">No Active Sessions</p>
+          <p className="text-sm mt-1">You don&apos;t have any active sessions at the moment.</p>
+          <Button variant="outline" size="sm" onClick={fetchSessions} className="mt-4">
+            <RefreshCw className="h-4 w-4 mr-1" aria-hidden="true" />
+            Refresh Sessions
+          </Button>
+        </div>
       </div>
     )
   }

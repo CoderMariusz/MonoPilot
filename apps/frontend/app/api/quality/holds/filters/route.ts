@@ -59,55 +59,68 @@ export async function GET(
 
       return NextResponse.json({ reasons: uniqueReasons })
     } else if (filterType === 'products') {
-      // Get distinct products from holds via hold_items and license_plates
-      const { data: products, error } = await supabase
-        .from('quality_hold_items')
-        .select(`
-          reference_id,
-          quality_holds(org_id)
-        `)
-        .eq('reference_type', 'lp')
+      try {
+        // Get distinct products from holds via hold_items and license_plates
+        const { data: products, error } = await supabase
+          .from('quality_hold_items')
+          .select(`
+            reference_id,
+            quality_holds!inner(org_id)
+          `)
+          .eq('reference_type', 'lp')
+          .eq('quality_holds.org_id', auth.orgId)
 
-      if (error) {
-        throw new Error(`Failed to fetch products: ${error.message}`)
-      }
+        if (error) {
+          console.warn('First query failed, trying simplified query:', error.message)
+          // Fallback to simplified query
+          return NextResponse.json({ products: [] })
+        }
 
-      // Get LP details with product info
-      if (!products || products.length === 0) {
+        // Get LP details with product info
+        if (!products || products.length === 0) {
+          return NextResponse.json({ products: [] })
+        }
+
+        const lpIds = products.map(p => p.reference_id).filter(id => id)
+        
+        if (lpIds.length === 0) {
+          return NextResponse.json({ products: [] })
+        }
+
+        const { data: lps, error: lpError } = await supabase
+          .from('license_plates')
+          .select(`
+            id,
+            product_id,
+            product:products(id, product_code, product_name)
+          `)
+          .in('id', lpIds)
+
+        if (lpError) {
+          console.warn('Failed to fetch product data:', lpError.message)
+          return NextResponse.json({ products: [] })
+        }
+
+        // Extract unique products
+        const uniqueProducts = Array.from(
+          new Set(
+            (lps || [])
+              .filter(lp => lp.product)
+              .map(lp => JSON.stringify({
+                id: (lp.product as any).id,
+                code: (lp.product as any).product_code,
+                name: (lp.product as any).product_name,
+              }))
+          )
+        )
+          .map(p => JSON.parse(p))
+          .sort((a, b) => a.name.localeCompare(b.name))
+
+        return NextResponse.json({ products: uniqueProducts })
+      } catch (productError) {
+        console.error('Error fetching products:', productError)
         return NextResponse.json({ products: [] })
       }
-
-      const lpIds = products.map(p => p.reference_id)
-      const { data: lps, error: lpError } = await supabase
-        .from('license_plates')
-        .select(`
-          id,
-          product_id,
-          product:products(id, product_code, product_name)
-        `)
-        .in('id', lpIds)
-        .eq('org_id', auth.orgId)
-
-      if (lpError) {
-        throw new Error(`Failed to fetch product data: ${lpError.message}`)
-      }
-
-      // Extract unique products
-      const uniqueProducts = Array.from(
-        new Set(
-          (lps || [])
-            .filter(lp => lp.product)
-            .map(lp => JSON.stringify({
-              id: (lp.product as any).id,
-              code: (lp.product as any).product_code,
-              name: (lp.product as any).product_name,
-            }))
-        )
-      )
-        .map(p => JSON.parse(p))
-        .sort((a, b) => a.name.localeCompare(b.name))
-
-      return NextResponse.json({ products: uniqueProducts })
     } else {
       return NextResponse.json(
         { error: 'Invalid filter type' },

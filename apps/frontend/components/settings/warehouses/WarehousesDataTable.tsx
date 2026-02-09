@@ -197,7 +197,7 @@ export function WarehousesDataTable({
       />
 
       {/* Table */}
-      <div className="border rounded-md">
+      <div className="border-2 border-gray-300 rounded-md">
         <Table>
           <TableHeader>
             <TableRow>

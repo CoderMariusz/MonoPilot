@@ -198,8 +198,9 @@ export default function UsersPage() {
 
             <TabsContent value="users" className="space-y-4">
           {/* Filters */}
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1">
+          <div className="flex flex-wrap gap-4 mb-6 items-center">
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium text-gray-700 block mb-2">Search</label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -211,35 +212,41 @@ export default function UsersPage() {
               </div>
             </div>
 
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="planner">Planner</SelectItem>
-                <SelectItem value="technical">Technical</SelectItem>
-                <SelectItem value="purchasing">Purchasing</SelectItem>
-                <SelectItem value="warehouse">Warehouse</SelectItem>
-                <SelectItem value="qc">QC</SelectItem>
-                <SelectItem value="finance">Finance</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="min-w-[200px]">
+              <label className="text-sm font-medium text-gray-700 block mb-2">Role Filter</label>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-full border-2 border-gray-200">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="operator">Operator</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="planner">Planner</SelectItem>
+                  <SelectItem value="technical">Technical</SelectItem>
+                  <SelectItem value="purchasing">Purchasing</SelectItem>
+                  <SelectItem value="warehouse">Warehouse</SelectItem>
+                  <SelectItem value="qc">QC</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="min-w-[200px]">
+              <label className="text-sm font-medium text-gray-700 block mb-2">Status Filter</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full border-2 border-gray-200">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Users Table */}
@@ -287,21 +294,27 @@ export default function UsersPage() {
                           : 'Never'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 items-center">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => setEditingUser(user)}
+                            title="Edit user"
+                            className="opacity-100 visible"
                           >
                             <Edit className="h-4 w-4" />
+                            <span className="ml-2">Edit</span>
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => handleDeactivate(user)}
                             disabled={!user.is_active}
+                            title="Delete user"
+                            className="opacity-100 visible"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
+                            <span className="ml-2">Delete</span>
                           </Button>
                         </div>
                       </TableCell>

@@ -247,13 +247,16 @@ export function AllergensDataTable({
   return (
     <div className="space-y-4">
       {/* Search */}
-      <Input
-        placeholder="Search allergens by code or name..."
-        value={searchValue}
-        onChange={(e) => setSearchValue(e.target.value)}
-        className="max-w-md"
-        aria-label="Search allergens"
-      />
+      <div className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+        <label className="text-sm font-medium text-gray-700 block mb-2">Search Allergens</label>
+        <Input
+          placeholder="Search allergens by code or name..."
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          className="w-full md:max-w-md border-2 border-gray-300"
+          aria-label="Search allergens"
+        />
+      </div>
 
       {/* Table */}
       <div className="border rounded-md">
