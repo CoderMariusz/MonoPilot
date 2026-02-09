@@ -116,6 +116,7 @@ export default function HoldDetailPage(props: { params: Promise<{ id: string }> 
   const [releaseModalOpen, setReleaseModalOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [resolving, setResolving] = useState(false)
 
   const router = useRouter()
   const { toast } = useToast()
@@ -173,6 +174,41 @@ export default function HoldDetailPage(props: { params: Promise<{ id: string }> 
       hour: '2-digit',
       minute: '2-digit',
     })
+  }
+
+  // Handle resolve
+  const handleResolve = async () => {
+    if (!hold) return
+
+    setResolving(true)
+    try {
+      const response = await fetch(`/api/quality/holds/${holdId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'disposed' }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to resolve hold')
+      }
+
+      toast({
+        title: 'Success',
+        description: `Hold ${hold.hold_number} marked as resolved`,
+      })
+
+      fetchHold()
+    } catch (err) {
+      console.error('Error resolving hold:', err)
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Failed to resolve hold',
+        variant: 'destructive',
+      })
+    } finally {
+      setResolving(false)
+    }
   }
 
   // Handle delete
@@ -270,7 +306,7 @@ export default function HoldDetailPage(props: { params: Promise<{ id: string }> 
 
   const hasLPs = items.some((item) => item.reference_type === 'lp')
   const canRelease = hold.status === 'active'
-  const canDelete = hold.status === 'active' && items.length === 0
+  const canDelete = hold.status === 'active'
   const canEdit = hold.status === 'active'
 
   return (
@@ -294,13 +330,28 @@ export default function HoldDetailPage(props: { params: Promise<{ id: string }> 
         </div>
         <div className="flex items-center gap-2">
           {canRelease && (
-            <Button onClick={() => setReleaseModalOpen(true)}>
-              <Unlock className="mr-2 h-4 w-4" />
-              Release Hold
-            </Button>
+            <>
+              <Button onClick={() => setReleaseModalOpen(true)}>
+                <Unlock className="mr-2 h-4 w-4" />
+                Release Hold
+              </Button>
+              <Button variant="outline" onClick={handleResolve} disabled={resolving}>
+                {resolving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Resolving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Resolve
+                  </>
+                )}
+              </Button>
+            </>
           )}
           {canEdit && (
-            <Button variant="outline" disabled>
+            <Button variant="outline" onClick={() => router.push(`/quality/holds/${holdId}/edit`)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>

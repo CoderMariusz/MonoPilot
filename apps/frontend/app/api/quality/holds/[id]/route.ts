@@ -15,12 +15,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z, ZodError } from 'zod'
 import * as QualityHoldService from '@/lib/services/quality-hold-service'
 import { isValidUUID, getAuthenticatedUser, handleError } from '@/lib/utils/api-helpers'
+import { createServerSupabase } from '@/lib/supabase/server'
 
 // Validation schema for updating hold details
 const updateHoldSchema = z.object({
   reason: z.string().min(10, 'Reason must be at least 10 characters').max(500, 'Reason must not exceed 500 characters').optional(),
   hold_type: z.enum(['qa_pending', 'investigation', 'recall', 'quarantine']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  status: z.enum(['active', 'released', 'disposed']).optional(),
 })
 
 export type UpdateHoldInput = z.infer<typeof updateHoldSchema>
@@ -107,7 +109,62 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const body = await request.json()
     const validatedData = updateHoldSchema.parse(body)
 
-    // Update hold details
+    // Handle status changes separately
+    if (validatedData.status) {
+      const supabase = await createServerSupabase()
+
+      // Get current hold
+      const { data: currentHold, error: fetchError } = await supabase
+        .from('quality_holds')
+        .select('status')
+        .eq('id', holdId)
+        .eq('org_id', auth.orgId)
+        .single()
+
+      if (fetchError || !currentHold) {
+        return NextResponse.json({ error: 'Hold not found' }, { status: 404 })
+      }
+
+      // Update status and metadata
+      const { data: updatedHold, error: updateError } = await supabase
+        .from('quality_holds')
+        .update({
+          status: validatedData.status,
+          updated_by: auth.userId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', holdId)
+        .eq('org_id', auth.orgId)
+        .select(
+          `id, org_id, hold_number, reason, hold_type, status, priority,
+           held_at, released_at, release_notes, disposition, ncr_id,
+           created_at, updated_at, created_by, updated_by,
+           held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name, email),
+           released_by_user:users!quality_holds_released_by_fkey(id, first_name, last_name, email)`
+        )
+        .single()
+
+      if (updateError) {
+        return NextResponse.json({ error: 'Failed to update hold status' }, { status: 400 })
+      }
+
+      const heldByUser = updatedHold.held_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+      const releasedByUser = updatedHold.released_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+
+      return NextResponse.json({
+        hold: {
+          ...updatedHold,
+          held_by: heldByUser
+            ? { id: heldByUser.id, name: `${heldByUser.first_name} ${heldByUser.last_name}`.trim(), email: heldByUser.email }
+            : { id: '', name: 'Unknown', email: '' },
+          released_by: releasedByUser
+            ? { id: releasedByUser.id, name: `${releasedByUser.first_name} ${releasedByUser.last_name}`.trim(), email: releasedByUser.email }
+            : null,
+        },
+      })
+    }
+
+    // Update hold details (for non-status fields)
     const result = await QualityHoldService.updateHold(
       holdId,
       validatedData,
