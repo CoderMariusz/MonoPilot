@@ -35,6 +35,12 @@ const workflows: WorkflowCard[] = [
     icon: <ArrowRightLeft className="h-12 w-12 text-cyan-600" />,
   },
   {
+    title: 'Transfer Between Locations',
+    description: 'Transfer license plates between warehouse locations. Scan source and destination to complete transfers.',
+    href: '/scanner/transfer',
+    icon: <ArrowRightLeft className="h-12 w-12 text-teal-600" />,
+  },
+  {
     title: 'Putaway',
     description: 'Move received goods to storage locations. Get FIFO/FEFO optimized location suggestions for efficient picking.',
     href: '/scanner/putaway',
