@@ -28,45 +28,45 @@
 
 #### Buttons
 
-- [ ] Create Customer button: Opens CustomerModal in create mode
-- [ ] Retry button: Refetch customers on error (visible only in error state)
-- [ ] Row Click: Navigate to detail or open CustomerModal in edit mode
-- [ ] Delete Icon: Trash button per row, opens DeleteConfirmDialog
-- [ ] Search Button: Submit search form with entered term
-- [ ] Clear Search Icon: Clears search input and resets results
+- [x] Create Customer button: Opens CustomerModal in create mode
+- [x] Retry button: Refetch customers on error (visible only in error state)
+- [x] Row Click: Navigate to detail or open CustomerModal in edit mode
+- [x] Delete Icon: Trash button per row, opens DeleteConfirmDialog
+- [x] Search Button: Submit search form with entered term
+- [x] Clear Search Icon: Clears search input and resets results
 
 #### Forms
 
-- [ ] Search Input: Text field, filters by name/customer code, synced to URL param
-- [ ] Category Filter: Select dropdown with options (all, retail, wholesale, distributor)
-- [ ] Status Filter: Select dropdown with options (all, active, inactive)
+- [x] Search Input: Text field, filters by name/customer code, synced to URL param
+- [x] Category Filter: Select dropdown with options (all, retail, wholesale, distributor)
+- [x] Status Filter: Select dropdown with options (all, active, inactive)
 
 #### Modals & Dialogs
 
-- [ ] CustomerModal: Create/Edit mode, fields (Name, Email, Phone, Website, Category, Contact Person, Notes, Allergen Restrictions, Shipping Addresses)
-- [ ] Shipping Addresses Sub-section: Add Address button, address rows with delete per row
-- [ ] Delete Confirmation Dialog: Title "Delete Customer?", warning about permanent deletion, Cancel/Delete buttons
+- [x] CustomerModal: Create/Edit mode, fields (Name, Email, Phone, Website, Category, Contact Person, Notes, Allergen Restrictions, Shipping Addresses)
+- [x] Shipping Addresses Sub-section: Add Address button, address rows with delete per row
+- [x] Delete Confirmation Dialog: Title "Delete Customer?", warning about permanent deletion, Cancel/Delete buttons
 
 #### Tables
 
-- [ ] Customer DataTable: Columns—Name, Email, Category, Status, Address Count, Actions
-- [ ] Column Sorting: Click headers to sort by each column (sort_by, sort_order)
-- [ ] Pagination: 25 items per page, page navigation buttons
-- [ ] Row Actions: Click row to edit, trash icon to delete
+- [x] Customer DataTable: Columns—Name, Email, Category, Status, Address Count, Actions
+- [x] Column Sorting: Click headers to sort by each column (sort_by, sort_order)
+- [x] Pagination: 25 items per page, page navigation buttons
+- [x] Row Actions: Click row to edit, trash icon to delete
 
 #### Workflows
 
-- [ ] Create Customer: Click Create → Fill form (Name, Email, Category required) → Add addresses → Click Save → Add to list
-- [ ] Edit Customer: Click row → Modal opens with pre-filled data → Modify fields → Save → Update list
-- [ ] Delete Customer: Click trash → Confirm in dialog → Remove from list and redirect
-- [ ] Filter & Search: Enter search term or select filter → Results update → Pagination resets
+- [x] Create Customer: Click Create → Fill form (Name, Email, Category required) → Add addresses → Click Save → Add to list
+- [x] Edit Customer: Click row → Modal opens with pre-filled data → Modify fields → Save → Update list
+- [x] Delete Customer: Click trash → Confirm in dialog → Remove from list and redirect
+- [x] Filter & Search: Enter search term or select filter → Results update → Pagination resets
 
 #### Error States
 
-- [ ] Loading State: Skeleton loaders for table rows
-- [ ] Error State: Error alert with retry button, offline/failed status
-- [ ] Empty State: "No customers found" message with Create button
-- [ ] Validation Error: Form fields show error messages on invalid input
+- [x] Loading State: Skeleton loaders for table rows
+- [x] Error State: Error alert with retry button, offline/failed status
+- [x] Empty State: "No customers found" message with Create button
+- [x] Validation Error: Form fields show error messages on invalid input
 
 ---
 
@@ -76,63 +76,63 @@
 
 #### Buttons
 
-- [ ] Create Sales Order button: Opens SOModal in create mode
-- [ ] Row Click: Navigate to detail view
-- [ ] Edit Icon: Pencil button, navigates to edit page
-- [ ] Delete Icon: Trash button, opens DeleteConfirmDialog
-- [ ] Confirm Icon: Lock button, opens ConfirmConfirmDialog
-- [ ] Add Line Button: Plus button in SOLineForm, adds new order line
-- [ ] Delete Line Button: Trash icon per line in SOLineTable, removes line
-- [ ] Edit Line Button: Pencil icon, opens edit form for line
+- [x] Create Sales Order button: Opens SOModal in create mode
+- [x] Row Click: Navigate to detail view
+- [x] Edit Icon: Pencil button, navigates to edit page
+- [x] Delete Icon: Trash button, opens DeleteConfirmDialog
+- [x] Confirm Icon: Lock button, opens ConfirmConfirmDialog
+- [x] Add Line Button: Plus button in SOLineForm, adds new order line
+- [x] Delete Line Button: Trash icon per line in SOLineTable, removes line
+- [x] Edit Line Button: Pencil icon, opens edit form for line
 
 #### Forms
 
-- [ ] Customer Select: Dropdown from available customers, required
-- [ ] Ship To Address: Radio buttons showing customer's shipping addresses
-- [ ] Product Select: Combobox/dropdown for products in line form
-- [ ] Quantity Input: Number field > 0, required, shows warning if over-allocated
-- [ ] Unit Price: Auto-populated from product, editable, required
-- [ ] Discount Type: Select dropdown (none, percent, fixed)
-- [ ] Discount Value: Number input (0-100 for %, 0-infinite for fixed)
-- [ ] Notes: Textarea per line or order
+- [x] Customer Select: Dropdown from available customers, required
+- [x] Ship To Address: Radio buttons showing customer's shipping addresses
+- [x] Product Select: Combobox/dropdown for products in line form
+- [x] Quantity Input: Number field > 0, required, shows warning if over-allocated
+- [x] Unit Price: Auto-populated from product, editable, required
+- [x] Discount Type: Select dropdown (none, percent, fixed)
+- [x] Discount Value: Number input (0-100 for %, 0-infinite for fixed)
+- [x] Notes: Textarea per line or order
 
 #### Modals & Dialogs
 
-- [ ] SOModal: Create mode with customer, address, line items, order summary sections
-- [ ] SOLineForm: Nested form for adding/editing order lines
-- [ ] SOLineTable: Display existing lines with edit/delete actions
-- [ ] Delete Confirmation Dialog: Title "Delete Sales Order?", warning, Cancel/Delete
-- [ ] Confirm Confirmation Dialog: Title "Confirm Sales Order?", irreversibility warning, Cancel/Confirm
+- [x] SOModal: Create mode with customer, address, line items, order summary sections
+- [x] SOLineForm: Nested form for adding/editing order lines
+- [x] SOLineTable: Display existing lines with edit/delete actions
+- [x] Delete Confirmation Dialog: Title "Delete Sales Order?", warning, Cancel/Delete
+- [x] Confirm Confirmation Dialog: Title "Confirm Sales Order?", irreversibility warning, Cancel/Confirm
 
 #### Tables
 
-- [ ] Sales Orders Table: Columns—Order #, Customer, Status, Order Date, Total, Actions
-- [ ] Column Sorting: Default sort by order_date desc, click headers to change
-- [ ] Pagination: 25 items per page
-- [ ] SOLineTable (nested): Columns—Product, Qty, Unit Price, Discount, Line Total, Actions
+- [x] Sales Orders Table: Columns—Order #, Customer, Status, Order Date, Total, Actions
+- [x] Column Sorting: Default sort by order_date desc, click headers to change
+- [x] Pagination: 25 items per page
+- [x] SOLineTable (nested): Columns—Product, Qty, Unit Price, Discount, Line Total, Actions
 
 #### Workflows
 
-- [ ] Create Sales Order: Click Create → Select customer → Select ship-to address → Add order lines (product, qty, price, discount) → Review summary → Click Save
-- [ ] Edit Sales Order: Navigate to detail → Click Edit → Modify fields and lines → Save → Update display
-- [ ] Delete Sales Order: Click trash → Confirm → Remove from list
-- [ ] Confirm Order: Click lock icon → Confirm dialog → Order locked, cannot edit
-- [ ] Add Line: Click "Add Line" → SOLineForm opens → Fill product, qty, price, discount → Click Add → Line appears in table
+- [x] Create Sales Order: Click Create → Select customer → Select ship-to address → Add order lines (product, qty, price, discount) → Review summary → Click Save
+- [x] Edit Sales Order: Navigate to detail → Click Edit → Modify fields and lines → Save → Update display
+- [x] Delete Sales Order: Click trash → Confirm → Remove from list
+- [x] Confirm Order: Click lock icon → Confirm dialog → Order locked, cannot edit
+- [x] Add Line: Click "Add Line" → SOLineForm opens → Fill product, qty, price, discount → Click Add → Line appears in table
 
 #### Validations
 
-- [ ] Required Fields: Customer and address required, at least 1 line required
-- [ ] Product Warning: Amber warning if product has no standard price
-- [ ] Quantity Warning: Show available quantity if over-allocation detected
-- [ ] Discount Validation: Percent cannot exceed 100%
-- [ ] Line Total: Calculated real-time (Qty × Price - Discount)
+- [x] Required Fields: Customer and address required, at least 1 line required
+- [x] Product Warning: Amber warning if product has no standard price
+- [x] Quantity Warning: Show available quantity if over-allocation detected
+- [x] Discount Validation: Percent cannot exceed 100%
+- [x] Line Total: Calculated real-time (Qty × Price - Discount)
 
 #### Error States
 
-- [ ] Loading State: Skeleton loaders for table and form
-- [ ] Error State: Error alert with retry button
-- [ ] Empty State: "No sales orders found" message
-- [ ] Validation Error: Field-level error messages, form stays open
+- [x] Loading State: Skeleton loaders for table and form
+- [x] Error State: Error alert with retry button
+- [x] Empty State: "No sales orders found" message
+- [x] Validation Error: Field-level error messages, form stays open
 
 ---
 
@@ -140,15 +140,15 @@
 
 #### Buttons
 
-- [ ] Same as `/shipping/sales-orders` Create button workflow
+- [x] Same as `/shipping/sales-orders` Create button workflow
 
 #### Forms
 
-- [ ] Same form fields as SOModal
+- [x] Same form fields as SOModal
 
 #### Workflows
 
-- [ ] Dedicated new order creation page with same workflow as modal
+- [x] Dedicated new order creation page with same workflow as modal
 
 ---
 
@@ -156,23 +156,23 @@
 
 #### Buttons
 
-- [ ] Back Button: Navigate to sales orders list
-- [ ] Edit Button: Navigate to edit page (if editable)
-- [ ] Delete Button: Open delete confirmation (if deletable)
-- [ ] Confirm Button: Lock the order
+- [x] Back Button: Navigate to sales orders list
+- [x] Edit Button: Navigate to edit page (if editable)
+- [x] Delete Button: Open delete confirmation (if deletable)
+- [x] Confirm Button: Lock the order
 
 #### Forms
 
-- [ ] All order and line details display (read-only in detail view)
+- [x] All order and line details display (read-only in detail view)
 
 #### Workflows
 
-- [ ] View Detail: Load order → Display all fields → Show all order lines → Show totals
+- [x] View Detail: Load order → Display all fields → Show all order lines → Show totals
 
 #### Error States
 
-- [ ] Loading State: Skeleton loaders
-- [ ] Error State: Alert with retry button
+- [x] Loading State: Skeleton loaders
+- [x] Error State: Alert with retry button
 
 ---
 
@@ -182,11 +182,11 @@
 
 #### Buttons
 
-- [ ] Row Click: Navigate to `/shipping/shipments/[id]` detail view
-- [ ] Manifest Button: Outline style, visible when status='packed', opens manifest workflow
-- [ ] Ship Button: Destructive style, visible when status in [packed, manifested], opens ShipConfirmDialog
-- [ ] Mark Delivered Button: Outline style, visible when status='shipped' AND user in [Manager, Admin], marks as delivered
-- [ ] View Tracking Button: Outline style, visible when status in [shipped, delivered], opens TrackingDialog
+- [x] Row Click: Navigate to `/shipping/shipments/[id]` detail view
+- [x] Manifest Button: Outline style, visible when status='packed', opens manifest workflow
+- [x] Ship Button: Destructive style, visible when status in [packed, manifested], opens ShipConfirmDialog
+- [x] Mark Delivered Button: Outline style, visible when status='shipped' AND user in [Manager, Admin], marks as delivered
+- [x] View Tracking Button: Outline style, visible when status in [shipped, delivered], opens TrackingDialog
 
 #### Forms
 
@@ -194,28 +194,28 @@
 
 #### Modals & Dialogs
 
-- [ ] ShipConfirmDialog: AlertDialog with warning, shipment details card, irreversibility warnings, acknowledgment checkbox, Cancel/Ship buttons
-- [ ] TrackingDialog: Displays carrier info, tracking number, external link, TrackingTimeline with steps (Packed, Manifested, Shipped, Delivered)
+- [x] ShipConfirmDialog: AlertDialog with warning, shipment details card, irreversibility warnings, acknowledgment checkbox, Cancel/Ship buttons
+- [x] TrackingDialog: Displays carrier info, tracking number, external link, TrackingTimeline with steps (Packed, Manifested, Shipped, Delivered)
 
 #### Tables
 
-- [ ] ShipmentsTable: Columns—Shipment #, SO #, Customer, Status, Boxes, Weight
-- [ ] Status Badge: Color-coded (pending:yellow, packing:blue, packed:green, manifested:purple, shipped:indigo, delivered:emerald, exception:red)
-- [ ] PackListTable (within shipment detail): Columns—Box #, Weight, Dimensions, Items, SSCC, Actions
-- [ ] PackListTable Row Expansion: Click chevron to expand → Sub-table shows contents (Product, LP Number, Lot Number, Quantity)
+- [x] ShipmentsTable: Columns—Shipment #, SO #, Customer, Status, Boxes, Weight
+- [x] Status Badge: Color-coded (pending:yellow, packing:blue, packed:green, manifested:purple, shipped:indigo, delivered:emerald, exception:red)
+- [x] PackListTable (within shipment detail): Columns—Box #, Weight, Dimensions, Items, SSCC, Actions
+- [x] PackListTable Row Expansion: Click chevron to expand → Sub-table shows contents (Product, LP Number, Lot Number, Quantity)
 
 #### Workflows
 
-- [ ] Ship Workflow: Click Ship button → ShipConfirmDialog opens → Verify shipment details → Check warning impacts → Acknowledge irreversibility → Click "Ship Shipment" → Status updates to shipped
-- [ ] Mark Delivered: Click "Mark Delivered" → Status updates to delivered (no confirmation required)
-- [ ] View Tracking: Click "View Tracking" → TrackingDialog opens → Shows carrier, tracking number, timeline
-- [ ] Manifest Shipment: Click "Manifest" button → Shipment status updates to manifested
+- [x] Ship Workflow: Click Ship button → ShipConfirmDialog opens → Verify shipment details → Check warning impacts → Acknowledge irreversibility → Click "Ship Shipment" → Status updates to shipped
+- [x] Mark Delivered: Click "Mark Delivered" → Status updates to delivered (no confirmation required)
+- [x] View Tracking: Click "View Tracking" → TrackingDialog opens → Shows carrier, tracking number, timeline
+- [x] Manifest Shipment: Click "Manifest" button → Shipment status updates to manifested
 
 #### Error States
 
-- [ ] Loading State: Spinner on action buttons during async operations
-- [ ] Error State: Toast error notification for failed operations
-- [ ] Loading Dialog: TrackingDialog shows skeleton for loading, error state with retry
+- [x] Loading State: Spinner on action buttons during async operations
+- [x] Error State: Toast error notification for failed operations
+- [x] Loading Dialog: TrackingDialog shows skeleton for loading, error state with retry
 
 ---
 
@@ -223,35 +223,35 @@
 
 #### Buttons
 
-- [ ] Back Button: Navigate to shipments list
-- [ ] Manifest Button: Execute manifest action (if status='packed')
-- [ ] Ship Button: Open ShipConfirmDialog (if status in [packed, manifested])
-- [ ] Mark Delivered Button: Execute delivery (if status='shipped')
-- [ ] View Tracking Button: Open TrackingDialog (if status in [shipped, delivered])
-- [ ] Edit Box Button: Pencil icon per box in PackListTable, opens edit form (if editable)
-- [ ] Delete Box Button: Trash icon per box, removes box (if editable)
+- [x] Back Button: Navigate to shipments list
+- [x] Manifest Button: Execute manifest action (if status='packed')
+- [x] Ship Button: Open ShipConfirmDialog (if status in [packed, manifested])
+- [x] Mark Delivered Button: Execute delivery (if status='shipped')
+- [x] View Tracking Button: Open TrackingDialog (if status in [shipped, delivered])
+- [x] Edit Box Button: Pencil icon per box in PackListTable, opens edit form (if editable)
+- [x] Delete Box Button: Trash icon per box, removes box (if editable)
 
 #### Forms
 
-- [ ] No direct edit forms (status-driven with modal confirmations)
+- [x] No direct edit forms (status-driven with modal confirmations)
 
 #### Tables
 
-- [ ] PackListTable: Box #, Weight, Dimensions, Items count, SSCC
-- [ ] Expandable Rows: Click chevron to show contents sub-table
-- [ ] Contents Sub-table: Product, LP Number, Lot Number, Quantity
-- [ ] Row Actions: Edit and Delete buttons (conditional on status)
+- [x] PackListTable: Box #, Weight, Dimensions, Items count, SSCC
+- [x] Expandable Rows: Click chevron to show contents sub-table
+- [x] Contents Sub-table: Product, LP Number, Lot Number, Quantity
+- [x] Row Actions: Edit and Delete buttons (conditional on status)
 
 #### Workflows
 
-- [ ] View Shipment Detail: Load shipment info → Display status and customer info → Show PackListTable → Ready for actions based on status
-- [ ] Execute Shipment Actions: Click button → Confirmation dialog → Verify details → Acknowledge impacts → Execute → Status updates
+- [x] View Shipment Detail: Load shipment info → Display status and customer info → Show PackListTable → Ready for actions based on status
+- [x] Execute Shipment Actions: Click button → Confirmation dialog → Verify details → Acknowledge impacts → Execute → Status updates
 
 #### Error States
 
-- [ ] Loading State: Skeleton loaders for shipment info and pack list
-- [ ] Error State: Alert with retry/back buttons
-- [ ] No Boxes State: Message "No boxes in this shipment" with Add button (if editable)
+- [x] Loading State: Skeleton loaders for shipment info and pack list
+- [x] Error State: Alert with retry/back buttons
+- [x] No Boxes State: Message "No boxes in this shipment" with Add button (if editable)
 
 ---
 
@@ -261,52 +261,52 @@
 
 #### Buttons
 
-- [ ] Add to Box Button: Disabled if no LP selected or no active box
-- [ ] Add Box Button: Plus icon to create new box (disabled while adding)
-- [ ] Complete Packing Button: Enabled if all boxes have weight AND all LPs packed, shows loading spinner
-- [ ] Add to Box (in AddItemDialog): Enabled if quantity valid and item selected
+- [x] Add to Box Button: Disabled if no LP selected or no active box
+- [x] Add Box Button: Plus icon to create new box (disabled while adding)
+- [x] Complete Packing Button: Enabled if all boxes have weight AND all LPs packed, shows loading spinner
+- [x] Add to Box (in AddItemDialog): Enabled if quantity valid and item selected
 
 #### Forms
 
-- [ ] Weight Input: Number field (0-25 kg max), required for each box
-- [ ] Dimensions Inputs: Length, Width, Height (10-200 cm each), required
-- [ ] LP Search Input: Searchable "Search LP, product, lot..." with debounce
-- [ ] Box Quantity Input: Number field in AddItemDialog, min 1, max available
+- [x] Weight Input: Number field (0-25 kg max), required for each box
+- [x] Dimensions Inputs: Length, Width, Height (10-200 cm each), required
+- [x] LP Search Input: Searchable "Search LP, product, lot..." with debounce
+- [x] Box Quantity Input: Number field in AddItemDialog, min 1, max available
 
 #### Modals & Dialogs
 
-- [ ] AllergenWarningDialog: AlertDialog with allergen conflict warning, conflicting allergen badges, Cancel/Continue buttons
-- [ ] AddItemDialog: Alternative add workflow with box select, LP search, quantity input, validation errors
+- [x] AllergenWarningDialog: AlertDialog with allergen conflict warning, conflicting allergen badges, Cancel/Continue buttons
+- [x] AddItemDialog: Alternative add workflow with box select, LP search, quantity input, validation errors
 
 #### Tables
 
-- [ ] LP Selector Cards (left column): LP Number, Quantity badge, Product name, Lot number, Location (clickable cards)
-- [ ] Box Contents List (center column): LP number, Product, Lot + Qty info cards in each box
-- [ ] No Items State: "No items in this box yet" message
+- [x] LP Selector Cards (left column): LP Number, Quantity badge, Product name, Lot number, Location (clickable cards)
+- [x] Box Contents List (center column): LP number, Product, Lot + Qty info cards in each box
+- [x] No Items State: "No items in this box yet" message
 
 #### Workflows
 
-- [ ] 3-Column Packing Layout: Left (LP Selector) → Center (Box Builder) → Right (Packing Summary)
-- [ ] Add LP to Box: Search LP in left panel → Click to select → Click "Add to Box" → Added to active box in center
-- [ ] Create Box: Click "+ Add Box" → New box tab appears → Enter weight and dimensions → Show in box tabs
-- [ ] Pack Workflow: Select LP → Add to box → Set weight/dimensions → Repeat for all LPs → Click "Complete Packing" when all conditions met
-- [ ] Handle Allergen Warning: If product allergen conflicts with customer restrictions → AllergenWarningDialog opens → Click Continue to proceed
+- [x] 3-Column Packing Layout: Left (LP Selector) → Center (Box Builder) → Right (Packing Summary)
+- [x] Add LP to Box: Search LP in left panel → Click to select → Click "Add to Box" → Added to active box in center
+- [x] Create Box: Click "+ Add Box" → New box tab appears → Enter weight and dimensions → Show in box tabs
+- [x] Pack Workflow: Select LP → Add to box → Set weight/dimensions → Repeat for all LPs → Click "Complete Packing" when all conditions met
+- [x] Handle Allergen Warning: If product allergen conflicts with customer restrictions → AllergenWarningDialog opens → Click Continue to proceed
 
 #### Packing Summary (Right Column)
 
-- [ ] Shipment Details Card: Shipment #, Customer, Status (pending/packing/packed)
-- [ ] Pack Progress: Large percentage display (0-100%), progress bar, counter "X / Y LPs"
-- [ ] Totals Card: Total Boxes count, Total Weight sum
-- [ ] Missing Weight Alert: Red alert if any box missing weight
-- [ ] Remaining Items Alert: Blue alert if LPs not yet packed
-- [ ] Complete Packing Button: Enabled only when all boxes have weight AND all LPs packed
+- [x] Shipment Details Card: Shipment #, Customer, Status (pending/packing/packed)
+- [x] Pack Progress: Large percentage display (0-100%), progress bar, counter "X / Y LPs"
+- [x] Totals Card: Total Boxes count, Total Weight sum
+- [x] Missing Weight Alert: Red alert if any box missing weight
+- [x] Remaining Items Alert: Blue alert if LPs not yet packed
+- [x] Complete Packing Button: Enabled only when all boxes have weight AND all LPs packed
 
 #### Error States
 
-- [ ] Loading State: Spinner while submitting complete packing
-- [ ] Validation Errors: Red text below weight/dimension inputs
-- [ ] Allergen Warning: Dialog appears for conflicting allergens
-- [ ] Submission Error: Toast error if complete packing fails
+- [x] Loading State: Spinner while submitting complete packing
+- [x] Validation Errors: Red text below weight/dimension inputs
+- [x] Allergen Warning: Dialog appears for conflicting allergens
+- [x] Submission Error: Toast error if complete packing fails
 
 ---
 
@@ -316,57 +316,57 @@
 
 #### Buttons
 
-- [ ] Create RMA button: Opens RMAModal in create mode
-- [ ] Row Click: Navigate to detail view
-- [ ] Edit Icon: Pencil button, opens RMAModal in edit mode (only if status='pending')
-- [ ] Delete Icon: Trash button, opens DeleteConfirmDialog (conditional on canDelete)
-- [ ] Approve Icon: CheckCircle button, opens ApproveConfirmDialog (only if status='pending' AND canApprove)
-- [ ] Add Line Button: Plus button to add RMA line items
-- [ ] Delete Line Button: Trash per line, removes line from RMA
-- [ ] Edit Line Button: Pencil per line, opens edit form
+- [x] Create RMA button: Opens RMAModal in create mode
+- [x] Row Click: Navigate to detail view
+- [x] Edit Icon: Pencil button, opens RMAModal in edit mode (only if status='pending')
+- [x] Delete Icon: Trash button, opens DeleteConfirmDialog (conditional on canDelete)
+- [x] Approve Icon: CheckCircle button, opens ApproveConfirmDialog (only if status='pending' AND canApprove)
+- [x] Add Line Button: Plus button to add RMA line items
+- [x] Delete Line Button: Trash per line, removes line from RMA
+- [x] Edit Line Button: Pencil per line, opens edit form
 
 #### Forms
 
-- [ ] Customer Select: Dropdown from customers, required
-- [ ] Sales Order Select: Dropdown filtered by selected customer
-- [ ] Reason Code Select: Dropdown of RMA reasons, required
-- [ ] Reason Notes: Textarea, free text explanation
-- [ ] Disposition Select: Dropdown (credit, repair, replace, etc.)
-- [ ] General Notes: Textarea for RMA-level notes
+- [x] Customer Select: Dropdown from customers, required
+- [x] Sales Order Select: Dropdown filtered by selected customer
+- [x] Reason Code Select: Dropdown of RMA reasons, required
+- [x] Reason Notes: Textarea, free text explanation
+- [x] Disposition Select: Dropdown (credit, repair, replace, etc.)
+- [x] General Notes: Textarea for RMA-level notes
 
 #### Modals & Dialogs
 
-- [ ] RMAModal: Create/Edit mode with customer, SO, reason, disposition, RMA lines, notes
-- [ ] Delete Confirmation Dialog: Title "Delete RMA?", warning, Cancel/Delete
-- [ ] Approve Confirmation Dialog: Title "Approve RMA?", irreversibility warning, Cancel/Approve
+- [x] RMAModal: Create/Edit mode with customer, SO, reason, disposition, RMA lines, notes
+- [x] Delete Confirmation Dialog: Title "Delete RMA?", warning, Cancel/Delete
+- [x] Approve Confirmation Dialog: Title "Approve RMA?", irreversibility warning, Cancel/Approve
 
 #### Tables
 
-- [ ] RMA DataTable: Columns—RMA #, Customer, Product, Reason, Status, Disposition, Actions
-- [ ] Column Sorting: Click headers to sort
-- [ ] Pagination: 25 items per page
-- [ ] RMA Lines Table (nested): Columns—Product, Lot Number, Qty Expected, Reason Notes, Disposition, Actions
+- [x] RMA DataTable: Columns—RMA #, Customer, Product, Reason, Status, Disposition, Actions
+- [x] Column Sorting: Click headers to sort
+- [x] Pagination: 25 items per page
+- [x] RMA Lines Table (nested): Columns—Product, Lot Number, Qty Expected, Reason Notes, Disposition, Actions
 
 #### Stats Summary
 
-- [ ] Pending Card: Count of pending RMAs
-- [ ] Approved Card: Count of approved RMAs
-- [ ] Total Card: Total count of RMAs
+- [x] Pending Card: Count of pending RMAs
+- [x] Approved Card: Count of approved RMAs
+- [x] Total Card: Total count of RMAs
 
 #### Workflows
 
-- [ ] Create RMA: Click Create → Select customer → Select sales order → Select reason → Add RMA lines (product, lot, qty, notes) → Click Save → Add to list
-- [ ] Edit RMA: Click pencil (if pending) → RMAModal opens → Modify fields and lines → Save → Update list
-- [ ] Delete RMA: Click trash → Confirm → Remove from list
-- [ ] Approve RMA: Click checkmark → ApproveConfirmDialog → Confirm → Status changes to approved → Enables receiving workflow
-- [ ] Add RMA Line: Click "Add Line" in modal → Form opens → Fill product, lot, qty, disposition → Add to lines table
+- [x] Create RMA: Click Create → Select customer → Select sales order → Select reason → Add RMA lines (product, lot, qty, notes) → Click Save → Add to list
+- [x] Edit RMA: Click pencil (if pending) → RMAModal opens → Modify fields and lines → Save → Update list
+- [x] Delete RMA: Click trash → Confirm → Remove from list
+- [x] Approve RMA: Click checkmark → ApproveConfirmDialog → Confirm → Status changes to approved → Enables receiving workflow
+- [x] Add RMA Line: Click "Add Line" in modal → Form opens → Fill product, lot, qty, disposition → Add to lines table
 
 #### Error States
 
-- [ ] Loading State: Skeleton loaders for table and stats cards
-- [ ] Error State: Error alert with retry button
-- [ ] Empty State: "No RMAs found" message with Create button
-- [ ] Validation Error: Form field errors, form stays open
+- [x] Loading State: Skeleton loaders for table and stats cards
+- [x] Error State: Error alert with retry button
+- [x] Empty State: "No RMAs found" message with Create button
+- [x] Validation Error: Form field errors, form stays open
 
 ---
 
@@ -374,35 +374,35 @@
 
 ### Primary Buttons
 
-- [ ] Create Button: Blue background, plus icon, opens create modal or navigates to create page
-- [ ] Save Button: Blue background, white text, submits forms and modals
-- [ ] Approve Button: Primary style, executes approval workflow
-- [ ] Add Button: Blue style, adds items or lines
+- [x] Create Button: Blue background, plus icon, opens create modal or navigates to create page
+- [x] Save Button: Blue background, white text, submits forms and modals
+- [x] Approve Button: Primary style, executes approval workflow
+- [x] Add Button: Blue style, adds items or lines
 
 ### Action Buttons
 
-- [ ] Ship Button: Destructive style, opens confirmation dialog for irreversible action
-- [ ] Manifest Button: Outline style, executes manifest workflow
-- [ ] Mark Delivered Button: Outline style, marks shipment as delivered
-- [ ] View Tracking Button: Outline style, opens tracking information dialog
+- [x] Ship Button: Destructive style, opens confirmation dialog for irreversible action
+- [x] Manifest Button: Outline style, executes manifest workflow
+- [x] Mark Delivered Button: Outline style, marks shipment as delivered
+- [x] View Tracking Button: Outline style, opens tracking information dialog
 
 ### Ghost/Secondary Buttons
 
-- [ ] Back Button: Ghost style with arrow icon, navigates back
-- [ ] Cancel Button: Outline style, closes modals without saving
-- [ ] Retry Button: Outline style, refetches data on error
+- [x] Back Button: Ghost style with arrow icon, navigates back
+- [x] Cancel Button: Outline style, closes modals without saving
+- [x] Retry Button: Outline style, refetches data on error
 
 ### Destructive Buttons
 
-- [ ] Delete Button: Red background, trash icon, opens delete confirmation
-- [ ] Remove Button: Red style, removes item from list
+- [x] Delete Button: Red background, trash icon, opens delete confirmation
+- [x] Remove Button: Red style, removes item from list
 
 ### Icon Buttons
 
-- [ ] Clear Search: X icon in search field
-- [ ] Row Expand: Chevron down/up per row
-- [ ] Edit Icon: Pencil icon per row
-- [ ] Delete Icon: Trash icon per row
+- [x] Clear Search: X icon in search field
+- [x] Row Expand: Chevron down/up per row
+- [x] Edit Icon: Pencil icon per row
+- [x] Delete Icon: Trash icon per row
 
 ---
 
@@ -410,34 +410,34 @@
 
 ### Input Fields
 
-- [ ] Text Input: Name, Email, Product, Customer, etc. with placeholder text
-- [ ] Email Input: Valid email format validation
-- [ ] Phone Input: Phone format validation
-- [ ] URL Input: Valid URL format validation
-- [ ] Number Input: Quantity, Price, Weight, Dimensions with min/max ranges
-- [ ] Textarea: Notes, Reason Notes with character limits and counter
-- [ ] Select/Dropdown: Category, Status, Reason, Disposition with enum options
-- [ ] Combobox: Product and customer search with filtering
-- [ ] Checkbox: Allergen selections, acknowledgments
-- [ ] Radio: Disposition options (Release, Rework, Scrap, Return; Credit, Repair, Replace)
-- [ ] Address Fields: Address Line 1, Address Line 2, City, State, Postal Code, Country
+- [x] Text Input: Name, Email, Product, Customer, etc. with placeholder text
+- [x] Email Input: Valid email format validation
+- [x] Phone Input: Phone format validation
+- [x] URL Input: Valid URL format validation
+- [x] Number Input: Quantity, Price, Weight, Dimensions with min/max ranges
+- [x] Textarea: Notes, Reason Notes with character limits and counter
+- [x] Select/Dropdown: Category, Status, Reason, Disposition with enum options
+- [x] Combobox: Product and customer search with filtering
+- [x] Checkbox: Allergen selections, acknowledgments
+- [x] Radio: Disposition options (Release, Rework, Scrap, Return; Credit, Repair, Replace)
+- [x] Address Fields: Address Line 1, Address Line 2, City, State, Postal Code, Country
 
 ### Validation
 
-- [ ] Required Fields: Highlighted in red, error message below
-- [ ] Email Validation: Valid format required
-- [ ] Number Validation: Min/max ranges enforced, > 0 for quantities
-- [ ] Character Limits: Min/max enforced, character counter shown
-- [ ] Percent Discount: Cannot exceed 100%
-- [ ] Quantity Warning: Show available quantity if over-allocation
-- [ ] Date Validation: Future dates, format validation
+- [x] Required Fields: Highlighted in red, error message below
+- [x] Email Validation: Valid format required
+- [x] Number Validation: Min/max ranges enforced, > 0 for quantities
+- [x] Character Limits: Min/max enforced, character counter shown
+- [x] Percent Discount: Cannot exceed 100%
+- [x] Quantity Warning: Show available quantity if over-allocation
+- [x] Date Validation: Future dates, format validation
 
 ### Form States
 
-- [ ] Loading: Inputs disabled, spinner on submit button
-- [ ] Dirty: Unsaved changes indicator appears
-- [ ] Success: Form closes, toast notification, navigate if applicable
-- [ ] Error: Field-level errors, form stays open, submit button shows error state
+- [x] Loading: Inputs disabled, spinner on submit button
+- [x] Dirty: Unsaved changes indicator appears
+- [x] Success: Form closes, toast notification, navigate if applicable
+- [x] Error: Field-level errors, form stays open, submit button shows error state
 
 ---
 

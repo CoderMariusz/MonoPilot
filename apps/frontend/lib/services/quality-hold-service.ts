@@ -732,6 +732,89 @@ export async function getHoldsStats(orgId: string): Promise<HoldStatsResponse> {
 }
 
 /**
+ * Update hold details (reason, priority, hold_type)
+ * Only allowed for 'active' holds
+ */
+export async function updateHold(
+  holdId: string,
+  data: {
+    reason?: string
+    hold_type?: 'qa_pending' | 'investigation' | 'recall' | 'quarantine'
+    priority?: 'low' | 'medium' | 'high' | 'critical'
+  },
+  orgId: string,
+  userId: string
+): Promise<QualityHold> {
+  const supabase = await createServerSupabase()
+
+  // Get current hold
+  const { data: hold, error: holdError } = await supabase
+    .from('quality_holds')
+    .select(
+      `id, org_id, hold_number, reason, hold_type, status, priority,
+       held_at, released_at, release_notes, disposition, ncr_id,
+       created_at, updated_at, created_by, updated_by,
+       held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name, email),
+       released_by_user:users!quality_holds_released_by_fkey(id, first_name, last_name, email)`
+    )
+    .eq('id', holdId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (holdError) {
+    if (holdError.code === 'PGRST116') {
+      throw new Error('Hold not found')
+    }
+    throw new Error(`Failed to fetch hold: ${holdError.message}`)
+  }
+
+  // Check status - can only update active holds
+  if (hold.status !== 'active') {
+    throw new Error(`Hold cannot be updated (not in active status): current status is '${hold.status}'`)
+  }
+
+  // Build update object
+  const updateData: any = {}
+  if (data.reason !== undefined) updateData.reason = data.reason
+  if (data.hold_type !== undefined) updateData.hold_type = data.hold_type
+  if (data.priority !== undefined) updateData.priority = data.priority
+  updateData.updated_by = userId
+  updateData.updated_at = new Date().toISOString()
+
+  // Update hold
+  const { data: updatedHold, error: updateError } = await supabase
+    .from('quality_holds')
+    .update(updateData)
+    .eq('id', holdId)
+    .eq('org_id', orgId)
+    .select(
+      `id, org_id, hold_number, reason, hold_type, status, priority,
+       held_at, released_at, release_notes, disposition, ncr_id,
+       created_at, updated_at, created_by, updated_by,
+       held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name, email),
+       released_by_user:users!quality_holds_released_by_fkey(id, first_name, last_name, email)`
+    )
+    .single()
+
+  if (updateError) {
+    throw new Error(`Failed to update hold: ${updateError.message}`)
+  }
+
+  const heldByUser = updatedHold.held_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+  const releasedByUser = updatedHold.released_by_user as { id: string; first_name: string; last_name: string; email: string } | null
+
+  return {
+    ...updatedHold,
+    held_by: heldByUser
+      ? { id: heldByUser.id, name: `${heldByUser.first_name} ${heldByUser.last_name}`.trim(), email: heldByUser.email }
+      : { id: '', name: 'Unknown', email: '' },
+    released_by: releasedByUser
+      ? { id: releasedByUser.id, name: `${releasedByUser.first_name} ${releasedByUser.last_name}`.trim(), email: releasedByUser.email }
+      : null,
+  } as QualityHold
+}
+
+/**
  * Delete hold (only if active and has no items)
  */
 export async function deleteHold(holdId: string, orgId: string): Promise<void> {
@@ -1028,6 +1111,7 @@ async function enrichHoldItems(
 export default {
   createHold,
   getHoldById,
+  updateHold,
   releaseHold,
   getActiveHolds,
   getHoldsList,

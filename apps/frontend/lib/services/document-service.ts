@@ -74,6 +74,7 @@ export interface LineItem {
   sku: string
   quantityOrdered: number
   quantityShipped: number
+  weight: number
   lotNumber: string
   bestBeforeDate?: Date
 }
@@ -408,14 +409,15 @@ function buildPackingSlipDocument(content: PackingSlipContent) {
       {
         table: {
           headerRows: 1,
-          widths: ['*', 'auto', 'auto', 'auto', 'auto', 'auto'],
+          widths: ['*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
           body: [
-            ['Product', 'SKU', 'Qty Ordered', 'Qty Shipped', 'Lot #', 'BBD'],
+            ['Product', 'SKU', 'Qty Ordered', 'Qty Shipped', 'Weight (kg)', 'Lot #', 'BBD'],
             ...content.lineItems.map((item) => [
               item.product,
               item.sku,
               item.quantityOrdered.toString(),
               item.quantityShipped.toString(),
+              item.weight.toString(),
               item.lotNumber,
               item.bestBeforeDate ? item.bestBeforeDate.toISOString().slice(0, 10) : '',
             ]),
