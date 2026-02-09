@@ -48,7 +48,14 @@ export async function GET(req: NextRequest) {
       .from('products')
       .select('*, product_type:product_types(id, code, name)', { count: 'exact' })
       .eq('org_id', orgId)
-      .is('deleted_at', null)
+
+    // Filter based on archived parameter - if archived=true show only deleted, otherwise show only active
+    const archived = searchParams.archived === 'true'
+    if (archived) {
+      query = query.not('deleted_at', 'is', null)
+    } else {
+      query = query.is('deleted_at', null)
+    }
 
     // Apply filters
     if (params.code) {

@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     const orgId = currentUser.org_id
 
-    // Fetch product with allergens and product type
+    // Fetch product with allergens and product type (including archived products)
     const { data, error } = await supabase
       .from('products')
       .select(`
@@ -61,7 +61,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
       `)
       .eq('id', id)
       .eq('org_id', orgId)
-      .is('deleted_at', null)
       .single()
 
     if (error || !data) {
@@ -221,6 +220,107 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     }
 
     console.error('Unexpected error in PUT /api/technical/products/[id]:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH /api/technical/products/[id] - Restore archived product
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  try {
+    const supabase = await createServerSupabase()
+    const { id } = await context.params
+
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
+
+    // Get the request body to determine action
+    const body = await req.json()
+    const action = body.action
+
+    // Only support restore action
+    if (action !== 'restore') {
+      return NextResponse.json(
+        { error: 'Invalid action. Only "restore" is supported.' },
+        { status: 400 }
+      )
+    }
+
+    // Check if product exists (should be archived)
+    const { data: existing } = await supabase
+      .from('products')
+      .select('id, deleted_at')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .single()
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Product not found' },
+        { status: 404 }
+      )
+    }
+
+    if (!existing.deleted_at) {
+      return NextResponse.json(
+        { error: 'Product is not archived' },
+        { status: 400 }
+      )
+    }
+
+    // Restore product by clearing deleted_at
+    const { data, error } = await supabase
+      .from('products')
+      .update({
+        deleted_at: null,
+        updated_by: session.user.id
+      })
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error restoring product:', error)
+      return NextResponse.json(
+        { error: 'Failed to restore product', details: error.message },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Product restored successfully',
+      data
+    })
+
+  } catch (error) {
+    console.error('Unexpected error in PATCH /api/technical/products/[id]:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

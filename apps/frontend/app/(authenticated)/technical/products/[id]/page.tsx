@@ -25,6 +25,7 @@ import {
   GitCompare,
   BookOpen,
   Plus,
+  Archive,
 } from 'lucide-react'
 import {
   Table,
@@ -60,6 +61,7 @@ interface Product {
   cost_per_unit?: number
   created_at: string
   updated_at: string
+  deleted_at?: string | null
   created_by?: string
   updated_by?: string
 }
@@ -274,6 +276,38 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     router.push('/technical/products')
   }
 
+  const handleRestore = async () => {
+    try {
+      const response = await fetch(`/api/technical/products/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'restore' }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to restore product')
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Product restored successfully',
+      })
+
+      // Refresh product data
+      fetchProduct()
+    } catch (error) {
+      console.error('Error restoring product:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to restore product',
+        variant: 'destructive',
+      })
+    }
+  }
+
   // Render helpers
   const getTypeBadge = (typeCode?: string) => {
     const code = typeCode || 'CUSTOM'
@@ -346,18 +380,39 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowEditModal(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                className="text-red-500 hover:text-red-600"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
+              {product.deleted_at ? (
+                // Product is archived - show restore button
+                <Button
+                  variant="outline"
+                  className="text-green-600 hover:text-green-700"
+                  onClick={() => handleRestore()}
+                  title="Restore this archived product"
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  Restore
+                </Button>
+              ) : (
+                // Product is active - show edit and delete buttons
+                <>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowEditModal(true)}
+                    title="Edit product details"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="text-red-500 hover:text-red-600"
+                    onClick={() => setShowDeleteDialog(true)}
+                    title="Archive this product"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </CardContent>

@@ -49,6 +49,7 @@ export default function ProductsPage() {
     search: '',
     type: null,
     status: null,
+    archived: false,
   })
 
   // Pagination
@@ -85,6 +86,7 @@ export default function ProductsPage() {
       params.append('limit', pagination.limit.toString())
       params.append('sort', sorting.field)
       params.append('order', sorting.order)
+      params.append('archived', filters.archived.toString())
 
       if (filters.search) {
         params.append('search', filters.search)

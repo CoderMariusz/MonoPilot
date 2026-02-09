@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -22,12 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search } from 'lucide-react'
+import { Search, Archive } from 'lucide-react'
 
 export interface ProductFilters {
   search: string
   type: string | null
   status: string | null
+  archived: boolean
 }
 
 interface ProductFiltersProps {
@@ -171,6 +173,19 @@ export function ProductFilters({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Archived Toggle */}
+      <Button
+        variant={filters.archived ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => onChange({ ...filters, archived: !filters.archived })}
+        disabled={loading}
+        title={filters.archived ? 'Showing archived products' : 'Show archived products'}
+        className="h-10"
+      >
+        <Archive className="w-4 h-4 mr-2" />
+        {filters.archived ? 'Archived' : 'Active'}
+      </Button>
     </div>
   )
 }

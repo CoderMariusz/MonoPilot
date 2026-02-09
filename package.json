@@ -22,6 +22,8 @@
     "pre-push": "pnpm lint",
     "seed:admin": "node scripts/seed-first-admin.mjs",
     "seed:e2e": "npx ts-node scripts/seed-e2e-test-data.ts",
+    "seed:scanner": "npx ts-node scripts/seed-scanner-test-data.ts",
+    "verify:scanner": "npx ts-node scripts/verify-scanner-seed.ts",
     "test": "pnpm test:unit && pnpm test:e2e",
     "test:unit": "cd apps/frontend && pnpm test",
     "test:e2e": "playwright test",
