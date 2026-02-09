@@ -81,10 +81,13 @@ export function calculateVariance(
     total: totalActual.total / count,
   }
 
-  // Calculate variance for each component
+  // Calculate variance for each component with proper precision handling
   const calcVariance = (standard: number, actual: number): VarianceComponent => {
     const variance = actual - standard
-    const variance_percent = standard !== 0 ? (variance / standard) * 100 : 0
+    // Round to 2 decimal places to avoid floating point precision issues (~5% variance)
+    const variance_percent = standard !== 0 
+      ? Math.round((variance / standard) * 10000) / 100  // Round to 2 decimal places
+      : 0
     return {
       standard,
       actual,

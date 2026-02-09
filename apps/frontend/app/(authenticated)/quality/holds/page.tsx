@@ -77,6 +77,12 @@ interface Pagination {
   total_pages: number
 }
 
+interface Product {
+  id: string
+  code: string
+  name: string
+}
+
 export default function QualityHoldsPage() {
   // Data state
   const [holds, setHolds] = useState<HoldSummary[]>([])
@@ -93,6 +99,17 @@ export default function QualityHoldsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
+  const [reasonFilter, setReasonFilter] = useState<string>('all')
+  const [productFilter, setProductFilter] = useState<string>('all')
+
+  // Filter options state
+  const [reasons, setReasons] = useState<string[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [loadingFilters, setLoadingFilters] = useState(true)
+
+  // Sort state
+  const [sortBy, setSortBy] = useState<string>('held_at')
+  const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('DESC')
 
   // UI state
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -101,6 +118,31 @@ export default function QualityHoldsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { isMobile } = useResponsiveView()
+
+  // Fetch filter options
+  const fetchFilterOptions = useCallback(async () => {
+    try {
+      setLoadingFilters(true)
+
+      // Fetch reasons
+      const reasonsResponse = await fetch('/api/quality/holds/filters?type=reasons')
+      if (reasonsResponse.ok) {
+        const reasonsData = await reasonsResponse.json()
+        setReasons(reasonsData.reasons || [])
+      }
+
+      // Fetch products
+      const productsResponse = await fetch('/api/quality/holds/filters?type=products')
+      if (productsResponse.ok) {
+        const productsData = await productsResponse.json()
+        setProducts(productsData.products || [])
+      }
+    } catch (err) {
+      console.error('Error fetching filter options:', err)
+    } finally {
+      setLoadingFilters(false)
+    }
+  }, [])
 
   // Fetch holds
   const fetchHolds = useCallback(async () => {
@@ -114,6 +156,7 @@ export default function QualityHoldsPage() {
       if (priorityFilter && priorityFilter !== 'all') params.append('priority', priorityFilter)
       params.append('limit', pagination.limit.toString())
       params.append('offset', ((pagination.page - 1) * pagination.limit).toString())
+      params.append('sort', `${sortBy} ${sortDirection}`)
 
       const response = await fetch(`/api/quality/holds?${params.toString()}`)
 
@@ -139,7 +182,7 @@ export default function QualityHoldsPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit])
+  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit, sortBy, sortDirection])
 
   // Reset pagination to page 1 when filters change (but not when pagination.page changes)
   useEffect(() => {
@@ -153,7 +196,7 @@ export default function QualityHoldsPage() {
     }, search ? 300 : 0) // Debounce search
 
     return () => clearTimeout(timer)
-  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit, fetchHolds])
+  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit, sortBy, sortDirection, fetchHolds])
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -170,6 +213,30 @@ export default function QualityHoldsPage() {
   const truncateReason = (text: string, maxLength: number = 50) => {
     if (text.length <= maxLength) return text
     return text.substring(0, maxLength) + '...'
+  }
+
+  // Handle column sort
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(sortDirection === 'ASC' ? 'DESC' : 'ASC')
+    } else {
+      // Set new sort column with DESC as default
+      setSortBy(column)
+      setSortDirection('DESC')
+    }
+    // Reset to page 1 when sort changes
+    setPagination((p) => ({ ...p, page: 1 }))
+  }
+
+  // Render sort indicator for column header
+  const renderSortIndicator = (column: string) => {
+    if (sortBy !== column) return null
+    return sortDirection === 'ASC' ? (
+      <ChevronUp className="ml-2 h-4 w-4 inline" />
+    ) : (
+      <ChevronDown className="ml-2 h-4 w-4 inline" />
+    )
   }
 
   // Handle create success

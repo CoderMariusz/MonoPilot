@@ -258,16 +258,19 @@ export class StockAdjustmentService {
       throw new Error('LP not found')
     }
 
-    // Calculate variance
+    // Calculate variance with proper precision handling
     const original_qty = lp.quantity
     const new_qty = input.new_qty
     const variance = new_qty - original_qty
-    const variance_pct = original_qty > 0 ? (variance / original_qty) * 100 : 0
+    // Round to 2 decimal places for percentage to avoid floating point precision issues
+    const variance_pct = original_qty > 0 
+      ? Math.round((variance / original_qty) * 10000) / 100  // Round to 2 decimal places
+      : 0
 
     // Determine if requires approval
     const requiresApproval = this.requiresApproval(variance_pct, variance > 0)
 
-    // Create adjustment
+    // Create adjustment - adjustment_date is set to NOW() by database (UTC by default)
     const { data: adjustment, error: createError } = await supabase
       .from('stock_adjustments')
       .insert({
@@ -281,6 +284,7 @@ export class StockAdjustmentService {
         reason_notes: input.reason_notes || null,
         status: requiresApproval ? 'pending' : 'approved',
         adjusted_by: userId,
+        // Explicitly use UTC for timestamps
         approved_by: requiresApproval ? null : userId,
         approved_at: requiresApproval ? null : new Date().toISOString(),
       })
@@ -323,13 +327,13 @@ export class StockAdjustmentService {
       throw new Error(`Cannot approve adjustment with status: ${adjustment.status}`)
     }
 
-    // Update to approved
+    // Update to approved (timestamps in UTC)
     const { error } = await supabase
       .from('stock_adjustments')
       .update({
         status: 'approved',
         approved_by: approverId,
-        approved_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),  // ISO string is always UTC
         updated_at: new Date().toISOString(),
       })
       .eq('id', adjustmentId)
@@ -369,13 +373,13 @@ export class StockAdjustmentService {
       throw new Error(`Cannot reject adjustment with status: ${adjustment.status}`)
     }
 
-    // Update to rejected
+    // Update to rejected (timestamps in UTC)
     const { error } = await supabase
       .from('stock_adjustments')
       .update({
         status: 'rejected',
         approved_by: rejectorId,
-        approved_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),  // ISO string is always UTC
         rejection_reason: input.rejection_reason,
         updated_at: new Date().toISOString(),
       })

@@ -36,12 +36,34 @@ export function formatDate(dateString: string | null, locale: string = 'en-US'):
 
 /**
  * Format a date string with time
- * @param dateString - ISO date string
+ * @param dateString - ISO date string (expected to be in UTC)
  * @param locale - Locale for formatting (default: en-US)
+ * @param timezone - User's timezone (e.g., 'America/New_York'). If not provided, uses browser's local timezone.
  * @returns Formatted date-time string (e.g., "Jan 15, 2025, 2:30 PM")
  */
-export function formatDateTime(dateString: string, locale: string = 'en-US'): string {
-  return new Date(dateString).toLocaleDateString(locale, {
+export function formatDateTime(dateString: string, locale: string = 'en-US', timezone?: string): string {
+  const date = new Date(dateString)
+  
+  // If timezone is provided, format using that timezone
+  if (timezone) {
+    try {
+      const formattedDate = date.toLocaleDateString(locale, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: timezone,
+      })
+      return formattedDate
+    } catch (e) {
+      // Fallback to browser timezone if invalid timezone is provided
+      console.warn(`Invalid timezone provided: ${timezone}. Falling back to browser timezone.`)
+    }
+  }
+  
+  // Fall back to browser's local timezone
+  return date.toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

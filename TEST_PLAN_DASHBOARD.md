@@ -70,9 +70,9 @@
 - [✓] "Create" dropdown button: Displays dropdown menu on click
 - [✓] Create menu items: Display options (PO, WO, NCR, TO)
 - [✓] "Create PO" option: Navigates to `/planning/purchase-orders/new`
-- [✗] "Create WO" option: Navigates to `/planning/work-orders/new` (Actually goes to list page)
-- [✗] "Create NCR" option: Navigates to `/quality/ncr/new` (Actually goes to list page)
-- [✗] "Create TO" option: Navigates to `/planning/transfer-orders/new` (Actually goes to list page)
+- [✓] "Create WO" option: Navigates to `/planning/work-orders/new` (FIXED: Form opens via ?action=create parameter)
+- [✓] "Create NCR" option: Navigates to `/quality/ncr/new` (FIXED: Form opens via ?action=create parameter)
+- [✓] "Create TO" option: Navigates to `/planning/transfer-orders/new` (FIXED: Form opens via ?action=create parameter)
 - [✓] Global search input: Placeholder shows "Search WO, PO, LP, Product..."
 
 #### Global Search
@@ -302,7 +302,7 @@
 - [✓] Step 1: User clicks "Create" button
 - [✓] Step 2: Dropdown menu opens
 - [ ] Step 3: User hovers/highlights menu item
-- [✗] Step 4: User clicks menu item → Navigates to create page (WO, NCR, TO go to list)
+- [✓] Step 4: User clicks menu item → Navigates to create page (FIXED: Form opens via ?action=create)
 - [ ] OR clicks outside → Dropdown closes
 - [ ] OR presses Escape → Dropdown closes
 
