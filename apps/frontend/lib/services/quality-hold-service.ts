@@ -616,6 +616,11 @@ export async function getHoldsList(
     query = query.lte('held_at', filters.to)
   }
   
+  // Apply reason filter (exact match)
+  if (filters.reason) {
+    query = query.eq('reason', filters.reason)
+  }
+
   // Apply search filter using OR (search in hold_number or reason)
   if (filters.search) {
     const searchTerm = filters.search
