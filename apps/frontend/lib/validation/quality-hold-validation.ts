@@ -85,6 +85,8 @@ export const holdListFiltersSchema = z.object({
   status: z.array(z.enum(HOLD_STATUSES)).optional(),
   priority: z.array(z.enum(PRIORITIES)).optional(),
   hold_type: z.array(z.enum(HOLD_TYPES)).optional(),
+  reason: z.string().optional(),
+  product: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   search: z.string().optional(),
