@@ -83,8 +83,9 @@ const DELETABLE_STATUSES: TOStatus[] = ['draft']
 
 /**
  * Statuses that allow adding/removing lines
+ * UPDATED: Include pending_approval and approved statuses
  */
-const LINE_EDITABLE_STATUSES: TOStatus[] = ['draft', 'planned']
+const LINE_EDITABLE_STATUSES: TOStatus[] = ['draft', 'pending_approval', 'approved', 'planned']
 
 /**
  * Statuses that allow shipping operations
@@ -246,6 +247,9 @@ export function isTerminalStatus(status: TOStatus): boolean {
 export function getStatusDescription(status: TOStatus): string {
   const descriptions: Record<TOStatus, string> = {
     draft: 'Draft - being prepared',
+    pending_approval: 'Pending Approval - awaiting manager approval',
+    approved: 'Approved - ready to plan',
+    rejected: 'Rejected - approval denied',
     planned: 'Planned - ready to ship',
     partially_shipped: 'Partially Shipped - some items shipped',
     shipped: 'Shipped - all items shipped',
@@ -265,7 +269,10 @@ export function getStatusDescription(status: TOStatus): string {
  */
 export function getRecommendedAction(status: TOStatus): string {
   const actions: Record<TOStatus, string> = {
-    draft: 'Add lines and change status to Planned',
+    draft: 'Add lines and request approval',
+    pending_approval: 'Waiting for manager approval',
+    approved: 'Change status to Planned',
+    rejected: 'Review rejection reason and create new TO',
     planned: 'Create shipment to ship items',
     partially_shipped: 'Ship remaining items or receive shipped items',
     shipped: 'Create receipt to receive items',
@@ -291,6 +298,9 @@ export function getRecommendedAction(status: TOStatus): string {
 export function isValidStatus(status: string): status is TOStatus {
   return (
     status === 'draft' ||
+    status === 'pending_approval' ||
+    status === 'approved' ||
+    status === 'rejected' ||
     status === 'planned' ||
     status === 'partially_shipped' ||
     status === 'shipped' ||
@@ -311,4 +321,61 @@ export function assertValidStatus(status: string): asserts status is TOStatus {
   if (!isValidStatus(status)) {
     throw new Error(`Invalid TO status: ${status}`)
   }
+}
+
+// ============================================================================
+// APPROVAL WORKFLOW HELPERS (Story 03.8 Extended)
+// ============================================================================
+
+/**
+ * Check if TO requires approval (is in approval workflow)
+ *
+ * @param status - TO status
+ * @returns True if status is approval-related
+ */
+export function isApprovalStatus(status: TOStatus): boolean {
+  return status === 'pending_approval' || status === 'approved' || status === 'rejected'
+}
+
+/**
+ * Check if TO is awaiting approval
+ *
+ * @param status - TO status
+ * @returns True if status is pending_approval
+ */
+export function isAwaitingApproval(status: TOStatus): boolean {
+  return status === 'pending_approval'
+}
+
+/**
+ * Check if TO has been rejected
+ *
+ * @param status - TO status
+ * @returns True if status is rejected
+ */
+export function isRejected(status: TOStatus): boolean {
+  return status === 'rejected'
+}
+
+/**
+ * Check if TO is approved
+ *
+ * @param status - TO status
+ * @returns True if status is approved
+ */
+export function isApproved(status: TOStatus): boolean {
+  return status === 'approved'
+}
+
+/**
+ * Check if TO requires manager approval before shipping
+ * (Applies when TO has crossed approval threshold)
+ *
+ * @param toValue - Transfer order total value (optional)
+ * @param approvalThreshold - Approval threshold in currency (optional, default 10000)
+ * @returns True if approval is required
+ */
+export function requiresApproval(toValue?: number, approvalThreshold: number = 10000): boolean {
+  if (!toValue) return true // Default to requiring approval if no value provided
+  return toValue >= approvalThreshold
 }

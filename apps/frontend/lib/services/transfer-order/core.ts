@@ -524,3 +524,302 @@ export async function changeToStatus(
     }
   }
 }
+
+// ============================================================================
+// APPROVAL WORKFLOW FUNCTIONS (Story 03.8 Extended)
+// ============================================================================
+
+/**
+ * Request approval for a Transfer Order
+ * Transitions: draft -> pending_approval
+ */
+export async function requestToApproval(
+  id: string
+): Promise<ServiceResult<TransferOrder>> {
+  try {
+    const userData = await getCurrentUserData()
+
+    if (!userData) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        code: ErrorCode.INVALID_INPUT,
+      }
+    }
+
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get current TO
+    const { data: existingTo, error: fetchError } = await supabaseAdmin
+      .from('transfer_orders')
+      .select('status, transfer_order_lines(id)')
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .single()
+
+    if (fetchError || !existingTo) {
+      return {
+        success: false,
+        error: 'Transfer Order not found',
+        code: ErrorCode.NOT_FOUND,
+      }
+    }
+
+    // Validate transition
+    const { canTransition } = await import('./state-machine')
+    if (!canTransition(existingTo.status as any, 'pending_approval')) {
+      return {
+        success: false,
+        error: `Cannot request approval for TO with status: ${existingTo.status}`,
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
+    // Validate: TO must have lines
+    if (!existingTo.transfer_order_lines || existingTo.transfer_order_lines.length === 0) {
+      return {
+        success: false,
+        error: 'Cannot request approval for TO without lines. Add at least one product.',
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
+    // Update status to pending_approval
+    const { data: updatedTo, error: updateError } = await supabaseAdmin
+      .from('transfer_orders')
+      .update({
+        status: 'pending_approval',
+        updated_by: userData.userId,
+      })
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .select('*')
+      .single()
+
+    if (updateError) {
+      console.error('Error requesting TO approval:', updateError)
+      return {
+        success: false,
+        error: 'Failed to request approval',
+        code: ErrorCode.DATABASE_ERROR,
+      }
+    }
+
+    // Enrich with warehouse info
+    const enriched = await enrichWithWarehouses(updatedTo)
+
+    return {
+      success: true,
+      data: enriched as TransferOrder,
+    }
+  } catch (error) {
+    console.error('Error in requestToApproval:', error)
+    return {
+      success: false,
+      error: 'Internal server error',
+      code: ErrorCode.DATABASE_ERROR,
+    }
+  }
+}
+
+/**
+ * Approve a Transfer Order
+ * Transitions: pending_approval -> approved
+ */
+export async function approveTransferOrder(
+  id: string,
+  notes?: string
+): Promise<ServiceResult<TransferOrder>> {
+  try {
+    const userData = await getCurrentUserData()
+
+    if (!userData) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        code: ErrorCode.INVALID_INPUT,
+      }
+    }
+
+    // Check role authorization - only ADMIN or WH_MANAGER can approve
+    if (!['admin', 'warehouse_manager', 'purchasing_manager'].includes(userData.role.toLowerCase())) {
+      return {
+        success: false,
+        error: 'Forbidden: Manager role or higher required to approve',
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get current TO
+    const { data: existingTo, error: fetchError } = await supabaseAdmin
+      .from('transfer_orders')
+      .select('status')
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .single()
+
+    if (fetchError || !existingTo) {
+      return {
+        success: false,
+        error: 'Transfer Order not found',
+        code: ErrorCode.NOT_FOUND,
+      }
+    }
+
+    // Validate transition
+    const { canTransition } = await import('./state-machine')
+    if (!canTransition(existingTo.status as any, 'approved')) {
+      return {
+        success: false,
+        error: `Cannot approve TO with status: ${existingTo.status}. Must be pending_approval.`,
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
+    // Update status to approved
+    const { data: updatedTo, error: updateError } = await supabaseAdmin
+      .from('transfer_orders')
+      .update({
+        status: 'approved',
+        approved_by: userData.userId,
+        approval_date: new Date().toISOString(),
+        approval_notes: notes,
+        updated_by: userData.userId,
+      })
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .select('*')
+      .single()
+
+    if (updateError) {
+      console.error('Error approving TO:', updateError)
+      return {
+        success: false,
+        error: 'Failed to approve Transfer Order',
+        code: ErrorCode.DATABASE_ERROR,
+      }
+    }
+
+    // Enrich with warehouse info
+    const enriched = await enrichWithWarehouses(updatedTo)
+
+    return {
+      success: true,
+      data: enriched as TransferOrder,
+    }
+  } catch (error) {
+    console.error('Error in approveTransferOrder:', error)
+    return {
+      success: false,
+      error: 'Internal server error',
+      code: ErrorCode.DATABASE_ERROR,
+    }
+  }
+}
+
+/**
+ * Reject a Transfer Order
+ * Transitions: pending_approval -> rejected
+ */
+export async function rejectTransferOrder(
+  id: string,
+  rejectionReason: string
+): Promise<ServiceResult<TransferOrder>> {
+  try {
+    const userData = await getCurrentUserData()
+
+    if (!userData) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        code: ErrorCode.INVALID_INPUT,
+      }
+    }
+
+    // Check role authorization
+    if (!['admin', 'warehouse_manager', 'purchasing_manager'].includes(userData.role.toLowerCase())) {
+      return {
+        success: false,
+        error: 'Forbidden: Manager role or higher required to reject',
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
+    if (!rejectionReason || rejectionReason.trim().length === 0) {
+      return {
+        success: false,
+        error: 'Rejection reason is required',
+        code: ErrorCode.INVALID_INPUT,
+      }
+    }
+
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get current TO
+    const { data: existingTo, error: fetchError } = await supabaseAdmin
+      .from('transfer_orders')
+      .select('status')
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .single()
+
+    if (fetchError || !existingTo) {
+      return {
+        success: false,
+        error: 'Transfer Order not found',
+        code: ErrorCode.NOT_FOUND,
+      }
+    }
+
+    // Validate transition
+    const { canTransition } = await import('./state-machine')
+    if (!canTransition(existingTo.status as any, 'rejected')) {
+      return {
+        success: false,
+        error: `Cannot reject TO with status: ${existingTo.status}. Must be pending_approval.`,
+        code: ErrorCode.INVALID_STATUS,
+      }
+    }
+
+    // Update status to rejected
+    const { data: updatedTo, error: updateError } = await supabaseAdmin
+      .from('transfer_orders')
+      .update({
+        status: 'rejected',
+        rejected_by: userData.userId,
+        rejection_date: new Date().toISOString(),
+        rejection_reason: rejectionReason,
+        updated_by: userData.userId,
+      })
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .select('*')
+      .single()
+
+    if (updateError) {
+      console.error('Error rejecting TO:', updateError)
+      return {
+        success: false,
+        error: 'Failed to reject Transfer Order',
+        code: ErrorCode.DATABASE_ERROR,
+      }
+    }
+
+    // Enrich with warehouse info
+    const enriched = await enrichWithWarehouses(updatedTo)
+
+    return {
+      success: true,
+      data: enriched as TransferOrder,
+    }
+  } catch (error) {
+    console.error('Error in rejectTransferOrder:', error)
+    return {
+      success: false,
+      error: 'Internal server error',
+      code: ErrorCode.DATABASE_ERROR,
+    }
+  }
+}

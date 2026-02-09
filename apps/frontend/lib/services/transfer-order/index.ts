@@ -32,6 +32,9 @@ export {
   updateTransferOrder,
   deleteTransferOrder,
   changeToStatus,
+  requestToApproval,
+  approveTransferOrder,
+  rejectTransferOrder,
 } from './core'
 
 // ============================================================================
@@ -76,3 +79,29 @@ export {
   calculateToStatus,
   enrichWithWarehouses,
 } from './helpers'
+
+// ============================================================================
+// STATE MACHINE & APPROVAL HELPERS (Story 3.8 Extended)
+// ============================================================================
+
+export {
+  canTransition,
+  validateTransition,
+  getAvailableTransitions,
+  canEdit,
+  canDelete,
+  canEditLines,
+  canShip,
+  canReceive,
+  isTerminalStatus,
+  getStatusDescription,
+  getRecommendedAction,
+  isValidStatus,
+  assertValidStatus,
+  isApprovalStatus,
+  isAwaitingApproval,
+  isRejected,
+  isApproved,
+  requiresApproval,
+  type TOStatus,
+} from './state-machine'
