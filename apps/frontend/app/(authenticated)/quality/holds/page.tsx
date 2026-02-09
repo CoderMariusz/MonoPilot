@@ -154,6 +154,8 @@ export default function QualityHoldsPage() {
       if (search) params.append('search', search)
       if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter)
       if (priorityFilter && priorityFilter !== 'all') params.append('priority', priorityFilter)
+      if (reasonFilter && reasonFilter !== 'all') params.append('reason', reasonFilter)
+      if (productFilter && productFilter !== 'all') params.append('product', productFilter)
       params.append('limit', pagination.limit.toString())
       params.append('offset', ((pagination.page - 1) * pagination.limit).toString())
       params.append('sort', `${sortBy} ${sortDirection}`)
@@ -182,12 +184,17 @@ export default function QualityHoldsPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit, sortBy, sortDirection])
+  }, [search, statusFilter, priorityFilter, reasonFilter, productFilter, pagination.page, pagination.limit, sortBy, sortDirection])
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    fetchFilterOptions()
+  }, [fetchFilterOptions])
 
   // Reset pagination to page 1 when filters change (but not when pagination.page changes)
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }))
-  }, [search, statusFilter, priorityFilter])
+  }, [search, statusFilter, priorityFilter, reasonFilter, productFilter])
 
   // Fetch on filter changes and pagination changes
   useEffect(() => {
@@ -196,7 +203,7 @@ export default function QualityHoldsPage() {
     }, search ? 300 : 0) // Debounce search
 
     return () => clearTimeout(timer)
-  }, [search, statusFilter, priorityFilter, pagination.page, pagination.limit, sortBy, sortDirection, fetchHolds])
+  }, [search, statusFilter, priorityFilter, reasonFilter, productFilter, pagination.page, pagination.limit, sortBy, sortDirection, fetchHolds])
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -342,7 +349,33 @@ export default function QualityHoldsPage() {
             <SelectItem value="critical">Critical</SelectItem>
           </SelectContent>
         </Select>
-        {loading && <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />}
+        <Select value={reasonFilter} onValueChange={setReasonFilter} disabled={loadingFilters || reasons.length === 0}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder={loadingFilters ? "Loading reasons..." : "All Reasons"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Reasons</SelectItem>
+            {reasons.map((reason) => (
+              <SelectItem key={reason} value={reason}>
+                {reason.substring(0, 50)}{reason.length > 50 ? '...' : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={productFilter} onValueChange={setProductFilter} disabled={loadingFilters || products.length === 0}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder={loadingFilters ? "Loading products..." : "All Products"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Products</SelectItem>
+            {products.map((product) => (
+              <SelectItem key={product.id} value={product.id}>
+                {product.code} - {product.name.substring(0, 30)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {(loading || loadingFilters) && <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />}
       </div>
 
       {/* Empty state */}
@@ -351,7 +384,7 @@ export default function QualityHoldsPage() {
           <Shield className="h-16 w-16 text-gray-300" />
           <h2 className="mt-4 text-lg font-semibold text-gray-700">No Quality Holds</h2>
           <p className="mt-2 text-sm text-gray-500">
-            {search || statusFilter !== 'all' || priorityFilter !== 'all'
+            {search || statusFilter !== 'all' || priorityFilter !== 'all' || reasonFilter !== 'all' || productFilter !== 'all'
               ? 'No holds match your search criteria.'
               : 'Create your first quality hold to start tracking inventory issues.'}
           </p>
@@ -448,14 +481,44 @@ export default function QualityHoldsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Hold Number</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Reason</TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('hold_number')}
+                >
+                  Hold Number {renderSortIndicator('hold_number')}
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('status')}
+                >
+                  Status {renderSortIndicator('status')}
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('priority')}
+                >
+                  Priority {renderSortIndicator('priority')}
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('hold_type')}
+                >
+                  Type {renderSortIndicator('hold_type')}
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('reason')}
+                >
+                  Reason {renderSortIndicator('reason')}
+                </TableHead>
                 <TableHead className="text-center">Items</TableHead>
                 <TableHead>Held By</TableHead>
-                <TableHead>Age</TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => handleSort('held_at')}
+                >
+                  Age {renderSortIndicator('held_at')}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -506,30 +569,57 @@ export default function QualityHoldsPage() {
       )}
 
       {/* Pagination */}
-      {pagination.total_pages > 1 && (
-        <div className="flex items-center justify-between">
+      {pagination.total > 0 && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500">
             Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
             {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}{' '}
             holds
           </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page <= 1}
-              onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.page >= pagination.total_pages}
-              onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-            >
-              Next
-            </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex items-center gap-2">
+              <label htmlFor="page-size" className="text-sm text-gray-600">
+                Per page:
+              </label>
+              <Select 
+                value={pagination.limit.toString()} 
+                onValueChange={(value) => {
+                  const newLimit = parseInt(value, 10)
+                  setPagination((p) => ({ ...p, limit: newLimit, page: 1 }))
+                }}
+              >
+                <SelectTrigger className="w-[80px]" id="page-size">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page <= 1}
+                onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+              >
+                Previous
+              </Button>
+              <span className="flex items-center text-sm text-gray-600">
+                Page {pagination.page} of {pagination.total_pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page >= pagination.total_pages}
+                onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </div>
       )}
