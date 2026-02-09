@@ -591,6 +591,72 @@ export async function getHoldsList(
 ): Promise<HoldsListResponse> {
   const supabase = await createServerSupabase()
 
+  // If product filter is specified, get hold IDs that contain the product first
+  let holdIdsForProductFilter: string[] | null = null
+  if (filters.product) {
+    const { data: holdItems, error: holdItemError } = await supabase
+      .from('quality_hold_items')
+      .select('hold_id')
+      .eq('reference_type', 'lp')
+      .then(async (result) => {
+        if (result.error) return result
+        // Now get LP details to filter by product_id
+        const lpIds = (result.data || []).map(item => item.reference_id)
+        if (lpIds.length === 0) return { data: [], error: null }
+        
+        const { data: lps, error: lpError } = await supabase
+          .from('license_plates')
+          .select('id')
+          .eq('product_id', filters.product)
+          .eq('org_id', orgId)
+          .in('id', lpIds)
+        
+        if (lpError) return { data: null, error: lpError }
+        return { 
+          data: lps ? lps.map(lp => ({ hold_id: '' })) : [],
+          error: null 
+        }
+      })
+    
+    // Get hold_items for the filtered LPs
+    if (!holdItemError && holdItems) {
+      const { data: holdItemsForProduct, error: hifpError } = await supabase
+        .from('quality_hold_items')
+        .select('hold_id')
+        .eq('reference_type', 'lp')
+        .then(async (result) => {
+          if (result.error) return result
+          const lpIds = (result.data || []).map(item => item.reference_id)
+          if (lpIds.length === 0) return { data: [], error: null }
+          
+          const { data: lps, error: lpError } = await supabase
+            .from('license_plates')
+            .select('id')
+            .eq('product_id', filters.product)
+            .eq('org_id', orgId)
+            .in('id', lpIds)
+          
+          if (lpError) return { data: null, error: lpError }
+          
+          if (!lps || lps.length === 0) return { data: [], error: null }
+          
+          const { data: items, error: itemError } = await supabase
+            .from('quality_hold_items')
+            .select('hold_id')
+            .eq('reference_type', 'lp')
+            .in('reference_id', lps.map(l => l.id))
+          
+          return { data: items, error: itemError }
+        })
+      
+      if (!hifpError && holdItemsForProduct) {
+        holdIdsForProductFilter = Array.from(
+          new Set((holdItemsForProduct as any[]).map(item => item.hold_id).filter(Boolean))
+        )
+      }
+    }
+  }
+
   let query = supabase
     .from('quality_holds')
     .select(`
@@ -598,6 +664,31 @@ export async function getHoldsList(
       held_by_user:users!quality_holds_held_by_fkey(id, first_name, last_name)
     `, { count: 'exact' })
     .eq('org_id', orgId)
+
+  // Apply product filter by hold_id
+  if (holdIdsForProductFilter !== null) {
+    if (holdIdsForProductFilter.length === 0) {
+      // No holds with this product, return empty
+      return {
+        holds: [],
+        pagination: {
+          total: 0,
+          page: Math.floor((filters.offset || 0) / (filters.limit || 20)) + 1,
+          limit: filters.limit || 20,
+          total_pages: 0,
+          has_next: false,
+          has_prev: (filters.offset || 0) > 0,
+        },
+        filters_applied: {
+          status: filters.status,
+          priority: filters.priority,
+          hold_type: filters.hold_type,
+          date_range: filters.from || filters.to ? { from: filters.from, to: filters.to } : null,
+        },
+      }
+    }
+    query = query.in('id', holdIdsForProductFilter)
+  }
 
   // Apply filters
   if (filters.status && filters.status.length > 0) {
