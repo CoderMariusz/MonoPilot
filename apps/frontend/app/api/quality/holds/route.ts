@@ -122,6 +122,8 @@ export async function GET(request: NextRequest) {
       status: searchParams.get('status')?.split(',').filter(Boolean) || undefined,
       priority: searchParams.get('priority')?.split(',').filter(Boolean) || undefined,
       hold_type: searchParams.get('hold_type')?.split(',').filter(Boolean) || undefined,
+      reason: searchParams.get('reason') || undefined,
+      product: searchParams.get('product') || undefined,
       from: searchParams.get('from') || undefined,
       to: searchParams.get('to') || undefined,
       search: searchParams.get('search') || undefined,
