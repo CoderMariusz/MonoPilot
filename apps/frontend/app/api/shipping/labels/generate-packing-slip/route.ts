@@ -233,28 +233,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       )
     }
 
-    // Build line items array
-    const buildLineItems: LineItem[] = (lineItems || []).map((item: any) => ({
-      product: item.products?.name || 'Unknown Product',
-      sku: item.products?.sku || '',
-      quantityOrdered: item.quantity_ordered,
-      quantityShipped: item.quantity_shipped,
-      weight: item.weight || 0,
-      lotNumber: item.lot_number || '',
-      bestBeforeDate: item.best_before_date ? new Date(item.best_before_date) : undefined,
-    }))
+    // Build line items array with null checks and fallback values for weights (W6 fix)
+    const buildLineItems: LineItem[] = (lineItems || []).map((item: any) => {
+      // CRITICAL: Ensure weight is always a valid number, never null or undefined
+      const weight = item.weight !== null && item.weight !== undefined ? parseFloat(item.weight) : 0
+      // Log if weight is missing (for debugging intermittent failures)
+      if (item.weight === null || item.weight === undefined) {
+        console.warn(`[W6-WEIGHT] Line item missing weight: product=${item.products?.name}, sku=${item.products?.sku}`)
+      }
+      return {
+        product: item.products?.name || 'Unknown Product',
+        sku: item.products?.sku || '',
+        quantityOrdered: item.quantity_ordered,
+        quantityShipped: item.quantity_shipped,
+        weight: isNaN(weight) ? 0 : weight,
+        lotNumber: item.lot_number || '',
+        bestBeforeDate: item.best_before_date ? new Date(item.best_before_date) : undefined,
+      }
+    })
 
-    // Build boxes array
-    const buildBoxes: PackingSlipBox[] = (boxes || []).map((box: any) => ({
-      boxNumber: box.box_number,
-      sscc: box.sscc || '',
-      weight: box.weight || 0,
-      dimensions: {
-        length: box.length || 0,
-        width: box.width || 0,
-        height: box.height || 0,
-      },
-    }))
+    // Build boxes array with null checks and fallback values for weights (W6 fix)
+    const buildBoxes: PackingSlipBox[] = (boxes || []).map((box: any) => {
+      // CRITICAL: Ensure weight is always a valid number, never null or undefined
+      const weight = box.weight !== null && box.weight !== undefined ? parseFloat(box.weight) : 0
+      // Log if weight is missing (for debugging intermittent failures)
+      if (box.weight === null || box.weight === undefined) {
+        console.warn(`[W6-WEIGHT] Box missing weight: box_number=${box.box_number}, sscc=${box.sscc}`)
+      }
+      return {
+        boxNumber: box.box_number,
+        sscc: box.sscc || '',
+        weight: isNaN(weight) ? 0 : weight,
+        dimensions: {
+          length: (box.length !== null && box.length !== undefined) ? parseFloat(box.length) : 0,
+          width: (box.width !== null && box.width !== undefined) ? parseFloat(box.width) : 0,
+          height: (box.height !== null && box.height !== undefined) ? parseFloat(box.height) : 0,
+        },
+      }
+    })
 
     // Build ship-to address
     const shipToAddress = (shipment.addresses as any) || null

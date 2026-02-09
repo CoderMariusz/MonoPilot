@@ -405,7 +405,7 @@ function buildPackingSlipDocument(content: PackingSlipContent) {
       },
       { text: '\n' },
 
-      // Line Items Table
+      // Line Items Table (W6 fix: added null checks for weights)
       {
         table: {
           headerRows: 1,
@@ -417,7 +417,8 @@ function buildPackingSlipDocument(content: PackingSlipContent) {
               item.sku,
               item.quantityOrdered.toString(),
               item.quantityShipped.toString(),
-              item.weight.toString(),
+              // CRITICAL: Ensure weight is always a string (never null or undefined)
+              (item.weight !== null && item.weight !== undefined ? item.weight : 0).toString(),
               item.lotNumber,
               item.bestBeforeDate ? item.bestBeforeDate.toISOString().slice(0, 10) : '',
             ]),
@@ -426,7 +427,7 @@ function buildPackingSlipDocument(content: PackingSlipContent) {
       },
       { text: '\n' },
 
-      // Carton Summary
+      // Carton Summary (W6 fix: added null checks for weights and dimensions)
       content.boxes.length > 0
         ? {
             stack: [
@@ -440,8 +441,10 @@ function buildPackingSlipDocument(content: PackingSlipContent) {
                     ...content.boxes.map((box) => [
                       box.boxNumber.toString(),
                       box.sscc,
-                      box.weight.toString(),
-                      `${box.dimensions.length} x ${box.dimensions.width} x ${box.dimensions.height}`,
+                      // CRITICAL: Ensure weight is always a string (never null or undefined)
+                      (box.weight !== null && box.weight !== undefined ? box.weight : 0).toString(),
+                      // CRITICAL: Ensure dimensions are always numbers (never null or undefined)
+                      `${(box.dimensions.length !== null && box.dimensions.length !== undefined ? box.dimensions.length : 0)} x ${(box.dimensions.width !== null && box.dimensions.width !== undefined ? box.dimensions.width : 0)} x ${(box.dimensions.height !== null && box.dimensions.height !== undefined ? box.dimensions.height : 0)}`,
                     ]),
                   ],
                 },

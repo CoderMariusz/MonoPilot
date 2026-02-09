@@ -237,23 +237,38 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if barcode already exists (W2: Duplicate barcode validation)
-    if (validated.barcode) {
-      const { data: existingBarcode } = await supabase
+    // CRITICAL: Must enforce constraint at all times to prevent race conditions
+    if (validated.barcode && validated.barcode.trim()) {
+      const { data: existingBarcodes, error: barcodeError } = await supabase
         .from('products')
         .select('id, code')
         .eq('org_id', orgId)
-        .eq('barcode', validated.barcode)
+        .eq('barcode', validated.barcode.trim())
         .is('deleted_at', null)
-        .single()
 
-      if (existingBarcode) {
+      // Log for debugging intermittent failures
+      console.log(`[W6-BARCODE] POST - Checking barcode "${validated.barcode}" for org "${orgId}" - Found: ${existingBarcodes?.length || 0}`)
+
+      if (barcodeError) {
+        console.error('[W6-BARCODE] POST - Database error checking barcode:', barcodeError)
+        return NextResponse.json(
+          {
+            error: 'Failed to validate barcode uniqueness',
+            code: 'BARCODE_VALIDATION_ERROR',
+            details: { error: barcodeError.message }
+          },
+          { status: 500 }
+        )
+      }
+
+      if (existingBarcodes && existingBarcodes.length > 0) {
         return NextResponse.json(
           {
             error: 'Product barcode already exists',
             code: 'PRODUCT_BARCODE_EXISTS',
             details: {
               field: 'barcode',
-              existingProduct: existingBarcode.code
+              existingProduct: existingBarcodes[0].code
             }
           },
           { status: 400 }
