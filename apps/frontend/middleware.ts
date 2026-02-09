@@ -75,8 +75,45 @@ if (typeof global !== 'undefined' && !(global as any).__rateLimitCleanupStarted)
   setInterval(cleanupRateLimits, 2 * 60 * 1000)
 }
 
+/**
+ * Add CORS headers to response
+ */
+function addCorsHeaders(response: NextResponse): NextResponse {
+  const origin = process.env.CORS_ORIGIN || 'http://localhost:3000'
+  
+  response.headers.set('Access-Control-Allow-Origin', origin)
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  response.headers.set('Access-Control-Max-Age', '86400')
+  
+  return response
+}
+
+/**
+ * Add security headers to response
+ */
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('X-XSS-Protection', '1; mode=block')
+  response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:")
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+  
+  return response
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Handle CORS preflight requests
+  if (request.method === 'OPTIONS') {
+    const response = new NextResponse(null, { status: 200 })
+    addCorsHeaders(response)
+    addSecurityHeaders(response)
+    return response
+  }
 
   // Apply rate limiting to API endpoints
   if (pathname.startsWith('/api/')) {
@@ -84,7 +121,7 @@ export async function middleware(request: NextRequest) {
     
     if (!checkRateLimit(ip)) {
       console.warn(`[RateLimit] IP ${ip} exceeded limit on ${pathname}`)
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: 'Too many requests' },
         { 
           status: 429,
@@ -95,10 +132,16 @@ export async function middleware(request: NextRequest) {
           }
         }
       )
+      addCorsHeaders(response)
+      addSecurityHeaders(response)
+      return response
     }
 
-    // Allow API request to proceed
-    return NextResponse.next()
+    // Allow API request to proceed and add headers
+    const response = NextResponse.next()
+    addCorsHeaders(response)
+    addSecurityHeaders(response)
+    return response
   }
 
   // Define public routes (no auth required)
@@ -167,9 +210,12 @@ export async function middleware(request: NextRequest) {
     if (error) {
       console.error('[Proxy] Auth error:', error.message)
       if (isPublicRoute) {
+        addSecurityHeaders(supabaseResponse)
         return supabaseResponse
       }
-      return NextResponse.redirect(new URL('/login', request.url))
+      const response = NextResponse.redirect(new URL('/login', request.url))
+      addSecurityHeaders(response)
+      return response
     }
 
     // If not authenticated and trying to access protected route
@@ -180,24 +226,33 @@ export async function middleware(request: NextRequest) {
       if (pathname !== '/' && pathname !== '/login') {
         redirectUrl.searchParams.set('redirect', pathname)
       }
-      return NextResponse.redirect(redirectUrl)
+      const response = NextResponse.redirect(redirectUrl)
+      addSecurityHeaders(response)
+      return response
     }
 
     // If authenticated and trying to access auth pages, redirect to dashboard
     if (user && isPublicRoute && pathname !== '/auth/callback') {
       console.log('[Proxy] User authenticated on public route, redirecting to /dashboard')
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      const response = NextResponse.redirect(new URL('/dashboard', request.url))
+      addSecurityHeaders(response)
+      return response
     }
 
     console.log('[Proxy] Allowing request to continue')
+    addSecurityHeaders(supabaseResponse)
     return supabaseResponse
   } catch (error) {
     // If anything fails, allow public routes
     console.error('Proxy error:', error)
     if (isPublicRoute) {
-      return NextResponse.next()
+      const response = NextResponse.next()
+      addSecurityHeaders(response)
+      return response
     }
-    return NextResponse.redirect(new URL('/login', request.url))
+    const response = NextResponse.redirect(new URL('/login', request.url))
+    addSecurityHeaders(response)
+    return response
   }
 }
 
