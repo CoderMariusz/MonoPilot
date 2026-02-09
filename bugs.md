@@ -508,3 +508,169 @@ The TEST_PLAN_PLANNING.md markers should be updated to reflect the current imple
 - **Test Date**: 2026-02-08
 - **Verification**: Code review confirmed all row click handlers are properly implemented and tested
 
+
+---
+
+## BATCH 1 QA TESTING - DASHBOARD ISSUES (2026-02-09)
+
+### Bug-DASH-001 | 🔴 OPEN - User Menu Button Missing on Dashboard Header
+
+- **Module**: Dashboard
+- **Component**: Dashboard Header / User Menu
+- **Route**: `/dashboard`
+- **Checkbox**: "User menu visible / Logout button accessible"
+- **Expected**: User profile button/avatar should be visible in top right corner of dashboard header, showing user initials or avatar
+- **Actual**: User menu button not found when inspecting dashboard header
+- **Steps to Reproduce**:
+  1. Navigate to http://localhost:3001
+  2. Login with admin@monopilot.com / test1234
+  3. Observe dashboard page
+  4. Look for user avatar/menu button in top right corner
+  5. Expected: Avatar button shows, clicking opens menu with logout option
+  6. Actual: No user menu button visible
+- **Severity**: 🔴 CRITICAL
+- **Impact**: 
+  - Users cannot access user menu/settings from dashboard
+  - Users cannot logout from dashboard UI
+  - Forces users to navigate to other modules or use browser dev tools
+- **Found In**: Batch 1 QA Test #7, #8
+- **Browser**: Chromium (Playwright)
+- **Test Date**: 2026-02-09 13:30 GMT
+- **Tester**: QA Subagent
+- **Status**: 🔴 OPEN
+- **Files to Check**:
+  - `/app/(authenticated)/dashboard/page.tsx` - Dashboard page layout
+  - `/components/dashboard/DashboardHeader.tsx` or similar - Header component
+  - Check if UserMenu component is imported and rendered
+- **Notes**: 
+  - This blocks logout functionality from dashboard
+  - May be a missing import or conditional rendering issue
+  - Check if UserMenu is hidden behind responsive breakpoints
+
+### Bug-DASH-002 | 🟠 OPEN - Shopping List UI Components Missing
+
+- **Module**: Dashboard / Shopping List
+- **Component**: Shopping List Form & Item Display
+- **Route**: `/dashboard/shopping`
+- **Checkboxes**: 
+  - "Add item form present"
+  - "Shopping cart/list structure"  
+  - "Item interaction possible"
+- **Expected**: 
+  - Shopping page should display a form to add new items with input field and submit button
+  - Shopping list should display items in a structured list container
+  - Each item should have interactive buttons (delete, mark complete, etc.)
+- **Actual**: 
+  - Add item form not found
+  - Shopping list structure not detected
+  - Item interaction buttons not found
+- **Steps to Reproduce**:
+  1. Navigate to http://localhost:3001/dashboard/shopping
+  2. Look for "Add item" form with input field
+  3. Look for shopping list items displayed
+  4. Try to interact with items (delete, complete, etc.)
+- **Severity**: 🟠 HIGH
+- **Impact**:
+  - Users cannot add items to shopping list
+  - Users cannot see shopping list items
+  - Users cannot interact with items (delete/complete)
+  - Entire shopping list feature is non-functional
+- **Found In**: Batch 1 QA Tests #28, #29, #30
+- **Browser**: Chromium (Playwright)
+- **Test Date**: 2026-02-09 13:30 GMT
+- **Tester**: QA Subagent
+- **Status**: 🔴 OPEN
+- **Possible Causes**:
+  - Shopping list component not rendering properly
+  - Component uses different CSS classes/structure than expected
+  - Form component not imported or conditionally hidden
+- **Files to Check**:
+  - `/app/(authenticated)/dashboard/shopping/page.tsx` - Shopping page
+  - `/components/shopping/ShoppingList.tsx` or similar
+  - `/components/shopping/AddItemForm.tsx` or similar
+- **Notes**: 
+  - Shopping page loads (URL correct)
+  - Items count shows 0 (empty state works)
+  - Form and item containers not rendering
+
+### Bug-DASH-003 | 🟡 OPEN - Analytics Navigation Link Not Visible
+
+- **Module**: Dashboard
+- **Component**: Dashboard Navigation / Sidebar
+- **Route**: `/dashboard` (navigation to `/dashboard/analytics`)
+- **Checkbox**: "Analytics link accessible"
+- **Expected**: Dashboard navigation should include a visible link to Analytics page at `/dashboard/analytics`
+- **Actual**: Analytics link not found in sidebar or header navigation
+- **Steps to Reproduce**:
+  1. Navigate to `/dashboard`
+  2. Look in sidebar for "Analytics" link
+  3. Look in header navigation for "Analytics" link
+  4. Try to click Analytics navigation item
+- **Severity**: 🟡 MEDIUM
+- **Impact**:
+  - Users cannot easily navigate to Analytics page
+  - May need to manually type URL or find link elsewhere
+  - Navigation structure may be incomplete
+- **Found In**: Batch 1 QA Test #23
+- **Browser**: Chromium (Playwright)
+- **Test Date**: 2026-02-09 13:30 GMT
+- **Tester**: QA Subagent
+- **Status**: 🔴 OPEN
+- **Files to Check**:
+  - `/app/(authenticated)/dashboard/page.tsx` - Dashboard layout
+  - `/components/layout/Sidebar.tsx` or similar - Navigation
+  - Check nav configuration for Analytics link
+
+### Bug-DASH-004 | 🟡 OPEN - No Input Fields on Dashboard Page
+
+- **Module**: Dashboard
+- **Component**: Dashboard Forms/Search
+- **Route**: `/dashboard`
+- **Checkbox**: "Input fields render"
+- **Expected**: Dashboard should contain at minimum a global search input field to search for entities
+- **Actual**: No input elements found on dashboard page
+- **Steps to Reproduce**:
+  1. Navigate to `/dashboard`
+  2. Look for input elements (search box, form fields, etc.)
+  3. Try to interact with inputs
+- **Severity**: 🟡 MEDIUM
+- **Impact**:
+  - Global search functionality may not be available
+  - Form-based features may not work
+  - Dashboard interactivity reduced
+- **Found In**: Batch 1 QA Test #31
+- **Browser**: Chromium (Playwright)
+- **Test Date**: 2026-02-09 13:30 GMT
+- **Tester**: QA Subagent
+- **Status**: 🔴 OPEN
+- **Notes**: 
+  - This may be a CSS selector issue in test script
+  - Could be that inputs are hidden or use different attribute
+  - Need to inspect actual HTML structure
+
+---
+
+## QA BATCH 1 SUMMARY
+
+**Total Tests**: 50
+**Passed**: 39 (78%)
+**Failed**: 11 (22%)
+**Test Date**: 2026-02-09 13:30 GMT
+**Tester**: QA Subagent
+**New Bugs Found**: 4
+**Status**: ⚠️ CONDITIONAL PASS
+
+### Critical Issues (Need Fixing)
+1. User menu/logout button missing from dashboard header
+2. Shopping list UI components not rendering
+
+### Medium Issues (Should Fix)
+1. Analytics navigation link not visible
+2. Input fields not rendering on dashboard
+
+**Recommendations**:
+- Fix critical issues (DASH-001, DASH-002) before next deployment
+- Re-run tests after fixes to verify
+- Update dashboard component structure if needed
+- Check responsive design for hidden elements
+
