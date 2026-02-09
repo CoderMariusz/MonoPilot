@@ -46,6 +46,8 @@ import {
   Shield,
   RefreshCw,
   AlertCircle,
+  X,
+  Filter,
 } from 'lucide-react'
 import {
   HoldStatusBadge,
@@ -95,12 +97,18 @@ export default function QualityHoldsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Filter state
+  // Applied filter state (used for API calls)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [reasonFilter, setReasonFilter] = useState<string>('all')
   const [productFilter, setProductFilter] = useState<string>('all')
+
+  // Pending filter state (for deferred apply mode)
+  const [pendingStatus, setPendingStatus] = useState<string>('all')
+  const [pendingPriority, setPendingPriority] = useState<string>('all')
+  const [pendingReason, setPendingReason] = useState<string>('all')
+  const [pendingProduct, setPendingProduct] = useState<string>('all')
 
   // Filter options state
   const [reasons, setReasons] = useState<string[]>([])
@@ -114,6 +122,46 @@ export default function QualityHoldsPage() {
   // UI state
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
+
+  // Check if filters have pending changes
+  const hasFilterChanges = 
+    pendingStatus !== statusFilter ||
+    pendingPriority !== priorityFilter ||
+    pendingReason !== reasonFilter ||
+    pendingProduct !== productFilter
+
+  // Check if any filters are active
+  const hasActiveFilters = 
+    statusFilter !== 'all' ||
+    priorityFilter !== 'all' ||
+    reasonFilter !== 'all' ||
+    productFilter !== 'all' ||
+    search !== ''
+
+  // Apply pending filters
+  const applyFilters = () => {
+    setStatusFilter(pendingStatus)
+    setPriorityFilter(pendingPriority)
+    setReasonFilter(pendingReason)
+    setProductFilter(pendingProduct)
+    setPagination((p) => ({ ...p, page: 1 }))
+  }
+
+  // Clear all filters
+  const clearFilters = () => {
+    // Clear pending
+    setPendingStatus('all')
+    setPendingPriority('all')
+    setPendingReason('all')
+    setPendingProduct('all')
+    // Clear applied
+    setStatusFilter('all')
+    setPriorityFilter('all')
+    setReasonFilter('all')
+    setProductFilter('all')
+    setSearch('')
+    setPagination((p) => ({ ...p, page: 1 }))
+  }
 
   const router = useRouter()
   const { toast } = useToast()
@@ -316,66 +364,118 @@ export default function QualityHoldsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search by hold number..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+      <div className="space-y-4">
+        {/* Search row */}
+        <div className="flex flex-wrap gap-4">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search by hold number..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {(loading || loadingFilters) && <RefreshCw className="h-5 w-5 animate-spin text-gray-400 self-center" />}
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="released">Released</SelectItem>
-            <SelectItem value="disposed">Disposed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Priorities</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={reasonFilter} onValueChange={setReasonFilter} disabled={loadingFilters || reasons.length === 0}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder={loadingFilters ? "Loading reasons..." : "All Reasons"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Reasons</SelectItem>
-            {reasons.map((reason) => (
-              <SelectItem key={reason} value={reason}>
-                {reason.substring(0, 50)}{reason.length > 50 ? '...' : ''}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={productFilter} onValueChange={setProductFilter} disabled={loadingFilters || products.length === 0}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder={loadingFilters ? "Loading products..." : "All Products"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Products</SelectItem>
-            {products.map((product) => (
-              <SelectItem key={product.id} value={product.id}>
-                {product.code} - {product.name.substring(0, 30)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {(loading || loadingFilters) && <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />}
+        
+        {/* Filter controls row */}
+        <div className="flex flex-wrap gap-4 items-end">
+          <Select value={pendingStatus} onValueChange={setPendingStatus}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="released">Released</SelectItem>
+              <SelectItem value="disposed">Disposed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={pendingPriority} onValueChange={setPendingPriority}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={pendingReason} onValueChange={setPendingReason} disabled={loadingFilters || reasons.length === 0}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder={loadingFilters ? "Loading reasons..." : "All Reasons"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Reasons</SelectItem>
+              {reasons.map((reason) => (
+                <SelectItem key={reason} value={reason}>
+                  {reason.substring(0, 50)}{reason.length > 50 ? '...' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={pendingProduct} onValueChange={setPendingProduct} disabled={loadingFilters || products.length === 0}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder={loadingFilters ? "Loading products..." : "All Products"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Products</SelectItem>
+              {products.map((product) => (
+                <SelectItem key={product.id} value={product.id}>
+                  {product.code} - {product.name.substring(0, 30)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Clear and Apply buttons */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters && !hasFilterChanges}
+              className="gap-1"
+            >
+              <X className="h-4 w-4" />
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              onClick={applyFilters}
+              disabled={!hasFilterChanges}
+              className="gap-1"
+            >
+              <Filter className="h-4 w-4" />
+              Apply
+            </Button>
+          </div>
+        </div>
+        
+        {/* Active filters indicator */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Active filters:</span>
+            {statusFilter !== 'all' && (
+              <Badge variant="secondary" className="text-xs">Status: {statusFilter}</Badge>
+            )}
+            {priorityFilter !== 'all' && (
+              <Badge variant="secondary" className="text-xs">Priority: {priorityFilter}</Badge>
+            )}
+            {reasonFilter !== 'all' && (
+              <Badge variant="secondary" className="text-xs">Reason</Badge>
+            )}
+            {productFilter !== 'all' && (
+              <Badge variant="secondary" className="text-xs">Product</Badge>
+            )}
+            {search && (
+              <Badge variant="secondary" className="text-xs">Search: "{search}"</Badge>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Empty state */}

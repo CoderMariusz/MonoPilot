@@ -1,14 +1,20 @@
 /**
  * NCR List Page
  * Story 06.9: Basic NCR Creation
- * Displays list of Non-Conformance Reports with filters and creation
+ * Displays list of Non-Conformance Reports with filters, sorting, and pagination
+ * 
+ * Features:
+ * - Column sorting with server-side support
+ * - Page size selector
+ * - Previous/Next pagination
+ * - Status and severity filters
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, RefreshCw } from 'lucide-react'
+import { Plus, Search, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -66,6 +72,9 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-800',
 }
 
+// Sortable columns configuration
+type SortableColumn = 'ncr_number' | 'title' | 'detection_point' | 'status' | 'severity' | 'created_at'
+
 export default function NCRListPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -85,48 +94,85 @@ export default function NCRListPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [severityFilter, setSeverityFilter] = useState<string>('all')
-  const [showCreateForm, setShowCreateForm] = useState(false)
 
-  // Load NCRs
-  useEffect(() => {
-    const fetchNCRs = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const params = new URLSearchParams()
-        params.append('page', pagination.page.toString())
-        params.append('limit', pagination.limit.toString())
+  // Sort state
+  const [sortBy, setSortBy] = useState<SortableColumn>('created_at')
+  const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('DESC')
 
-        if (search) {
-          params.append('search', search)
-        }
-        if (statusFilter !== 'all') {
-          params.append('status', statusFilter)
-        }
-        if (severityFilter !== 'all') {
-          params.append('severity', severityFilter)
-        }
+  // Fetch NCRs
+  const fetchNCRs = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams()
+      params.append('page', pagination.page.toString())
+      params.append('limit', pagination.limit.toString())
+      params.append('sort', `${sortBy} ${sortDirection}`)
 
-        const response = await fetch(`/api/quality/ncrs?${params.toString()}`)
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch NCR reports')
-        }
-
-        const data = await response.json()
-        setNCRs(data.ncrs || data.data || [])
-        setPagination(data.pagination || { total: 0, page: 1, limit: 20, total_pages: 0 })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load NCR reports'
-        setError(message)
-        console.error('Error fetching NCRs:', err)
-      } finally {
-        setLoading(false)
+      if (search) {
+        params.append('search', search)
       }
-    }
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter)
+      }
+      if (severityFilter !== 'all') {
+        params.append('severity', severityFilter)
+      }
 
-    fetchNCRs()
-  }, [pagination.page, pagination.limit, search, statusFilter, severityFilter])
+      const response = await fetch(`/api/quality/ncrs?${params.toString()}`)
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch NCR reports')
+      }
+
+      const data = await response.json()
+      setNCRs(data.ncrs || data.data || [])
+      setPagination(prev => ({
+        ...prev,
+        total: data.pagination?.total || 0,
+        total_pages: data.pagination?.total_pages || 0,
+      }))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load NCR reports'
+      setError(message)
+      console.error('Error fetching NCRs:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [pagination.page, pagination.limit, search, statusFilter, severityFilter, sortBy, sortDirection])
+
+  // Fetch on changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchNCRs()
+    }, search ? 300 : 0) // Debounce search
+
+    return () => clearTimeout(timer)
+  }, [fetchNCRs])
+
+  // Handle column sort
+  const handleSort = (column: SortableColumn) => {
+    if (sortBy === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(sortDirection === 'ASC' ? 'DESC' : 'ASC')
+    } else {
+      // Set new sort column with DESC as default
+      setSortBy(column)
+      setSortDirection('DESC')
+    }
+    // Reset to page 1 when sort changes
+    setPagination(prev => ({ ...prev, page: 1 }))
+  }
+
+  // Render sort indicator
+  const renderSortIndicator = (column: SortableColumn) => {
+    if (sortBy !== column) return null
+    return sortDirection === 'ASC' ? (
+      <ChevronUp className="ml-1 h-4 w-4 inline" />
+    ) : (
+      <ChevronDown className="ml-1 h-4 w-4 inline" />
+    )
+  }
 
   const handleSearch = (value: string) => {
     setSearch(value)
@@ -143,31 +189,17 @@ export default function NCRListPage() {
     setPagination(prev => ({ ...prev, page: 1 }))
   }
 
-  const handleRefresh = async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      params.append('page', pagination.page.toString())
-      params.append('limit', pagination.limit.toString())
+  const handlePageSizeChange = (value: string) => {
+    const newLimit = parseInt(value, 10)
+    setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }))
+  }
 
-      const response = await fetch(`/api/quality/ncrs?${params.toString()}`)
-      if (response.ok) {
-        const data = await response.json()
-        setNCRs(data.ncrs || data.data || [])
-        toast({
-          title: 'Refreshed',
-          description: 'NCR list updated',
-        })
-      }
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Failed to refresh NCR list',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
+  const handleRefresh = async () => {
+    await fetchNCRs()
+    toast({
+      title: 'Refreshed',
+      description: 'NCR list updated',
+    })
   }
 
   const handleCreateClick = () => {
@@ -204,7 +236,7 @@ export default function NCRListPage() {
               onClick={handleRefresh}
               disabled={loading}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button onClick={handleCreateClick}>
               <Plus className="mr-2 h-4 w-4" />
@@ -278,12 +310,42 @@ export default function NCRListPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50">
-                <TableHead className="font-semibold">ID</TableHead>
-                <TableHead className="font-semibold">Title</TableHead>
-                <TableHead className="font-semibold">Detection Point</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Severity</TableHead>
-                <TableHead className="font-semibold">Created</TableHead>
+                <TableHead 
+                  className="font-semibold cursor-pointer hover:bg-slate-100 select-none"
+                  onClick={() => handleSort('ncr_number')}
+                >
+                  ID {renderSortIndicator('ncr_number')}
+                </TableHead>
+                <TableHead 
+                  className="font-semibold cursor-pointer hover:bg-slate-100 select-none"
+                  onClick={() => handleSort('title')}
+                >
+                  Title {renderSortIndicator('title')}
+                </TableHead>
+                <TableHead 
+                  className="font-semibold cursor-pointer hover:bg-slate-100 select-none"
+                  onClick={() => handleSort('detection_point')}
+                >
+                  Detection Point {renderSortIndicator('detection_point')}
+                </TableHead>
+                <TableHead 
+                  className="font-semibold cursor-pointer hover:bg-slate-100 select-none"
+                  onClick={() => handleSort('status')}
+                >
+                  Status {renderSortIndicator('status')}
+                </TableHead>
+                <TableHead 
+                  className="font-semibold cursor-pointer hover:bg-slate-100 select-none"
+                  onClick={() => handleSort('severity')}
+                >
+                  Severity {renderSortIndicator('severity')}
+                </TableHead>
+                <TableHead 
+                  className="font-semibold cursor-pointer hover:bg-slate-100 select-none"
+                  onClick={() => handleSort('created_at')}
+                >
+                  Created {renderSortIndicator('created_at')}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -361,35 +423,63 @@ export default function NCRListPage() {
         </div>
 
         {/* Pagination */}
-        {!loading && pagination.total_pages > 1 && (
-          <div className="flex items-center justify-between">
+        {pagination.total > 0 && (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
               {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
               {pagination.total} NCR reports
             </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                disabled={pagination.page <= 1}
-                onClick={() =>
-                  setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))
-                }
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                disabled={pagination.page >= pagination.total_pages}
-                onClick={() =>
-                  setPagination(prev => ({
-                    ...prev,
-                    page: Math.min(pagination.total_pages, prev.page + 1),
-                  }))
-                }
-              >
-                Next
-              </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              {/* Page size selector */}
+              <div className="flex items-center gap-2">
+                <label htmlFor="page-size" className="text-sm text-gray-600">
+                  Per page:
+                </label>
+                <Select 
+                  value={pagination.limit.toString()} 
+                  onValueChange={handlePageSizeChange}
+                >
+                  <SelectTrigger className="w-[80px]" id="page-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Navigation buttons */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pagination.page <= 1}
+                  onClick={() =>
+                    setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))
+                  }
+                >
+                  Previous
+                </Button>
+                <span className="flex items-center text-sm text-gray-600">
+                  Page {pagination.page} of {pagination.total_pages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pagination.page >= pagination.total_pages}
+                  onClick={() =>
+                    setPagination(prev => ({
+                      ...prev,
+                      page: Math.min(pagination.total_pages, prev.page + 1),
+                    }))
+                  }
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           </div>
         )}
