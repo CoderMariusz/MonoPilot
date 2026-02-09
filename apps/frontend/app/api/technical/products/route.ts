@@ -229,6 +229,31 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Check if barcode already exists (W2: Duplicate barcode validation)
+    if (validated.barcode) {
+      const { data: existingBarcode } = await supabase
+        .from('products')
+        .select('id, code')
+        .eq('org_id', orgId)
+        .eq('barcode', validated.barcode)
+        .is('deleted_at', null)
+        .single()
+
+      if (existingBarcode) {
+        return NextResponse.json(
+          {
+            error: 'Product barcode already exists',
+            code: 'PRODUCT_BARCODE_EXISTS',
+            details: {
+              field: 'barcode',
+              existingProduct: existingBarcode.code
+            }
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Insert product (version defaults to 1.0)
     const { data, error } = await supabase
       .from('products')

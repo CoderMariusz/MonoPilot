@@ -5,6 +5,7 @@
  * Includes:
  * - Required field validation
  * - SKU format validation (alphanumeric, hyphens, underscores only)
+ * - Barcode validation (W2: unique per organization)
  * - GTIN-14 check digit validation (GS1 algorithm)
  * - Shelf life validation (required when expiry_policy set)
  * - Min/max stock validation (min <= max)
@@ -32,7 +33,14 @@ const baseProductSchema = z.object({
   description: z.string().nullable().optional(),
   product_type_id: z.string().uuid('Invalid product type'),
   base_uom: z.string().min(1, 'Base UoM is required'),
-  barcode: z.string().max(100).nullable().optional(),
+  barcode: z
+    .string()
+    .max(100, 'Barcode must not exceed 100 characters')
+    .nullable()
+    .optional()
+    .refine((val) => !val || val.trim().length > 0, {
+      message: 'Barcode cannot be empty string (use null instead)',
+    }),
   gtin: z
     .string()
     .length(GTIN14_LENGTH, `GTIN must be exactly ${GTIN14_LENGTH} digits`)

@@ -151,7 +151,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     // Check if product exists
     const { data: existing } = await supabase
       .from('products')
-      .select('id, version')
+      .select('id, version, barcode')
       .eq('id', id)
       .eq('org_id', orgId)
       .is('deleted_at', null)
@@ -162,6 +162,32 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         { error: 'Product not found' },
         { status: 404 }
       )
+    }
+
+    // Check if barcode is being changed and if new barcode already exists (W2: Duplicate barcode validation)
+    if (validated.barcode && validated.barcode !== existing.barcode) {
+      const { data: existingBarcode } = await supabase
+        .from('products')
+        .select('id, code')
+        .eq('org_id', orgId)
+        .eq('barcode', validated.barcode)
+        .neq('id', id)
+        .is('deleted_at', null)
+        .single()
+
+      if (existingBarcode) {
+        return NextResponse.json(
+          {
+            error: 'Product barcode already exists',
+            code: 'PRODUCT_BARCODE_EXISTS',
+            details: {
+              field: 'barcode',
+              existingProduct: existingBarcode.code
+            }
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Update product (trigger will auto-increment version)
