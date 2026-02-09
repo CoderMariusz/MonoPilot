@@ -8,14 +8,14 @@
 ## 📋 Settings Dashboard
 
 ### Buttons
-- [x] Edit Organization Profile: Navigates to organization settings (admin only)
-- [x] Manage Users & Roles: Navigates to user management page
-- [x] Manage Infrastructure: Navigates to warehouses page
-- [x] Manage Master Data: Navigates to allergens page
-- [ ] Manage Integrations: Navigate to API keys (future)
-- [x] Manage System: Navigates to modules page
-- [x] Manage Security: Navigates to security settings page
-- [ ] View All Audit Logs: Navigates to audit logs (future)
+- [x] 1. Edit Organization Profile: Navigates to organization settings (admin only)
+- [x] 2. Manage Users & Roles: Navigates to user management page
+- [x] 3. Manage Infrastructure: Navigates to warehouses page
+- [x] 4. Manage Master Data: Navigates to allergens page
+- [ ] 5. Manage Integrations: Navigate to API keys (future)
+- [x] 6. Manage System: Navigates to modules page
+- [x] 7. Manage Security: Navigates to security settings page
+- [ ] 8. View All Audit Logs: Navigates to audit logs (future)
 
 ### Forms
 - [ ] No forms on dashboard (read-only)
@@ -46,22 +46,22 @@
 - [x] Upload Logo: Opens file picker (accepts jpg, png, webp)
 - [ ] Change Logo: Shows when logo exists
 - [ ] Remove Logo: Deletes current logo
-- [x] Save Changes: Submits form, disabled during submission
+- [x] 20. Save Changes: Submits form, disabled during submission
 - [ ] Reset: Discards changes, resets to fetched values
 
 ### Forms
-- [x] Company name: Text input, required, placeholder "Acme Corp"
-- [x] Address: Text input, optional
-- [x] City: Text input, optional, placeholder "Warsaw"
-- [x] Postal code: Text input, optional
-- [x] Country: Text input, optional, ISO 2-letter code
-- [x] VAT/NIP: Text input, optional
-- [x] Date format: Dropdown (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD)
-- [x] Number format: Dropdown (1,234.56 | 1.234,56 | 1 234.56)
-- [x] Unit system: Dropdown (Metric, Imperial)
-- [x] Timezone: Text input, IANA format, required
-- [x] Default currency: Dropdown (PLN, EUR, USD, GBP)
-- [x] Default language: Dropdown (Polish, English)
+- [x] 8. Company name: Text input, required, placeholder "Acme Corp"
+- [✗] 9. Address: Text input, optional [MISSING]
+- [✗] 10. City: Text input, optional, placeholder "Warsaw" [MISSING]
+- [✗] 11. Postal code: Text input, optional [MISSING]
+- [✗] 12. Country: Text input, optional, ISO 2-letter code [MISSING]
+- [✗] 13. VAT/NIP: Text input, optional [MISSING]
+- [x] 14. Date format: Dropdown (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD)
+- [x] 15. Number format: Dropdown (1,234.56 | 1.234,56 | 1 234.56)
+- [x] 16. Unit system: Dropdown (Metric, Imperial)
+- [✗] 17. Timezone: Text input, IANA format, required [MISSING]
+- [x] 18. Default currency: Dropdown (PLN, EUR, USD, GBP)
+- [x] 19. Default language: Dropdown (Polish, English)
 
 ### Modals
 - [ ] Logo upload modal: File picker, size validation (2MB max)
@@ -88,15 +88,15 @@
 ## 📋 User Management
 
 ### Buttons
-- [x] Add User: Opens user invite modal
-- [x] Edit (per user): Opens edit drawer
-- [x] Delete/Deactivate: Shows confirmation dialog
+- [x] 21. Add User: Opens user invite modal
+- [✗] 26. Edit (per user): Opens edit drawer [NOT VISIBLE]
+- [✗] 27. Delete/Deactivate: Shows confirmation dialog [NOT VISIBLE]
 - [ ] Resend Invitation: Resends invite to pending user (invitations tab)
 - [ ] Copy Link: Copies invitation token
 - [ ] Send Another: Copies new invitation link
 
 ### Forms
-- [x] Search input: Debounced (300ms), searches name/email
+- [x] 22. Search input: Debounced (300ms), searches name/email
 - [ ] First name: Text input, required
 - [ ] Last name: Text input, required
 - [ ] Email: Text input, required, validates format
@@ -110,7 +110,7 @@
 - [ ] Deactivate Confirmation: Confirms action, warns about logout
 
 ### Tables
-- [x] Users table: Name, Email, Role, Status, Last Login, Actions
+- [x] 23. Users table: Name, Email, Role, Status, Last Login, Actions
 - [ ] Invitations table: Email, Sent Date, Expires, Status, Actions
 
 ### Workflows
@@ -119,8 +119,9 @@
 - [ ] Edit user: Opens drawer, updates fields, saves
 - [ ] Deactivate user: Shows confirmation, deactivates, logs out
 - [ ] Resend invitation: Resends invite to pending user
-- [x] Filter users: By role, by status
-- [x] Search users: Debounced input filters list
+- [✗] 24. Filter users: By role, by status [DROPDOWN NOT FOUND]
+- [✗] 25. Search users: Debounced input filters list [FILTER NOT WORKING]
+- [✗] 28. Pagination controls visible [NOT FOUND]
 
 ### Error States
 - [ ] User not found: "No users found" empty state
@@ -134,15 +135,15 @@
 ## 📋 Warehouses Management
 
 ### Buttons
-- [x] Add Warehouse: Opens create modal (permission-gated)
-- [x] Edit: Opens edit modal
-- [x] Set Default: Shows confirmation dialog
-- [x] Manage Locations: Navigates to locations page
-- [x] Disable/Enable: Inline action or dialog
-- [x] Delete: Shows confirmation (if not default)
+- [x] 29. Add Warehouse: Opens create modal (permission-gated)
+- [✗] 32. Edit: Opens edit modal [NOT VISIBLE]
+- [✗] 33. Set Default: Shows confirmation dialog [NOT VISIBLE]
+- [✗] 34. Manage Locations: Navigates to locations page [NOT VISIBLE]
+- [✗] 35. Disable/Enable: Inline action or dialog [NOT VISIBLE]
+- [✗] 36. Delete: Shows confirmation (if not default) [NOT VISIBLE]
 
 ### Forms
-- [x] Search input: Searches warehouse code/name
+- [✗] 30. Search input: Searches warehouse code/name [NOT FOUND]
 - [x] Warehouse code: Text input, required, 2-10 uppercase chars
 - [x] Name: Text input, required, max 100 chars
 - [x] Address: Text input, optional
@@ -159,7 +160,7 @@
 - [x] Disable confirmation: Warns about impact
 
 ### Tables
-- [x] Warehouses table: Code, Name, Location, Manager, Status, Default badge, Capacity %, Actions
+- [x] 31. Warehouses table: Code, Name, Location, Manager, Status, Default badge, Capacity %, Actions
 - [x] Pagination: 20 items per page
 
 ### Workflows
@@ -212,13 +213,13 @@
 
 ### Buttons
 - [ ] Terminate Session: Per-session red button
-- [x] Change Password: Submits form
-- [x] Show/Hide Password: Toggle visibility on password fields
+- [x] 40. Change Password: Submits form
+- [✗] 41. Show/Hide Password: Toggle visibility on password fields [NOT FOUND]
 
 ### Forms
-- [x] Current password: Password input, required, show/hide toggle
-- [x] New password: Password input, required, min 8 chars, show/hide toggle
-- [x] Confirm password: Password input, required, must match new password, show/hide toggle
+- [x] 37. Current password: Password input, required, show/hide toggle
+- [x] 38. New password: Password input, required, min 8 chars, show/hide toggle
+- [x] 39. Confirm password: Password input, required, must match new password, show/hide toggle
 - [x] Password strength indicator: Visual strength meter (weak/medium/strong)
 
 ### Modals
@@ -226,7 +227,7 @@
 - [ ] Change Password success: Toast shows "Password changed, logging out..."
 
 ### Tables
-- [ ] Active sessions table: Device, IP, Location, Last Activity, Current indicator, Actions
+- [✗] 42. Active sessions table: Device, IP, Location, Last Activity, Current indicator, Actions [NOT FOUND]
 
 ### Workflows
 - [ ] Load sessions: Fetches all active sessions on page load
@@ -240,7 +241,7 @@
 - [ ] Passwords don't match: "Passwords do not match"
 - [x] Password too weak: Shows strength requirements
 - [ ] API error: Toast with error message
-- [x] Empty sessions: "No active sessions" - **BUG: Active sessions fail to load**
+- [✗] 42. Empty sessions: "No active sessions" - **BUG: Active sessions fail to load**
 
 ---
 
@@ -250,17 +251,21 @@
 - [x] None (read-only list)
 
 ### Forms
-- [x] Search input: Searches all language fields + code
+- [✗] 44. Search input: Searches all language fields + code [NOT FOUND]
 
 ### Modals
 - [x] None
 
 ### Tables
-- [x] Allergens table: Code, Icon, Name (EN, PL, DE, FR), EU Symbols
+- [x] 43-47. Allergens table: Code, Icon, Name (EN, PL, DE, FR), EU Symbols
+  - [x] 43. Page loads correctly
+  - [x] 45. Code column visible
+  - [x] 46. Names in multiple languages
+  - [x] 47. EU symbols column present
 
 ### Workflows
 - [x] Load allergens: Fetches 14 EU-mandated allergens
-- [x] Search: Filters across all language fields
+- [✗] 44. Search: Filters across all language fields [NOT WORKING]
 - [x] Display: Shows allergen names in 4 languages
 
 ### Error States
@@ -458,8 +463,8 @@
 ### Buttons
 - [x] Enable Module: Toggle switch per module (opens confirmation)
 - [x] Disable Module: Toggle switch per module (opens confirmation)
-- [x] Expand All: Opens all module groups
-- [x] Collapse All: Closes all module groups
+- [x] 49. Expand All: Opens all module groups
+- [x] 50. Collapse All: Closes all module groups
 
 ### Forms
 - [x] None (toggle-based)
@@ -682,34 +687,37 @@
 
 ---
 
-## ✅ Testing Summary (Wave 1)
+## ✅ Testing Summary (Batch 1 - Items 1-50)
 
-**Total Items Tested**: 50+  
-**Passed**: 40+  
-**Failed**: 1 (Active Sessions loading)  
-**Future/Not Yet Implemented**: 8  
+**Test Date**: February 9, 2026  
+**Total Items Tested**: 50  
+**Passed**: 30/50 (60%)  
+**Failed**: 20/50 (40%)  
+**Bugs Reported**: 7 (see bugs.md)
 
-### Tested Sections:
-- ✅ Settings Dashboard - Navigation working correctly
-- ✅ Organization Settings - All form fields functional
-- ✅ User Management - Table, search, filters, CRUD buttons present
-- ✅ Security Settings - Password change form working (with password strength indicator)
-- ✅ Modules Management - Toggle switches, expand/collapse, dependencies
-- ✅ Allergens Management - Read-only list with search, all 14 EU allergens present
-- ✅ User Roles & Permissions - Matrix view with export/print functions
-- ✅ Warehouses Management - Full CRUD functionality, search/filter, pagination
-- ❌ Security Settings (Partial) - Active Sessions tab fails to load
+### Test Results by Section:
+- ✅ Settings Dashboard (7/7 passed) - Navigation cards working
+- ⚠️  Organization Settings (7/13 passed) - Missing address/location fields
+- ⚠️  User Management (3/8 passed) - Missing edit/delete buttons and filters
+- ⚠️  Warehouses Management (3/8 passed) - Missing search, edit, and action buttons
+- ⚠️  Security Settings (4/6 passed) - Missing password visibility toggle, active sessions
+- ⚠️  Allergens Management (5/6 passed) - Missing search functionality
+- ✅ Modules Management (2/2 passed) - Expand/Collapse buttons working
 
-### Key Findings:
-1. **Navigation System**: All navigation links work correctly across all sections
-2. **Form Validation**: Required field validation appears functional
-3. **Table Rendering**: Tables display correctly with proper columns and data
-4. **Search/Filter Functionality**: Search inputs and filter dropdowns respond correctly
-5. **Permission Matrix**: Roles & Permissions page displays complete matrix with export/print
+### Critical Issues Found:
+1. **Organization Settings**: Multiple location/address fields not rendering (Address, City, Postal Code, Country, VAT/NIP, Timezone)
+2. **User Management**: Action buttons (Edit, Delete) not visible in table rows
+3. **Warehouses Management**: Search input missing, action buttons not visible
+4. **Security Settings**: Active sessions table not loading, password visibility toggle missing
+5. **Allergens Management**: Search functionality not working
+
+### Next Steps:
+- Verify if missing elements are UI layout issues or missing features
+- Check if permissions/role restrictions hiding UI elements
+- Inspect DOM for hidden elements that might need rendering
 
 ---
 
-**Test Date**: February 9, 2026  
-**Tester**: Subagent QA Tester (Full Autonomy Mode)  
-**Generated**: 2026-02-09  
-**Version**: 1.1 (With Bug Report)
+**Tester**: QA Subagent  
+**Mode**: Headless Playwright  
+**Version**: Batch 1 QA Report
