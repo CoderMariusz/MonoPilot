@@ -488,6 +488,253 @@ function buildPackingSlipDocument(content: PackingSlipContent) {
 // DocumentService Class (for dependency injection)
 // =============================================================================
 
+// =============================================================================
+// Invoice Types
+// =============================================================================
+
+export interface InvoiceLineItem {
+  product_name: string
+  sku: string
+  quantity: number
+  unit_price: number
+  discount_type?: string
+  discount_value?: number
+  line_total: number
+}
+
+export interface InvoiceContent {
+  invoice_number: string
+  sales_order_number: string
+  date: Date
+  customer: {
+    name: string
+    contact_name?: string
+    email?: string
+    phone?: string
+  }
+  billing_address: {
+    address_line_1: string
+    address_line_2?: string
+    city: string
+    state_province: string
+    postal_code: string
+    country: string
+  }
+  line_items: InvoiceLineItem[]
+  subtotal: number
+  discount_total: number
+  tax_amount: number
+  shipping_amount: number
+  grand_total: number
+  notes?: string
+}
+
+// =============================================================================
+// Invoice PDF Generation
+// =============================================================================
+
+/**
+ * Generate Invoice PDF and upload to Supabase Storage
+ *
+ * @param content - Invoice content data
+ * @returns PDF generation result with URL
+ */
+export async function generateInvoicePDF(content: InvoiceContent): Promise<PDFGenerationResult> {
+  // Validate required fields
+  if (!content.invoice_number) {
+    throw new Error('Invoice number is required')
+  }
+
+  if (!content.customer) {
+    throw new Error('Customer information is required')
+  }
+
+  if (!content.billing_address) {
+    throw new Error('Billing address is required')
+  }
+
+  try {
+    // In production, this would use pdfmake:
+    // const docDefinition = buildInvoiceDocument(content)
+    // const pdfDoc = pdfMake.createPdf(docDefinition)
+    // const pdfBuffer = await pdfDoc.getBuffer()
+    //
+    // Upload to Supabase Storage
+    // const { data, error } = await supabase.storage
+    //   .from('invoices')
+    //   .upload(`${orgId}/${content.invoice_number}.pdf`, pdfBuffer)
+
+    // For testing, return mock result
+    const mockPdfUrl = `https://storage.supabase.co/object/public/invoices/mock-org/${content.invoice_number}.pdf?token=mock-token`
+    const mockFileSize = 210 // KB
+
+    return {
+      success: true,
+      pdf_url: mockPdfUrl,
+      generated_at: new Date().toISOString(),
+      file_size_kb: mockFileSize,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Invoice PDF generation failed',
+    }
+  }
+}
+
+// =============================================================================
+// Invoice Document Builder
+// =============================================================================
+
+/**
+ * Build Invoice document definition for pdfmake
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function buildInvoiceDocument(content: InvoiceContent) {
+  const formattedDate = content.date.toISOString().slice(0, 10)
+
+  return {
+    pageSize: 'LETTER',
+    pageMargins: [36, 36, 36, 36], // 0.5" margins
+    content: [
+      // Header with Invoice Number
+      {
+        columns: [
+          { text: 'INVOICE', style: 'header' },
+          {
+            stack: [
+              { text: `Invoice #: ${content.invoice_number}`, style: 'headerRight' },
+              { text: `Order #: ${content.sales_order_number}`, style: 'headerRight' },
+              { text: `Date: ${formattedDate}`, style: 'headerRight' },
+            ],
+          },
+        ],
+      },
+      { text: '\n' },
+
+      // Bill To / Ship To
+      {
+        columns: [
+          {
+            width: '50%',
+            stack: [
+              { text: 'BILL TO', style: 'sectionTitle' },
+              { text: content.customer.name, style: 'bold' },
+              content.customer.contact_name ? { text: content.customer.contact_name } : {},
+              { text: content.billing_address.address_line_1 },
+              content.billing_address.address_line_2 ? { text: content.billing_address.address_line_2 } : {},
+              {
+                text: `${content.billing_address.city}, ${content.billing_address.state_province} ${content.billing_address.postal_code}`,
+              },
+              { text: content.billing_address.country },
+              { text: '\n' },
+              content.customer.email ? { text: `Email: ${content.customer.email}` } : {},
+              content.customer.phone ? { text: `Phone: ${content.customer.phone}` } : {},
+            ],
+          },
+        ],
+      },
+      { text: '\n' },
+
+      // Line Items Table
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+          body: [
+            [
+              { text: 'PRODUCT', style: 'tableHeader' },
+              { text: 'SKU', style: 'tableHeader' },
+              { text: 'QTY', style: 'tableHeader', alignment: 'right' },
+              { text: 'UNIT PRICE', style: 'tableHeader', alignment: 'right' },
+              { text: 'TOTAL', style: 'tableHeader', alignment: 'right' },
+            ],
+            ...content.line_items.map((item) => [
+              item.product_name,
+              item.sku,
+              { text: item.quantity.toString(), alignment: 'right' },
+              { text: `$${item.unit_price.toFixed(2)}`, alignment: 'right' },
+              { text: `$${item.line_total.toFixed(2)}`, alignment: 'right' },
+            ]),
+          ],
+        },
+      },
+      { text: '\n' },
+
+      // Totals Section
+      {
+        alignment: 'right',
+        stack: [
+          {
+            columns: [
+              { text: 'Subtotal:', width: '50%' },
+              { text: `$${content.subtotal.toFixed(2)}`, width: '50%', alignment: 'right' },
+            ],
+          },
+          content.discount_total > 0
+            ? {
+                columns: [
+                  { text: 'Discount:', width: '50%', color: '#d9534f' },
+                  { text: `-$${content.discount_total.toFixed(2)}`, width: '50%', alignment: 'right', color: '#d9534f' },
+                ],
+              }
+            : {},
+          {
+            columns: [
+              { text: 'Tax:', width: '50%' },
+              { text: `$${content.tax_amount.toFixed(2)}`, width: '50%', alignment: 'right' },
+            ],
+          },
+          {
+            columns: [
+              { text: 'Shipping:', width: '50%' },
+              { text: `$${content.shipping_amount.toFixed(2)}`, width: '50%', alignment: 'right' },
+            ],
+          },
+          { text: '\n' },
+          {
+            columns: [
+              { text: 'GRAND TOTAL:', width: '50%', style: 'bold', fontSize: 12 },
+              { text: `$${content.grand_total.toFixed(2)}`, width: '50%', alignment: 'right', style: 'bold', fontSize: 12 },
+            ],
+          },
+        ],
+      },
+      { text: '\n\n' },
+
+      // Notes
+      content.notes
+        ? {
+            stack: [
+              { text: 'NOTES', style: 'sectionTitle' },
+              { text: content.notes },
+            ],
+          }
+        : {},
+
+      // Footer
+      {
+        text: 'Thank you for your business!',
+        alignment: 'center',
+        style: 'footer',
+        margin: [0, 20, 0, 0],
+      },
+    ],
+    styles: {
+      header: { fontSize: 20, bold: true },
+      headerRight: { fontSize: 10, alignment: 'right' },
+      sectionTitle: { fontSize: 11, bold: true, margin: [0, 8, 0, 4] },
+      tableHeader: { bold: true, fillColor: '#f5f5f5', margin: [2, 4, 2, 4] },
+      bold: { bold: true },
+      footer: { fontSize: 10, italics: true, color: '#666666' },
+    },
+  }
+}
+
+// =============================================================================
+// DocumentService Class (for dependency injection)
+// =============================================================================
+
 export class DocumentService {
   /**
    * Generate BOL PDF
@@ -501,5 +748,12 @@ export class DocumentService {
    */
   static async generatePackingSlip(content: PackingSlipContent): Promise<PDFGenerationResult> {
     return generatePackingSlipPDF(content)
+  }
+
+  /**
+   * Generate Invoice PDF
+   */
+  static async generateInvoice(content: InvoiceContent): Promise<PDFGenerationResult> {
+    return generateInvoicePDF(content)
   }
 }
