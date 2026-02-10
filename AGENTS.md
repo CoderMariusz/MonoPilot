@@ -31,4 +31,4 @@ Follow the gates from `.claude/agents/ORCHESTRATOR.md`:
 ## Project Conventions Pointers
 
 - Start here: `.claude/AGENT-QUICK-START-MONOPILOT.md`
-- Patterns/checklists: `.claude/PATTERNS.md`, `.claude/checklists/*`, `.claude/skills/generic/*`
+- Patterns/checklists: `.claude/TECHNICAL-REFERENCE.md`, `.claude/checklists/*`, `.claude/skills/generic/*`

@@ -41,6 +41,17 @@ Pre-analyzed: {extract-service-patterns output}
 Do: Implement batch release approval
 ```
 
+## 📝 Documentation
+
+**Core Files (Keep Updated):**
+- `MASTER-PROMPT-FOR-AGENTS.md` ← YOU ARE HERE
+- `IMPLEMENTATION-ROADMAP.yaml` - Detailed task roadmap
+- `PROJECT-DASHBOARD.md` - Live status snapshot
+- `TECHNICAL-REFERENCE.md` - Database schema, patterns, API endpoints
+
+**Archived Reports** (`.claude/archive/obsolete/`):
+Historical reports from past sessions (EPIC-02-*, EPIC-03-*, DEBUG-SESSION-*, E2E-*, etc.) are archived to keep core directory clean.
+
 ## 📋 7-PHASE FLOW
 
 | Phase | Agent | Pre-Scripts | Skip When | Parallel |

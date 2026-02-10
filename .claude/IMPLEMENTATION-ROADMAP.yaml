@@ -1,7 +1,11 @@
 # MonoPilot - Implementation Roadmap
 # Generated: 2026-01-14 21:45 UTC
 # Purpose: Unified roadmap for remaining implementation work across all epics
-# Last checkpoint scan: 2026-01-22 (UPDATED - Epic 07: 07.16 RMA Core CRUD DEPLOYED)
+# Last checkpoint scan: 2026-02-10 (CONSOLIDATED - Archived obsolete reports)
+#
+# NOTE: Historical reports archived to .claude/archive/obsolete/
+# See PROJECT-DASHBOARD.md for live status
+# See TECHNICAL-REFERENCE.md for schema/patterns/API docs
 
 meta:
   generated: "2026-01-14 21:45 UTC"
