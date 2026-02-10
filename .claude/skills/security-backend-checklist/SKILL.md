@@ -86,3 +86,16 @@ async function getResource(userId: string, resourceId: string) {
 
 ## Context
 Based on OWASP Top Ten 2021 (latest released standard). Note: 2025 RC emphasizes supply chain security and access control as top priorities.
+
+## MonoPilot: Multi-Tenant Security
+
+```markdown
+## Critical Rules
+- [ ] RLS + application-level org_id filtering (defense in depth)
+- [ ] Never trust client-provided org_id - always derive from auth session
+- [ ] Use createServerSupabase() (RLS-enabled) not admin client for data access
+- [ ] Admin client ONLY for cross-org operations (user setup, billing)
+- [ ] Test cross-org isolation: user from Org A cannot access Org B resources
+- [ ] Permission checks use PERMISSION_MATRIX via hasPermission()
+- [ ] RLS returns PGRST116 (not found) for cross-org access → return 404 not 403
+```

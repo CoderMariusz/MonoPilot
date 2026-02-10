@@ -101,3 +101,38 @@ const PasswordSchema = z.string()
 - [ ] `safeParse` used for user-facing validation
 - [ ] Custom error messages for UX
 - [ ] Environment variables validated at startup
+
+## MonoPilot: Domain Schemas
+
+MonoPilot validation pattern (from `lib/validation/`):
+
+```typescript
+// 1. Define enums first
+export const UserRoleEnum = z.enum([
+  'owner', 'admin', 'production_manager', 'quality_manager',
+  'warehouse_manager', 'production_operator', 'quality_inspector',
+  'warehouse_operator', 'planner', 'viewer',
+])
+export type UserRole = z.infer<typeof UserRoleEnum>
+
+// 2. Schema using enum + custom messages + .trim()
+export const CreateUserSchema = z.object({
+  email: z.string().min(1, 'Email is required').email('Invalid email').max(255),
+  first_name: z.string().min(1, 'Required').max(100).trim(),
+  role: UserRoleEnum.optional(),
+  role_id: z.string().uuid('Invalid role ID').optional(),
+}).refine(
+  (data) => data.role !== undefined || data.role_id !== undefined,
+  { message: 'Role is required', path: ['role'] }
+)
+
+// 3. Helper function
+export function validateCreateUser(data: unknown) {
+  return CreateUserSchema.parse(data)
+}
+
+// 4. Display label map
+export const roleLabels: Record<UserRole, string> = {
+  owner: 'Owner', admin: 'Administrator', /* ... */
+}
+```

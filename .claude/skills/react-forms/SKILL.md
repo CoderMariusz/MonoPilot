@@ -117,3 +117,46 @@ function DynamicForm() {
 - [ ] Submit button disabled during loading
 - [ ] Form resets or redirects after success
 - [ ] Accessible: labels, aria-invalid, focus management
+
+## MonoPilot: ShadCN Form Pattern
+
+MonoPilot uses react-hook-form + zodResolver + ShadCN UI Form components:
+
+```tsx
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { useToast } from '@/hooks/use-toast'
+
+const form = useForm<FormData>({
+  resolver: zodResolver(formSchema),
+  defaultValues: { code: '', name: '' }
+})
+
+// Mutation via TanStack Query hook
+const createMutation = useCreateSupplier()
+const onSubmit = async (data: FormData) => {
+  try {
+    await createMutation.mutateAsync(data)
+    toast({ title: 'Success', description: 'Created.' })
+    onClose()
+  } catch (error) {
+    toast({ title: 'Error', description: error.message, variant: 'destructive' })
+  }
+}
+
+// JSX: Form → FormField → FormItem → FormControl → Input
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <FormField control={form.control} name="code" render={({ field }) => (
+      <FormItem>
+        <FormLabel>Code</FormLabel>
+        <FormControl><Input {...field} /></FormControl>
+        <FormMessage />
+      </FormItem>
+    )} />
+    <Button type="submit" disabled={createMutation.isPending}>Save</Button>
+  </form>
+</Form>
+```

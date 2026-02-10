@@ -77,3 +77,26 @@ COMMENT:      - Questions or suggestions, no strong opinion
 - [ ] Check all changed files
 - [ ] Run code locally if complex
 - [ ] Feedback is constructive and specific
+
+## MonoPilot: Multi-Tenant Review
+
+Additional checks for every MonoPilot PR:
+
+```markdown
+## Multi-Tenancy & Security
+- [ ] Every Supabase query uses createServerSupabase() (not admin) for RLS
+- [ ] No raw SQL without org_id filter
+- [ ] No cross-org data leakage possible
+- [ ] Permission check uses hasPermission() or requireRole()
+
+## Data Integrity
+- [ ] Zod validation on ALL API inputs
+- [ ] LP system used for inventory (no loose quantities)
+- [ ] BOM snapshots not modified after WO creation
+
+## Conventions
+- [ ] Services use static methods pattern
+- [ ] Error handling uses handleApiError()
+- [ ] Auth uses getAuthContextOrThrow()
+- [ ] Tests use Vitest (vi.fn, NOT jest.fn)
+```

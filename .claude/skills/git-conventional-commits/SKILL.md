@@ -86,3 +86,20 @@ No scope when change is broad:
 - [ ] Subject under 72 characters
 - [ ] Breaking changes marked with `!` or footer
 - [ ] One logical change per commit
+
+## MonoPilot: Module Scopes
+
+```
+Module scopes (11 modules):
+  settings, technical, planning, production, warehouse,
+  quality, shipping, npd, finance, oee, integrations
+
+Cross-cutting scopes:
+  rls, auth, lp-system, api, ui, db, deps
+
+Examples:
+  feat(warehouse): add LP receiving form
+  fix(planning): correct BOM snapshot on WO creation
+  feat(rls): add org_id policy for quality_checks table
+  fix(auth): handle expired session redirect
+```

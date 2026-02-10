@@ -53,7 +53,7 @@ import userEvent from '@testing-library/user-event';
 
 test('submits form', async () => {
   const user = userEvent.setup();
-  const onSubmit = jest.fn();
+  const onSubmit = vi.fn(); // Vitest (use vi.fn, NOT jest.fn)
 
   render(<LoginForm onSubmit={onSubmit} />);
 

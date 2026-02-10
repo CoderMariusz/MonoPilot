@@ -7,6 +7,7 @@ description: >-
 tools: Read, Bash, Grep, Glob, Write
 model: opus
 skills:
+  - monopilot-patterns
   - code-review-checklist
   - security-backend-checklist
   - accessibility-checklist

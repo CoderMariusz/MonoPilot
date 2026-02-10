@@ -149,3 +149,7 @@ export function ProfileButton() {
 - [ ] Error handling with return values
 - [ ] Using `useActionState` for Next.js 16+
 - [ ] Pending states properly displayed
+
+## MonoPilot Note
+
+MonoPilot uses **react-hook-form + zodResolver** for form handling, not server actions. See `monopilot-patterns` skill (Pattern 7) for the actual form pattern. Server actions are used only for simple mutations (e.g., `revalidatePath` after data change), not for form submissions.

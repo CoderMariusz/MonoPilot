@@ -134,3 +134,26 @@ export async function OPTIONS() {
 - [ ] Correct HTTP status codes used
 - [ ] Auth checked where required
 - [ ] CORS configured if needed
+
+## MonoPilot: API Route Pattern
+
+```typescript
+import { createServerSupabase } from '@/lib/supabase/server'
+import { handleApiError } from '@/lib/api/error-handler'
+import { getAuthContextOrThrow, requireRole, RoleSets } from '@/lib/api/auth-helpers'
+
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
+  try {
+    const supabase = await createServerSupabase()
+    const { userId, orgId } = await getAuthContextOrThrow(supabase)
+    // Query (RLS filters by org_id) ...
+    return NextResponse.json({ data, total: count })
+  } catch (error) {
+    return handleApiError(error, 'GET /api/module/resource')
+  }
+}
+```
+
+**Key**: Always `try/catch` + `handleApiError()`. Use `getAuthContextOrThrow()` for auth. `handleApiError` maps AuthError, ZodError, AppError to proper HTTP responses. See `monopilot-patterns` skill for full pattern.

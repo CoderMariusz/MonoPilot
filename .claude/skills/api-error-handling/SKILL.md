@@ -171,3 +171,27 @@ type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
 - [ ] Validation errors include field details
 - [ ] Stack traces hidden in production
 - [ ] Request ID for debugging correlation
+
+## MonoPilot: Error Classes
+
+MonoPilot uses a custom error hierarchy at `lib/errors/`:
+
+```typescript
+// Abstract base: lib/errors/app-error.ts
+abstract class AppError extends Error { abstract readonly statusCode: number }
+
+// Concrete errors:
+UnauthorizedError (401)  // lib/errors/unauthorized-error.ts
+ForbiddenError    (403)  // lib/errors/forbidden-error.ts
+NotFoundError     (404)  // lib/errors/not-found-error.ts
+
+// Auth errors (separate): lib/api/auth-helpers.ts
+AuthError { message, code: 'UNAUTHORIZED'|'USER_NOT_FOUND'|'FORBIDDEN', status }
+
+// Centralized handler: lib/api/error-handler.ts
+handleApiError(error, context?)  // Maps all error types to NextResponse
+successResponse(data, { status?, message?, meta? })  // Wraps in { success: true }
+
+// Postgres error codes in services:
+if (error?.code === '23505') throw new Error('Already exists')  // unique violation
+```

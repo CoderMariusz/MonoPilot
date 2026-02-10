@@ -88,3 +88,27 @@ const { count, error } = await supabase
 - [ ] `.single()` used for single-row queries
 - [ ] RLS policies allow the operation
 - [ ] Types match database schema
+
+## MonoPilot: org_id Filtering
+
+Every query in MonoPilot is org-scoped via RLS. The pattern:
+
+```typescript
+// In services: RLS automatically filters by org_id (via auth session)
+const supabase = await createServerSupabase()
+const { data, count, error } = await supabase
+  .from('suppliers')
+  .select('id, code, name, is_active', { count: 'exact' })
+  .range(offset, offset + limit - 1)
+  .order('created_at', { ascending: false })
+
+// In API routes: get org_id explicitly for logic
+const { orgId } = await getAuthContextOrThrow(supabase)
+
+// Pagination pattern
+const offset = (page - 1) * limit
+const { data, count } = await query.range(offset, offset + limit - 1)
+return { data, meta: { total: count, page, limit, pages: Math.ceil(count / limit) } }
+```
+
+**Key**: Use `createServerSupabase()` (not admin client) so RLS filters by org_id automatically. Use admin client only for cross-org operations.

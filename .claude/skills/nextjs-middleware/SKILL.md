@@ -107,3 +107,7 @@ export const config = {
 - [ ] Auth redirects tested
 - [ ] Headers properly set
 - [ ] Using `proxy.ts` for Next.js 16+, `middleware.ts` for v15 and earlier
+
+## MonoPilot Note
+
+MonoPilot uses **Next.js 15.5** with `middleware.ts` (Legacy pattern). Do NOT use `proxy.ts` or run the middleware-to-proxy codemod. Auth is handled via Supabase session cookies checked in the authenticated layout, not in middleware.

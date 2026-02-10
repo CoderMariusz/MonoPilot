@@ -7,6 +7,7 @@ description: >-
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 skills:
+  - monopilot-patterns
   - api-rest-design
   - api-error-handling
   - nextjs-api-routes

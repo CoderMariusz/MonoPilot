@@ -7,6 +7,7 @@ description: >-
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 skills:
+  - monopilot-patterns
   - testing-monopilot
   - testing-tdd-workflow
   - typescript-zod
