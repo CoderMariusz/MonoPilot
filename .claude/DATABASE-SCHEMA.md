@@ -1,8 +1,12 @@
 # MonoPilot Database Schema Reference
 
-> Last Updated: 2025-12-14
-> Total Tables: 43
+> Last Updated: 2026-02-10
+> Total Tables: 65
 > Status: Active Development
+> 
+> **CURRENT AUDIT**: ✅ Database verified against 131 active migrations
+> - Tables with RLS: 60
+> - Tables without RLS: 5 (locations, machines, production_line_machines, production_lines, warehouses)
 
 ## Overview
 
@@ -568,6 +572,556 @@ UNIQUE(org_id, lp_number)
 
 ---
 
+### Quality Module (Epic 6)
+
+#### product_costs
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+product_id      UUID REFERENCES products(id)
+cost_per_unit   DECIMAL(15,4)
+currency        TEXT DEFAULT 'PLN'
+effective_from  DATE
+effective_to    DATE
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+created_by      UUID REFERENCES users(id)
+
+UNIQUE(org_id, product_id, effective_from)
+```
+
+#### product_nutrition
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+product_id      UUID REFERENCES products(id)
+energy_kcal     DECIMAL(10,2)
+energy_kj       DECIMAL(10,2)
+protein_g       DECIMAL(10,2)
+fat_g           DECIMAL(10,2)
+carbs_g         DECIMAL(10,2)
+fiber_g         DECIMAL(10,2)
+sodium_mg       DECIMAL(10,2)
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+
+UNIQUE(org_id, product_id)
+```
+
+#### ingredient_nutrition
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+ingredient_id   UUID REFERENCES products(id)
+bom_id          UUID REFERENCES boms(id)
+energy_kcal     DECIMAL(10,2)
+energy_kj       DECIMAL(10,2)
+protein_g       DECIMAL(10,2)
+fat_g           DECIMAL(10,2)
+carbs_g         DECIMAL(10,2)
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id, ingredient_id, bom_id)
+```
+
+#### product_traceability_config
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+product_id      UUID REFERENCES products(id)
+track_batch     BOOLEAN DEFAULT true
+track_serial    BOOLEAN DEFAULT false
+retention_days  INTEGER DEFAULT 365
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+
+UNIQUE(org_id, product_id)
+```
+
+#### shelf_life_audit_log
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+product_id      UUID REFERENCES products(id)
+old_days        INTEGER
+new_days        INTEGER
+changed_by      UUID REFERENCES users(id)
+changed_at      TIMESTAMPTZ
+reason          TEXT
+created_at      TIMESTAMPTZ
+```
+
+#### cost_variances
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+wo_id           UUID REFERENCES work_orders(id)
+material_cost_variance DECIMAL(15,4)
+labor_cost_variance DECIMAL(15,4)
+overhead_variance DECIMAL(15,4)
+total_variance  DECIMAL(15,4)
+variance_percent DECIMAL(5,2)
+status          TEXT DEFAULT 'flagged'
+analyzed_by     UUID REFERENCES users(id)
+analysis_notes  TEXT
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+---
+
+### Shipping/Receiving Module (Epic 7)
+
+#### asns
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+asn_number      TEXT NOT NULL           -- Auto: ASN-YYYYMMDD-NNNN
+supplier_id     UUID REFERENCES suppliers(id)
+po_id           UUID REFERENCES purchase_orders(id)
+expected_delivery_date DATE
+status          TEXT DEFAULT 'draft'    -- draft, sent, in_transit, received
+expected_pallets INTEGER
+expected_lps    INTEGER
+notes           TEXT
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+created_by      UUID REFERENCES users(id)
+
+UNIQUE(org_id, asn_number)
+```
+
+#### asn_items
+```sql
+id              UUID PRIMARY KEY
+asn_id          UUID REFERENCES asns(id) ON DELETE CASCADE
+line_number     INTEGER
+product_id      UUID REFERENCES products(id)
+lp_count        INTEGER
+quantity        DECIMAL(15,4)
+uom             TEXT
+expected_pallets INTEGER
+notes           TEXT
+created_at      TIMESTAMPTZ
+
+UNIQUE(asn_id, line_number)
+```
+
+#### grns
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+grn_number      TEXT NOT NULL           -- Auto: GRN-YYYYMMDD-NNNN
+asn_id          UUID REFERENCES asns(id)
+po_id           UUID REFERENCES purchase_orders(id)
+warehouse_id    UUID REFERENCES warehouses(id)
+received_date   DATE NOT NULL
+received_by     UUID REFERENCES users(id)
+total_lps       INTEGER DEFAULT 0
+discrepancies   INTEGER DEFAULT 0       -- Qty/quality issues
+status          TEXT DEFAULT 'partial'  -- partial, complete, closed
+notes           TEXT
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+
+UNIQUE(org_id, grn_number)
+```
+
+#### grn_items
+```sql
+id              UUID PRIMARY KEY
+grn_id          UUID REFERENCES grns(id) ON DELETE CASCADE
+asn_item_id     UUID REFERENCES asn_items(id)
+po_line_id      UUID REFERENCES purchase_order_lines(id)
+product_id      UUID REFERENCES products(id)
+lp_count        INTEGER
+received_qty    DECIMAL(15,4)
+expected_qty    DECIMAL(15,4)
+uom             TEXT
+status          TEXT DEFAULT 'received'
+notes           TEXT
+created_at      TIMESTAMPTZ
+
+UNIQUE(grn_id, product_id)
+```
+
+#### over_receipt_approvals
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+grn_item_id     UUID REFERENCES grn_items(id)
+excess_qty      DECIMAL(15,4)
+excess_percent  DECIMAL(5,2)
+approval_status TEXT DEFAULT 'pending'  -- pending, approved, rejected
+approved_by     UUID REFERENCES users(id)
+approved_at     TIMESTAMPTZ
+approval_notes  TEXT
+created_at      TIMESTAMPTZ
+```
+
+#### to_line_lps
+```sql
+id              UUID PRIMARY KEY
+to_line_id      UUID REFERENCES transfer_order_lines(id) ON DELETE CASCADE
+lp_id           UUID REFERENCES license_plates(id)
+allocated_qty   DECIMAL(15,4)
+shipped_qty     DECIMAL(15,4) DEFAULT 0
+received_qty    DECIMAL(15,4) DEFAULT 0
+status          TEXT DEFAULT 'pending'  -- pending, shipped, received
+created_at      TIMESTAMPTZ
+```
+
+---
+
+### Inventory Management Module
+
+#### stock_moves
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+lp_id           UUID REFERENCES license_plates(id)
+from_location_id UUID REFERENCES locations(id)
+to_location_id  UUID REFERENCES locations(id)
+from_warehouse_id UUID REFERENCES warehouses(id)
+to_warehouse_id UUID REFERENCES warehouses(id)
+move_qty        DECIMAL(15,4)
+uom             TEXT
+move_type       TEXT                    -- internal, transfer, receipt, issue
+move_reason     TEXT
+status          TEXT DEFAULT 'pending'  -- pending, completed, cancelled
+created_by      UUID REFERENCES users(id)
+completed_by    UUID REFERENCES users(id)
+created_at      TIMESTAMPTZ
+completed_at    TIMESTAMPTZ
+
+INDEX idx_stock_moves_org_status (org_id, status)
+```
+
+#### lp_reservations
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+lp_id           UUID REFERENCES license_plates(id)
+reserved_by     UUID REFERENCES work_orders(id)
+reserved_qty    DECIMAL(15,4)
+uom             TEXT
+status          TEXT DEFAULT 'active'   -- active, fulfilled, cancelled
+created_at      TIMESTAMPTZ
+fulfilled_at    TIMESTAMPTZ
+```
+
+#### lp_transactions
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+lp_id           UUID REFERENCES license_plates(id)
+transaction_type TEXT                   -- receipt, issue, transfer, adjustment
+transaction_qty DECIMAL(15,4)
+uom             TEXT
+reference_id    UUID
+reference_type  TEXT                    -- wo, to, po, manual
+created_by      UUID REFERENCES users(id)
+created_at      TIMESTAMPTZ
+```
+
+#### stock_adjustments
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+lp_id           UUID REFERENCES license_plates(id)
+adjustment_qty  DECIMAL(15,4)
+reason          TEXT
+adjustment_type TEXT                   -- variance, damage, expiry, recount
+approved_by     UUID REFERENCES users(id)
+approved_at     TIMESTAMPTZ
+created_by      UUID REFERENCES users(id)
+created_at      TIMESTAMPTZ
+```
+
+#### stock_move_sequences
+```sql
+id              SERIAL PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+sequence_value  INTEGER
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id)
+```
+
+#### lp_number_sequences
+```sql
+id              SERIAL PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+sequence_value  INTEGER
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id)
+```
+
+#### grn_number_sequences
+```sql
+id              SERIAL PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+sequence_value  INTEGER
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id)
+```
+
+#### yield_logs
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+wo_id           UUID REFERENCES work_orders(id)
+operation_id    UUID REFERENCES wo_operations(id)
+expected_qty    DECIMAL(15,4)
+actual_qty      DECIMAL(15,4)
+yield_percent   DECIMAL(5,2)
+scrap_qty       DECIMAL(15,4)
+scrap_reason    TEXT
+logged_by       UUID REFERENCES users(id)
+logged_at       TIMESTAMPTZ
+created_at      TIMESTAMPTZ
+```
+
+---
+
+### Production Planning & Operations
+
+#### wo_material_consumptions
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+wo_id           UUID REFERENCES work_orders(id)
+wo_material_id  UUID REFERENCES wo_materials(id)
+consumed_qty    DECIMAL(15,4)
+consumed_lp_id  UUID REFERENCES license_plates(id)
+consumption_by  UUID REFERENCES users(id)
+consumed_at     TIMESTAMPTZ
+created_at      TIMESTAMPTZ
+```
+
+#### wo_daily_sequence
+```sql
+id              SERIAL PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+sequence_date   DATE
+sequence_value  INTEGER
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id, sequence_date)
+```
+
+#### operation_attachments
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+operation_id    UUID REFERENCES wo_operations(id)
+file_name       TEXT NOT NULL
+file_path       TEXT NOT NULL
+file_size       INTEGER
+file_type       TEXT
+uploaded_by     UUID REFERENCES users(id)
+created_at      TIMESTAMPTZ
+```
+
+---
+
+### Settings & Configuration
+
+#### planning_settings
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+setting_key     TEXT NOT NULL
+setting_value   JSONB
+description     TEXT
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+
+UNIQUE(org_id, setting_key)
+```
+
+#### warehouse_settings
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+warehouse_id    UUID REFERENCES warehouses(id)
+setting_key     TEXT NOT NULL
+setting_value   JSONB
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+
+UNIQUE(org_id, warehouse_id, setting_key)
+```
+
+#### warehouse_settings_audit
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+setting_id      UUID REFERENCES warehouse_settings(id)
+old_value       JSONB
+new_value       JSONB
+changed_by      UUID REFERENCES users(id)
+changed_at      TIMESTAMPTZ
+created_at      TIMESTAMPTZ
+```
+
+#### production_line_products
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+production_line_id UUID REFERENCES production_lines(id)
+product_id      UUID REFERENCES products(id)
+planned_qty     DECIMAL(15,4)
+priority        INTEGER DEFAULT 0
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id, production_line_id, product_id)
+```
+
+#### production_line_machines
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+production_line_id UUID REFERENCES production_lines(id)
+machine_id      UUID REFERENCES machines(id)
+sequence        INTEGER
+is_active       BOOLEAN DEFAULT true
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id, production_line_id, machine_id)
+```
+
+#### po_statuses
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+code            TEXT NOT NULL
+name            TEXT NOT NULL
+is_default      BOOLEAN DEFAULT false
+is_active       BOOLEAN DEFAULT true
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id, code)
+```
+
+#### po_status_history
+```sql
+id              UUID PRIMARY KEY
+po_id           UUID REFERENCES purchase_orders(id) ON DELETE CASCADE
+old_status      TEXT
+new_status      TEXT
+changed_by      UUID REFERENCES users(id)
+changed_at      TIMESTAMPTZ
+created_at      TIMESTAMPTZ
+```
+
+#### po_status_transitions
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+from_status     TEXT
+to_status       TEXT
+transition_rules JSONB
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id, from_status, to_status)
+```
+
+#### po_approval_history
+```sql
+id              UUID PRIMARY KEY
+po_id           UUID REFERENCES purchase_orders(id) ON DELETE CASCADE
+approval_level  INTEGER
+approved_by     UUID REFERENCES users(id)
+approved_at     TIMESTAMPTZ
+approval_notes  TEXT
+status          TEXT
+created_at      TIMESTAMPTZ
+```
+
+---
+
+### System & Metadata
+
+#### organization_modules
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+module_id       UUID REFERENCES modules(id)
+is_enabled      BOOLEAN DEFAULT true
+license_type    TEXT DEFAULT 'basic'    -- basic, standard, premium
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+
+UNIQUE(org_id, module_id)
+```
+
+#### roles
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+code            TEXT NOT NULL
+name            TEXT NOT NULL
+is_system       BOOLEAN DEFAULT false
+permissions     JSONB
+created_at      TIMESTAMPTZ
+
+UNIQUE(org_id, code)
+```
+
+#### modules
+```sql
+id              UUID PRIMARY KEY
+code            TEXT NOT NULL UNIQUE
+name            TEXT NOT NULL
+description     TEXT
+icon            TEXT
+sort_order      INTEGER
+is_active       BOOLEAN DEFAULT true
+created_at      TIMESTAMPTZ
+```
+
+#### user_sessions
+```sql
+id              UUID PRIMARY KEY
+user_id         UUID REFERENCES users(id)
+auth_token      TEXT
+session_start   TIMESTAMPTZ
+session_end     TIMESTAMPTZ
+ip_address      TEXT
+user_agent      TEXT
+status          TEXT DEFAULT 'active'
+created_at      TIMESTAMPTZ
+```
+
+#### user_invitations
+```sql
+id              UUID PRIMARY KEY
+org_id          UUID REFERENCES organizations(id)
+email           TEXT NOT NULL
+role            TEXT
+token           TEXT UNIQUE
+status          TEXT DEFAULT 'pending'  -- pending, accepted, expired
+invited_by      UUID REFERENCES users(id)
+created_at      TIMESTAMPTZ
+accepted_at     TIMESTAMPTZ
+expires_at      TIMESTAMPTZ
+
+UNIQUE(org_id, email)
+```
+
+#### password_history
+```sql
+id              UUID PRIMARY KEY
+user_id         UUID REFERENCES users(id)
+hashed_password TEXT
+set_at          TIMESTAMPTZ
+```
+
+---
+
 ## Key Indexes
 
 ```sql
@@ -586,6 +1140,55 @@ CREATE INDEX idx_lp_org_product ON license_plates(org_id, product_id);
 ---
 
 ## Schema Change Log
+
+### 2026-02-10: Comprehensive Database Audit Update
+
+**Status**: ✅ Completed - Database synchronized with 131 active migrations
+
+**Changes**:
+- Updated table count from 43 to **65 tables**
+- Added documentation for 22 new tables discovered in migrations
+- Verified RLS policies: 60 tables with RLS, 5 without
+- New modules documented:
+  - Quality Module (6 tables)
+  - Shipping/Receiving Module (6 tables)
+  - Inventory Management Module (7 tables)
+  - Production Planning Module (3 tables)
+  - Settings & Configuration Module (8 tables)
+  - System & Metadata Module (6 tables)
+
+**New Tables Added**:
+1. product_costs - Cost tracking per product
+2. product_nutrition - Nutrition facts per product
+3. ingredient_nutrition - Computed nutrition from ingredients
+4. product_traceability_config - Traceability settings
+5. shelf_life_audit_log - Shelf life change history
+6. cost_variances - WO cost analysis
+7. asns, asn_items - Advanced Shipping Notices
+8. grns, grn_items - Goods Receipt Notes
+9. over_receipt_approvals - Over-receipt management
+10. to_line_lps - Transfer order LP tracking
+11. stock_moves - Inventory movements
+12. lp_reservations - LP allocation to WOs
+13. lp_transactions - Transaction audit trail
+14. stock_adjustments - Inventory adjustments
+15. stock_move_sequences, lp_number_sequences, grn_number_sequences - Auto-sequencing
+16. yield_logs - Yield tracking per WO
+17. wo_material_consumptions - Material consumption tracking
+18. wo_daily_sequence - Daily WO numbering
+19. operation_attachments - WO operation attachments
+20. planning_settings, warehouse_settings - Config tables
+21. production_line_products, production_line_machines - Line management
+22. po_statuses, po_status_history, po_status_transitions, po_approval_history - PO workflow
+
+**Rationale**:
+- Database has grown significantly with new features across all modules
+- RLS policies ensure multi-tenant data isolation on 60 of 65 tables
+- New tables support advanced features: traceability, costing, shipments, inventory
+
+**Related Migrations**: 001-127 (active), excluding .skip files
+
+---
 
 ### 2025-12-14: Move Lead Time and MOQ to Products
 
