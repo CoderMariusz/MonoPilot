@@ -234,7 +234,7 @@ export default function SettingsPage() {
             Let&apos;s get your organization set up in 15 minutes. Complete the setup wizard to configure essential settings.
           </p>
           <div className="flex gap-2">
-            <Button onClick={() => (window.location.href = '/settings/onboarding')}>
+            <Button onClick={() => (window.location.href = '/settings/wizard')}>
               Start Setup Wizard
             </Button>
             <Button
@@ -306,11 +306,18 @@ export default function SettingsPage() {
 
                     {cardStats && (
                       <div className="mb-4 text-sm space-y-1">
-                        {Object.entries(cardStats).map(([key, value]) => (
-                          <div key={key}>
-                            {value} {key.replace(/_/g, ' ')}
-                          </div>
-                        ))}
+                        {Object.entries(cardStats).map(([key, value]) => {
+                          // Format the label with better naming
+                          const label = key
+                            .split('_')
+                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                            .join(' ')
+                          return (
+                            <div key={key}>
+                              {label}: {value}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
 

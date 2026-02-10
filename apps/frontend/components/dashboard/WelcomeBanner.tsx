@@ -48,7 +48,7 @@ export function WelcomeBanner({ show, onDismiss }: WelcomeBannerProps) {
         <Button
           onClick={handleDismiss}
           variant="outline"
-          className="border-white text-white hover:bg-white/10"
+          className="border-white text-gray-800 dark:text-gray-100 hover:bg-white/10"
         >
           Skip for now
         </Button>

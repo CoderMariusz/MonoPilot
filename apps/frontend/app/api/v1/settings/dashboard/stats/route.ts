@@ -54,16 +54,20 @@ export async function GET(request: NextRequest) {
       if (allowedStats.includes('users')) {
         const userCountResult = await supabase
           .from('users')
-          .select('id', { count: 'exact' })
+          .select('id, is_active', { count: 'exact' })
           .eq('org_id', org_id)
 
-        // Invitations table may not exist yet - gracefully handle
+        // Count active users
+        const activeUsersCount = (userCountResult.data || []).filter(u => u.is_active).length
+
+        // Get invitation count - gracefully handle if table doesn't exist
         let invitationCount = 0
         try {
           const invitationCountResult = await supabase
-            .from('invitations')
+            .from('user_invitations')
             .select('id', { count: 'exact' })
             .eq('org_id', org_id)
+            .eq('status', 'pending')
           invitationCount = invitationCountResult.count || 0
         } catch {
           // Table doesn't exist yet
@@ -71,6 +75,7 @@ export async function GET(request: NextRequest) {
 
         stats.users = {
           total: userCountResult.count || 0,
+          active_users: activeUsersCount,
           pending_invitations: invitationCount,
         }
       }
