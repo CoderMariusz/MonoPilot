@@ -1,0 +1,87 @@
+# MonoPilot - Next Actions Index
+# Quick-reference: what to work on next per epic
+# Full details: IMPLEMENTATION-ROADMAP.yaml (load only when needed)
+# Updated: 2026-02-10
+
+next_actions:
+  epic_01_settings:
+    status: "62% (16/26)"
+    next_story: "01.17"
+    next_name: "Audit Trail"
+    next_phase: "P2 (tests)"
+    blocker: null
+
+  epic_02_technical:
+    status: "74% (17/23)"
+    next_story: "02.16"
+    next_name: "Product Advanced Features"
+    next_phase: "P2 (tests)"
+    blocker: null
+
+  epic_03_planning:
+    status: "95% (18/20)"
+    next_story: "03.13"
+    next_name: "Material Availability Check"
+    next_phase: "P4 (frontend + P5-P7)"
+    blocker: "03.14 deferred to Phase 2"
+
+  epic_04_production:
+    status: "100% Phase 0+1 (17/17)"
+    next_story: "04.9a"
+    next_name: "OEE Calculation (Phase 2)"
+    next_phase: "P1 (planning)"
+    blocker: null
+
+  epic_05_warehouse:
+    status: "100% Phase 1 (20/20)"
+    next_story: "05.20"
+    next_name: "Scanner Move Workflow (Phase 2)"
+    next_phase: "P1 (planning)"
+    blocker: null
+
+  epic_06_quality:
+    status: "29% (12/41)"
+    next_story: "06.8"
+    next_name: "In-progress stories (06.8-06.11)"
+    next_phase: "P3 (implementation)"
+    blocker: null
+
+  epic_07_shipping:
+    status: "46% (11/24)"
+    next_story: "07.3"
+    next_name: "SO Status Workflow"
+    next_phase: "P2 (tests)"
+    blocker: null
+    also_ready: ["07.8", "07.9", "07.10", "07.11"]
+
+  epic_08_npd:
+    status: "0% (no stories)"
+    next_story: null
+    next_phase: "Create stories from PRD"
+    blocker: null
+
+  epic_09_finance:
+    status: "0% (no stories)"
+    next_story: null
+    next_phase: "Create stories from PRD"
+    blocker: null
+
+  epic_10_oee:
+    status: "0% (no stories)"
+    next_story: null
+    next_phase: "Create stories from PRD"
+    blocker: null
+
+  epic_11_integrations:
+    status: "0% (no stories)"
+    next_story: null
+    next_phase: "Create stories from PRD"
+    blocker: null
+
+# Priority order for next work:
+priority_queue:
+  - {story: "03.13", epic: 3, reason: "Partial - finish frontend"}
+  - {story: "07.3", epic: 7, reason: "Active epic - SO Status"}
+  - {story: "07.8", epic: 7, reason: "Active epic - Pick List"}
+  - {story: "06.8", epic: 6, reason: "In progress - complete Phase 1-2A"}
+  - {story: "01.17", epic: 1, reason: "Security - Audit Trail"}

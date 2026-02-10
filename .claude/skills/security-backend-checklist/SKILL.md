@@ -1,15 +1,6 @@
 ---
 name: security-backend-checklist
 description: When implementing backend APIs, database queries, authentication, or handling user input.
-version: 1.1.0
-tokens: ~550
-confidence: high
-sources:
-  - https://owasp.org/www-project-top-ten/
-  - https://cheatsheetseries.owasp.org/
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [security, backend, api, owasp]
 ---
 
 ## When to Use

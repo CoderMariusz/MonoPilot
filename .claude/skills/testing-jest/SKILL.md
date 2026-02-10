@@ -1,15 +1,6 @@
 ---
 name: testing-jest
 description: Apply when writing unit tests with Jest: assertions, mocking, async tests, and test organization.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://jestjs.io/docs/getting-started
-  - https://jestjs.io/docs/mock-functions
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [testing, jest, unit-tests, mocking]
 ---
 
 ## When to Use

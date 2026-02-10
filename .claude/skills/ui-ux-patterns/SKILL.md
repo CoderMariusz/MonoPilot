@@ -1,15 +1,6 @@
 ---
 name: ui-ux-patterns
 description: When designing layouts, navigation, forms, or feedback components. Reference for consistent UI decisions.
-version: 1.0.0
-tokens: ~550
-confidence: high
-sources:
-  - https://www.nngroup.com/articles/
-  - https://lawsofux.com/
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [ui, ux, design, frontend]
 ---
 
 ## When to Use

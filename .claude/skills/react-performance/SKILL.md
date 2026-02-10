@@ -1,17 +1,6 @@
 ---
 name: react-performance
 description: Apply when diagnosing slow renders, optimizing list rendering, or preventing unnecessary re-renders in React applications.
-version: 1.1.0
-tokens: ~950
-confidence: high
-sources:
-  - https://react.dev/learn/react-compiler
-  - https://react.dev/reference/react/memo
-  - https://react.dev/reference/react/useMemo
-  - https://react.dev/learn/render-and-commit
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [react, performance, optimization, frontend]
 ---
 
 ## When to Use

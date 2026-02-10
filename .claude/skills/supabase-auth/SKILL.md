@@ -1,16 +1,6 @@
 ---
 name: supabase-auth
 description: Apply when implementing authentication: sign up, sign in, OAuth providers, session management, and protected routes.
-version: 1.1.0
-tokens: ~750
-confidence: high
-sources:
-  - https://supabase.com/docs/guides/auth
-  - https://supabase.com/docs/reference/javascript/auth-signinwithpassword
-  - https://supabase.com/docs/guides/auth/server-side/nextjs
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [supabase, auth, authentication, security]
 ---
 
 ## When to Use

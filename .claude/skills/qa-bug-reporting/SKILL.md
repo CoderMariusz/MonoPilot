@@ -1,15 +1,6 @@
 ---
 name: qa-bug-reporting
 description: When reporting bugs found during manual testing or QA validation.
-version: 1.1.0
-tokens: ~400
-confidence: high
-sources:
-  - https://istqb-glossary.page/bug-report/
-  - https://www.theknowledgeacademy.com/blog/defect-report-istqb/
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [qa, bugs, testing, reporting]
 ---
 
 ## When to Use

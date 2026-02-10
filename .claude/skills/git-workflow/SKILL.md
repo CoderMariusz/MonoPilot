@@ -1,15 +1,6 @@
 ---
 name: git-workflow
 description: Apply when establishing team branching strategy, PR workflows, and release management.
-version: 1.0.0
-tokens: ~550
-confidence: high
-sources:
-  - https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
-  - https://docs.github.com/en/get-started/quickstart/github-flow
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [git, workflow, branching, collaboration]
 ---
 
 ## When to Use

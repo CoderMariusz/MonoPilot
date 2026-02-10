@@ -1,15 +1,6 @@
 ---
 name: agile-retrospective
 description: When facilitating sprint retrospectives or team improvement sessions.
-version: 1.0.0
-tokens: ~300
-confidence: high
-sources:
-  - https://www.atlassian.com/team-playbook/plays/retrospective
-  - https://www.scrum.org/resources/what-is-a-sprint-retrospective
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [agile, retrospective, scrum, planning]
 ---
 
 ## When to Use

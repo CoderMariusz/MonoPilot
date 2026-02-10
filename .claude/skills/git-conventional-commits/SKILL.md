@@ -1,15 +1,6 @@
 ---
 name: git-conventional-commits
 description: Apply when writing commit messages to maintain consistent, readable git history that enables automated changelog generation.
-version: 1.0.0
-tokens: ~400
-confidence: high
-sources:
-  - https://www.conventionalcommits.org/en/v1.0.0/
-  - https://github.com/angular/angular/blob/main/CONTRIBUTING.md#commit
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [git, commits, conventions]
 ---
 
 ## When to Use

@@ -1,15 +1,6 @@
 ---
 name: typescript-api-types
 description: Apply when defining API request/response types, DTOs, and shared types between frontend and backend.
-version: 1.1.0
-tokens: ~650
-confidence: high
-sources:
-  - https://www.typescriptlang.org/docs/handbook/utility-types.html
-  - https://zod.dev/
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [typescript, api, types, validation]
 ---
 
 ## When to Use

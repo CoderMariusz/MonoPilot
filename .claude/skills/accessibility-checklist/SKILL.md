@@ -1,15 +1,6 @@
 ---
 name: accessibility-checklist
 description: When building UI components, forms, or any user-facing interface. Check before every frontend PR.
-version: 1.1.0
-tokens: ~450
-confidence: high
-sources:
-  - https://www.w3.org/WAI/WCAG22/quickref/
-  - https://developer.mozilla.org/en-US/docs/Web/Accessibility
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [accessibility, a11y, frontend, ux]
 ---
 
 ## When to Use

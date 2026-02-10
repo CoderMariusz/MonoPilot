@@ -1,15 +1,6 @@
 ---
 name: nextjs-server-actions
 description: When handling form submissions, data mutations, or any action that modifies server-side data. **Version Context**: Next.js 16.0+ uses `useActionState` (replaces deprecated `useFormState`).
-version: 1.1.0
-tokens: ~550
-confidence: high
-sources:
-  - https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations
-  - https://react.dev/reference/rsc/server-actions
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [nextjs, react, forms, server-actions, frontend]
 ---
 
 ## When to Use

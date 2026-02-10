@@ -1,15 +1,6 @@
 ---
 name: supabase-rls
 description: Apply when implementing multi-tenant data isolation, user-specific data access, or any scenario requiring row-level authorization in Supabase.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://supabase.com/docs/guides/auth/row-level-security
-  - https://supabase.com/docs/guides/database/postgres/row-level-security
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [supabase, security, database, rls]
 ---
 
 ## When to Use

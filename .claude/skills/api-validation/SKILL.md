@@ -1,16 +1,6 @@
 ---
 name: api-validation
 description: Apply when validating API request inputs: body, query params, path params, and headers. This skill covers Zod v4 patterns.
-version: 1.1.0
-tokens: ~700
-confidence: high
-sources:
-  - https://zod.dev/
-  - https://express-validator.github.io/docs/
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [api, validation, zod, backend]
-zod_version: "4.x"
 ---
 
 ## When to Use

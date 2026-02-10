@@ -1,17 +1,6 @@
 ---
 name: nextjs-app-router
 description: Apply when building Next.js 13-16 applications with App Router for routing, layouts, data fetching, and server components.
-version: 1.1.0
-tokens: ~950
-confidence: high
-sources:
-  - https://nextjs.org/docs/app/building-your-application/routing
-  - https://nextjs.org/docs/app/building-your-application/data-fetching
-  - https://nextjs.org/docs/messages/sync-dynamic-apis
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [nextjs, routing, frontend, ssr]
-nextjs_version: "13-16 (App Router)"
 ---
 
 ## When to Use

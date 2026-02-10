@@ -1,15 +1,6 @@
 ---
 name: skill-quality-standards
 description: When creating or validating skills. Reference for SKILL-CREATOR and SKILL-VALIDATOR.
-version: 1.1.0
-tokens: ~420
-confidence: high
-sources:
-  - internal: .claude/skills/REGISTRY.yaml
-  - https://www.anthropic.com/news/claude-2-1-prompting (context window optimization)
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [skills, quality, standards, meta]
 ---
 
 ## When to Use

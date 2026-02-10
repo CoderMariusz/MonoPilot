@@ -1,15 +1,6 @@
 ---
 name: tailwind-patterns
 description: Apply when styling components with Tailwind CSS: responsive design, component patterns, and class organization.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://tailwindcss.com/docs/reusing-styles
-  - https://tailwindcss.com/docs/responsive-design
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [tailwind, css, styling, frontend]
 ---
 
 ## When to Use

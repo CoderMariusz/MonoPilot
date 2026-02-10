@@ -1,15 +1,6 @@
 ---
 name: supabase-queries
 description: Apply when writing Supabase client queries for CRUD operations, filtering, joins, and real-time subscriptions.
-version: 1.0.0
-tokens: ~700
-confidence: high
-sources:
-  - https://supabase.com/docs/reference/javascript/select
-  - https://supabase.com/docs/reference/javascript/insert
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [supabase, database, queries, javascript]
 ---
 
 ## When to Use

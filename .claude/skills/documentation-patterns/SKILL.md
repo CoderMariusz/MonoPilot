@@ -1,15 +1,6 @@
 ---
 name: documentation-patterns
 description: Apply when writing code documentation: JSDoc comments, README files, API documentation, and inline comments.
-version: 1.0.0
-tokens: ~550
-confidence: high
-sources:
-  - https://www.writethedocs.org/guide/writing/beginners-guide-to-docs/
-  - https://jsdoc.app/
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [documentation, jsdoc, readme, code-quality]
 ---
 
 ## When to Use

@@ -1,15 +1,6 @@
 ---
 name: supabase-edge-functions
 description: Apply when building serverless functions in Supabase: webhooks, background jobs, third-party integrations, or complex server-side logic. Runs on Deno 2.1+.
-version: 1.1.0
-tokens: ~600
-confidence: high
-sources:
-  - https://supabase.com/docs/guides/functions
-  - https://supabase.com/docs/reference/javascript/functions-invoke
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [supabase, edge-functions, serverless, deno]
 ---
 
 ## When to Use

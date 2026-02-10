@@ -1,15 +1,6 @@
 ---
 name: prd-structure
 description: When creating or reviewing Product Requirements Documents. Used by PM-AGENT.
-version: 1.0.0
-tokens: ~400
-confidence: high
-sources:
-  - https://www.productplan.com/glossary/product-requirements-document/
-  - https://www.atlassian.com/agile/product-management/requirements
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [product, prd, requirements, planning]
 ---
 
 ## When to Use

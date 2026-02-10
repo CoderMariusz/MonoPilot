@@ -1,15 +1,6 @@
 ---
 name: invest-stories
 description: When writing, reviewing, or validating user stories. Used by ARCHITECT-AGENT and PRODUCT-OWNER.
-version: 1.0.0
-tokens: ~400
-confidence: high
-sources:
-  - https://www.agilealliance.org/glossary/invest/
-  - https://xp123.com/articles/invest-in-good-stories-and-smart-tasks/
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [agile, stories, planning, product]
 ---
 
 ## When to Use

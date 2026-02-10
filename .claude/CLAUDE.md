@@ -147,11 +147,21 @@ output_artifacts:
 
 **UX in context**: Include UX references in same YAML file (not separate). Reference wireframe paths, don't duplicate content.
 
+## Roadmap & Status
+- **Quick status**: `.claude/NEXT-ACTIONS.yaml` (~55 lines, load this first)
+- **Full details**: `.claude/IMPLEMENTATION-ROADMAP.yaml` (load only when needed)
+- **Dashboard**: `.claude/PROJECT-DASHBOARD.md`
+
+## Agent System (7 agents)
+- **Orchestrator prompt**: `.claude/MASTER-PROMPT-FOR-AGENTS.md`
+- **Agents**: `.claude/agents/` (planner, developer, tester, quality, documenter, devops, researcher)
+- **Handoffs**: `.claude/handoffs/{STORY_ID}-frontend.md` / `-backend.md`
+- **External AI**: Kimi K2.5 (KiloCode, frontend P3a), Codex CLI (backend P3b)
+- **Codex instructions**: `AGENTS.md` (project root)
+
 ## Key Files
-- `.claude/PROJECT-STATE.md` - Current project state after context clear
-- `.claude/PATTERNS.md` - Code patterns and conventions
-- `.claude/TABLES.md` - Database schema reference (43 tables)
-- `.claude/SUPABASE-CONNECTION.md` - **Cloud Supabase connection guide** 🔑
+- `.claude/TECHNICAL-REFERENCE.md` - Database schema, patterns, API docs
+- `.claude/SUPABASE-CONNECTION.md` - **Cloud Supabase connection guide**
 - `docs/1-BASELINE/product/prd.md` - PRD index (11 modules)
 - `docs/0-DISCOVERY/FEATURE-GAP-ANALYSIS.md` - Competitive analysis
 
@@ -179,21 +189,10 @@ npx supabase db push
 - Migration management
 - Database verification
 
-## Cache System (Active)
-**Status**: Fully Operational (95% token savings)
-- **5 Layers**: Claude Prompt Cache, Hot, Cold, Semantic, Global KB
-- **Global KB**: 20 agents + 51 skills available at `~/.claude-agent-pack/global/`
-- **Commands**: `cache-stats.sh`, `cache-test.sh`, `cache-clear.sh`
-- **Agents**: BACKEND-DEV, FRONTEND-DEV, ARCHITECT-AGENT, CODE-REVIEWER, etc.
-- **Skills**: 52 skills (API, Next.js, React, Supabase, Testing, TypeScript)
-
 ## Current Phase
-**Phase**: UX Design Complete (Settings) | Ready for Implementation
-**Last Update**: 2025-12-11
-**Next Steps**:
-1. Implement Settings wireframes (SET-001 to SET-029)
-2. Continue UX for Technical/Production/Warehouse modules
-3. Create PR from newDoc to main
+**Phase**: Implementation (Epic 06-07 active, Epic 01-05 MVP complete)
+**Last Update**: 2026-02-10
+**Next Steps**: See `.claude/NEXT-ACTIONS.yaml`
 
 ## Auto-Update Rules
 

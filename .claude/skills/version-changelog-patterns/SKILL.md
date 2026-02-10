@@ -1,15 +1,6 @@
 ---
 name: version-changelog-patterns
 description: When checking if skill content matches current library/framework version.
-version: 1.0.0
-tokens: ~350
-confidence: high
-sources:
-  - https://semver.org/
-  - https://keepachangelog.com/
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [versioning, changelog, updates, skills]
 ---
 
 ## When to Use

@@ -1,15 +1,6 @@
 ---
 name: env-configuration
 description: Apply when managing application configuration: environment variables, secrets management, and config validation.
-version: 1.0.0
-tokens: ~550
-confidence: high
-sources:
-  - https://12factor.net/config
-  - https://nextjs.org/docs/app/building-your-application/configuring/environment-variables
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [configuration, environment, security, devops]
 ---
 
 ## When to Use

@@ -1,15 +1,6 @@
 ---
 name: nextjs-server-components
 description: When building Next.js App Router pages and deciding between Server and Client Components.
-version: 1.0.0
-tokens: ~450
-confidence: high
-sources:
-  - https://nextjs.org/docs/app/building-your-application/rendering/server-components
-  - https://react.dev/reference/rsc/server-components
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [nextjs, react, rsc, server-components, frontend]
 ---
 
 ## When to Use

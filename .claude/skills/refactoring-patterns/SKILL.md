@@ -1,15 +1,6 @@
 ---
 name: refactoring-patterns
 description: Apply when improving code structure without changing behavior: reducing duplication, simplifying complexity, or improving readability.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://refactoring.guru/refactoring/catalog
-  - https://martinfowler.com/books/refactoring.html
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [refactoring, code-quality, patterns, clean-code]
 ---
 
 ## When to Use

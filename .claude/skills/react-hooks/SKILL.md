@@ -1,18 +1,6 @@
 ---
 name: react-hooks
 description: Apply when managing state, side effects, context, or refs in React functional components. **React 19+ Note**: React 19.x introduced new hooks for forms/actions (useActionState, useOptimistic, useFormStatus) and effect events (useEffectEvent in 19.2). Core hooks (useState, useEffect, useCallback, etc.) remain unchanged.
-version: 1.1.0
-tokens: ~1100
-confidence: high
-sources:
-  - https://react.dev/reference/react/hooks
-  - https://react.dev/reference/rules/rules-of-hooks
-  - https://react.dev/blog/2024/12/05/react-19
-  - https://react.dev/blog/2025/10/01/react-19-2
-react_version: "18.2+, 19.x"
-last_validated: 2025-12-10
-next_review: 2025-01-24
-tags: [react, hooks, frontend, state]
 ---
 
 ## When to Use

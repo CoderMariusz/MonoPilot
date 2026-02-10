@@ -1,15 +1,6 @@
 ---
 name: testing-playwright
 description: Apply when writing end-to-end tests: user flows, cross-browser testing, visual regression, and API testing.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://playwright.dev/docs/intro
-  - https://playwright.dev/docs/locators
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [testing, e2e, playwright, automation]
 ---
 
 ## When to Use

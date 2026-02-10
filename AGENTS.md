@@ -1,34 +1,65 @@
-# MonoPilot Agent Workflow (Codex CLI)
+# MonoPilot - Agent Instructions (Codex CLI)
 
-This repo includes a Claude-style “agent pack” under `.claude/agents/`. In Codex CLI these files are **not** executed as real multi-agents, but should be treated as the canonical **process + checklists** for how work is done here.
+## Tech Stack
+- Next.js 15.5, React 19, TypeScript, TailwindCSS, ShadCN UI
+- Supabase (PostgreSQL + Auth + RLS + Edge Functions)
+- Zod validation schemas, pnpm workspaces monorepo
 
-## How to Use `.claude/agents/*` in Codex CLI
+## Project Structure
+- API routes: `apps/frontend/app/api/[module]/[resource]/route.ts`
+- Services: `apps/frontend/lib/services/*-service.ts` (class-based, static methods)
+- Validation: `apps/frontend/lib/validation/*-schemas.ts` (Zod)
+- Components: `apps/frontend/components/[module]/`
+- Pages: `apps/frontend/app/(authenticated)/[module]/`
+- Tests: `apps/frontend/__tests__/[module]/`
+- Migrations: `supabase/migrations/`
 
-- Use `.claude/agents/ORCHESTRATOR.md` as the routing table to choose a role for the current user request.
-- Implement “delegation” by running the work in **explicit phases** (simulated roles) within one assistant:
-  - `DISCOVERY-AGENT` → clarify unknowns (max 7 questions/round).
-  - `PM-AGENT` → PRD/scope/KPIs when requirements are needed.
-  - `TEST-ENGINEER`/`TEST-WRITER` → TDD RED (tests first).
-  - `BACKEND-DEV`/`FRONTEND-DEV` → TDD GREEN (minimal code to pass tests).
-  - `SENIOR-DEV` → REFACTOR (no behavior changes).
-  - `CODE-REVIEWER` → approve/request changes with `file:line`.
-  - `QA-AGENT` → AC-based manual validation, PASS/FAIL.
+## Conventions
 
-## Parallelism (Practical)
+### API Routes
+- GET: createRouteHandlerClient -> query with org_id filter -> NextResponse.json({data, total})
+- POST: Zod validate body -> insert with org_id -> NextResponse.json(data, {status: 201})
+- PUT/PATCH: Zod validate -> update WHERE id AND org_id -> NextResponse.json(data)
+- DELETE: delete WHERE id AND org_id -> NextResponse.json({success: true})
+- Error: try/catch -> NextResponse.json({error: message}, {status: 500})
 
-- You can parallelize **tool reads/searches** (e.g. multiple `rg`/`sed`/`ls`) when tasks are independent.
-- Do **not** parallelize edits to the same files; keep code changes sequential.
+### Multi-Tenancy (CRITICAL)
+- Every table has `org_id` column
+- Every query MUST filter by org_id from session
+- RLS policies enforce at database level (defense in depth)
+- Never trust client-provided org_id
 
-## Quality Gates (Default)
+### Services
+- Class-based with static methods
+- Accept org_id as first parameter
+- Return typed objects (not raw Supabase responses)
+- Handle errors with descriptive messages
 
-Follow the gates from `.claude/agents/ORCHESTRATOR.md`:
+### Validation
+- Zod schemas for all API inputs
+- Export both schema and inferred TypeScript type
+- Use .refine() for complex business rules
 
-- RED → GREEN: tests exist and fail
-- GREEN → REVIEW: tests pass + build succeeds
-- REVIEW → QA: `CODE-REVIEWER` approved
-- QA → DONE: `QA-AGENT` pass
+## Testing
+- Unit: Vitest (`pnpm test`)
+- E2E: Playwright (`pnpm e2e`)
+- Run tests before committing: `pnpm test && pnpm build`
 
-## Project Conventions Pointers
+## Quality Gates
+- RED -> GREEN: tests exist and fail
+- GREEN -> REVIEW: tests pass + build succeeds
+- REVIEW -> QA: code-reviewer approved
+- QA -> DONE: qa-agent pass
 
-- Start here: `.claude/AGENT-QUICK-START-MONOPILOT.md`
-- Patterns/checklists: `.claude/TECHNICAL-REFERENCE.md`, `.claude/checklists/*`, `.claude/skills/generic/*`
+## Do NOT
+- Use loose inventory quantities (LP-only system)
+- Modify BOM snapshots after WO creation
+- Skip org_id filtering on ANY query
+- Create new migration files directly (use supabase CLI)
+- Hardcode secrets or API keys
+- Skip Zod validation on API inputs
+
+## References
+- Patterns: `.claude/TECHNICAL-REFERENCE.md`
+- Handoff files: `.claude/handoffs/{STORY_ID}-backend.md`
+- Story context: `docs/2-MANAGEMENT/epics/current/{epic}/context/{story-id}.context.yaml`

@@ -1,15 +1,6 @@
 ---
 name: typescript-generics
 description: Apply when writing reusable functions, components, or utilities that work with multiple types while maintaining type safety.
-version: 1.1.0
-tokens: ~750
-confidence: high
-sources:
-  - https://www.typescriptlang.org/docs/handbook/2/generics.html
-  - https://www.typescriptlang.org/docs/handbook/2/conditional-types.html
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [typescript, generics, types]
 ---
 
 ## When to Use

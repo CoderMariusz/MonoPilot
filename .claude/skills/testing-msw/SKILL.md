@@ -1,15 +1,6 @@
 ---
 name: testing-msw
 description: Apply when mocking API calls in tests or development: intercepting requests, simulating error states, and testing loading states.
-version: 1.0.0
-tokens: ~600
-confidence: high
-sources:
-  - https://mswjs.io/docs/getting-started
-  - https://mswjs.io/docs/best-practices/typescript
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [testing, msw, mocking, api]
 ---
 
 ## When to Use

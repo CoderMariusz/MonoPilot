@@ -1,16 +1,6 @@
 ---
 name: api-authentication
 description: Apply when implementing API authentication: JWT tokens, session management, API keys, and auth middleware. Follows JWT Best Current Practices (RFC 8725).
-version: 1.1.0
-tokens: ~750
-confidence: high
-sources:
-  - https://datatracker.ietf.org/doc/html/rfc7519
-  - https://datatracker.ietf.org/doc/html/rfc8725
-  - https://oauth.net/2/
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [api, authentication, jwt, security]
 ---
 
 ## When to Use

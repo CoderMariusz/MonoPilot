@@ -1,15 +1,6 @@
 ---
 name: api-rest-design
 description: Apply when designing RESTful APIs, defining endpoints, HTTP methods, status codes, and response formats.
-version: 1.1.0
-tokens: ~700
-confidence: high
-sources:
-  - https://restfulapi.net/
-  - https://www.rfc-editor.org/rfc/rfc9110
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [api, rest, backend, design]
 ---
 
 ## When to Use

@@ -1,15 +1,6 @@
 ---
 name: nextjs-data-fetching
 description: Apply when fetching data in Next.js App Router: server components, caching strategies, revalidation, and streaming.
-version: 1.0.0
-tokens: ~700
-confidence: high
-sources:
-  - https://nextjs.org/docs/app/building-your-application/data-fetching
-  - https://nextjs.org/docs/app/building-your-application/caching
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [nextjs, data-fetching, caching, ssr]
 ---
 
 ## When to Use

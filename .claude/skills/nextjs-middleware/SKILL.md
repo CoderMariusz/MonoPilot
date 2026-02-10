@@ -1,14 +1,6 @@
 ---
 name: nextjs-middleware
 description: When you need to run code before a request completes: auth checks, redirects, headers, A/B testing. **Version Context**: Next.js 16.0+ uses `proxy.ts` (replaces `middleware.ts` from v15 and earlier).
-version: 1.1.0
-tokens: ~550
-confidence: high
-sources:
-  - https://nextjs.org/docs/app/building-your-application/routing/middleware
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [nextjs, middleware, proxy, auth, routing, frontend]
 ---
 
 ## When to Use

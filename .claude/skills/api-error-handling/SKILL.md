@@ -1,15 +1,6 @@
 ---
 name: api-error-handling
 description: Apply when designing error responses, implementing error handlers, and ensuring consistent error format across APIs.
-version: 1.1.0
-tokens: ~650
-confidence: high
-sources:
-  - https://www.rfc-editor.org/rfc/rfc9457
-  - https://datatracker.ietf.org/doc/html/rfc9110#section-6
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [api, error-handling, backend, rest]
 ---
 
 ## When to Use

@@ -1,15 +1,6 @@
 ---
 name: nextjs-api-routes
 description: Apply when building API endpoints in Next.js App Router using Route Handlers.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://nextjs.org/docs/app/building-your-application/routing/route-handlers
-  - https://nextjs.org/docs/app/api-reference/functions/next-request
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [nextjs, api, routes, backend]
 ---
 
 ## When to Use

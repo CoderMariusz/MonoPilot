@@ -1,15 +1,6 @@
 ---
 name: architecture-adr
 description: When making significant architectural decisions that need to be documented. Used by ARCHITECT-AGENT.
-version: 1.0.0
-tokens: ~400
-confidence: high
-sources:
-  - https://adr.github.io/
-  - https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [architecture, adr, decisions, documentation]
 ---
 
 ## When to Use

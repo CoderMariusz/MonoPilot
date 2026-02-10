@@ -1,15 +1,6 @@
 ---
 name: typescript-zod
 description: Apply when validating external data (API inputs, form data, environment variables) with TypeScript type inference.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://zod.dev/
-  - https://github.com/colinhacks/zod
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [typescript, validation, zod, schema]
 ---
 
 ## When to Use

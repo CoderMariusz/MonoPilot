@@ -1,15 +1,6 @@
 ---
 name: requirements-clarity-scoring
 description: When gathering requirements during discovery phase to measure answer quality and decide when to proceed.
-version: 1.1.0
-tokens: ~350
-confidence: high
-sources:
-  - https://standards.ieee.org/ieee/29148/6937/
-  - https://www.reqview.com/doc/iso-iec-ieee-29148-templates/
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [requirements, discovery, clarity, planning]
 ---
 
 ## When to Use

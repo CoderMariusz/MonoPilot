@@ -1,15 +1,6 @@
 ---
 name: research-source-evaluation
 description: When searching for authoritative sources for skills or validating existing source links.
-version: 1.0.0
-tokens: ~400
-confidence: high
-sources:
-  - https://developers.google.com/search/docs/fundamentals/creating-helpful-content
-  - https://www.w3.org/TR/
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [research, sources, validation, skills]
 ---
 
 ## When to Use

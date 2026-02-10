@@ -1,15 +1,6 @@
 ---
 name: ci-github-actions
 description: Apply when setting up CI/CD pipelines: automated testing, linting, building, and deployment with GitHub Actions.
-version: 1.1.0
-tokens: ~700
-confidence: high
-sources:
-  - https://docs.github.com/en/actions/quickstart
-  - https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [ci, github-actions, automation, devops]
 ---
 
 ## When to Use

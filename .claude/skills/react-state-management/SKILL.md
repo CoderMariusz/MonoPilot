@@ -1,16 +1,6 @@
 ---
 name: react-state-management
 description: Apply when deciding state management approach: local state, context, Zustand for client state, or TanStack Query for server state.
-version: 1.0.0
-tokens: ~750
-confidence: high
-sources:
-  - https://react.dev/learn/managing-state
-  - https://zustand-demo.pmnd.rs/
-  - https://tanstack.com/query/latest
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [react, state, zustand, tanstack-query, frontend]
 ---
 
 ## When to Use

@@ -1,15 +1,6 @@
 ---
 name: code-review-checklist
 description: Apply when reviewing pull requests, conducting code reviews, or self-reviewing code before submission.
-version: 1.0.0
-tokens: ~500
-confidence: high
-sources:
-  - https://google.github.io/eng-practices/review/
-  - https://github.com/google/eng-practices
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [quality, review, checklist, best-practices]
 ---
 
 ## When to Use

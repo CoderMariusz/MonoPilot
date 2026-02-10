@@ -1,15 +1,6 @@
 ---
 name: testing-react-testing-lib
 description: Apply when testing React components: rendering, user interactions, and accessibility-focused testing.
-version: 1.0.0
-tokens: ~650
-confidence: high
-sources:
-  - https://testing-library.com/docs/react-testing-library/intro
-  - https://testing-library.com/docs/queries/about
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [testing, react, testing-library, frontend]
 ---
 
 ## When to Use

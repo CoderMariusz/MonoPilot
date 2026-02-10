@@ -1,15 +1,6 @@
 ---
 name: supabase-realtime
 description: Apply when implementing real-time features: live updates, presence, broadcast messages, or database change subscriptions.
-version: 1.0.0
-tokens: ~600
-confidence: high
-sources:
-  - https://supabase.com/docs/guides/realtime
-  - https://supabase.com/docs/reference/javascript/subscribe
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [supabase, realtime, websocket, database]
 ---
 
 ## When to Use

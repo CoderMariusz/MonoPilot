@@ -1,15 +1,6 @@
 ---
 name: react-forms
 description: Apply when building forms with validation, handling form state, or integrating with validation libraries like Zod.
-version: 1.0.0
-tokens: ~700
-confidence: high
-sources:
-  - https://react-hook-form.com/get-started
-  - https://react.dev/reference/react-dom/components/input
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [react, forms, validation, frontend]
 ---
 
 ## When to Use

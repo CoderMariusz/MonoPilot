@@ -1,15 +1,6 @@
 ---
 name: testing-tdd-workflow
 description: Apply when implementing new features, fixing bugs, or refactoring code. TDD ensures tests drive design and all code is covered.
-version: 1.0.0
-tokens: ~600
-confidence: high
-sources:
-  - https://martinfowler.com/bliki/TestDrivenDevelopment.html
-  - https://blog.cleancoder.com/uncle-bob/2014/12/17/TheCyclesOfTDD.html
-last_validated: 2025-01-10
-next_review: 2025-01-24
-tags: [testing, tdd, workflow, methodology]
 ---
 
 ## When to Use

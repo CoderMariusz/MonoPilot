@@ -1,15 +1,6 @@
 ---
 name: docker-basics
 description: Apply when containerizing applications: writing Dockerfiles, docker-compose configurations, and multi-stage builds.
-version: 1.1.0
-tokens: ~650
-confidence: high
-sources:
-  - https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
-  - https://docs.docker.com/compose/
-last_validated: 2025-12-10
-next_review: 2025-12-24
-tags: [docker, containers, devops, deployment]
 ---
 
 ## When to Use
